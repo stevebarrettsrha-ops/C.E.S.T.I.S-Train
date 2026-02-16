@@ -1,0 +1,1611 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>VocTrain LMS — Vocational Training Management System</title>
+<link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=Playfair+Display:wght@500;600;700;800&display=swap" rel="stylesheet">
+<style>
+:root {
+  --bg-primary: #0c1117;
+  --bg-secondary: #141b24;
+  --bg-card: #1a2332;
+  --bg-card-hover: #1f2b3d;
+  --bg-input: #0f1820;
+  --accent: #f0a500;
+  --accent-dim: rgba(240,165,0,0.15);
+  --accent-glow: rgba(240,165,0,0.3);
+  --green: #2ecc71;
+  --green-dim: rgba(46,204,113,0.15);
+  --red: #e74c3c;
+  --red-dim: rgba(231,76,60,0.15);
+  --blue: #3498db;
+  --blue-dim: rgba(52,152,219,0.15);
+  --purple: #9b59b6;
+  --purple-dim: rgba(155,89,182,0.15);
+  --orange: #e67e22;
+  --teal: #1abc9c;
+  --teal-dim: rgba(26,188,156,0.15);
+  --text-primary: #e8edf3;
+  --text-secondary: #8899aa;
+  --text-muted: #556677;
+  --border: rgba(255,255,255,0.06);
+  --border-light: rgba(255,255,255,0.1);
+  --shadow: 0 4px 24px rgba(0,0,0,0.3);
+  --radius: 12px;
+  --radius-sm: 8px;
+  --radius-lg: 16px;
+  --transition: 0.25s cubic-bezier(0.4,0,0.2,1);
+  --sidebar-w: 260px;
+  --topbar-h: 64px;
+}
+* { margin:0; padding:0; box-sizing:border-box; }
+body { font-family:'DM Sans',sans-serif; background:var(--bg-primary); color:var(--text-primary); overflow:hidden; height:100vh; }
+h1,h2,h3,h4 { font-family:'Playfair Display',serif; }
+::-webkit-scrollbar { width:6px; }
+::-webkit-scrollbar-track { background:transparent; }
+::-webkit-scrollbar-thumb { background:var(--text-muted); border-radius:3px; }
+
+/* ============================== LANDING PAGE ============================== */
+#landingPage {
+  position:fixed; inset:0; z-index:1000;
+  background:var(--bg-primary);
+  display:flex; flex-direction:column;
+  overflow:hidden;
+}
+.landing-bg {
+  position:absolute; inset:0; z-index:0;
+  overflow:hidden;
+}
+.landing-bg .orb {
+  position:absolute; border-radius:50%; filter:blur(120px); opacity:0.12;
+  animation:orbFloat 12s ease-in-out infinite;
+}
+.landing-bg .orb-1 { width:600px; height:600px; background:var(--accent); top:-200px; right:-100px; animation-delay:0s; }
+.landing-bg .orb-2 { width:500px; height:500px; background:var(--blue); bottom:-200px; left:-100px; animation-delay:4s; }
+.landing-bg .orb-3 { width:400px; height:400px; background:var(--teal); top:40%; left:50%; animation-delay:8s; }
+@keyframes orbFloat {
+  0%,100% { transform:translate(0,0) scale(1); }
+  33% { transform:translate(30px,-20px) scale(1.05); }
+  66% { transform:translate(-20px,30px) scale(0.95); }
+}
+.landing-grid {
+  position:absolute; inset:0;
+  background-image:
+    linear-gradient(rgba(240,165,0,0.03) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(240,165,0,0.03) 1px, transparent 1px);
+  background-size:60px 60px;
+}
+.landing-content {
+  position:relative; z-index:1;
+  flex:1; display:flex; flex-direction:column;
+  align-items:center; justify-content:center;
+  padding:40px;
+  text-align:center;
+}
+.landing-badge {
+  display:inline-flex; align-items:center; gap:8px;
+  background:rgba(240,165,0,0.1);
+  border:1px solid rgba(240,165,0,0.2);
+  padding:8px 18px;
+  border-radius:30px;
+  font-size:12px;
+  font-weight:600;
+  color:var(--accent);
+  margin-bottom:32px;
+  animation:fadeSlideDown 0.6s ease both;
+}
+.landing-badge .pulse-dot {
+  width:8px; height:8px; border-radius:50%;
+  background:var(--green);
+  animation:pulse 1.5s infinite;
+}
+@keyframes pulse { 0%,100%{opacity:1;} 50%{opacity:0.3;} }
+.landing-logo-group {
+  display:flex; align-items:center; gap:16px;
+  margin-bottom:20px;
+  animation:fadeSlideDown 0.6s ease 0.1s both;
+}
+.landing-logo-icon {
+  width:72px; height:72px;
+  background:linear-gradient(135deg, var(--accent), #d4900a);
+  border-radius:18px;
+  display:flex; align-items:center; justify-content:center;
+  font-size:36px; font-weight:800; color:#000;
+  box-shadow:0 8px 32px rgba(240,165,0,0.25);
+}
+.landing-logo-text h1 {
+  font-size:42px; font-weight:800; color:var(--text-primary);
+  text-align:left; line-height:1;
+}
+.landing-logo-text span {
+  font-size:13px; color:var(--text-muted);
+  font-family:'DM Sans',sans-serif;
+  text-align:left; display:block; margin-top:4px;
+}
+.landing-subtitle {
+  font-size:17px;
+  color:var(--text-secondary);
+  max-width:540px;
+  line-height:1.6;
+  margin-bottom:48px;
+  animation:fadeSlideDown 0.6s ease 0.2s both;
+}
+@keyframes fadeSlideDown {
+  from { opacity:0; transform:translateY(-16px); }
+  to { opacity:1; transform:translateY(0); }
+}
+.role-cards {
+  display:flex; gap:28px;
+  animation:fadeSlideUp 0.7s ease 0.35s both;
+}
+@keyframes fadeSlideUp {
+  from { opacity:0; transform:translateY(24px); }
+  to { opacity:1; transform:translateY(0); }
+}
+.role-card {
+  width:320px;
+  background:rgba(26,35,50,0.7);
+  backdrop-filter:blur(20px);
+  border:1px solid var(--border-light);
+  border-radius:var(--radius-lg);
+  padding:36px 32px;
+  cursor:pointer;
+  transition:all 0.35s cubic-bezier(0.4,0,0.2,1);
+  text-align:center;
+  position:relative;
+  overflow:hidden;
+}
+.role-card::before {
+  content:'';
+  position:absolute; inset:0;
+  border-radius:var(--radius-lg);
+  opacity:0;
+  transition:opacity 0.35s ease;
+  pointer-events:none;
+}
+.role-card.admin-card::before { background:linear-gradient(135deg, rgba(240,165,0,0.08), transparent); }
+.role-card.student-card::before { background:linear-gradient(135deg, rgba(52,152,219,0.08), transparent); }
+.role-card:hover {
+  transform:translateY(-6px);
+  box-shadow:0 16px 48px rgba(0,0,0,0.4);
+  border-color:rgba(255,255,255,0.15);
+}
+.role-card:hover::before { opacity:1; }
+.role-card:hover .role-icon { transform:scale(1.08); }
+.role-icon {
+  width:80px; height:80px;
+  border-radius:20px;
+  display:flex; align-items:center; justify-content:center;
+  font-size:36px;
+  margin:0 auto 20px;
+  transition:transform 0.35s ease;
+}
+.admin-card .role-icon { background:var(--accent-dim); }
+.student-card .role-icon { background:var(--blue-dim); }
+.role-card h2 {
+  font-size:22px; margin-bottom:8px;
+}
+.admin-card h2 { color:var(--accent); }
+.student-card h2 { color:var(--blue); }
+.role-card p {
+  font-size:13.5px;
+  color:var(--text-muted);
+  line-height:1.5;
+  margin-bottom:24px;
+}
+.role-enter-btn {
+  display:inline-flex; align-items:center; gap:8px;
+  padding:12px 28px;
+  border-radius:var(--radius-sm);
+  font-size:14px;
+  font-weight:700;
+  font-family:'DM Sans',sans-serif;
+  cursor:pointer;
+  border:none;
+  transition:all var(--transition);
+  position:relative;
+  z-index:2;
+}
+.admin-card .role-enter-btn {
+  background:linear-gradient(135deg, var(--accent), #d4900a);
+  color:#000;
+}
+.student-card .role-enter-btn {
+  background:linear-gradient(135deg, var(--blue), #2980b9);
+  color:#fff;
+}
+.role-enter-btn:hover { transform:translateY(-1px); box-shadow:0 4px 16px rgba(0,0,0,0.3); }
+
+.landing-footer {
+  position:relative; z-index:1;
+  text-align:center;
+  padding:24px;
+  font-size:12px;
+  color:var(--text-muted);
+  border-top:1px solid var(--border);
+}
+.landing-footer a { color:var(--accent); text-decoration:none; }
+
+/* LOGIN FORM ON ROLE CARD */
+.role-login {
+  display:none;
+  text-align:left;
+  margin-top:16px;
+  animation:fadeIn 0.3s ease;
+  position:relative;
+  z-index:2;
+}
+.role-login.active { display:block; }
+.role-login .form-group { margin-bottom:12px; }
+.role-login label { font-size:11px; font-weight:600; color:var(--text-secondary); margin-bottom:5px; display:block; text-transform:uppercase; letter-spacing:0.5px; }
+.role-login input, .role-login select {
+  width:100%; background:var(--bg-input); border:1px solid var(--border-light);
+  color:var(--text-primary); padding:10px 14px; border-radius:var(--radius-sm);
+  font-size:13px; font-family:'DM Sans',sans-serif; outline:none;
+}
+.role-login input:focus, .role-login select:focus { border-color:var(--accent); }
+
+/* ============================== APP SHELL ============================== */
+#appShell { display:none; }
+#appShell.active { display:block; }
+
+/* SIDEBAR */
+.sidebar {
+  position:fixed; left:0; top:0; bottom:0;
+  width:var(--sidebar-w);
+  background:linear-gradient(180deg, #111922 0%, #0a1018 100%);
+  border-right:1px solid var(--border);
+  z-index:100;
+  display:flex; flex-direction:column;
+}
+.sidebar-header {
+  padding:20px 20px 16px;
+  border-bottom:1px solid var(--border);
+}
+.sidebar-logo { display:flex; align-items:center; gap:12px; }
+.sidebar-logo .icon {
+  width:40px; height:40px;
+  background:linear-gradient(135deg, var(--accent), #d4900a);
+  border-radius:10px;
+  display:flex; align-items:center; justify-content:center;
+  font-size:20px; font-weight:700; color:#000;
+}
+.sidebar-logo h2 { font-size:18px; color:var(--accent); }
+.sidebar-logo small {
+  font-size:11px; color:var(--text-muted);
+  font-family:'DM Sans',sans-serif;
+  display:block; margin-top:2px;
+}
+.sidebar-nav { flex:1; overflow-y:auto; padding:12px 10px; }
+.nav-section-label {
+  font-size:10px; font-weight:700; text-transform:uppercase;
+  letter-spacing:1.5px; color:var(--text-muted); padding:16px 12px 8px;
+}
+.nav-item {
+  display:flex; align-items:center; gap:12px;
+  padding:10px 14px; border-radius:var(--radius-sm);
+  cursor:pointer; transition:all var(--transition);
+  font-size:13.5px; color:var(--text-secondary); margin-bottom:2px;
+  position:relative;
+}
+.nav-item:hover { background:rgba(255,255,255,0.04); color:var(--text-primary); }
+.nav-item.active { background:var(--accent-dim); color:var(--accent); }
+.nav-item.active::before {
+  content:''; position:absolute; left:0; top:50%; transform:translateY(-50%);
+  width:3px; height:24px; background:var(--accent); border-radius:0 3px 3px 0;
+}
+.nav-item svg { width:18px; height:18px; flex-shrink:0; }
+.nav-badge {
+  margin-left:auto; background:var(--red); color:#fff;
+  font-size:10px; font-weight:700; padding:2px 7px; border-radius:10px;
+}
+.sidebar-footer {
+  padding:16px;
+  border-top:1px solid var(--border);
+}
+.sidebar-user {
+  display:flex; align-items:center; gap:10px;
+  padding:8px;
+  border-radius:var(--radius-sm);
+  cursor:pointer;
+  transition:all var(--transition);
+}
+.sidebar-user:hover { background:rgba(255,255,255,0.04); }
+.sidebar-user-avatar {
+  width:34px; height:34px; border-radius:50%;
+  display:flex; align-items:center; justify-content:center;
+  font-weight:700; font-size:13px; color:#000; flex-shrink:0;
+}
+.sidebar-user-info { flex:1; min-width:0; }
+.sidebar-user-info .name { font-size:13px; font-weight:600; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+.sidebar-user-info .role { font-size:11px; color:var(--text-muted); }
+
+/* TOPBAR */
+.topbar {
+  position:fixed; left:var(--sidebar-w); right:0; top:0;
+  height:var(--topbar-h); background:rgba(12,17,23,0.85);
+  backdrop-filter:blur(20px); border-bottom:1px solid var(--border);
+  z-index:90; display:flex; align-items:center; padding:0 28px; gap:16px;
+}
+.topbar-title { font-family:'Playfair Display',serif; font-size:20px; font-weight:600; }
+.topbar-search { flex:1; max-width:380px; margin-left:24px; position:relative; }
+.topbar-search input {
+  width:100%; background:var(--bg-input); border:1px solid var(--border-light);
+  color:var(--text-primary); padding:9px 14px 9px 38px; border-radius:var(--radius-sm);
+  font-size:13px; font-family:'DM Sans',sans-serif; outline:none;
+}
+.topbar-search input:focus { border-color:var(--accent); }
+.topbar-search svg { position:absolute; left:12px; top:50%; transform:translateY(-50%); width:16px; height:16px; color:var(--text-muted); }
+.topbar-right { margin-left:auto; display:flex; align-items:center; gap:12px; }
+.topbar-btn {
+  background:none; border:none; color:var(--text-secondary); cursor:pointer;
+  width:36px; height:36px; display:flex; align-items:center; justify-content:center;
+  border-radius:var(--radius-sm); transition:all var(--transition); position:relative;
+}
+.topbar-btn:hover { background:rgba(255,255,255,0.06); color:var(--text-primary); }
+.topbar-btn .dot {
+  position:absolute; top:6px; right:6px; width:8px; height:8px;
+  background:var(--red); border-radius:50%; border:2px solid var(--bg-primary);
+}
+.logout-btn {
+  display:flex; align-items:center; gap:6px;
+  background:rgba(231,76,60,0.1);
+  border:1px solid rgba(231,76,60,0.2);
+  color:var(--red);
+  padding:7px 14px;
+  border-radius:var(--radius-sm);
+  font-size:12px; font-weight:600;
+  font-family:'DM Sans',sans-serif;
+  cursor:pointer;
+  transition:all var(--transition);
+}
+.logout-btn:hover { background:rgba(231,76,60,0.2); }
+
+/* MAIN */
+.main-content {
+  margin-left:var(--sidebar-w); margin-top:var(--topbar-h);
+  height:calc(100vh - var(--topbar-h)); overflow-y:auto; padding:28px;
+}
+
+/* ============================== SHARED COMPONENTS ============================== */
+.page { display:none; animation:fadeIn 0.35s ease; }
+.page.active { display:block; }
+@keyframes fadeIn { from{opacity:0;transform:translateY(8px);} to{opacity:1;transform:translateY(0);} }
+
+.stats-grid { display:grid; grid-template-columns:repeat(auto-fit,minmax(220px,1fr)); gap:18px; margin-bottom:28px; }
+.stat-card {
+  background:var(--bg-card); border:1px solid var(--border);
+  border-radius:var(--radius); padding:20px; transition:all var(--transition);
+}
+.stat-card:hover { border-color:var(--border-light); transform:translateY(-2px); box-shadow:var(--shadow); }
+.stat-card .stat-icon {
+  width:42px; height:42px; border-radius:10px;
+  display:flex; align-items:center; justify-content:center;
+  margin-bottom:14px; font-size:20px;
+}
+.stat-card .stat-value { font-size:28px; font-weight:700; font-family:'Playfair Display',serif; line-height:1; }
+.stat-card .stat-label { font-size:12.5px; color:var(--text-secondary); margin-top:4px; }
+.stat-card .stat-change { font-size:11.5px; margin-top:8px; display:flex; align-items:center; gap:4px; }
+
+.card { background:var(--bg-card); border:1px solid var(--border); border-radius:var(--radius); padding:22px; margin-bottom:18px; }
+.card-header { display:flex; align-items:center; justify-content:space-between; margin-bottom:18px; }
+.card-header h3 { font-size:16px; }
+
+table { width:100%; border-collapse:collapse; }
+thead th { text-align:left; font-size:11px; font-weight:700; text-transform:uppercase; letter-spacing:1px; color:var(--text-muted); padding:12px 14px; border-bottom:1px solid var(--border); }
+tbody td { padding:12px 14px; font-size:13.5px; border-bottom:1px solid var(--border); color:var(--text-secondary); }
+tbody tr:hover { background:rgba(255,255,255,0.02); }
+
+.badge { display:inline-flex; align-items:center; gap:5px; padding:4px 10px; border-radius:20px; font-size:11.5px; font-weight:600; }
+.badge-green { background:var(--green-dim); color:var(--green); }
+.badge-red { background:var(--red-dim); color:var(--red); }
+.badge-blue { background:var(--blue-dim); color:var(--blue); }
+.badge-purple { background:var(--purple-dim); color:var(--purple); }
+.badge-amber { background:var(--accent-dim); color:var(--accent); }
+.badge-teal { background:var(--teal-dim); color:var(--teal); }
+.badge-dot { width:6px; height:6px; border-radius:50%; background:currentColor; }
+
+.btn {
+  display:inline-flex; align-items:center; gap:8px;
+  padding:9px 18px; border-radius:var(--radius-sm);
+  font-size:13px; font-weight:600; font-family:'DM Sans',sans-serif;
+  cursor:pointer; border:none; transition:all var(--transition);
+}
+.btn-primary { background:linear-gradient(135deg,var(--accent),#d4900a); color:#000; }
+.btn-primary:hover { transform:translateY(-1px); box-shadow:0 4px 16px var(--accent-glow); }
+.btn-secondary { background:rgba(255,255,255,0.06); color:var(--text-primary); border:1px solid var(--border-light); }
+.btn-secondary:hover { background:rgba(255,255,255,0.1); }
+.btn-sm { padding:6px 12px; font-size:12px; }
+.btn-danger { background:var(--red-dim); color:var(--red); }
+.btn-success { background:var(--green-dim); color:var(--green); }
+.btn-blue { background:linear-gradient(135deg,var(--blue),#2980b9); color:#fff; }
+.btn-blue:hover { box-shadow:0 4px 16px rgba(52,152,219,0.3); }
+
+.form-group { margin-bottom:16px; }
+.form-group label { display:block; font-size:12px; font-weight:600; color:var(--text-secondary); margin-bottom:6px; text-transform:uppercase; letter-spacing:0.5px; }
+.form-control {
+  width:100%; background:var(--bg-input); border:1px solid var(--border-light);
+  color:var(--text-primary); padding:10px 14px; border-radius:var(--radius-sm);
+  font-size:13.5px; font-family:'DM Sans',sans-serif; outline:none;
+}
+.form-control:focus { border-color:var(--accent); }
+select.form-control { cursor:pointer; }
+textarea.form-control { resize:vertical; min-height:80px; }
+
+.progress-bar { width:100%; height:6px; background:rgba(255,255,255,0.06); border-radius:3px; overflow:hidden; }
+.progress-bar .fill { height:100%; border-radius:3px; transition:width 0.6s ease; }
+.progress-bar-lg { height:10px; }
+
+.tabs { display:flex; gap:4px; margin-bottom:20px; border-bottom:1px solid var(--border); }
+.tab { padding:10px 18px; font-size:13px; font-weight:600; color:var(--text-muted); cursor:pointer; border-bottom:2px solid transparent; transition:all var(--transition); margin-bottom:-1px; }
+.tab:hover { color:var(--text-secondary); }
+.tab.active { color:var(--accent); border-bottom-color:var(--accent); }
+
+.modal-overlay {
+  display:none; position:fixed; inset:0; background:rgba(0,0,0,0.6);
+  backdrop-filter:blur(8px); z-index:200; align-items:center; justify-content:center;
+}
+.modal-overlay.active { display:flex; }
+.modal {
+  background:var(--bg-secondary); border:1px solid var(--border-light);
+  border-radius:var(--radius-lg); padding:28px; width:90%; max-width:560px;
+  max-height:85vh; overflow-y:auto; animation:modalIn 0.3s ease;
+}
+@keyframes modalIn { from{opacity:0;transform:scale(0.95) translateY(10px);} to{opacity:1;transform:scale(1) translateY(0);} }
+.modal-header { display:flex; align-items:center; justify-content:space-between; margin-bottom:20px; }
+.modal-close {
+  background:none; border:none; color:var(--text-muted); cursor:pointer;
+  font-size:20px; width:32px; height:32px; display:flex; align-items:center;
+  justify-content:center; border-radius:var(--radius-sm);
+}
+.modal-close:hover { background:rgba(255,255,255,0.06); color:var(--text-primary); }
+
+.pipeline { display:flex; gap:2px; margin:20px 0; }
+.pipeline-stage {
+  flex:1; text-align:center; padding:14px 8px;
+  background:var(--bg-input); position:relative; font-size:12px; font-weight:600;
+}
+.pipeline-stage:first-child { border-radius:var(--radius-sm) 0 0 var(--radius-sm); }
+.pipeline-stage:last-child { border-radius:0 var(--radius-sm) var(--radius-sm) 0; }
+.pipeline-stage .count { font-size:22px; font-family:'Playfair Display',serif; display:block; margin-bottom:4px; }
+.pipeline-stage.s-test { background:rgba(52,152,219,0.12); color:var(--blue); }
+.pipeline-stage.s-interview { background:rgba(155,89,182,0.12); color:var(--purple); }
+.pipeline-stage.s-training { background:rgba(240,165,0,0.12); color:var(--accent); }
+.pipeline-stage.s-certified { background:rgba(46,204,113,0.12); color:var(--green); }
+.pipeline-stage.s-collected { background:rgba(46,204,113,0.2); color:#27ae60; }
+.pipeline-stage.s-incomplete { background:rgba(231,76,60,0.12); color:var(--red); }
+
+.skills-grid { display:grid; grid-template-columns:repeat(auto-fill,minmax(240px,1fr)); gap:16px; }
+.skill-card {
+  background:var(--bg-card); border:1px solid var(--border);
+  border-radius:var(--radius); padding:20px; cursor:pointer;
+  transition:all var(--transition); overflow:hidden;
+}
+.skill-card:hover { border-color:var(--accent); transform:translateY(-3px); box-shadow:0 8px 30px rgba(0,0,0,0.3); }
+.skill-card .skill-icon { width:48px; height:48px; border-radius:12px; display:flex; align-items:center; justify-content:center; font-size:22px; margin-bottom:14px; }
+.skill-card h4 { font-size:15px; margin-bottom:6px; }
+.skill-card p { font-size:12px; color:var(--text-muted); }
+.skill-card .skill-meta { display:flex; gap:12px; margin-top:12px; font-size:11.5px; color:var(--text-muted); }
+
+.video-grid { display:grid; grid-template-columns:repeat(auto-fit,minmax(280px,1fr)); gap:16px; margin-bottom:20px; }
+.video-tile {
+  aspect-ratio:16/9; background:var(--bg-input); border-radius:var(--radius);
+  border:1px solid var(--border); display:flex; align-items:center;
+  justify-content:center; position:relative; overflow:hidden;
+}
+.video-tile .participant-info { position:absolute; bottom:12px; left:12px; background:rgba(0,0,0,0.7); padding:4px 10px; border-radius:6px; font-size:12px; }
+.video-tile .avatar-lg {
+  width:64px; height:64px; border-radius:50%;
+  display:flex; align-items:center; justify-content:center;
+  font-size:24px; font-weight:700; color:#000;
+}
+.video-controls {
+  display:flex; align-items:center; justify-content:center; gap:12px;
+  padding:16px; background:var(--bg-card); border-radius:var(--radius); border:1px solid var(--border);
+}
+.vc-btn {
+  width:48px; height:48px; border-radius:50%; background:rgba(255,255,255,0.08);
+  border:none; color:var(--text-primary); cursor:pointer;
+  display:flex; align-items:center; justify-content:center;
+  transition:all var(--transition); font-size:18px;
+}
+.vc-btn:hover { background:rgba(255,255,255,0.14); }
+.vc-btn.danger { background:var(--red); }
+.vc-btn.danger:hover { background:#c0392b; }
+.vc-btn.active { background:var(--accent); color:#000; }
+
+.chat-panel {
+  background:var(--bg-card); border:1px solid var(--border); border-radius:var(--radius);
+  padding:16px; height:400px; display:flex; flex-direction:column;
+}
+.chat-messages { flex:1; overflow-y:auto; margin-bottom:12px; }
+.chat-msg { margin-bottom:10px; }
+.chat-msg .sender { font-size:11px; font-weight:700; color:var(--accent); margin-bottom:2px; }
+.chat-msg .text { font-size:13px; color:var(--text-secondary); background:var(--bg-input); padding:8px 12px; border-radius:8px; display:inline-block; }
+.chat-input-row { display:flex; gap:8px; }
+.chat-input-row input { flex:1; }
+
+.bar-chart { display:flex; align-items:flex-end; gap:8px; height:160px; padding:10px 0; }
+.bar-chart .bar-col { flex:1; display:flex; flex-direction:column; align-items:center; gap:6px; height:100%; justify-content:flex-end; }
+.bar-chart .bar { width:100%; max-width:40px; border-radius:4px 4px 0 0; transition:height 0.6s ease; }
+.bar-chart .bar-label { font-size:10px; color:var(--text-muted); text-align:center; }
+
+.cert-status-grid { display:grid; grid-template-columns:repeat(auto-fit,minmax(200px,1fr)); gap:14px; margin-bottom:24px; }
+.cert-stat { background:var(--bg-card); border:1px solid var(--border); border-radius:var(--radius); padding:18px; text-align:center; }
+.cert-stat .num { font-size:32px; font-family:'Playfair Display',serif; font-weight:700; }
+
+.material-list { list-style:none; }
+.material-item {
+  display:flex; align-items:center; gap:14px; padding:12px 16px;
+  border:1px solid var(--border); border-radius:var(--radius-sm);
+  margin-bottom:8px; transition:all var(--transition); cursor:pointer;
+}
+.material-item:hover { background:rgba(255,255,255,0.03); border-color:var(--border-light); }
+.material-icon { width:38px; height:38px; border-radius:8px; display:flex; align-items:center; justify-content:center; font-size:16px; flex-shrink:0; }
+
+@keyframes pulse { 0%,100%{opacity:1;} 50%{opacity:0.4;} }
+.live-dot { width:8px; height:8px; background:var(--red); border-radius:50%; animation:pulse 1.5s infinite; display:inline-block; }
+
+.toast {
+  position:fixed; bottom:28px; right:28px;
+  background:var(--bg-card); border:1px solid var(--green);
+  border-radius:var(--radius); padding:14px 20px; font-size:13px; color:var(--green);
+  display:flex; align-items:center; gap:10px; z-index:300;
+  animation:slideUp 0.3s ease, fadeOut 0.3s ease 2.7s;
+  box-shadow:0 8px 30px rgba(0,0,0,0.4);
+}
+@keyframes slideUp { from{transform:translateY(20px);opacity:0;} to{transform:translateY(0);opacity:1;} }
+@keyframes fadeOut { to{opacity:0;} }
+
+/* ============================== STUDENT PORTAL SPECIFIC ============================== */
+.student-welcome-banner {
+  background:linear-gradient(135deg, rgba(52,152,219,0.15), rgba(26,188,156,0.08));
+  border:1px solid rgba(52,152,219,0.2);
+  border-radius:var(--radius-lg);
+  padding:28px 32px;
+  margin-bottom:24px;
+  position:relative;
+  overflow:hidden;
+}
+.student-welcome-banner::after {
+  content:''; position:absolute; top:-40px; right:-40px;
+  width:200px; height:200px; border-radius:50%;
+  background:rgba(52,152,219,0.06);
+  pointer-events:none;
+}
+.student-welcome-banner h2 { font-size:24px; margin-bottom:6px; }
+.student-welcome-banner p { color:var(--text-secondary); font-size:14px; }
+
+.progress-ring-container {
+  display:flex; align-items:center; justify-content:center;
+  flex-direction:column; gap:8px;
+}
+.progress-ring { position:relative; width:120px; height:120px; }
+.progress-ring svg { transform:rotate(-90deg); }
+.progress-ring .ring-bg { stroke:rgba(255,255,255,0.06); }
+.progress-ring .ring-fill { transition:stroke-dashoffset 1s ease; }
+.progress-ring .ring-text {
+  position:absolute; inset:0;
+  display:flex; align-items:center; justify-content:center;
+  flex-direction:column;
+}
+.progress-ring .ring-value { font-size:28px; font-weight:700; font-family:'Playfair Display',serif; }
+.progress-ring .ring-label { font-size:10px; color:var(--text-muted); text-transform:uppercase; letter-spacing:1px; }
+
+.student-stage-tracker {
+  display:flex; align-items:center; gap:0; margin:24px 0;
+}
+.stage-node {
+  display:flex; flex-direction:column; align-items:center; gap:8px;
+  position:relative; z-index:1;
+}
+.stage-circle {
+  width:44px; height:44px; border-radius:50%;
+  display:flex; align-items:center; justify-content:center;
+  font-size:18px; border:3px solid var(--border-light);
+  background:var(--bg-input);
+  transition:all 0.4s ease;
+}
+.stage-circle.completed { border-color:var(--green); background:var(--green-dim); }
+.stage-circle.current { border-color:var(--accent); background:var(--accent-dim); box-shadow:0 0 16px var(--accent-glow); animation:pulseGlow 2s infinite; }
+.stage-circle.locked { opacity:0.4; }
+@keyframes pulseGlow { 0%,100%{box-shadow:0 0 8px var(--accent-glow);} 50%{box-shadow:0 0 20px var(--accent-glow);} }
+.stage-label { font-size:11px; font-weight:600; color:var(--text-muted); text-align:center; max-width:70px; }
+.stage-label.active-label { color:var(--accent); }
+.stage-connector {
+  flex:1; height:3px; background:var(--border-light); min-width:20px;
+  margin-bottom:28px;
+}
+.stage-connector.completed { background:var(--green); }
+
+.class-schedule-card {
+  display:flex; align-items:center; gap:16px;
+  padding:16px; border:1px solid var(--border);
+  border-radius:var(--radius); margin-bottom:10px;
+  transition:all var(--transition); cursor:pointer;
+}
+.class-schedule-card:hover { background:rgba(255,255,255,0.03); border-color:var(--border-light); }
+.class-time-block {
+  min-width:70px; text-align:center; padding:10px;
+  background:var(--bg-input); border-radius:var(--radius-sm);
+}
+.class-time-block .time { font-size:15px; font-weight:700; font-family:'Playfair Display',serif; }
+.class-time-block .period { font-size:10px; color:var(--text-muted); text-transform:uppercase; }
+
+.resource-card {
+  background:var(--bg-card); border:1px solid var(--border);
+  border-radius:var(--radius); padding:18px;
+  transition:all var(--transition); cursor:pointer;
+}
+.resource-card:hover { border-color:var(--blue); transform:translateY(-2px); }
+
+@media(max-width:900px) {
+  .role-cards { flex-direction:column; align-items:center; }
+  .role-card { width:100%; max-width:360px; }
+}
+@media(max-width:768px) {
+  .sidebar { transform:translateX(-100%); }
+  .main-content, .topbar { margin-left:0; left:0; }
+  .stats-grid { grid-template-columns:1fr 1fr; }
+  .pipeline { flex-wrap:wrap; }
+  .pipeline-stage { min-width:calc(33% - 2px); }
+}
+</style>
+</head>
+<body>
+
+<!-- ============================== LANDING PAGE ============================== -->
+<div id="landingPage">
+  <div class="landing-bg">
+    <div class="orb orb-1"></div>
+    <div class="orb orb-2"></div>
+    <div class="orb orb-3"></div>
+    <div class="landing-grid"></div>
+  </div>
+
+  <div class="landing-content">
+    <div class="landing-badge">
+      <span class="pulse-dot"></span>
+      HEART/NSTA Trust — Community Training Interventions
+    </div>
+
+    <div class="landing-logo-group">
+      <div class="landing-logo-icon">V</div>
+      <div class="landing-logo-text">
+        <h1>VocTrain</h1>
+        <span>Learning Management System</span>
+      </div>
+    </div>
+
+    <p class="landing-subtitle">
+      Empowering vocational excellence through integrated learning, assessment, and certification tracking — from enrolment to career readiness.
+    </p>
+
+    <div class="role-cards">
+      <!-- ADMIN CARD -->
+      <div class="role-card admin-card" id="adminCard">
+        <div class="role-icon">🛡️</div>
+        <h2>Administrator</h2>
+        <p>Manage students, schedule exams, monitor progress, track certifications, and run training centres.</p>
+        <div class="role-login" id="adminLogin">
+          <div class="form-group">
+            <label>Admin Username</label>
+            <input type="text" placeholder="admin@heartlms.edu.jm" id="adminUser">
+          </div>
+          <div class="form-group">
+            <label>Password</label>
+            <input type="password" placeholder="••••••••" id="adminPass">
+          </div>
+        </div>
+        <button class="role-enter-btn" onclick="handleAdminClick()">Enter as Admin →</button>
+      </div>
+
+      <!-- STUDENT CARD -->
+      <div class="role-card student-card" id="studentCard">
+        <div class="role-icon">🎓</div>
+        <h2>Student</h2>
+        <p>Access your classes, join live sessions, view progress, download resources, and track your certification.</p>
+        <div class="role-login" id="studentLogin">
+          <div class="form-group">
+            <label>Select Your Name</label>
+            <select id="studentSelect">
+              <option value="">— Choose Student —</option>
+            </select>
+          </div>
+          <div class="form-group">
+            <label>Student ID</label>
+            <input type="text" placeholder="STU-2026XXX" id="studentId">
+          </div>
+        </div>
+        <button class="role-enter-btn" onclick="handleStudentClick()">Enter as Student →</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="landing-footer">
+    © 2026 HEART/NSTA Trust — VocTrain LMS v2.0 &nbsp;|&nbsp; <a href="#">Privacy Policy</a> &nbsp;|&nbsp; <a href="#">Support</a>
+  </div>
+</div>
+
+<!-- ============================== APP SHELL ============================== -->
+<div id="appShell">
+  <aside class="sidebar" id="sidebar">
+    <div class="sidebar-header">
+      <div class="sidebar-logo">
+        <div class="icon">V</div>
+        <div>
+          <h2>VocTrain</h2>
+          <small id="sidebarRoleLabel">Learning Management System</small>
+        </div>
+      </div>
+    </div>
+    <nav class="sidebar-nav" id="sidebarNav"></nav>
+    <div class="sidebar-footer">
+      <div class="sidebar-user">
+        <div class="sidebar-user-avatar" id="sidebarAvatar" style="background:linear-gradient(135deg,var(--accent),var(--orange));">A</div>
+        <div class="sidebar-user-info">
+          <div class="name" id="sidebarUserName">Admin</div>
+          <div class="role" id="sidebarUserRole">Administrator</div>
+        </div>
+      </div>
+    </div>
+  </aside>
+
+  <header class="topbar">
+    <div class="topbar-title" id="topbarTitle">Dashboard</div>
+    <div class="topbar-search">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+      <input type="text" placeholder="Search..." id="globalSearch">
+    </div>
+    <div class="topbar-right">
+      <button class="topbar-btn" title="Notifications">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/></svg>
+        <span class="dot"></span>
+      </button>
+      <button class="logout-btn" onclick="logout()">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg>
+        Sign Out
+      </button>
+    </div>
+  </header>
+
+  <main class="main-content" id="mainContent"></main>
+</div>
+
+<!-- MODALS -->
+<div class="modal-overlay" id="addStudentModal">
+  <div class="modal">
+    <div class="modal-header"><h3>Add New Student</h3><button class="modal-close" onclick="closeModal('addStudentModal')">✕</button></div>
+    <div class="form-group"><label>Full Name</label><input type="text" class="form-control" id="newStudentName" placeholder="e.g. John Smith"></div>
+    <div class="form-group"><label>Email</label><input type="email" class="form-control" id="newStudentEmail" placeholder="e.g. john@email.com"></div>
+    <div class="form-group"><label>Programme</label><select class="form-control" id="newStudentCourse"><option>Welding</option><option>Electrical Installation</option><option>Cosmetology</option><option>Business Administration</option><option>Auto Mechanics</option><option>Plumbing</option><option>Carpentry</option><option>Hospitality</option><option>Information Technology</option><option>Garment Construction</option></select></div>
+    <div class="form-group"><label>Starting Stage</label><select class="form-control" id="newStudentStage"><option value="testing">Testing</option><option value="interview">Interview</option><option value="training">In Training</option></select></div>
+    <div style="display:flex;gap:10px;justify-content:flex-end;margin-top:20px;"><button class="btn btn-secondary" onclick="closeModal('addStudentModal')">Cancel</button><button class="btn btn-primary" onclick="addStudent()">Add Student</button></div>
+  </div>
+</div>
+<div class="modal-overlay" id="createExamModal">
+  <div class="modal">
+    <div class="modal-header"><h3>Create New Exam</h3><button class="modal-close" onclick="closeModal('createExamModal')">✕</button></div>
+    <div class="form-group"><label>Exam Title</label><input type="text" class="form-control" id="examTitle" placeholder="e.g. Welding Level 2 — Final Assessment"></div>
+    <div class="form-group"><label>Programme</label><select class="form-control" id="examCourse"><option>Welding</option><option>Electrical Installation</option><option>Cosmetology</option><option>Business Administration</option><option>Auto Mechanics</option><option>Plumbing</option><option>Carpentry</option><option>Hospitality</option><option>Information Technology</option></select></div>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;"><div class="form-group"><label>Date</label><input type="date" class="form-control" id="examDate"></div><div class="form-group"><label>Start Time</label><input type="time" class="form-control" id="examTime"></div></div>
+    <div class="form-group"><label>Duration (minutes)</label><input type="number" class="form-control" id="examDuration" value="90" min="15" max="300"></div>
+    <div class="form-group"><label>Number of Questions</label><input type="number" class="form-control" id="examQuestions" value="50" min="5" max="200"></div>
+    <div class="form-group"><label>Pass Mark (%)</label><input type="number" class="form-control" id="examPassMark" value="60" min="1" max="100"></div>
+    <div class="form-group"><label>Instructions</label><textarea class="form-control" id="examInstructions" placeholder="Special instructions for students..."></textarea></div>
+    <div style="display:flex;gap:10px;justify-content:flex-end;margin-top:20px;"><button class="btn btn-secondary" onclick="closeModal('createExamModal')">Cancel</button><button class="btn btn-primary" onclick="createExam()">Schedule Exam</button></div>
+  </div>
+</div>
+<div class="modal-overlay" id="updateStageModal">
+  <div class="modal">
+    <div class="modal-header"><h3>Update Student Stage</h3><button class="modal-close" onclick="closeModal('updateStageModal')">✕</button></div>
+    <div id="updateStageContent"></div>
+  </div>
+</div>
+<div id="toastContainer"></div>
+
+<script>
+// ============================== DATA ==============================
+const skillAreas = [
+  {id:1,name:"Welding & Fabrication",icon:"🔥",color:"#e74c3c",students:87,materials:24,desc:"SMAW, MIG, TIG welding processes and metal fabrication"},
+  {id:2,name:"Electrical Installation",icon:"⚡",color:"#f1c40f",students:72,materials:31,desc:"Residential and commercial wiring, conduit bending, circuits"},
+  {id:3,name:"Cosmetology",icon:"💇",color:"#e91e63",students:65,materials:28,desc:"Hair care, styling, chemical treatments, salon management"},
+  {id:4,name:"Business Administration",icon:"💼",color:"#3498db",students:93,materials:35,desc:"Office management, accounting, business communication"},
+  {id:5,name:"Auto Mechanics",icon:"🔧",color:"#e67e22",students:58,materials:22,desc:"Engine repair, diagnostics, brake and suspension systems"},
+  {id:6,name:"Plumbing",icon:"🔩",color:"#1abc9c",students:44,materials:18,desc:"Pipe fitting, drainage systems, water supply installation"},
+  {id:7,name:"Carpentry",icon:"🪚",color:"#8d6e63",students:51,materials:20,desc:"Furniture making, roof framing, cabinet installation"},
+  {id:8,name:"Hospitality & Tourism",icon:"🏨",color:"#9b59b6",students:76,materials:26,desc:"Food & beverage service, front office, housekeeping"},
+  {id:9,name:"Information Technology",icon:"💻",color:"#2196f3",students:88,materials:40,desc:"Networking, hardware repair, software applications"},
+  {id:10,name:"Garment Construction",icon:"🧵",color:"#ff7043",students:39,materials:19,desc:"Pattern drafting, sewing techniques, fashion design basics"},
+  {id:11,name:"Refrigeration & AC",icon:"❄️",color:"#00bcd4",students:42,materials:21,desc:"AC installation, refrigerant handling, system maintenance"},
+  {id:12,name:"Heavy Equipment Ops",icon:"🚜",color:"#ff9800",students:31,materials:15,desc:"Excavator, loader, bulldozer operation and safety"},
+  {id:13,name:"Commercial Cooking",icon:"👨‍🍳",color:"#4caf50",students:68,materials:32,desc:"Culinary arts, food safety, menu planning, pastry arts"},
+  {id:14,name:"Beauty Therapy",icon:"💆",color:"#ce93d8",students:55,materials:24,desc:"Facial treatments, body massage, nail technology"},
+  {id:15,name:"Data Operations",icon:"📊",color:"#42a5f5",students:47,materials:22,desc:"Data entry, spreadsheets, database management"},
+  {id:16,name:"Agriculture",icon:"🌾",color:"#66bb6a",students:36,materials:18,desc:"Crop production, livestock management, agribusiness"},
+  {id:17,name:"Masonry",icon:"🧱",color:"#a1887f",students:29,materials:14,desc:"Block laying, plastering, tiling, concrete work"},
+  {id:18,name:"Solar Energy Tech",icon:"☀️",color:"#fdd835",students:33,materials:16,desc:"PV installation, solar system design, inverter setup"},
+  {id:19,name:"Early Childhood Ed",icon:"👶",color:"#ef9a9a",students:61,materials:27,desc:"Child development, lesson planning, classroom management"},
+  {id:20,name:"Customer Service",icon:"🎯",color:"#7e57c2",students:54,materials:20,desc:"Communication skills, conflict resolution, CRM systems"}
+];
+
+const studentNames = [
+  "Keisha Brown","Marlon Davis","Tanya Johnson","Andre Smith","Shanice Williams",
+  "Dwayne Clarke","Patrice Morgan","Tyrone Campbell","Nicole Thomas","Ricardo Lewis",
+  "Camille Harris","Damion Jones","Sheryl Reid","Omar Wright","Janelle Scott",
+  "Devon Green","Simone Allen","Jason Taylor","Monique Edwards","Akeem Robinson",
+  "Tricia James","Rohan Bennett","Alicia Stewart","Marcus Young","Kimberly Walker",
+  "Bryan Mitchell","Samantha King","Leroy Adams","Crystal Nelson","Troy Phillips",
+  "Nadine Baker","Kurt Martin","Shelly Carter","Deon Anderson","Renee Hall",
+  "Adrian Gordon","Lisa Francis","Garfield Henry","Camisha Powell","Jevon Gray"
+];
+
+const stages = ['testing','interview','training','certified','collected','incomplete'];
+const stageLabels = {testing:'Testing',interview:'Interview',training:'In Training',certified:'Certified',collected:'Collected',incomplete:'Incomplete'};
+const stageBadge = {testing:'badge-blue',interview:'badge-purple',training:'badge-amber',certified:'badge-green',collected:'badge-green',incomplete:'badge-red'};
+const stageIcons = {testing:'📝',interview:'🗣️',training:'📚',certified:'🎓',collected:'✅',incomplete:'⚠️'};
+const courses = ['Welding','Electrical Installation','Cosmetology','Business Administration','Auto Mechanics','Plumbing','Carpentry','Hospitality'];
+
+let students = [];
+function generateStudents() {
+  students = [];
+  for(let i=0;i<80;i++) {
+    const name = studentNames[i%studentNames.length]+(i>=40?' Jr.':'');
+    const stage = stages[Math.floor(Math.random()*stages.length)];
+    const course = courses[Math.floor(Math.random()*courses.length)];
+    const score = stage==='testing'?'':(Math.floor(Math.random()*40)+60)+'%';
+    const progress = stage==='collected'?100:stage==='certified'?90:stage==='training'?Math.floor(Math.random()*50)+30:stage==='interview'?20:stage==='testing'?10:Math.floor(Math.random()*40)+10;
+    students.push({
+      id:'STU-'+String(2026000+i), name, stage, course, score, progress,
+      certNo: stage==='collected'||stage==='certified'? course.substring(0,2).toUpperCase()+'-2026-'+String(300+i).padStart(4,'0'):null,
+      certDate: stage==='collected'||stage==='certified'?'2026-'+(Math.floor(Math.random()*2)+1).toString().padStart(2,'0')+'-'+(Math.floor(Math.random()*28)+1).toString().padStart(2,'0'):null,
+      certCollected: stage==='collected',
+      attendance: Math.floor(Math.random()*20)+80,
+      assignments: Math.floor(Math.random()*5)+3,
+      assignmentsTotal: 8,
+      gpa: (Math.random()*1.5+2.5).toFixed(1),
+      instructor: ['Mr. R. Campbell','Ms. J. Williams','Mrs. P. Morgan','Ms. D. Stewart','Mr. K. Edwards'][Math.floor(Math.random()*5)]
+    });
+  }
+}
+generateStudents();
+
+let exams = [
+  {title:"Welding Level 2 — Final Theory",course:"Welding",date:"2026-02-18",time:"09:00",duration:90,students:24,status:"upcoming",questions:50,passMark:60},
+  {title:"Electrical Installation L3 — Safety",course:"Electrical Installation",date:"2026-02-20",time:"10:00",duration:60,students:18,status:"upcoming",questions:40,passMark:70},
+  {title:"Business Admin L1 — Midterm",course:"Business Administration",date:"2026-02-22",time:"14:00",duration:120,students:32,status:"upcoming",questions:80,passMark:55},
+  {title:"Cosmetology L1 — Practical Theory",course:"Cosmetology",date:"2026-02-25",time:"09:30",duration:75,students:22,status:"upcoming",questions:45,passMark:60},
+  {title:"Auto Mechanics — Diagnostics",course:"Auto Mechanics",date:"2026-02-15",time:"08:00",duration:90,students:19,status:"active",questions:50,passMark:65},
+  {title:"Welding L1 — Safety Fundamentals",course:"Welding",date:"2026-02-10",time:"09:00",duration:60,students:26,status:"completed",questions:35,passMark:60,passRate:"84%"},
+  {title:"Hospitality — Food Safety",course:"Hospitality",date:"2026-02-08",time:"11:00",duration:45,students:30,status:"completed",questions:30,passMark:70,passRate:"90%"},
+  {title:"IT Fundamentals — Networking",course:"Information Technology",date:"2026-02-05",time:"14:00",duration:90,students:25,status:"completed",questions:60,passMark:60,passRate:"72%"},
+  {title:"Plumbing L2 — Pipe Systems",course:"Plumbing",date:"2026-03-01",time:"10:00",duration:75,students:15,status:"upcoming",questions:40,passMark:60},
+  {title:"Carpentry — Joints & Framing",course:"Carpentry",date:"2026-03-04",time:"09:00",duration:90,students:20,status:"upcoming",questions:55,passMark:60},
+  {title:"Beauty Therapy — Skin Analysis",course:"Cosmetology",date:"2026-03-06",time:"13:00",duration:60,students:28,status:"upcoming",questions:35,passMark:65},
+  {title:"Data Operations — Spreadsheets",course:"Information Technology",date:"2026-03-10",time:"10:00",duration:60,students:22,status:"upcoming",questions:40,passMark:60},
+];
+
+let currentRole = null; // 'admin' or 'student'
+let currentStudent = null;
+let videoTimerInterval = null;
+let videoSeconds = 0;
+
+// ============================== LANDING ==============================
+function populateStudentSelect() {
+  const sel = document.getElementById('studentSelect');
+  students.forEach((s,i) => {
+    const opt = document.createElement('option');
+    opt.value = i; opt.textContent = s.name + ' — ' + s.course;
+    sel.appendChild(opt);
+  });
+}
+
+let adminLoginShown = false, studentLoginShown = false;
+function handleAdminClick() {
+  try {
+    if(!adminLoginShown) {
+      document.getElementById('adminLogin').classList.add('active');
+      adminLoginShown = true;
+      document.getElementById('adminUser').focus();
+      return;
+    }
+    enterApp('admin');
+  } catch(err) { console.error('handleAdminClick error:', err); alert('Error: ' + err.message); }
+}
+function handleStudentClick() {
+  try {
+    if(!studentLoginShown) {
+      document.getElementById('studentLogin').classList.add('active');
+      studentLoginShown = true;
+      return;
+    }
+    const idx = document.getElementById('studentSelect').value;
+    if(idx === '') { alert('Please select your name from the dropdown'); return; }
+    currentStudent = students[parseInt(idx)];
+    enterApp('student');
+  } catch(err) { console.error('handleStudentClick error:', err); alert('Error: ' + err.message); }
+}
+
+function enterApp(role) {
+  try {
+    currentRole = role;
+    document.getElementById('landingPage').style.display = 'none';
+    document.getElementById('appShell').classList.add('active');
+    document.body.style.overflow = 'hidden';
+
+    if(role === 'admin') {
+      buildAdminSidebar();
+      buildAdminPages();
+      document.getElementById('sidebarRoleLabel').textContent = 'Administrator Panel';
+      document.getElementById('sidebarAvatar').textContent = 'A';
+      document.getElementById('sidebarAvatar').style.background = 'linear-gradient(135deg,var(--accent),var(--orange))';
+      document.getElementById('sidebarUserName').textContent = 'Administrator';
+      document.getElementById('sidebarUserRole').textContent = 'System Admin';
+      showPage('dashboard');
+    } else {
+      buildStudentSidebar();
+      buildStudentPages();
+      var initials = currentStudent.name.split(' ').map(function(n){return n[0];}).join('');
+      document.getElementById('sidebarRoleLabel').textContent = 'Student Portal';
+      document.getElementById('sidebarAvatar').textContent = initials;
+      document.getElementById('sidebarAvatar').style.background = 'linear-gradient(135deg,var(--blue),var(--teal))';
+      document.getElementById('sidebarUserName').textContent = currentStudent.name;
+      document.getElementById('sidebarUserRole').textContent = currentStudent.course;
+      showPage('s-dashboard');
+    }
+  } catch(err) {
+    console.error('enterApp error:', err);
+    alert('Error entering app: ' + err.message);
+  }
+}
+
+function logout() {
+  currentRole = null;
+  currentStudent = null;
+  document.getElementById('appShell').classList.remove('active');
+  document.getElementById('landingPage').style.display = '';
+  document.getElementById('mainContent').innerHTML = '';
+  document.getElementById('sidebarNav').innerHTML = '';
+  if(videoTimerInterval) clearInterval(videoTimerInterval);
+}
+
+// ============================== NAV ==============================
+function buildAdminSidebar() {
+  document.getElementById('sidebarNav').innerHTML = `
+    <div class="nav-section-label">Main</div>
+    <div class="nav-item active" data-page="dashboard" onclick="showPage('dashboard')">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/></svg>Dashboard</div>
+    <div class="nav-item" data-page="video" onclick="showPage('video')">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="23 7 16 12 23 17 23 7"/><rect x="1" y="5" width="15" height="14" rx="2"/></svg>Video Conference<span class="nav-badge">LIVE</span></div>
+    <div class="nav-item" data-page="students" onclick="showPage('students')">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>Student Progress</div>
+    <div class="nav-section-label">Learning</div>
+    <div class="nav-item" data-page="training" onclick="showPage('training')">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/></svg>Training Centres</div>
+    <div class="nav-item" data-page="exams" onclick="showPage('exams')">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg>Online Exams</div>
+    <div class="nav-section-label">Administration</div>
+    <div class="nav-item" data-page="certificates" onclick="showPage('certificates')">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="8" r="7"/><polyline points="8.21 13.89 7 23 12 20 17 23 15.79 13.88"/></svg>Certificates</div>
+    <div class="nav-item" data-page="reports" onclick="showPage('reports')">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/></svg>Reports</div>
+    <div class="nav-item" data-page="settings" onclick="showPage('settings')">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>Settings</div>
+  `;
+}
+
+function buildStudentSidebar() {
+  document.getElementById('sidebarNav').innerHTML = `
+    <div class="nav-section-label">My Portal</div>
+    <div class="nav-item active" data-page="s-dashboard" onclick="showPage('s-dashboard')">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/></svg>My Dashboard</div>
+    <div class="nav-item" data-page="s-video" onclick="showPage('s-video')">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="23 7 16 12 23 17 23 7"/><rect x="1" y="5" width="15" height="14" rx="2"/></svg>My Classes<span class="nav-badge">LIVE</span></div>
+    <div class="nav-item" data-page="s-progress" onclick="showPage('s-progress')">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg>My Progress</div>
+    <div class="nav-section-label">Learning</div>
+    <div class="nav-item" data-page="s-resources" onclick="showPage('s-resources')">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/></svg>My Resources</div>
+    <div class="nav-item" data-page="s-exams" onclick="showPage('s-exams')">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg>My Exams</div>
+    <div class="nav-item" data-page="s-certificate" onclick="showPage('s-certificate')">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="8" r="7"/><polyline points="8.21 13.89 7 23 12 20 17 23 15.79 13.88"/></svg>My Certificate</div>
+  `;
+}
+
+function showPage(pageId) {
+  document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
+  const pg = document.getElementById('page-'+pageId);
+  if(pg) pg.classList.add('active');
+  document.querySelectorAll('.nav-item').forEach(n => n.classList.remove('active'));
+  const navItem = document.querySelector(`.nav-item[data-page="${pageId}"]`);
+  if(navItem) navItem.classList.add('active');
+  const titles = {
+    dashboard:'Dashboard',video:'Video Conference',students:'Student Progress',
+    training:'Training Centres',exams:'Online Exams',certificates:'Certificate Tracking',
+    reports:'Reports & Analytics',settings:'Settings',
+    's-dashboard':'My Dashboard','s-video':'My Classes','s-progress':'My Progress',
+    's-resources':'My Resources','s-exams':'My Exams','s-certificate':'My Certificate'
+  };
+  document.getElementById('topbarTitle').textContent = titles[pageId]||pageId;
+}
+
+// ============================== BUILD ADMIN PAGES ==============================
+function buildAdminPages() {
+  const mc = document.getElementById('mainContent');
+  mc.innerHTML = `
+  <!-- DASHBOARD -->
+  <section class="page active" id="page-dashboard">
+    <div class="stats-grid">
+      <div class="stat-card"><div class="stat-icon" style="background:var(--blue-dim);color:var(--blue);">👥</div><div class="stat-value">1,247</div><div class="stat-label">Total Enrolled Students</div><div class="stat-change" style="color:var(--green);">↑ 12% this quarter</div></div>
+      <div class="stat-card"><div class="stat-icon" style="background:var(--green-dim);color:var(--green);">🎓</div><div class="stat-value">384</div><div class="stat-label">Certified This Year</div><div class="stat-change" style="color:var(--green);">↑ 8% vs last year</div></div>
+      <div class="stat-card"><div class="stat-icon" style="background:var(--accent-dim);color:var(--accent);">📝</div><div class="stat-value">12</div><div class="stat-label">Upcoming Exams</div><div class="stat-change" style="color:var(--text-muted);">Next: Feb 18</div></div>
+      <div class="stat-card"><div class="stat-icon" style="background:var(--purple-dim);color:var(--purple);">📹</div><div class="stat-value">3</div><div class="stat-label">Live Classes Now</div><div class="stat-change" style="color:var(--red);"><span class="live-dot"></span>&nbsp;In Session</div></div>
+    </div>
+    <div class="card"><div class="card-header"><h3>Student Progress Pipeline</h3><button class="btn btn-secondary btn-sm" onclick="showPage('students')">View All →</button></div>
+      <div class="pipeline"><div class="pipeline-stage s-test"><span class="count" id="pTest">0</span>Testing</div><div class="pipeline-stage s-interview"><span class="count" id="pInterview">0</span>Interview</div><div class="pipeline-stage s-training"><span class="count" id="pTraining">0</span>In Training</div><div class="pipeline-stage s-certified"><span class="count" id="pCertified">0</span>Certified</div><div class="pipeline-stage s-collected"><span class="count" id="pCollected">0</span>Collected</div><div class="pipeline-stage s-incomplete"><span class="count" id="pIncomplete">0</span>Incomplete</div></div>
+    </div>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:18px;">
+      <div class="card"><div class="card-header"><h3>Recent Activity</h3></div>
+        <div style="display:flex;flex-direction:column;gap:12px;">
+          <div style="display:flex;align-items:center;gap:12px;padding:8px 0;border-bottom:1px solid var(--border);"><div style="width:8px;height:8px;border-radius:50%;background:var(--green);flex-shrink:0;"></div><div><div style="font-size:13px;">Keisha Brown completed <strong>Welding Level 2</strong> exam</div><div style="font-size:11px;color:var(--text-muted);">Score: 87% — 15 min ago</div></div></div>
+          <div style="display:flex;align-items:center;gap:12px;padding:8px 0;border-bottom:1px solid var(--border);"><div style="width:8px;height:8px;border-radius:50%;background:var(--blue);flex-shrink:0;"></div><div><div style="font-size:13px;">New class started: <strong>Electrical Installation L3</strong></div><div style="font-size:11px;color:var(--text-muted);">28 students enrolled — 1 hour ago</div></div></div>
+          <div style="display:flex;align-items:center;gap:12px;padding:8px 0;border-bottom:1px solid var(--border);"><div style="width:8px;height:8px;border-radius:50%;background:var(--accent);flex-shrink:0;"></div><div><div style="font-size:13px;">Marlon Davis collected certificate for <strong>Auto Mechanics</strong></div><div style="font-size:11px;color:var(--text-muted);">Certificate #AM-2026-0392 — 3 hours ago</div></div></div>
+          <div style="display:flex;align-items:center;gap:12px;padding:8px 0;"><div style="width:8px;height:8px;border-radius:50%;background:var(--red);flex-shrink:0;"></div><div><div style="font-size:13px;">5 students marked <strong>incomplete</strong> in Cosmetology L1</div><div style="font-size:11px;color:var(--text-muted);">Attendance below threshold — Today</div></div></div>
+        </div>
+      </div>
+      <div class="card"><div class="card-header"><h3>Certifications by Month</h3></div>
+        <div class="bar-chart"><div class="bar-col"><div class="bar" style="height:40%;background:var(--accent);"></div><div class="bar-label">Sep</div></div><div class="bar-col"><div class="bar" style="height:55%;background:var(--accent);"></div><div class="bar-label">Oct</div></div><div class="bar-col"><div class="bar" style="height:70%;background:var(--accent);"></div><div class="bar-label">Nov</div></div><div class="bar-col"><div class="bar" style="height:85%;background:var(--accent);"></div><div class="bar-label">Dec</div></div><div class="bar-col"><div class="bar" style="height:60%;background:var(--accent);"></div><div class="bar-label">Jan</div></div><div class="bar-col"><div class="bar" style="height:45%;background:var(--blue);"></div><div class="bar-label">Feb</div></div></div>
+      </div>
+    </div>
+  </section>
+
+  <!-- VIDEO -->
+  <section class="page" id="page-video">
+    <div style="display:flex;gap:12px;margin-bottom:18px;"><button class="btn btn-primary" onclick="showToast('Creating new class session...')">+ New Class Session</button><button class="btn btn-secondary">Join Existing Class</button></div>
+    <div class="card" id="videoClassList"><div class="card-header"><h3>Active & Scheduled Classes</h3></div><div class="table-wrapper"><table><thead><tr><th>Class</th><th>Instructor</th><th>Time</th><th>Students</th><th>Status</th><th>Action</th></tr></thead><tbody>
+      <tr><td><strong>Welding Theory L2</strong></td><td>Mr. R. Campbell</td><td>9:00 AM - 11:00 AM</td><td>24</td><td><span class="badge badge-red"><span class="badge-dot"></span>Live</span></td><td><button class="btn btn-sm btn-primary" onclick="enterVideoRoom('Welding Theory L2','admin')">Join</button></td></tr>
+      <tr><td><strong>Electrical Safety</strong></td><td>Ms. J. Williams</td><td>11:30 AM - 1:00 PM</td><td>18</td><td><span class="badge badge-red"><span class="badge-dot"></span>Live</span></td><td><button class="btn btn-sm btn-primary" onclick="enterVideoRoom('Electrical Safety','admin')">Join</button></td></tr>
+      <tr><td><strong>Business Admin L1</strong></td><td>Mrs. P. Morgan</td><td>2:00 PM - 4:00 PM</td><td>32</td><td><span class="badge badge-blue"><span class="badge-dot"></span>Scheduled</span></td><td><button class="btn btn-sm btn-secondary">Waiting</button></td></tr>
+      <tr><td><strong>Cosmetology Basics</strong></td><td>Ms. D. Stewart</td><td>10:00 AM - 12:00 PM</td><td>22</td><td><span class="badge badge-red"><span class="badge-dot"></span>Live</span></td><td><button class="btn btn-sm btn-primary" onclick="enterVideoRoom('Cosmetology Basics','admin')">Join</button></td></tr>
+    </tbody></table></div></div>
+    <div id="videoRoom" style="display:none;"></div>
+  </section>
+
+  <!-- STUDENTS -->
+  <section class="page" id="page-students">
+    <div style="display:flex;gap:12px;margin-bottom:20px;flex-wrap:wrap;">
+      <button class="btn btn-primary" onclick="openModal('addStudentModal')">+ Add Student</button>
+      <select class="form-control" style="width:200px;" id="filterStage" onchange="filterStudents()"><option value="all">All Stages</option><option value="testing">Testing</option><option value="interview">Interview</option><option value="training">In Training</option><option value="certified">Certified</option><option value="collected">Cert. Collected</option><option value="incomplete">Incomplete</option></select>
+      <select class="form-control" style="width:200px;" id="filterCourse" onchange="filterStudents()"><option value="all">All Courses</option>${courses.map(c=>'<option>'+c+'</option>').join('')}</select>
+      <input type="text" class="form-control" style="width:220px;" placeholder="Search student name..." id="studentSearch" onkeyup="filterStudents()">
+    </div>
+    <div class="pipeline" style="margin-bottom:20px;"><div class="pipeline-stage s-test"><span class="count" id="pTest2">0</span>Testing</div><div class="pipeline-stage s-interview"><span class="count" id="pInterview2">0</span>Interview</div><div class="pipeline-stage s-training"><span class="count" id="pTraining2">0</span>In Training</div><div class="pipeline-stage s-certified"><span class="count" id="pCertified2">0</span>Certified</div><div class="pipeline-stage s-collected"><span class="count" id="pCollected2">0</span>Collected</div><div class="pipeline-stage s-incomplete"><span class="count" id="pIncomplete2">0</span>Incomplete</div></div>
+    <div class="card"><div class="card-header"><h3>Student Records</h3><span style="font-size:13px;color:var(--text-muted);" id="studentCount">Showing 80 students</span></div><div class="table-wrapper"><table><thead><tr><th>Student</th><th>ID</th><th>Course</th><th>Stage</th><th>Test Score</th><th>Progress</th><th>Actions</th></tr></thead><tbody id="studentTableBody"></tbody></table></div></div>
+  </section>
+
+  <!-- TRAINING -->
+  <section class="page" id="page-training">
+    <div id="trainingOverview"><p style="color:var(--text-secondary);margin-bottom:20px;font-size:14px;">20 dedicated skill centres — select a programme to view materials, curriculum, and resources.</p><div class="skills-grid" id="skillsGrid"></div></div>
+    <div id="skillDetailPage" style="display:none;"></div>
+  </section>
+
+  <!-- EXAMS -->
+  <section class="page" id="page-exams">
+    <div style="display:flex;gap:12px;margin-bottom:20px;"><button class="btn btn-primary" onclick="openModal('createExamModal')">+ Create Exam</button><button class="btn btn-secondary">Export Results</button></div>
+    <div class="tabs"><div class="tab active" onclick="switchExamTab(this,'upcoming')">Upcoming</div><div class="tab" onclick="switchExamTab(this,'active')">Active Now</div><div class="tab" onclick="switchExamTab(this,'completed')">Completed</div></div>
+    <div class="card"><div class="card-header"><h3>Scheduled Examinations</h3></div><div class="table-wrapper"><table><thead><tr><th>Exam Title</th><th>Course</th><th>Date & Time</th><th>Duration</th><th>Students</th><th>Status</th><th>Actions</th></tr></thead><tbody id="examTableBody"></tbody></table></div></div>
+  </section>
+
+  <!-- CERTIFICATES -->
+  <section class="page" id="page-certificates">
+    <div class="cert-status-grid">
+      <div class="cert-stat"><div class="num" style="color:var(--green);">384</div><div style="font-size:12px;color:var(--text-muted);margin-top:4px;">Total Certified</div></div>
+      <div class="cert-stat"><div class="num" style="color:var(--accent);">301</div><div style="font-size:12px;color:var(--text-muted);margin-top:4px;">Certificates Collected</div></div>
+      <div class="cert-stat"><div class="num" style="color:var(--red);">83</div><div style="font-size:12px;color:var(--text-muted);margin-top:4px;">Awaiting Collection</div></div>
+      <div class="cert-stat"><div class="num" style="color:var(--blue);">78%</div><div style="font-size:12px;color:var(--text-muted);margin-top:4px;">Collection Rate</div></div>
+    </div>
+    <div style="display:flex;gap:12px;margin-bottom:20px;"><select class="form-control" style="width:200px;" id="certFilter" onchange="filterCerts()"><option value="all">All Certificates</option><option value="collected">Collected</option><option value="pending">Awaiting Collection</option></select><input type="text" class="form-control" style="width:260px;" placeholder="Search by name or cert number..." id="certSearch" onkeyup="filterCerts()"></div>
+    <div class="card"><div class="card-header"><h3>Certificate Registry</h3><button class="btn btn-secondary btn-sm">Export CSV</button></div><div class="table-wrapper"><table><thead><tr><th>Student</th><th>Certificate No.</th><th>Programme</th><th>Level</th><th>Date Certified</th><th>Collection Status</th><th>Actions</th></tr></thead><tbody id="certTableBody"></tbody></table></div></div>
+  </section>
+
+  <!-- REPORTS -->
+  <section class="page" id="page-reports">
+    <div class="stats-grid">
+      <div class="stat-card"><div class="stat-icon" style="background:var(--green-dim);color:var(--green);">📊</div><div class="stat-value">76%</div><div class="stat-label">Overall Pass Rate</div></div>
+      <div class="stat-card"><div class="stat-icon" style="background:var(--accent-dim);color:var(--accent);">⏱️</div><div class="stat-value">4.2</div><div class="stat-label">Avg. Months to Cert</div></div>
+      <div class="stat-card"><div class="stat-icon" style="background:var(--blue-dim);color:var(--blue);">📈</div><div class="stat-value">89%</div><div class="stat-label">Attendance Rate</div></div>
+      <div class="stat-card"><div class="stat-icon" style="background:var(--red-dim);color:var(--red);">⚠️</div><div class="stat-value">6.7%</div><div class="stat-label">Dropout Rate</div></div>
+    </div>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:18px;">
+      <div class="card"><div class="card-header"><h3>Pass Rate by Programme</h3></div><div id="passRateChart"></div></div>
+      <div class="card"><div class="card-header"><h3>Enrollment Trends</h3></div><div class="bar-chart"><div class="bar-col"><div class="bar" style="height:55%;background:var(--blue);"></div><div class="bar-label">Q1</div></div><div class="bar-col"><div class="bar" style="height:70%;background:var(--blue);"></div><div class="bar-label">Q2</div></div><div class="bar-col"><div class="bar" style="height:90%;background:var(--blue);"></div><div class="bar-label">Q3</div></div><div class="bar-col"><div class="bar" style="height:65%;background:var(--accent);"></div><div class="bar-label">Q4</div></div></div></div>
+    </div>
+  </section>
+
+  <!-- SETTINGS -->
+  <section class="page" id="page-settings">
+    <div class="card" style="max-width:700px;">
+      <div class="card-header"><h3>System Settings</h3></div>
+      <div class="form-group"><label>Institution Name</label><input type="text" class="form-control" value="HEART/NSTA Trust - Community Training Interventions"></div>
+      <div class="form-group"><label>Administrator Email</label><input type="email" class="form-control" value="admin@heartlms.edu.jm"></div>
+      <div class="form-group"><label>Academic Year</label><select class="form-control"><option>2025/2026</option><option>2024/2025</option></select></div>
+      <div class="form-group"><label>Video Conference Provider</label><select class="form-control"><option>Built-in (WebRTC)</option><option>Zoom Integration</option><option>Microsoft Teams</option><option>Google Meet</option></select></div>
+      <button class="btn btn-primary" onclick="showToast('Settings saved successfully!')">Save Changes</button>
+    </div>
+  </section>
+  `;
+
+  // Populate data
+  renderStudents(students);
+  renderSkills();
+  renderExams('upcoming');
+  renderCerts('all','');
+  renderPassRates();
+  updatePipelineCounts();
+}
+
+// ============================== BUILD STUDENT PAGES ==============================
+function buildStudentPages() {
+  try {
+  const s = currentStudent;
+  const skill = skillAreas.find(function(sk) { return s.course.toLowerCase().indexOf(sk.name.split(' ')[0].toLowerCase()) !== -1; }) || skillAreas[0];
+  const stageOrder = ['testing','interview','training','certified','collected'];
+  const currentStageIdx = stageOrder.indexOf(s.stage === 'incomplete' ? 'training' : s.stage);
+  const circumference = 2 * Math.PI * 52;
+  const dashoffset = circumference - (s.progress / 100) * circumference;
+  const skillColorRGB = hexToRgb(skill.color);
+
+  const mc = document.getElementById('mainContent');
+  mc.innerHTML = `
+  <!-- STUDENT DASHBOARD -->
+  <section class="page active" id="page-s-dashboard">
+    <div class="student-welcome-banner">
+      <h2>Welcome back, ${s.name.split(' ')[0]}! 👋</h2>
+      <p>Programme: <strong>${s.course}</strong> &nbsp;•&nbsp; ID: <strong>${s.id}</strong> &nbsp;•&nbsp; Instructor: <strong>${s.instructor}</strong></p>
+    </div>
+
+    <div class="stats-grid" style="grid-template-columns:repeat(4,1fr);">
+      <div class="stat-card" style="text-align:center;">
+        <div class="progress-ring-container">
+          <div class="progress-ring">
+            <svg width="120" height="120"><circle class="ring-bg" cx="60" cy="60" r="52" fill="none" stroke-width="8"/><circle class="ring-fill" cx="60" cy="60" r="52" fill="none" stroke="${s.progress>=80?'var(--green)':s.progress>=40?'var(--accent)':'var(--red)'}" stroke-width="8" stroke-linecap="round" stroke-dasharray="${circumference}" stroke-dashoffset="${dashoffset}"/></svg>
+            <div class="ring-text"><span class="ring-value">${s.progress}%</span><span class="ring-label">Complete</span></div>
+          </div>
+        </div>
+      </div>
+      <div class="stat-card"><div class="stat-icon" style="background:var(--blue-dim);color:var(--blue);">📊</div><div class="stat-value">${s.attendance}%</div><div class="stat-label">Attendance Rate</div></div>
+      <div class="stat-card"><div class="stat-icon" style="background:var(--accent-dim);color:var(--accent);">📝</div><div class="stat-value">${s.assignments}/${s.assignmentsTotal}</div><div class="stat-label">Assignments Done</div></div>
+      <div class="stat-card"><div class="stat-icon" style="background:var(--green-dim);color:var(--green);">⭐</div><div class="stat-value">${s.gpa}</div><div class="stat-label">Current GPA</div></div>
+    </div>
+
+    <!-- Stage Tracker -->
+    <div class="card">
+      <div class="card-header"><h3>My Journey</h3>
+        <span class="badge ${stageBadge[s.stage]}"><span class="badge-dot"></span>${stageLabels[s.stage]}</span>
+      </div>
+      <div class="student-stage-tracker">
+        ${stageOrder.map((st, i) => {
+          const isCompleted = i < currentStageIdx;
+          const isCurrent = i === currentStageIdx;
+          const isLocked = i > currentStageIdx;
+          return `
+            ${i > 0 ? `<div class="stage-connector ${isCompleted ? 'completed' : ''}"></div>` : ''}
+            <div class="stage-node">
+              <div class="stage-circle ${isCompleted ? 'completed' : isCurrent ? 'current' : 'locked'}">
+                ${isCompleted ? '✓' : stageIcons[st]}
+              </div>
+              <div class="stage-label ${isCurrent ? 'active-label' : ''}">${stageLabels[st]}</div>
+            </div>
+          `;
+        }).join('')}
+      </div>
+      ${s.stage === 'incomplete' ? '<div style="background:var(--red-dim);border:1px solid rgba(231,76,60,0.3);border-radius:var(--radius-sm);padding:14px;margin-top:16px;display:flex;align-items:center;gap:10px;"><span style="font-size:20px;">⚠️</span><div><strong style="color:var(--red);">Status: Incomplete</strong><p style="font-size:12px;color:var(--text-muted);margin-top:2px;">Please contact your instructor to discuss completing the remaining requirements.</p></div></div>' : ''}
+    </div>
+
+    <!-- Today's Schedule -->
+    <div class="card">
+      <div class="card-header"><h3>Today's Schedule</h3><span style="font-size:12px;color:var(--text-muted);">Sunday, Feb 15, 2026</span></div>
+      <div class="class-schedule-card" onclick="showPage('s-video')">
+        <div class="class-time-block"><div class="time">9:00</div><div class="period">AM</div></div>
+        <div style="flex:1;"><div style="font-size:14px;font-weight:600;">${s.course} — Theory Session</div><div style="font-size:12px;color:var(--text-muted);">${s.instructor} &nbsp;•&nbsp; Room: Virtual-01</div></div>
+        <span class="badge badge-red"><span class="live-dot"></span>&nbsp;Live Now</span>
+        <button class="btn btn-sm btn-blue" onclick="event.stopPropagation();showPage('s-video')">Join</button>
+      </div>
+      <div class="class-schedule-card">
+        <div class="class-time-block"><div class="time">1:00</div><div class="period">PM</div></div>
+        <div style="flex:1;"><div style="font-size:14px;font-weight:600;">${s.course} — Practical Lab</div><div style="font-size:12px;color:var(--text-muted);">${s.instructor} &nbsp;•&nbsp; Workshop Bay 3</div></div>
+        <span class="badge badge-blue">In Person</span>
+      </div>
+      <div class="class-schedule-card">
+        <div class="class-time-block"><div class="time">3:30</div><div class="period">PM</div></div>
+        <div style="flex:1;"><div style="font-size:14px;font-weight:600;">Study Group — Exam Prep</div><div style="font-size:12px;color:var(--text-muted);">Self-directed &nbsp;•&nbsp; Library</div></div>
+        <span class="badge badge-purple">Optional</span>
+      </div>
+    </div>
+  </section>
+
+  <!-- STUDENT VIDEO -->
+  <section class="page" id="page-s-video">
+    <div class="card" id="sVideoClassList">
+      <div class="card-header"><h3>My Class Sessions</h3></div>
+      <div class="class-schedule-card" style="border-color:rgba(231,76,60,0.3);">
+        <div class="class-time-block" style="background:var(--red-dim);"><div class="time">9:00</div><div class="period">AM</div></div>
+        <div style="flex:1;"><div style="font-size:14px;font-weight:600;">${s.course} — Theory Session</div><div style="font-size:12px;color:var(--text-muted);">${s.instructor} &nbsp;•&nbsp; 24 students online</div></div>
+        <span class="badge badge-red"><span class="live-dot"></span>&nbsp;Live Now</span>
+        <button class="btn btn-blue" onclick="enterVideoRoom('${s.course} — Theory','student')">Join Class →</button>
+      </div>
+      <div class="class-schedule-card">
+        <div class="class-time-block"><div class="time">2:00</div><div class="period">PM</div></div>
+        <div style="flex:1;"><div style="font-size:14px;font-weight:600;">${s.course} — Workshop Review</div><div style="font-size:12px;color:var(--text-muted);">${s.instructor} &nbsp;•&nbsp; Starts in 5 hours</div></div>
+        <span class="badge badge-blue">Scheduled</span>
+        <button class="btn btn-secondary btn-sm" disabled>Not Started</button>
+      </div>
+      <div class="card" style="margin-top:18px;"><div class="card-header"><h3>Past Recordings</h3></div>
+        <div class="material-item"><div class="material-icon" style="background:var(--red-dim);color:var(--red);">▶</div><div style="flex:1;"><div style="font-size:13px;">${s.course} — Safety Fundamentals</div><div style="font-size:11px;color:var(--text-muted);">Feb 12 • 1hr 20min</div></div><button class="btn btn-sm btn-secondary">Watch</button></div>
+        <div class="material-item"><div class="material-icon" style="background:var(--red-dim);color:var(--red);">▶</div><div style="flex:1;"><div style="font-size:13px;">${s.course} — Core Techniques Review</div><div style="font-size:11px;color:var(--text-muted);">Feb 10 • 55min</div></div><button class="btn btn-sm btn-secondary">Watch</button></div>
+        <div class="material-item"><div class="material-icon" style="background:var(--red-dim);color:var(--red);">▶</div><div style="flex:1;"><div style="font-size:13px;">${s.course} — Tool Identification</div><div style="font-size:11px;color:var(--text-muted);">Feb 7 • 1hr 5min</div></div><button class="btn btn-sm btn-secondary">Watch</button></div>
+      </div>
+    </div>
+    <div id="sVideoRoom" style="display:none;"></div>
+  </section>
+
+  <!-- STUDENT PROGRESS -->
+  <section class="page" id="page-s-progress">
+    <div class="stats-grid" style="grid-template-columns:repeat(4,1fr);">
+      <div class="stat-card"><div class="stat-icon" style="background:var(--accent-dim);color:var(--accent);">📊</div><div class="stat-value">${s.progress}%</div><div class="stat-label">Overall Progress</div></div>
+      <div class="stat-card"><div class="stat-icon" style="background:var(--blue-dim);color:var(--blue);">📅</div><div class="stat-value">${s.attendance}%</div><div class="stat-label">Attendance</div></div>
+      <div class="stat-card"><div class="stat-icon" style="background:var(--green-dim);color:var(--green);">✅</div><div class="stat-value">${s.score || 'N/A'}</div><div class="stat-label">Last Test Score</div></div>
+      <div class="stat-card"><div class="stat-icon" style="background:var(--purple-dim);color:var(--purple);">🏷️</div><div class="stat-value" style="font-size:18px;">${stageLabels[s.stage]}</div><div class="stat-label">Current Status</div></div>
+    </div>
+
+    <!-- Detailed progress -->
+    <div class="card">
+      <div class="card-header"><h3>Course Modules Progress</h3></div>
+      ${['Safety & PPE','Core Theory','Tool Identification','Practical Skills 1','Practical Skills 2','Workshop Practice','Assessment Preparation','Final Examination'].map((mod,i) => {
+        const pct = i < Math.floor(s.progress/12.5) ? 100 : (i === Math.floor(s.progress/12.5) ? (s.progress % 12.5)/12.5*100 : 0);
+        return `<div style="display:flex;align-items:center;gap:14px;padding:10px 0;${i<7?'border-bottom:1px solid var(--border);':''}">
+          <div style="width:200px;font-size:13px;">${mod}</div>
+          <div class="progress-bar progress-bar-lg" style="flex:1;"><div class="fill" style="width:${pct.toFixed(0)}%;background:${pct>=100?'var(--green)':pct>0?'var(--accent)':'var(--border-light)'};"></div></div>
+          <div style="width:50px;text-align:right;font-size:12px;font-weight:600;color:${pct>=100?'var(--green)':pct>0?'var(--accent)':'var(--text-muted)'};">${pct.toFixed(0)}%</div>
+          <span class="badge ${pct>=100?'badge-green':pct>0?'badge-amber':'badge-blue'}" style="width:90px;justify-content:center;">${pct>=100?'Complete':pct>0?'In Progress':'Locked'}</span>
+        </div>`;
+      }).join('')}
+    </div>
+
+    <!-- Assignments -->
+    <div class="card">
+      <div class="card-header"><h3>Assignments</h3><span style="font-size:13px;color:var(--text-muted);">${s.assignments}/${s.assignmentsTotal} completed</span></div>
+      <div class="table-wrapper"><table><thead><tr><th>Assignment</th><th>Due Date</th><th>Score</th><th>Status</th></tr></thead><tbody>
+        ${[
+          {t:'Safety Assessment Quiz',d:'Feb 3',sc:'92%',st:'graded'},
+          {t:'Tool Identification Test',d:'Feb 6',sc:'88%',st:'graded'},
+          {t:'Theory Worksheet #1',d:'Feb 8',sc:'76%',st:'graded'},
+          {t:'Practical Report #1',d:'Feb 10',sc:'85%',st:'graded'},
+          {t:'Mid-Term Examination',d:'Feb 13',sc:s.score||'82%',st:'graded'},
+          {t:'Practical Report #2',d:'Feb 17',sc:'—',st:'submitted'},
+          {t:'Workshop Portfolio',d:'Feb 22',sc:'—',st:'pending'},
+          {t:'Final Project',d:'Mar 5',sc:'—',st:'pending'}
+        ].map((a,i) => `<tr><td>${a.t}</td><td>${a.d}</td><td style="font-weight:600;${a.sc!=='—'?'color:var(--green)':''}">${a.sc}</td><td><span class="badge ${a.st==='graded'?'badge-green':a.st==='submitted'?'badge-blue':'badge-amber'}">${a.st==='graded'?'✓ Graded':a.st==='submitted'?'Submitted':'Pending'}</span></td></tr>`).join('')}
+      </tbody></table></div>
+    </div>
+  </section>
+
+  <!-- STUDENT RESOURCES -->
+  <section class="page" id="page-s-resources">
+    <div class="student-welcome-banner" style="background:linear-gradient(135deg,rgba(${skillColorRGB},0.15),rgba(52,152,219,0.05));">
+      <div style="display:flex;align-items:center;gap:14px;margin-bottom:8px;">
+        <div style="width:48px;height:48px;border-radius:12px;background:${skill.color}33;display:flex;align-items:center;justify-content:center;font-size:24px;">${skill.icon}</div>
+        <div><h2 style="font-size:20px;">${skill.name} Resources</h2><p style="margin:0;">Your programme-specific learning materials</p></div>
+      </div>
+    </div>
+
+    <div class="tabs">
+      <div class="tab active">All Materials</div>
+      <div class="tab">Videos</div>
+      <div class="tab">Documents</div>
+      <div class="tab">Worksheets</div>
+    </div>
+
+    ${[
+      {cat:'📹 Video Lectures',items:['Introduction to '+skill.name,'Safety Procedures & PPE Training','Core Techniques — Part 1','Core Techniques — Part 2','Advanced Methods & Best Practices','Industry Standards Overview']},
+      {cat:'📄 Study Guides & Handbooks',items:['Course Syllabus & Learning Outcomes','Theory Handbook (Complete)','Practical Assessment Preparation Guide','Exam Revision Notes & Tips','Industry Terminology Glossary']},
+      {cat:'📝 Practice Worksheets',items:['Practice Exercise Set 1','Practice Exercise Set 2','Self-Assessment Checklist','Mock Exam Questions','Past Paper — 2025']},
+      {cat:'🔗 Additional Resources',items:['Industry Standards Reference Link','Online Simulation Tool','Supplementary Reading List','Career Pathways Guide']}
+    ].map(section => `
+      <div class="card">
+        <div class="card-header"><h3>${section.cat}</h3><span style="font-size:12px;color:var(--text-muted);">${section.items.length} items</span></div>
+        <ul class="material-list">
+          ${section.items.map((item,i) => `
+            <li class="material-item">
+              <div class="material-icon" style="background:${skill.color}22;color:${skill.color};">${section.cat.split(' ')[0]}</div>
+              <div style="flex:1;"><div style="font-size:13.5px;">${item}</div><div style="font-size:11px;color:var(--text-muted);">Updated ${Math.floor(Math.random()*10)+1} days ago • ${['PDF','Video','DOC','Link'][i%4]}</div></div>
+              <button class="btn btn-sm btn-secondary">${section.cat.includes('Video')?'▶ Play':'Download'}</button>
+            </li>
+          `).join('')}
+        </ul>
+      </div>
+    `).join('')}
+  </section>
+
+  <!-- STUDENT EXAMS -->
+  <section class="page" id="page-s-exams">
+    <div class="card">
+      <div class="card-header"><h3>My Upcoming Exams</h3></div>
+      ${exams.filter(e => e.course === s.course && e.status === 'upcoming').map(e => `
+        <div class="class-schedule-card" style="border-left:3px solid var(--accent);">
+          <div class="class-time-block"><div class="time" style="font-size:13px;">${e.date.split('-').slice(1).join('/')}</div><div class="period">${e.time}</div></div>
+          <div style="flex:1;"><div style="font-size:14px;font-weight:600;">${e.title}</div><div style="font-size:12px;color:var(--text-muted);">${e.duration} minutes &nbsp;•&nbsp; ${e.questions} questions &nbsp;•&nbsp; Pass: ${e.passMark}%</div></div>
+          <span class="badge badge-amber">Upcoming</span>
+        </div>
+      `).join('') || '<p style="color:var(--text-muted);padding:16px;">No upcoming exams for your programme.</p>'}
+    </div>
+    <div class="card">
+      <div class="card-header"><h3>Past Exam Results</h3></div>
+      ${exams.filter(e => e.course === s.course && e.status === 'completed').map(e => `
+        <div class="class-schedule-card" style="border-left:3px solid var(--green);">
+          <div class="class-time-block" style="background:var(--green-dim);"><div class="time" style="font-size:13px;">${e.date.split('-').slice(1).join('/')}</div><div class="period">${e.time}</div></div>
+          <div style="flex:1;"><div style="font-size:14px;font-weight:600;">${e.title}</div><div style="font-size:12px;color:var(--text-muted);">Score: <strong style="color:var(--green);">${s.score||'82%'}</strong> &nbsp;•&nbsp; Class Average: ${e.passRate}</div></div>
+          <span class="badge badge-green"><span class="badge-dot"></span>Passed</span>
+        </div>
+      `).join('') || '<p style="color:var(--text-muted);padding:16px;">No past exams yet.</p>'}
+    </div>
+  </section>
+
+  <!-- STUDENT CERTIFICATE -->
+  <section class="page" id="page-s-certificate">
+    ${s.certNo ? `
+      <div class="card" style="text-align:center;padding:40px;">
+        <div style="font-size:64px;margin-bottom:16px;">🎓</div>
+        <h2 style="font-size:26px;margin-bottom:8px;color:var(--green);">Congratulations!</h2>
+        <p style="font-size:15px;color:var(--text-secondary);margin-bottom:24px;">You have been certified in <strong>${s.course}</strong></p>
+        <div style="display:inline-block;background:var(--bg-input);border:2px dashed var(--border-light);border-radius:var(--radius);padding:24px 40px;margin-bottom:24px;">
+          <div style="font-size:11px;color:var(--text-muted);text-transform:uppercase;letter-spacing:1px;margin-bottom:4px;">Certificate Number</div>
+          <div style="font-size:22px;font-family:'Playfair Display',serif;font-weight:700;color:var(--accent);">${s.certNo}</div>
+          <div style="font-size:12px;color:var(--text-muted);margin-top:8px;">Issued: ${s.certDate}</div>
+        </div>
+        <div>
+          <div style="font-size:13px;margin-bottom:8px;">Collection Status:</div>
+          ${s.certCollected
+            ? '<span class="badge badge-green" style="font-size:14px;padding:8px 20px;"><span class="badge-dot"></span>Certificate Collected ✓</span>'
+            : '<span class="badge badge-amber" style="font-size:14px;padding:8px 20px;"><span class="badge-dot"></span>Awaiting Collection — Visit your centre</span>'}
+        </div>
+      </div>
+    ` : `
+      <div class="card" style="text-align:center;padding:40px;">
+        <div style="font-size:64px;margin-bottom:16px;opacity:0.3;">🎓</div>
+        <h2 style="font-size:22px;margin-bottom:8px;color:var(--text-muted);">Certificate Not Yet Available</h2>
+        <p style="font-size:14px;color:var(--text-muted);max-width:400px;margin:0 auto 24px;">You must complete all training modules and pass your certification exam before your certificate can be issued.</p>
+        <div style="display:inline-flex;align-items:center;gap:8px;background:var(--bg-input);padding:12px 20px;border-radius:var(--radius-sm);">
+          <span>Current Status:</span>
+          <span class="badge ${stageBadge[s.stage]}"><span class="badge-dot"></span>${stageLabels[s.stage]}</span>
+        </div>
+      </div>
+    `}
+  </section>
+  `;
+  } catch(err) {
+    console.error('buildStudentPages error:', err);
+    document.getElementById('mainContent').innerHTML = '<div class="card" style="margin:40px;padding:40px;text-align:center;"><h3>Error loading student portal</h3><p style="color:var(--text-muted);margin-top:8px;">'+err.message+'</p><button class="btn btn-primary" style="margin-top:16px;" onclick="logout()">Go Back</button></div>';
+  }
+}
+
+function hexToRgb(hex) {
+  var result = /^#?([a-f\d]{2})([a-f\d]{2})([a-f\d]{2})$/i.exec(hex);
+  return result ? parseInt(result[1],16)+','+parseInt(result[2],16)+','+parseInt(result[3],16) : '52,152,219';
+}
+
+// ============================== SHARED FUNCTIONS ==============================
+function enterVideoRoom(title, role) {
+  const listId = role==='admin' ? 'videoClassList' : 'sVideoClassList';
+  const roomId = role==='admin' ? 'videoRoom' : 'sVideoRoom';
+  document.getElementById(listId).style.display = 'none';
+  const room = document.getElementById(roomId);
+  room.style.display = 'block';
+
+  const userName = role==='admin' ? 'Admin' : currentStudent.name;
+  const userInitials = role==='admin' ? 'A' : currentStudent.name.split(' ').map(n=>n[0]).join('');
+
+  room.innerHTML = `
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px;">
+      <div style="display:flex;align-items:center;gap:12px;">
+        <button class="btn btn-secondary btn-sm" onclick="exitVideoRoom('${role}')">← Back</button>
+        <h3 style="font-family:'Playfair Display',serif;">${title}</h3>
+        <span class="badge badge-red"><span class="live-dot"></span>&nbsp;LIVE</span>
+      </div>
+      <div style="font-size:13px;color:var(--text-muted);" id="vTimer-${role}">00:00:00</div>
+    </div>
+    <div style="display:grid;grid-template-columns:1fr 320px;gap:18px;">
+      <div>
+        <div class="video-grid">
+          <div class="video-tile" style="grid-column:span 2;"><div class="avatar-lg" style="background:linear-gradient(135deg,var(--accent),var(--orange));">RC</div><div class="participant-info">Mr. R. Campbell (Instructor) 🎤</div></div>
+          <div class="video-tile"><div class="avatar-lg" style="background:linear-gradient(135deg,var(--blue),#2980b9);">KB</div><div class="participant-info">Keisha Brown</div></div>
+          <div class="video-tile"><div class="avatar-lg" style="background:linear-gradient(135deg,var(--green),#27ae60);">MD</div><div class="participant-info">Marlon Davis</div></div>
+          ${role==='student' ? `<div class="video-tile" style="border-color:var(--blue);"><div class="avatar-lg" style="background:linear-gradient(135deg,var(--teal),#16a085);">${userInitials}</div><div class="participant-info">${userName} (You) 🎤</div></div>` : `<div class="video-tile"><div class="avatar-lg" style="background:linear-gradient(135deg,var(--purple),#8e44ad);">TJ</div><div class="participant-info">Tanya Johnson</div></div>`}
+          <div class="video-tile"><div class="avatar-lg" style="background:linear-gradient(135deg,var(--red),#c0392b);">AS</div><div class="participant-info">Andre Smith</div></div>
+        </div>
+        <div class="video-controls">
+          <button class="vc-btn active" onclick="this.classList.toggle('active')" title="Microphone">🎤</button>
+          <button class="vc-btn active" onclick="this.classList.toggle('active')" title="Camera">📹</button>
+          <button class="vc-btn" onclick="this.classList.toggle('active')" title="Screen Share">🖥️</button>
+          ${role==='student' ? '<button class="vc-btn" onclick="this.classList.toggle(\'active\')" title="Hand Raise">✋</button>' : '<button class="vc-btn" onclick="this.classList.toggle(\'active\')" title="Whiteboard">📋</button>'}
+          <button class="vc-btn" onclick="this.classList.toggle('active')" title="Record">⏺️</button>
+          <button class="vc-btn danger" onclick="exitVideoRoom('${role}')" title="Leave">📞</button>
+        </div>
+      </div>
+      <div>
+        <div class="chat-panel">
+          <h4 style="font-size:14px;margin-bottom:12px;font-family:'Playfair Display',serif;">Class Chat</h4>
+          <div class="chat-messages" id="chatMsgs-${role}">
+            <div class="chat-msg"><div class="sender">Mr. Campbell</div><div class="text">Welcome everyone. Let's get started.</div></div>
+            <div class="chat-msg"><div class="sender" style="color:var(--blue);">Keisha B.</div><div class="text">Good morning!</div></div>
+          </div>
+          <div class="chat-input-row">
+            <input type="text" class="form-control" placeholder="Type a message..." id="chatIn-${role}" onkeyup="if(event.key==='Enter')sendChatMsg('${role}','${userName}')">
+            <button class="btn btn-primary btn-sm" onclick="sendChatMsg('${role}','${userName}')">Send</button>
+          </div>
+        </div>
+        <div class="card" style="margin-top:12px;padding:14px;">
+          <h4 style="font-size:13px;margin-bottom:10px;">Participants (24)</h4>
+          <div style="display:flex;flex-wrap:wrap;gap:6px;">
+            <span class="badge badge-green" style="font-size:10px;">Mr. Campbell 🎤</span>
+            <span class="badge badge-blue" style="font-size:10px;">Keisha B.</span>
+            <span class="badge badge-blue" style="font-size:10px;">Marlon D.</span>
+            ${role==='student' ? `<span class="badge badge-teal" style="font-size:10px;">${userName} (You)</span>` : ''}
+            <span class="badge badge-blue" style="font-size:10px;">+${role==='student'?'20':'21'} more</span>
+          </div>
+        </div>
+      </div>
+    </div>
+  `;
+
+  videoSeconds = Math.floor(Math.random()*3600)+600;
+  if(videoTimerInterval) clearInterval(videoTimerInterval);
+  videoTimerInterval = setInterval(() => {
+    videoSeconds++;
+    const h=Math.floor(videoSeconds/3600),m=Math.floor((videoSeconds%3600)/60),sc=videoSeconds%60;
+    const el = document.getElementById('vTimer-'+role);
+    if(el) el.textContent = String(h).padStart(2,'0')+':'+String(m).padStart(2,'0')+':'+String(sc).padStart(2,'0');
+  },1000);
+}
+
+function exitVideoRoom(role) {
+  if(videoTimerInterval) clearInterval(videoTimerInterval);
+  const listId = role==='admin' ? 'videoClassList' : 'sVideoClassList';
+  const roomId = role==='admin' ? 'videoRoom' : 'sVideoRoom';
+  document.getElementById(listId).style.display = 'block';
+  document.getElementById(roomId).style.display = 'none';
+}
+
+function sendChatMsg(role, sender) {
+  const input = document.getElementById('chatIn-'+role);
+  const msg = input.value.trim();
+  if(!msg) return;
+  const msgs = document.getElementById('chatMsgs-'+role);
+  msgs.innerHTML += `<div class="chat-msg"><div class="sender" style="color:var(--teal);">${sender}</div><div class="text">${msg}</div></div>`;
+  input.value = '';
+  msgs.scrollTop = msgs.scrollHeight;
+}
+
+// ============================== ADMIN FUNCTIONS ==============================
+function renderStudents(data) {
+  const tbody = document.getElementById('studentTableBody');
+  if(!tbody) return;
+  tbody.innerHTML = data.map(s => `
+    <tr><td><strong>${s.name}</strong></td><td style="font-family:monospace;font-size:12px;color:var(--text-muted);">${s.id}</td><td>${s.course}</td>
+    <td><span class="badge ${stageBadge[s.stage]}"><span class="badge-dot"></span>${stageLabels[s.stage]}</span></td><td>${s.score||'—'}</td>
+    <td><div style="display:flex;align-items:center;gap:8px;"><div class="progress-bar" style="width:80px;"><div class="fill" style="width:${s.progress}%;background:${s.progress>=80?'var(--green)':s.progress>=40?'var(--accent)':'var(--red)'};"></div></div><span style="font-size:12px;color:var(--text-muted);">${s.progress}%</span></div></td>
+    <td><button class="btn btn-sm btn-secondary" onclick="openUpdateStage(${students.indexOf(s)})">Update</button></td></tr>
+  `).join('');
+  const sc = document.getElementById('studentCount');
+  if(sc) sc.textContent = `Showing ${data.length} students`;
+}
+
+function filterStudents() {
+  let filtered = [...students];
+  const stage = document.getElementById('filterStage')?.value;
+  const course = document.getElementById('filterCourse')?.value;
+  const search = document.getElementById('studentSearch')?.value?.toLowerCase();
+  if(stage && stage!=='all') filtered = filtered.filter(s => s.stage===stage);
+  if(course && course!=='all') filtered = filtered.filter(s => s.course===course);
+  if(search) filtered = filtered.filter(s => s.name.toLowerCase().includes(search));
+  renderStudents(filtered);
+}
+
+function openUpdateStage(idx) {
+  const s = students[idx];
+  document.getElementById('updateStageContent').innerHTML = `
+    <p style="margin-bottom:16px;font-size:14px;">Student: <strong>${s.name}</strong> (${s.id})<br>Course: ${s.course}<br>Current: <span class="badge ${stageBadge[s.stage]}">${stageLabels[s.stage]}</span></p>
+    <div class="form-group"><label>Move to Stage</label><select class="form-control" id="newStage">${stages.map(st=>`<option value="${st}" ${st===s.stage?'selected':''}>${stageLabels[st]}</option>`).join('')}</select></div>
+    <div class="form-group"><label>Notes</label><textarea class="form-control" placeholder="Add notes..."></textarea></div>
+    <div style="display:flex;gap:10px;justify-content:flex-end;margin-top:20px;"><button class="btn btn-secondary" onclick="closeModal('updateStageModal')">Cancel</button><button class="btn btn-primary" onclick="updateStudentStage(${idx})">Update</button></div>
+  `;
+  openModal('updateStageModal');
+}
+function updateStudentStage(idx) {
+  const newStage = document.getElementById('newStage').value;
+  students[idx].stage = newStage;
+  if(newStage==='certified'){students[idx].progress=90;students[idx].certNo=students[idx].course.substring(0,2).toUpperCase()+'-2026-'+String(Math.floor(Math.random()*9000)+1000);students[idx].certDate='2026-02-15';}
+  if(newStage==='collected'){students[idx].progress=100;students[idx].certCollected=true;}
+  if(newStage==='incomplete')students[idx].progress=Math.min(students[idx].progress,40);
+  closeModal('updateStageModal');filterStudents();updatePipelineCounts();
+  showToast(`${students[idx].name} moved to ${stageLabels[newStage]}`);
+}
+function updatePipelineCounts() {
+  stages.forEach(s => {
+    const count = students.filter(st=>st.stage===s).length;
+    ['','2'].forEach(sfx => { const el=document.getElementById('p'+s.charAt(0).toUpperCase()+s.slice(1)+sfx); if(el) el.textContent=count; });
+  });
+}
+function addStudent() {
+  const name = document.getElementById('newStudentName').value.trim();
+  if(!name){alert('Please enter a name');return;}
+  students.unshift({id:'STU-'+String(2026000+students.length),name,stage:document.getElementById('newStudentStage').value,course:document.getElementById('newStudentCourse').value,score:'',progress:10,certNo:null,certDate:null,certCollected:false,attendance:0,assignments:0,assignmentsTotal:8,gpa:'0.0',instructor:'Mr. R. Campbell'});
+  closeModal('addStudentModal');filterStudents();updatePipelineCounts();showToast(`${name} added!`);document.getElementById('newStudentName').value='';
+}
+
+function renderSkills() {
+  const grid = document.getElementById('skillsGrid');
+  if(!grid) return;
+  grid.innerHTML = skillAreas.map(s=>`<div class="skill-card" onclick="showSkillDetail(${s.id})"><div class="skill-icon" style="background:${s.color}22;color:${s.color};">${s.icon}</div><h4>${s.name}</h4><p>${s.desc}</p><div class="skill-meta"><span>👥 ${s.students}</span><span>📄 ${s.materials}</span></div></div>`).join('');
+}
+function showSkillDetail(id) {
+  const skill = skillAreas.find(s=>s.id===id);
+  document.getElementById('trainingOverview').style.display='none';
+  const d = document.getElementById('skillDetailPage');
+  d.style.display='block';
+  const mats = [{t:'📹 Video Lectures',items:['Introduction','Safety & PPE','Core Techniques Pt.1','Core Techniques Pt.2','Advanced Methods']},{t:'📄 Study Guides',items:['Syllabus','Theory Handbook','Assessment Guide','Exam Notes']},{t:'📝 Worksheets',items:['Exercise Set 1','Exercise Set 2','Self-Assessment','Revision Qs']},{t:'📊 Rubrics',items:['Practical Rubric','Exam Blueprint','Portfolio Requirements']}];
+  d.innerHTML = `<div style="display:flex;align-items:center;gap:16px;margin-bottom:24px;"><button style="background:rgba(255,255,255,0.06);border:1px solid var(--border-light);color:var(--text-secondary);width:36px;height:36px;border-radius:var(--radius-sm);display:flex;align-items:center;justify-content:center;cursor:pointer;" onclick="backToSkills()">←</button><div class="skill-icon" style="background:${skill.color}22;color:${skill.color};width:48px;height:48px;border-radius:12px;display:flex;align-items:center;justify-content:center;font-size:22px;">${skill.icon}</div><div><h2 style="font-size:22px;">${skill.name}</h2><p style="font-size:13px;color:var(--text-muted);">${skill.desc}</p></div></div>
+  <div class="stats-grid" style="grid-template-columns:repeat(4,1fr);margin-bottom:24px;"><div class="stat-card"><div class="stat-value" style="font-size:22px;">${skill.students}</div><div class="stat-label">Students</div></div><div class="stat-card"><div class="stat-value" style="font-size:22px;">${skill.materials}</div><div class="stat-label">Materials</div></div><div class="stat-card"><div class="stat-value" style="font-size:22px;">L1-3</div><div class="stat-label">Levels</div></div><div class="stat-card"><div class="stat-value" style="font-size:22px;">78%</div><div class="stat-label">Pass Rate</div></div></div>
+  ${mats.map(mt=>`<div class="card"><div class="card-header"><h3>${mt.t}</h3></div><ul class="material-list">${mt.items.map(item=>`<li class="material-item"><div class="material-icon" style="background:${skill.color}22;color:${skill.color};">${mt.t.split(' ')[0]}</div><div style="flex:1;"><div style="font-size:13.5px;">${item}</div><div style="font-size:11px;color:var(--text-muted);">Updated ${Math.floor(Math.random()*14)+1} days ago</div></div><button class="btn btn-sm btn-secondary">Open</button></li>`).join('')}</ul></div>`).join('')}`;
+}
+function backToSkills() { document.getElementById('trainingOverview').style.display='block'; document.getElementById('skillDetailPage').style.display='none'; }
+
+function renderExams(filter) {
+  const filtered = exams.filter(e=>e.status===(filter||'upcoming'));
+  const tbody = document.getElementById('examTableBody');
+  if(!tbody) return;
+  tbody.innerHTML = filtered.map(e=>`<tr><td><strong>${e.title}</strong></td><td>${e.course}</td><td>${e.date} @ ${e.time}</td><td>${e.duration} min</td><td>${e.students}</td><td><span class="badge ${e.status==='upcoming'?'badge-blue':e.status==='active'?'badge-red':'badge-green'}"><span class="badge-dot"></span>${e.status==='active'?'In Progress':e.status==='completed'?'Completed ✓':'Scheduled'}</span>${e.passRate?'<br><span style="font-size:11px;color:var(--text-muted);">Pass: '+e.passRate+'</span>':''}</td><td>${e.status==='upcoming'?'<button class="btn btn-sm btn-secondary">Edit</button>':e.status==='active'?'<button class="btn btn-sm btn-primary">Monitor</button>':'<button class="btn btn-sm btn-secondary">Results</button>'}</td></tr>`).join('');
+}
+function switchExamTab(el,tab) { document.querySelectorAll('#page-exams .tab').forEach(t=>t.classList.remove('active')); el.classList.add('active'); renderExams(tab); }
+function createExam() {
+  const title = document.getElementById('examTitle').value.trim();
+  if(!title){alert('Please enter exam title');return;}
+  exams.unshift({title,course:document.getElementById('examCourse').value,date:document.getElementById('examDate').value||'2026-03-15',time:document.getElementById('examTime').value||'09:00',duration:parseInt(document.getElementById('examDuration').value)||90,students:0,status:'upcoming',questions:parseInt(document.getElementById('examQuestions').value)||50,passMark:parseInt(document.getElementById('examPassMark').value)||60});
+  closeModal('createExamModal');renderExams('upcoming');showToast(`Exam "${title}" scheduled!`);document.getElementById('examTitle').value='';
+}
+
+function renderCerts(filter,search) {
+  let certs = students.filter(s=>s.certNo);
+  if(filter==='collected') certs=certs.filter(c=>c.certCollected);
+  if(filter==='pending') certs=certs.filter(c=>!c.certCollected);
+  if(search) certs=certs.filter(c=>c.name.toLowerCase().includes(search)||(c.certNo||'').toLowerCase().includes(search));
+  const tbody = document.getElementById('certTableBody');
+  if(!tbody) return;
+  tbody.innerHTML = certs.map(s=>`<tr><td><strong>${s.name}</strong></td><td style="font-family:monospace;font-size:12px;">${s.certNo}</td><td>${s.course}</td><td>Level ${Math.floor(Math.random()*3)+1}</td><td>${s.certDate}</td><td>${s.certCollected?'<span class="badge badge-green"><span class="badge-dot"></span>Collected</span>':'<span class="badge badge-amber"><span class="badge-dot"></span>Pending</span>'}</td><td>${!s.certCollected?`<button class="btn btn-sm btn-success" onclick="markCollected(${students.indexOf(s)})">Mark Collected</button>`:'<span style="font-size:12px;color:var(--text-muted);">✓ Done</span>'}</td></tr>`).join('');
+}
+function filterCerts() { renderCerts(document.getElementById('certFilter')?.value,document.getElementById('certSearch')?.value?.toLowerCase()); }
+function markCollected(idx) { students[idx].certCollected=true;students[idx].stage='collected';students[idx].progress=100;filterCerts();updatePipelineCounts();showToast(`Certificate collected: ${students[idx].name}`); }
+
+function renderPassRates() {
+  const progs=[{name:'Welding',rate:82},{name:'Electrical',rate:76},{name:'Cosmetology',rate:88},{name:'Business Admin',rate:71},{name:'Auto Mechanics',rate:79},{name:'Hospitality',rate:90},{name:'IT',rate:72},{name:'Plumbing',rate:84}];
+  const el = document.getElementById('passRateChart');
+  if(!el) return;
+  el.innerHTML = progs.map(p=>`<div style="display:flex;align-items:center;gap:12px;"><div style="width:100px;font-size:12px;color:var(--text-secondary);text-align:right;">${p.name}</div><div class="progress-bar" style="flex:1;height:10px;"><div class="fill" style="width:${p.rate}%;background:${p.rate>=80?'var(--green)':p.rate>=70?'var(--accent)':'var(--red)'};border-radius:5px;"></div></div><div style="width:40px;font-size:12px;font-weight:700;color:${p.rate>=80?'var(--green)':p.rate>=70?'var(--accent)':'var(--red)'};">${p.rate}%</div></div>`).join('');
+}
+
+// ============================== UTILITIES ==============================
+function openModal(id) { document.getElementById(id).classList.add('active'); }
+function closeModal(id) { document.getElementById(id).classList.remove('active'); }
+function showToast(message) {
+  const c = document.getElementById('toastContainer');
+  const t = document.createElement('div'); t.className='toast'; t.innerHTML=`✓ ${message}`;
+  c.appendChild(t); setTimeout(()=>t.remove(),3000);
+}
+
+// ============================== INIT ==============================
+populateStudentSelect();
+</script>
+</body>
+</html>
