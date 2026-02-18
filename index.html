@@ -51,7 +51,7 @@ h1,h2,h3,h4 { font-family:'Playfair Display',serif; }
   position:fixed; inset:0; z-index:1000;
   background:var(--bg-primary);
   display:flex; flex-direction:column;
-  overflow:hidden;
+  overflow-x:hidden; overflow-y:auto;
 }
 .landing-bg {
   position:absolute; inset:0; z-index:0;
@@ -265,6 +265,7 @@ h1,h2,h3,h4 { font-family:'Playfair Display',serif; }
   border-right:1px solid var(--border);
   z-index:100;
   display:flex; flex-direction:column;
+  transition:transform 0.3s cubic-bezier(0.4,0,0.2,1);
 }
 .sidebar-header {
   padding:20px 20px 16px;
@@ -1274,6 +1275,166 @@ textarea.form-control { resize:vertical; min-height:80px; }
   background:var(--bg-card); border-radius:var(--radius-lg); border:1px solid var(--border-light);
   max-width:480px; width:90%; padding:24px; box-shadow:0 20px 60px rgba(0,0,0,0.5);
 }
+
+/* ============================== MOBILE MENU BUTTON & SIDEBAR OVERLAY ============================== */
+.mobile-menu-btn {
+  display:none; background:none; border:none; color:var(--text-primary);
+  cursor:pointer; width:36px; height:36px; align-items:center; justify-content:center;
+  border-radius:var(--radius-sm); transition:all var(--transition); flex-shrink:0;
+}
+.mobile-menu-btn:hover { background:rgba(255,255,255,0.06); }
+.sidebar-overlay {
+  display:none; position:fixed; inset:0; background:rgba(0,0,0,0.5);
+  z-index:99; backdrop-filter:blur(4px);
+}
+.sidebar-overlay.active { display:block; }
+
+/* ============================== COMPREHENSIVE MOBILE FIXES ============================== */
+@media(max-width:768px) {
+  /* Hamburger menu button visible */
+  .mobile-menu-btn { display:flex; }
+
+  /* Sidebar slides in as drawer when toggled */
+  .sidebar { z-index:101; }
+  .sidebar.mobile-open { transform:translateX(0); }
+
+  /* Topbar: hide search on small screens, reduce padding */
+  .topbar { padding:0 12px; gap:8px; }
+  .topbar-search { display:none; }
+  .topbar-title { font-size:16px; }
+
+  /* Cloud sync button: abbreviate text */
+  .cloud-sync-btn { padding:6px 8px; font-size:0.7rem; }
+  .cloud-sync-btn span:nth-child(2) { display:none; }
+
+  /* Logout button: icon only */
+  .logout-btn { padding:7px 10px; font-size:0; gap:0; }
+  .logout-btn svg { width:16px; height:16px; }
+
+  /* Main content: reduce padding */
+  .main-content { padding:16px 12px; }
+
+  /* Notification dropdown: full width on mobile */
+  .notification-dropdown { width:calc(100vw - 24px); right:-60px; }
+
+  /* Tables: horizontal scroll */
+  .card { overflow-x:auto; -webkit-overflow-scrolling:touch; }
+  table { min-width:600px; }
+  .um-table { min-width:600px; }
+  .attendance-table { min-width:500px; }
+
+  /* Stats grid: single column on narrow phones */
+  .stats-grid { grid-template-columns:1fr; }
+
+  /* Form rows: stack on mobile */
+  .um-form-row { grid-template-columns:1fr; }
+
+  /* Quick actions: 2 columns on mobile */
+  .quick-actions { grid-template-columns:repeat(2,1fr); gap:8px; }
+  .quick-action-btn { padding:14px 8px; }
+  .quick-action-btn .qa-icon { width:36px; height:36px; font-size:18px; }
+  .quick-action-btn .qa-label { font-size:10.5px; }
+
+  /* Stage tracker: allow horizontal scroll */
+  .student-stage-tracker { overflow-x:auto; -webkit-overflow-scrolling:touch; padding-bottom:8px; }
+  .student-stage-tracker::after { content:''; min-width:1px; }
+
+  /* Profile header adjustments */
+  .profile-header { padding:20px 16px; gap:16px; }
+  .profile-header .profile-avatar { width:64px; height:64px; font-size:28px; }
+  .profile-header .profile-details h2 { font-size:20px; }
+
+  /* Card and section padding reduction */
+  .card { padding:16px; }
+  .card-header h3 { font-size:14px; }
+  .stat-card { padding:14px; }
+  .stat-card .stat-value { font-size:22px; }
+
+  /* Video conference */
+  .video-grid { grid-template-columns:1fr; }
+  .video-controls { flex-wrap:wrap; gap:8px; padding:12px; }
+  .vc-btn { width:42px; height:42px; font-size:16px; }
+  .chat-panel { height:280px; }
+
+  /* Modals: slightly larger on mobile */
+  .modal { padding:20px 16px; width:95%; max-height:90vh; }
+
+  /* Pipeline: full width stages */
+  .pipeline-stage { min-width:calc(50% - 2px); padding:10px 6px; font-size:11px; }
+  .pipeline-stage .count { font-size:18px; }
+
+  /* Bar chart */
+  .bar-chart { height:120px; }
+
+  /* Toast: full width on mobile */
+  .toast { left:12px; right:12px; bottom:12px; }
+
+  /* User management toolbar */
+  .um-toolbar .um-search { max-width:100%; }
+
+  /* Cloud dropdown positioning */
+  .cloud-dropdown-content { right:-40px; min-width:180px; }
+
+  /* Cert status grid */
+  .cert-status-grid { grid-template-columns:1fr 1fr; }
+
+  /* Skills grid */
+  .skills-grid { grid-template-columns:1fr; }
+
+  /* Welcome banner */
+  .student-welcome-banner { padding:20px 16px; }
+  .student-welcome-banner h2 { font-size:20px; }
+}
+
+/* Extra small phones (< 480px) */
+@media(max-width:480px) {
+  /* Landing page: compact layout */
+  .landing-content { padding:20px 16px; }
+  .landing-logo-icon { width:52px; height:52px; font-size:26px; border-radius:14px; }
+  .landing-logo-text h1 { font-size:28px; }
+  .landing-logo-text span { font-size:11px; }
+  .landing-subtitle { font-size:14px; margin-bottom:28px; }
+  .landing-badge { font-size:10px; padding:6px 12px; margin-bottom:20px; }
+  .landing-logo-group { gap:10px; margin-bottom:14px; }
+  .landing-footer { padding:16px; font-size:11px; }
+
+  /* Role cards: full width, compact */
+  .role-card { padding:24px 20px; }
+  .role-icon { width:60px; height:60px; font-size:28px; border-radius:16px; margin-bottom:14px; }
+  .role-card h2 { font-size:18px; }
+  .role-card p { font-size:12px; margin-bottom:18px; }
+  .role-enter-btn { padding:10px 22px; font-size:13px; }
+
+  /* Stats grid: single column */
+  .stats-grid { grid-template-columns:1fr; }
+  .cert-status-grid { grid-template-columns:1fr; }
+
+  /* Quick actions: 2 columns tight */
+  .quick-actions { grid-template-columns:repeat(2,1fr); }
+
+  /* Topbar title smaller */
+  .topbar-title { font-size:14px; }
+
+  /* Pipeline: full width single column */
+  .pipeline { flex-direction:column; }
+  .pipeline-stage { min-width:100%; border-radius:var(--radius-sm); }
+  .pipeline-stage:first-child, .pipeline-stage:last-child { border-radius:var(--radius-sm); }
+
+  /* Attendance summary */
+  .attendance-summary { gap:8px; }
+  .attendance-summary .att-stat { padding:8px 12px; }
+  .attendance-summary .att-stat .att-val { font-size:15px; }
+
+  /* Announcements */
+  .announcement-card { padding:14px; }
+
+  /* Modal */
+  .modal { padding:16px 12px; }
+
+  /* Progress ring smaller on tiny screens */
+  .progress-ring { width:100px; height:100px; }
+  .progress-ring .ring-value { font-size:22px; }
+}
 </style>
 <script src="https://unpkg.com/peerjs@1.5.4/dist/peerjs.min.js"></script>
 <!-- Google Identity Services for OAuth -->
@@ -1398,7 +1559,11 @@ textarea.form-control { resize:vertical; min-height:80px; }
     </div>
   </aside>
 
+  <div class="sidebar-overlay" id="sidebarOverlay" onclick="closeMobileSidebar()"></div>
   <header class="topbar">
+    <button class="mobile-menu-btn" id="mobileMenuBtn" onclick="toggleMobileSidebar()" aria-label="Open menu">
+      <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="18" x2="21" y2="18"/></svg>
+    </button>
     <div class="topbar-title" id="topbarTitle">Dashboard</div>
     <div class="topbar-search">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
@@ -2394,7 +2559,26 @@ function enterApp(role) {
   }
 }
 
+/* ============================== MOBILE SIDEBAR TOGGLE ============================== */
+function toggleMobileSidebar() {
+  var sidebar = document.getElementById('sidebar');
+  var overlay = document.getElementById('sidebarOverlay');
+  sidebar.classList.toggle('mobile-open');
+  overlay.classList.toggle('active');
+}
+function closeMobileSidebar() {
+  document.getElementById('sidebar').classList.remove('mobile-open');
+  document.getElementById('sidebarOverlay').classList.remove('active');
+}
+// Close sidebar when a nav item is clicked on mobile
+document.addEventListener('click', function(e) {
+  if (e.target.closest('.nav-item') && window.innerWidth <= 768) {
+    closeMobileSidebar();
+  }
+});
+
 function logout() {
+  closeMobileSidebar();
   currentRole = null;
   currentStudent = null;
   currentInstructor = null;
