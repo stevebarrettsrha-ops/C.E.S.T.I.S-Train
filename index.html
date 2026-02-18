@@ -1255,6 +1255,25 @@ textarea.form-control { resize:vertical; min-height:80px; }
   background:none; border:none; color:var(--text-secondary); font-size:1.5rem; cursor:pointer; padding:4px;
 }
 .google-auth-modal .close-btn:hover { color:var(--text-primary); }
+
+/* ============================== VIDEO RECORDING ============================== */
+.vc-btn.recording { background:var(--red); color:#fff; animation:recPulse 1.2s infinite; }
+.vc-btn.recording:hover { background:#c0392b; }
+@keyframes recPulse { 0%,100%{box-shadow:0 0 0 0 rgba(231,76,60,0.5);} 50%{box-shadow:0 0 0 8px rgba(231,76,60,0);} }
+.vc-rec-indicator {
+  display:inline-flex; align-items:center; gap:6px; background:rgba(231,76,60,0.15);
+  border:1px solid rgba(231,76,60,0.3); padding:3px 10px; border-radius:6px; font-size:12px; color:var(--red);
+}
+.vc-rec-dot { width:8px; height:8px; border-radius:50%; background:var(--red); animation:recDotBlink 1s infinite; }
+@keyframes recDotBlink { 0%,100%{opacity:1;} 50%{opacity:0.2;} }
+.vc-rec-save-modal {
+  position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.6);
+  display:flex; align-items:center; justify-content:center; z-index:10000;
+}
+.vc-rec-save-modal .modal-content {
+  background:var(--bg-card); border-radius:var(--radius-lg); border:1px solid var(--border-light);
+  max-width:480px; width:90%; padding:24px; box-shadow:0 20px 60px rgba(0,0,0,0.5);
+}
 </style>
 <script src="https://unpkg.com/peerjs@1.5.4/dist/peerjs.min.js"></script>
 <!-- Google Identity Services for OAuth -->
@@ -1676,6 +1695,12 @@ let videoSeconds = 0;
 // WebRTC Video Conferencing State
 let rtcPeer = null;
 let localStream = null;
+// Video Recording State
+let vcMediaRecorder = null;
+let vcRecordedChunks = [];
+let vcIsRecording = false;
+let vcRecordingStartTime = null;
+let vcRecordingAudioCtx = null;
 let screenStream = null;
 let isRoomHost = false;
 let currentRoomCode = '';
@@ -3759,6 +3784,7 @@ function vcShowConference(title, role) {
       </div>
       <div style="display:flex;align-items:center;gap:16px;">
         <div style="font-family:monospace;font-size:13px;color:var(--accent);background:var(--accent-dim);padding:4px 12px;border-radius:6px;cursor:pointer;" onclick="vcCopyCode()" title="Click to copy room code">Room: ${currentRoomCode}</div>
+        <div id="vc-rec-indicator" class="vc-rec-indicator" style="display:none;"><span class="vc-rec-dot"></span><span id="vc-rec-timer">REC 00:00</span></div>
         <div style="font-size:13px;color:var(--text-muted);" id="vTimer-${role}">00:00:00</div>
       </div>
     </div>
@@ -3776,7 +3802,7 @@ function vcShowConference(title, role) {
           <button class="vc-btn" id="vc-screen-btn" onclick="vcToggleScreen()" title="Screen Share">&#x1F5A5;&#xFE0F;</button>
           ${role==='student'
             ? `<button class="vc-btn" id="vc-hand-btn" onclick="vcToggleHand()" title="Raise Hand">&#x270B;</button>`
-            : ''}
+            : `<button class="vc-btn" id="vc-rec-btn" onclick="vcToggleRecord()" title="Record Session">&#x23FA;&#xFE0F;</button>`}
           <button class="vc-btn danger" onclick="exitVideoRoom('${role}')" title="Leave Call">&#x1F4DE;</button>
         </div>
       </div>
@@ -3943,6 +3969,241 @@ function vcCopyCode() {
   }).catch(function(){ showToast('Room code: ' + currentRoomCode); });
 }
 
+// ── Video Recording ──
+const VC_RECORDINGS_FOLDER_ID = '1lNpI00Et1BN5c4eaV5WfQwuQVhCMBtv8';
+let vcRecTimerInterval = null;
+
+function vcGetSupportedMimeType() {
+  const types = ['video/webm;codecs=vp9,opus','video/webm;codecs=vp8,opus','video/webm;codecs=h264,opus','video/webm','video/mp4'];
+  for (var i = 0; i < types.length; i++) {
+    if (MediaRecorder.isTypeSupported(types[i])) return types[i];
+  }
+  return '';
+}
+
+function vcToggleRecord() {
+  if (vcIsRecording) {
+    vcStopRecording();
+  } else {
+    vcStartRecording();
+  }
+}
+
+function vcStartRecording() {
+  try {
+    // Create a combined stream: local video + mixed audio from all sources
+    vcRecordingAudioCtx = new AudioContext();
+    var destination = vcRecordingAudioCtx.createMediaStreamDestination();
+
+    // Add local audio
+    if (localStream) {
+      localStream.getAudioTracks().forEach(function(track) {
+        if (track.enabled) {
+          var source = vcRecordingAudioCtx.createMediaStreamSource(new MediaStream([track]));
+          source.connect(destination);
+        }
+      });
+    }
+
+    // Add remote audio from all peers
+    Object.keys(peerConnections).forEach(function(pid) {
+      var stream = peerConnections[pid].stream;
+      if (stream) {
+        stream.getAudioTracks().forEach(function(track) {
+          var source = vcRecordingAudioCtx.createMediaStreamSource(new MediaStream([track]));
+          source.connect(destination);
+        });
+      }
+    });
+
+    // Build combined stream: video from screen share or local camera + mixed audio
+    var videoSource = screenStream || localStream;
+    var combinedStream = new MediaStream();
+
+    if (videoSource) {
+      videoSource.getVideoTracks().forEach(function(t) { combinedStream.addTrack(t); });
+    }
+    destination.stream.getAudioTracks().forEach(function(t) { combinedStream.addTrack(t); });
+
+    var mimeType = vcGetSupportedMimeType();
+    if (!mimeType) {
+      alert('Your browser does not support video recording.');
+      return;
+    }
+
+    vcMediaRecorder = new MediaRecorder(combinedStream, { mimeType: mimeType });
+    vcRecordedChunks = [];
+
+    vcMediaRecorder.ondataavailable = function(e) {
+      if (e.data.size > 0) vcRecordedChunks.push(e.data);
+    };
+
+    vcMediaRecorder.onstop = function() {
+      vcOnRecordingComplete();
+    };
+
+    vcMediaRecorder.start(1000);
+    vcIsRecording = true;
+    vcRecordingStartTime = new Date();
+
+    // Update button UI
+    var btn = document.getElementById('vc-rec-btn');
+    if (btn) { btn.classList.add('recording'); btn.innerHTML = '&#x23F9;&#xFE0F;'; btn.title = 'Stop Recording'; }
+
+    // Show recording indicator
+    var indicator = document.getElementById('vc-rec-indicator');
+    if (indicator) indicator.style.display = 'inline-flex';
+
+    // Start recording timer
+    if (vcRecTimerInterval) clearInterval(vcRecTimerInterval);
+    vcRecTimerInterval = setInterval(function() {
+      var elapsed = Math.floor((new Date() - vcRecordingStartTime) / 1000);
+      var m = Math.floor(elapsed / 60), s = elapsed % 60;
+      var el = document.getElementById('vc-rec-timer');
+      if (el) el.textContent = 'REC ' + String(m).padStart(2,'0') + ':' + String(s).padStart(2,'0');
+    }, 1000);
+
+    showToast('Recording started');
+  } catch(err) {
+    console.error('Failed to start recording:', err);
+    alert('Failed to start recording: ' + err.message);
+  }
+}
+
+function vcStopRecording() {
+  if (vcMediaRecorder && vcMediaRecorder.state !== 'inactive') {
+    vcMediaRecorder.stop();
+  }
+  vcIsRecording = false;
+  if (vcRecTimerInterval) { clearInterval(vcRecTimerInterval); vcRecTimerInterval = null; }
+  if (vcRecordingAudioCtx) { try { vcRecordingAudioCtx.close(); } catch(e){} vcRecordingAudioCtx = null; }
+
+  // Update button UI
+  var btn = document.getElementById('vc-rec-btn');
+  if (btn) { btn.classList.remove('recording'); btn.innerHTML = '&#x23FA;&#xFE0F;'; btn.title = 'Record Session'; }
+
+  // Hide recording indicator
+  var indicator = document.getElementById('vc-rec-indicator');
+  if (indicator) indicator.style.display = 'none';
+
+  showToast('Recording stopped — processing...');
+}
+
+function vcOnRecordingComplete() {
+  if (vcRecordedChunks.length === 0) return;
+
+  var mimeType = vcMediaRecorder ? vcMediaRecorder.mimeType : 'video/webm';
+  var blob = new Blob(vcRecordedChunks, { type: mimeType });
+  var ext = mimeType.includes('mp4') ? 'mp4' : 'webm';
+  var dateStr = new Date().toISOString().replace(/[:.]/g, '-').substring(0, 19);
+  var fileName = 'CESTIS_Recording_' + (currentRoomCode || 'session') + '_' + dateStr + '.' + ext;
+
+  vcRecordedChunks = [];
+
+  // Show save modal
+  vcShowRecordingSaveModal(blob, fileName);
+}
+
+function vcShowRecordingSaveModal(blob, fileName) {
+  var sizeMB = (blob.size / (1024 * 1024)).toFixed(1);
+  var cloudAvailable = isCloudConnected && googleAccessToken;
+
+  var modalHTML = '<div id="vcRecSaveModal" class="vc-rec-save-modal">' +
+    '<div class="modal-content">' +
+    '<h3 style="font-family:Playfair Display,serif;margin-bottom:16px;">Recording Complete</h3>' +
+    '<div style="background:var(--bg-secondary);border-radius:var(--radius);padding:14px;margin-bottom:16px;">' +
+    '<div style="display:flex;align-items:center;gap:10px;margin-bottom:8px;">' +
+    '<span style="font-size:1.5rem;">🎬</span>' +
+    '<div><div style="font-weight:600;font-size:0.9rem;">' + fileName + '</div>' +
+    '<div style="font-size:0.8rem;color:var(--text-muted);">Size: ' + sizeMB + ' MB</div></div></div></div>' +
+    (cloudAvailable ?
+      '<button class="btn btn-primary" onclick="vcUploadRecordingToDrive()" style="width:100%;margin-bottom:8px;padding:10px;">☁️ Save to Google Drive</button>' : '') +
+    '<button class="btn btn-secondary" onclick="vcDownloadRecording()" style="width:100%;margin-bottom:8px;padding:10px;">💾 Download to Device</button>' +
+    '<button class="btn btn-secondary" onclick="vcDismissRecording()" style="width:100%;padding:10px;color:var(--text-muted);">Discard</button>' +
+    '</div></div>';
+
+  // Store blob for use by button handlers
+  window._vcPendingRecording = { blob: blob, fileName: fileName };
+  document.body.insertAdjacentHTML('beforeend', modalHTML);
+}
+
+function vcDismissRecording() {
+  window._vcPendingRecording = null;
+  var modal = document.getElementById('vcRecSaveModal');
+  if (modal) modal.remove();
+}
+
+function vcDownloadRecording() {
+  var rec = window._vcPendingRecording;
+  if (!rec) return;
+
+  var url = URL.createObjectURL(rec.blob);
+  var a = document.createElement('a');
+  a.href = url;
+  a.download = rec.fileName;
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  setTimeout(function() { URL.revokeObjectURL(url); }, 1000);
+
+  showToast('Recording downloaded');
+  vcDismissRecording();
+}
+
+async function vcUploadRecordingToDrive() {
+  var rec = window._vcPendingRecording;
+  if (!rec) return;
+
+  // Close modal and show progress
+  var modal = document.getElementById('vcRecSaveModal');
+  if (modal) modal.remove();
+
+  showToast('Uploading recording to Google Drive...');
+
+  try {
+    var metadata = {
+      name: rec.fileName,
+      parents: [VC_RECORDINGS_FOLDER_ID],
+      mimeType: rec.blob.type || 'video/webm'
+    };
+
+    var formData = new FormData();
+    formData.append('metadata', new Blob([JSON.stringify(metadata)], { type: 'application/json' }));
+    formData.append('file', rec.blob);
+
+    var response = await fetch(
+      'https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart&fields=id,name,webViewLink',
+      {
+        method: 'POST',
+        headers: { 'Authorization': 'Bearer ' + googleAccessToken },
+        body: formData
+      }
+    );
+
+    if (!response.ok) {
+      var errData = await response.json();
+      throw new Error(errData.error?.message || 'Upload failed');
+    }
+
+    var result = await response.json();
+    alert('✅ Recording uploaded to Google Drive!\n\nFile: ' + result.name +
+      (result.webViewLink ? '\n\n🔗 Share this link with students:\n' + result.webViewLink : ''));
+    showToast('Recording saved to Google Drive');
+    window._vcPendingRecording = null;
+
+  } catch (err) {
+    console.error('Failed to upload recording:', err);
+    if (err.message.includes('invalid_token') || err.message.includes('Invalid Credentials')) {
+      alert('❌ Your Google Drive session has expired. The recording will be downloaded instead.');
+    } else {
+      alert('❌ Failed to upload: ' + err.message + '\n\nThe recording will be downloaded instead.');
+    }
+    // Restore pending recording and download
+    window._vcPendingRecording = rec;
+    vcDownloadRecording();
+  }
+}
+
 // ── Chat ──
 function vcDisplayChat(sender, text, isLocal) {
   var msgs = document.getElementById('chatMsgs-'+vcCurrentRole);
@@ -3968,6 +4229,12 @@ function sendChatMsg(role, sender) {
 
 // ── Exit / Cleanup ──
 function exitVideoRoom(role) {
+  // Stop recording if active
+  if(vcIsRecording && vcMediaRecorder && vcMediaRecorder.state !== 'inactive') {
+    vcMediaRecorder.stop();
+  }
+  vcIsRecording = false;
+  if(vcRecordingAudioCtx) { try { vcRecordingAudioCtx.close(); } catch(e){} vcRecordingAudioCtx = null; }
   if(videoTimerInterval) clearInterval(videoTimerInterval);
   if(localStream) { localStream.getTracks().forEach(function(t){t.stop();}); localStream = null; }
   if(screenStream) { screenStream.getTracks().forEach(function(t){t.stop();}); screenStream = null; }
@@ -4462,7 +4729,7 @@ populateInstructorSelect();
 const GOOGLE_DRIVE_CONFIG = {
   CLIENT_ID: '302497466088-0b619cqa9qno2c606k4rqp742lebc5o8.apps.googleusercontent.com',
   FOLDER_ID: '11vWe_Nc40TtJ1Hi7PoE7EZ3JrpR-K0Vj',
-  BACKUP_FILE_NAME: 'CESTIS_MAIN_DASHBOARD_BACKUP.json',
+  BACKUP_FILE_NAME: 'CESTIS_LMS_BACKUP.json',
   SCOPES: 'https://www.googleapis.com/auth/drive'
 };
 
