@@ -1127,6 +1127,42 @@ textarea.form-control { resize:vertical; min-height:80px; }
   .profile-header .profile-details .profile-meta { justify-content:center; }
   .quick-actions { grid-template-columns:repeat(3,1fr); }
 }
+
+/* ============================== USER MANAGEMENT ============================== */
+.um-toolbar { display:flex; gap:10px; margin-bottom:18px; flex-wrap:wrap; align-items:center; }
+.um-toolbar .um-search { flex:1; min-width:180px; max-width:280px; }
+.um-stats { display:grid; grid-template-columns:repeat(auto-fit,minmax(140px,1fr)); gap:12px; margin-bottom:20px; }
+.um-stat { background:var(--bg-card); border:1px solid var(--border); border-radius:var(--radius-sm); padding:14px; text-align:center; }
+.um-stat .um-stat-val { font-size:22px; font-weight:700; font-family:'Playfair Display',serif; }
+.um-stat .um-stat-label { font-size:11px; color:var(--text-muted); margin-top:2px; }
+.um-table { width:100%; border-collapse:collapse; }
+.um-table thead th { text-align:left; font-size:11px; font-weight:700; text-transform:uppercase; letter-spacing:1px; color:var(--text-muted); padding:10px 12px; border-bottom:1px solid var(--border); }
+.um-table tbody td { padding:10px 12px; font-size:13px; border-bottom:1px solid var(--border); color:var(--text-secondary); }
+.um-table tbody tr:hover { background:rgba(255,255,255,0.02); }
+.um-table .um-cb { width:18px; height:18px; accent-color:var(--accent); cursor:pointer; }
+.um-user-cell { display:flex; align-items:center; gap:10px; }
+.um-user-cell .um-avatar { width:32px; height:32px; border-radius:50%; display:flex; align-items:center; justify-content:center; font-size:12px; font-weight:700; color:#000; flex-shrink:0; }
+.um-user-cell .um-name { font-weight:600; color:var(--text-primary); }
+.um-user-cell .um-email { font-size:11px; color:var(--text-muted); }
+.um-actions { display:flex; gap:6px; }
+.um-actions button { background:none; border:1px solid var(--border); color:var(--text-secondary); width:30px; height:30px; border-radius:var(--radius-sm); cursor:pointer; display:flex; align-items:center; justify-content:center; font-size:14px; transition:all var(--transition); }
+.um-actions button:hover { background:rgba(255,255,255,0.06); color:var(--text-primary); border-color:var(--border-light); }
+.um-actions button.um-btn-danger:hover { background:var(--red-dim); color:var(--red); border-color:var(--red); }
+.um-toggle { position:relative; width:40px; height:22px; cursor:pointer; }
+.um-toggle input { opacity:0; width:0; height:0; }
+.um-toggle .um-slider { position:absolute; inset:0; background:rgba(231,76,60,0.3); border-radius:11px; transition:all 0.3s ease; }
+.um-toggle .um-slider::before { content:''; position:absolute; width:16px; height:16px; border-radius:50%; background:#fff; top:3px; left:3px; transition:transform 0.3s ease; }
+.um-toggle input:checked + .um-slider { background:var(--green); }
+.um-toggle input:checked + .um-slider::before { transform:translateX(18px); }
+.um-bulk-bar { display:none; align-items:center; gap:12px; padding:12px 16px; background:var(--accent-dim); border:1px solid rgba(240,165,0,0.2); border-radius:var(--radius-sm); margin-bottom:14px; animation:fadeIn 0.2s ease; }
+.um-bulk-bar.active { display:flex; }
+.um-bulk-bar .um-sel-count { font-size:13px; font-weight:600; color:var(--accent); }
+.um-bulk-bar .um-bulk-actions { display:flex; gap:8px; margin-left:auto; }
+.um-form-row { display:grid; grid-template-columns:1fr 1fr; gap:14px; }
+.um-role-badge { display:inline-flex; align-items:center; gap:4px; padding:3px 10px; border-radius:12px; font-size:11px; font-weight:600; }
+.um-role-admin { background:var(--accent-dim); color:var(--accent); }
+.um-role-instructor { background:var(--green-dim); color:var(--green); }
+.um-role-student { background:var(--blue-dim); color:var(--blue); }
 </style>
 </head>
 <body>
@@ -1303,6 +1339,61 @@ textarea.form-control { resize:vertical; min-height:80px; }
     <div id="updateStageContent"></div>
   </div>
 </div>
+<!-- CREATE USER MODAL -->
+<div class="modal-overlay" id="createUserModal">
+  <div class="modal">
+    <div class="modal-header"><h3>Create New User</h3><button class="modal-close" onclick="closeModal('createUserModal')">✕</button></div>
+    <div class="um-form-row">
+      <div class="form-group"><label>Full Name</label><input type="text" class="form-control" id="newUserName" placeholder="e.g. John Smith"></div>
+      <div class="form-group"><label>Role</label><select class="form-control" id="newUserRole" onchange="toggleUserFormFields()"><option value="admin">Administrator</option><option value="instructor">Instructor</option><option value="student">Student</option></select></div>
+    </div>
+    <div class="um-form-row">
+      <div class="form-group"><label>Username</label><input type="text" class="form-control" id="newUserUsername" placeholder="e.g. john.smith"></div>
+      <div class="form-group"><label>Password</label><input type="password" class="form-control" id="newUserPassword" placeholder="Minimum 6 characters"></div>
+    </div>
+    <div class="form-group"><label>Email</label><input type="email" class="form-control" id="newUserEmail" placeholder="e.g. john@heartlms.edu.jm"></div>
+    <div class="form-group" id="newUserProgrammeGroup"><label>Programme</label><select class="form-control" id="newUserProgramme"><option value="">— Select Programme —</option><option>Welding</option><option>Electrical Installation</option><option>Cosmetology</option><option>Business Administration</option><option>Auto Mechanics</option><option>Plumbing</option><option>Carpentry</option><option>Hospitality</option><option>Information Technology</option><option>Garment Construction</option></select></div>
+    <div style="display:flex;gap:10px;justify-content:flex-end;margin-top:20px;">
+      <button class="btn btn-secondary" onclick="closeModal('createUserModal')">Cancel</button>
+      <button class="btn btn-primary" onclick="createUserAccount()">Create User</button>
+    </div>
+  </div>
+</div>
+
+<!-- EDIT USER MODAL -->
+<div class="modal-overlay" id="editUserModal">
+  <div class="modal">
+    <div class="modal-header"><h3 id="editUserTitle">Edit User</h3><button class="modal-close" onclick="closeModal('editUserModal')">✕</button></div>
+    <input type="hidden" id="editUserId">
+    <div class="um-form-row">
+      <div class="form-group"><label>Full Name</label><input type="text" class="form-control" id="editUserName"></div>
+      <div class="form-group"><label>Role</label><select class="form-control" id="editUserRole" onchange="toggleEditUserFormFields()"><option value="admin">Administrator</option><option value="instructor">Instructor</option><option value="student">Student</option></select></div>
+    </div>
+    <div class="form-group"><label>Username</label><input type="text" class="form-control" id="editUserUsername"></div>
+    <div class="form-group"><label>Email</label><input type="email" class="form-control" id="editUserEmail"></div>
+    <div class="form-group" id="editUserProgrammeGroup"><label>Programme</label><select class="form-control" id="editUserProgramme"><option value="">— Select Programme —</option><option>Welding</option><option>Electrical Installation</option><option>Cosmetology</option><option>Business Administration</option><option>Auto Mechanics</option><option>Plumbing</option><option>Carpentry</option><option>Hospitality</option><option>Information Technology</option><option>Garment Construction</option></select></div>
+    <div style="display:flex;gap:10px;justify-content:flex-end;margin-top:20px;">
+      <button class="btn btn-secondary" onclick="closeModal('editUserModal')">Cancel</button>
+      <button class="btn btn-primary" onclick="saveUserEdit()">Save Changes</button>
+    </div>
+  </div>
+</div>
+
+<!-- RESET PASSWORD MODAL -->
+<div class="modal-overlay" id="resetPasswordModal">
+  <div class="modal" style="max-width:420px;">
+    <div class="modal-header"><h3>Reset Password</h3><button class="modal-close" onclick="closeModal('resetPasswordModal')">✕</button></div>
+    <input type="hidden" id="resetPwUserId">
+    <p style="font-size:13px;color:var(--text-secondary);margin-bottom:16px;">Resetting password for: <strong id="resetPwUserName"></strong></p>
+    <div class="form-group"><label>New Password</label><input type="password" class="form-control" id="resetPwNew" placeholder="Minimum 6 characters"></div>
+    <div class="form-group"><label>Confirm Password</label><input type="password" class="form-control" id="resetPwConfirm" placeholder="Re-enter password"></div>
+    <div style="display:flex;gap:10px;justify-content:flex-end;margin-top:20px;">
+      <button class="btn btn-secondary" onclick="closeModal('resetPasswordModal')">Cancel</button>
+      <button class="btn btn-primary" onclick="confirmResetPassword()">Reset Password</button>
+    </div>
+  </div>
+</div>
+
 <div id="toastContainer"></div>
 
 <script>
@@ -1460,6 +1551,7 @@ function saveState() {
     localStorage.setItem('voctrain_exams', JSON.stringify(exams));
     localStorage.setItem('voctrain_announcements', JSON.stringify(announcements));
     localStorage.setItem('voctrain_attendance', JSON.stringify(attendanceRecords));
+    localStorage.setItem('voctrain_users', JSON.stringify(userAccounts));
   } catch(e) { /* quota exceeded or private browsing */ }
 }
 
@@ -1476,6 +1568,263 @@ function loadState() {
   } catch(e) { /* parse error, use generated data */ }
 }
 loadState();
+
+// ============================== USER ACCOUNTS MANAGEMENT ==============================
+let userAccounts = [
+  {id:'USR-001',name:'Administrator',role:'admin',username:'admin',password:'admin123',email:'admin@heartlms.edu.jm',programme:'',status:'active',createdAt:'2026-01-01'},
+  {id:'USR-002',name:'Mr. R. Campbell',role:'instructor',username:'r.campbell',password:'instr123',email:'r.campbell@heartlms.edu.jm',programme:'Welding',status:'active',createdAt:'2026-01-02'},
+  {id:'USR-003',name:'Ms. J. Williams',role:'instructor',username:'j.williams',password:'instr123',email:'j.williams@heartlms.edu.jm',programme:'Electrical Installation',status:'active',createdAt:'2026-01-02'},
+  {id:'USR-004',name:'Mrs. P. Morgan',role:'instructor',username:'p.morgan',password:'instr123',email:'p.morgan@heartlms.edu.jm',programme:'Business Administration',status:'active',createdAt:'2026-01-02'},
+  {id:'USR-005',name:'Ms. D. Stewart',role:'instructor',username:'d.stewart',password:'instr123',email:'d.stewart@heartlms.edu.jm',programme:'Cosmetology',status:'active',createdAt:'2026-01-02'},
+  {id:'USR-006',name:'Mr. K. Edwards',role:'instructor',username:'k.edwards',password:'instr123',email:'k.edwards@heartlms.edu.jm',programme:'Auto Mechanics',status:'active',createdAt:'2026-01-02'},
+  {id:'USR-007',name:'Keisha Brown',role:'student',username:'keisha.brown',password:'student123',email:'keisha.b@heartlms.edu.jm',programme:'Welding',status:'active',createdAt:'2026-01-10'},
+  {id:'USR-008',name:'Marlon Davis',role:'student',username:'marlon.davis',password:'student123',email:'marlon.d@heartlms.edu.jm',programme:'Auto Mechanics',status:'active',createdAt:'2026-01-10'},
+  {id:'USR-009',name:'Tanya Johnson',role:'student',username:'tanya.johnson',password:'student123',email:'tanya.j@heartlms.edu.jm',programme:'Business Administration',status:'active',createdAt:'2026-01-11'},
+  {id:'USR-010',name:'Andre Smith',role:'student',username:'andre.smith',password:'student123',email:'andre.s@heartlms.edu.jm',programme:'Electrical Installation',status:'disabled',createdAt:'2026-01-11'}
+];
+let umSelectedIds = [];
+
+function saveUserAccounts() {
+  try { localStorage.setItem('voctrain_users', JSON.stringify(userAccounts)); } catch(e) {}
+}
+function loadUserAccounts() {
+  try {
+    var u = localStorage.getItem('voctrain_users');
+    if(u) userAccounts = JSON.parse(u);
+  } catch(e) {}
+}
+loadUserAccounts();
+
+function getNextUserId() {
+  var maxNum = 0;
+  userAccounts.forEach(function(u) {
+    var n = parseInt(u.id.replace('USR-',''));
+    if(n > maxNum) maxNum = n;
+  });
+  return 'USR-' + String(maxNum + 1).padStart(3,'0');
+}
+
+function toggleUserFormFields() {
+  var role = document.getElementById('newUserRole').value;
+  document.getElementById('newUserProgrammeGroup').style.display = (role === 'admin') ? 'none' : 'block';
+}
+
+function toggleEditUserFormFields() {
+  var role = document.getElementById('editUserRole').value;
+  document.getElementById('editUserProgrammeGroup').style.display = (role === 'admin') ? 'none' : 'block';
+}
+
+function createUserAccount() {
+  var name = document.getElementById('newUserName').value.trim();
+  var role = document.getElementById('newUserRole').value;
+  var username = document.getElementById('newUserUsername').value.trim();
+  var password = document.getElementById('newUserPassword').value;
+  var email = document.getElementById('newUserEmail').value.trim();
+  var programme = document.getElementById('newUserProgramme').value;
+  if(!name || !username || !password) { alert('Please fill in Name, Username, and Password.'); return; }
+  if(password.length < 6) { alert('Password must be at least 6 characters.'); return; }
+  if(userAccounts.find(function(u){ return u.username === username; })) { alert('Username already exists.'); return; }
+  if(role !== 'admin' && !programme) { alert('Please select a programme.'); return; }
+  var now = new Date(); var dateStr = now.getFullYear()+'-'+String(now.getMonth()+1).padStart(2,'0')+'-'+String(now.getDate()).padStart(2,'0');
+  userAccounts.push({id:getNextUserId(),name:name,role:role,username:username,password:password,email:email,programme:role==='admin'?'':programme,status:'active',createdAt:dateStr});
+  saveUserAccounts();
+  closeModal('createUserModal');
+  document.getElementById('newUserName').value='';
+  document.getElementById('newUserUsername').value='';
+  document.getElementById('newUserPassword').value='';
+  document.getElementById('newUserEmail').value='';
+  document.getElementById('newUserProgramme').value='';
+  renderUserAccountsTable();
+  showToast('User account created successfully!');
+}
+
+function openEditUser(userId) {
+  var user = userAccounts.find(function(u){ return u.id === userId; });
+  if(!user) return;
+  document.getElementById('editUserId').value = userId;
+  document.getElementById('editUserName').value = user.name;
+  document.getElementById('editUserRole').value = user.role;
+  document.getElementById('editUserUsername').value = user.username;
+  document.getElementById('editUserEmail').value = user.email || '';
+  document.getElementById('editUserProgramme').value = user.programme || '';
+  document.getElementById('editUserTitle').textContent = 'Edit User — ' + user.name;
+  toggleEditUserFormFields();
+  openModal('editUserModal');
+}
+
+function saveUserEdit() {
+  var userId = document.getElementById('editUserId').value;
+  var user = userAccounts.find(function(u){ return u.id === userId; });
+  if(!user) return;
+  var name = document.getElementById('editUserName').value.trim();
+  var role = document.getElementById('editUserRole').value;
+  var username = document.getElementById('editUserUsername').value.trim();
+  var email = document.getElementById('editUserEmail').value.trim();
+  var programme = document.getElementById('editUserProgramme').value;
+  if(!name || !username) { alert('Name and Username are required.'); return; }
+  var dup = userAccounts.find(function(u){ return u.username === username && u.id !== userId; });
+  if(dup) { alert('Username already in use by another account.'); return; }
+  if(role !== 'admin' && !programme) { alert('Please select a programme.'); return; }
+  user.name = name; user.role = role; user.username = username; user.email = email;
+  user.programme = role === 'admin' ? '' : programme;
+  saveUserAccounts();
+  closeModal('editUserModal');
+  renderUserAccountsTable();
+  showToast('User updated successfully!');
+}
+
+function openResetPassword(userId) {
+  var user = userAccounts.find(function(u){ return u.id === userId; });
+  if(!user) return;
+  document.getElementById('resetPwUserId').value = userId;
+  document.getElementById('resetPwUserName').textContent = user.name + ' (' + user.username + ')';
+  document.getElementById('resetPwNew').value = '';
+  document.getElementById('resetPwConfirm').value = '';
+  openModal('resetPasswordModal');
+}
+
+function confirmResetPassword() {
+  var userId = document.getElementById('resetPwUserId').value;
+  var newPw = document.getElementById('resetPwNew').value;
+  var confirmPw = document.getElementById('resetPwConfirm').value;
+  if(!newPw || newPw.length < 6) { alert('Password must be at least 6 characters.'); return; }
+  if(newPw !== confirmPw) { alert('Passwords do not match.'); return; }
+  var user = userAccounts.find(function(u){ return u.id === userId; });
+  if(!user) return;
+  user.password = newPw;
+  saveUserAccounts();
+  closeModal('resetPasswordModal');
+  showToast('Password reset successfully for ' + user.name);
+}
+
+function toggleUserStatus(userId) {
+  var user = userAccounts.find(function(u){ return u.id === userId; });
+  if(!user) return;
+  user.status = user.status === 'active' ? 'disabled' : 'active';
+  saveUserAccounts();
+  renderUserAccountsTable();
+  showToast(user.name + ' account ' + (user.status === 'active' ? 'enabled' : 'disabled'));
+}
+
+function toggleUmCheckbox(userId) {
+  var idx = umSelectedIds.indexOf(userId);
+  if(idx > -1) umSelectedIds.splice(idx, 1);
+  else umSelectedIds.push(userId);
+  updateBulkBar();
+}
+
+function toggleUmSelectAll(checked) {
+  var filtered = getFilteredUsers();
+  if(checked) { umSelectedIds = filtered.map(function(u){ return u.id; }); }
+  else { umSelectedIds = []; }
+  renderUserAccountsTable();
+}
+
+function updateBulkBar() {
+  var bar = document.getElementById('umBulkBar');
+  if(!bar) return;
+  if(umSelectedIds.length > 0) {
+    bar.classList.add('active');
+    document.getElementById('umSelCount').textContent = umSelectedIds.length + ' user' + (umSelectedIds.length > 1 ? 's' : '') + ' selected';
+  } else {
+    bar.classList.remove('active');
+  }
+  // update checkboxes
+  document.querySelectorAll('.um-row-cb').forEach(function(cb) {
+    cb.checked = umSelectedIds.indexOf(cb.getAttribute('data-uid')) > -1;
+  });
+  var selectAll = document.getElementById('umSelectAllCb');
+  if(selectAll) {
+    var filtered = getFilteredUsers();
+    selectAll.checked = filtered.length > 0 && umSelectedIds.length === filtered.length;
+  }
+}
+
+function bulkActivate() {
+  umSelectedIds.forEach(function(id) {
+    var u = userAccounts.find(function(a){ return a.id === id; });
+    if(u) u.status = 'active';
+  });
+  saveUserAccounts();
+  umSelectedIds = [];
+  renderUserAccountsTable();
+  showToast('Selected accounts activated');
+}
+
+function bulkDeactivate() {
+  umSelectedIds.forEach(function(id) {
+    var u = userAccounts.find(function(a){ return a.id === id; });
+    if(u) u.status = 'disabled';
+  });
+  saveUserAccounts();
+  umSelectedIds = [];
+  renderUserAccountsTable();
+  showToast('Selected accounts deactivated');
+}
+
+function bulkExportUsers() {
+  var selected = userAccounts.filter(function(u){ return umSelectedIds.indexOf(u.id) > -1; });
+  if(selected.length === 0) { showToast('No users selected'); return; }
+  var headers = ['name','role','username','email','programme','status','createdAt'];
+  exportCSV(selected, headers, 'users_export.csv');
+  showToast('Exported ' + selected.length + ' user(s) to CSV');
+}
+
+function getFilteredUsers() {
+  var roleFilter = document.getElementById('umRoleFilter');
+  var statusFilter = document.getElementById('umStatusFilter');
+  var searchInput = document.getElementById('umSearch');
+  var role = roleFilter ? roleFilter.value : 'all';
+  var status = statusFilter ? statusFilter.value : 'all';
+  var q = searchInput ? searchInput.value.trim().toLowerCase() : '';
+  return userAccounts.filter(function(u) {
+    if(role !== 'all' && u.role !== role) return false;
+    if(status !== 'all' && u.status !== status) return false;
+    if(q && u.name.toLowerCase().indexOf(q) === -1 && u.username.toLowerCase().indexOf(q) === -1 && (u.email||'').toLowerCase().indexOf(q) === -1) return false;
+    return true;
+  });
+}
+
+function renderUserAccountsTable() {
+  var tableBody = document.getElementById('umTableBody');
+  if(!tableBody) return;
+  var filtered = getFilteredUsers();
+  var roleColors = {admin:'linear-gradient(135deg,var(--accent),var(--orange))',instructor:'linear-gradient(135deg,var(--green),var(--teal))',student:'linear-gradient(135deg,var(--blue),#2980b9)'};
+  var roleBadges = {admin:'um-role-admin',instructor:'um-role-instructor',student:'um-role-student'};
+  var roleLabels = {admin:'Admin',instructor:'Instructor',student:'Student'};
+  tableBody.innerHTML = filtered.map(function(u) {
+    var initials = u.name.split(' ').map(function(n){return n[0];}).join('').substring(0,2).toUpperCase();
+    var checked = umSelectedIds.indexOf(u.id) > -1 ? 'checked' : '';
+    return '<tr>' +
+      '<td><input type="checkbox" class="um-cb um-row-cb" data-uid="'+u.id+'" '+checked+' onchange="toggleUmCheckbox(\''+u.id+'\')"></td>' +
+      '<td><div class="um-user-cell"><div class="um-avatar" style="background:'+roleColors[u.role]+';">'+initials+'</div><div><div class="um-name">'+u.name+'</div><div class="um-email">'+(u.email||u.username)+'</div></div></div></td>' +
+      '<td><span class="um-role-badge '+roleBadges[u.role]+'">'+roleLabels[u.role]+'</span></td>' +
+      '<td>'+u.username+'</td>' +
+      '<td>'+(u.programme||'—')+'</td>' +
+      '<td><label class="um-toggle"><input type="checkbox" '+(u.status==='active'?'checked':'')+' onchange="toggleUserStatus(\''+u.id+'\')"><span class="um-slider"></span></label></td>' +
+      '<td><div class="um-actions">' +
+        '<button title="Edit" onclick="openEditUser(\''+u.id+'\')">✏️</button>' +
+        '<button title="Reset Password" onclick="openResetPassword(\''+u.id+'\')">🔑</button>' +
+      '</div></td></tr>';
+  }).join('');
+
+  // Update stats
+  var total = userAccounts.length;
+  var active = userAccounts.filter(function(u){return u.status==='active';}).length;
+  var disabled = total - active;
+  var admins = userAccounts.filter(function(u){return u.role==='admin';}).length;
+  var instructors = userAccounts.filter(function(u){return u.role==='instructor';}).length;
+  var studs = userAccounts.filter(function(u){return u.role==='student';}).length;
+  var els = {umStatTotal:total,umStatActive:active,umStatDisabled:disabled,umStatAdmins:admins,umStatInstructors:instructors,umStatStudents:studs};
+  for(var key in els) {
+    var el = document.getElementById(key);
+    if(el) el.textContent = els[key];
+  }
+  var countEl = document.getElementById('umCount');
+  if(countEl) countEl.textContent = 'Showing ' + filtered.length + ' of ' + total + ' users';
+
+  updateBulkBar();
+}
 
 function animateCounter(element, target, duration) {
   duration = duration || 1000;
@@ -1637,6 +1986,14 @@ function exportReportCSV() {
   showToast('Report CSV exported!');
 }
 
+function switchSettingsTab(tab, which) {
+  tab.parentElement.querySelectorAll('.tab').forEach(function(t){ t.classList.remove('active'); });
+  tab.classList.add('active');
+  document.getElementById('settingsTabSystem').style.display = which==='system' ? '' : 'none';
+  document.getElementById('settingsTabUsers').style.display = which==='users' ? '' : 'none';
+  if(which === 'users') renderUserAccountsTable();
+}
+
 function populateStudentSelect() {
   const sel = document.getElementById('studentSelect');
   students.forEach((s,i) => {
@@ -1664,6 +2021,17 @@ function handleAdminClick() {
       document.getElementById('adminUser').focus();
       return;
     }
+    var uname = document.getElementById('adminUser').value.trim();
+    var pw = document.getElementById('adminPass').value;
+    var adminUser = userAccounts.find(function(u){ return u.role==='admin' && (u.username===uname || u.email===uname) && u.password===pw; });
+    if(!adminUser) {
+      // Fallback: allow blank for backwards compat
+      if(uname === '' && pw === '') { enterApp('admin'); return; }
+      var anyAdmin = userAccounts.find(function(u){ return u.role==='admin' && (u.username===uname || u.email===uname); });
+      if(anyAdmin && anyAdmin.status==='disabled') { alert('This account has been disabled. Contact a system administrator.'); return; }
+      alert('Invalid username or password.'); return;
+    }
+    if(adminUser.status === 'disabled') { alert('This account has been disabled. Contact a system administrator.'); return; }
     enterApp('admin');
   } catch(err) { console.error('handleAdminClick error:', err); alert('Error: ' + err.message); }
 }
@@ -2041,13 +2409,61 @@ function buildAdminPages() {
 
   <!-- SETTINGS -->
   <section class="page" id="page-settings">
-    <div class="card" style="max-width:700px;">
-      <div class="card-header"><h3>System Settings</h3></div>
-      <div class="form-group"><label>Institution Name</label><input type="text" class="form-control" value="C.E.S.T.I.S LMS - Community Training Intervention"></div>
-      <div class="form-group"><label>Administrator Email</label><input type="email" class="form-control" value="admin@heartlms.edu.jm"></div>
-      <div class="form-group"><label>Academic Year</label><select class="form-control"><option>2025/2026</option><option>2024/2025</option></select></div>
-      <div class="form-group"><label>Video Conference Provider</label><select class="form-control"><option>Built-in (WebRTC)</option><option>Zoom Integration</option><option>Microsoft Teams</option><option>Google Meet</option></select></div>
-      <button class="btn btn-primary" onclick="showToast('Settings saved successfully!')">Save Changes</button>
+    <div class="tabs">
+      <div class="tab active" onclick="switchSettingsTab(this,'system')">System Settings</div>
+      <div class="tab" onclick="switchSettingsTab(this,'users')">User Accounts</div>
+    </div>
+
+    <div id="settingsTabSystem">
+      <div class="card" style="max-width:700px;">
+        <div class="card-header"><h3>System Settings</h3></div>
+        <div class="form-group"><label>Institution Name</label><input type="text" class="form-control" value="C.E.S.T.I.S LMS - Community Training Intervention"></div>
+        <div class="form-group"><label>Administrator Email</label><input type="email" class="form-control" value="admin@heartlms.edu.jm"></div>
+        <div class="form-group"><label>Academic Year</label><select class="form-control"><option>2025/2026</option><option>2024/2025</option></select></div>
+        <div class="form-group"><label>Video Conference Provider</label><select class="form-control"><option>Built-in (WebRTC)</option><option>Zoom Integration</option><option>Microsoft Teams</option><option>Google Meet</option></select></div>
+        <button class="btn btn-primary" onclick="showToast('Settings saved successfully!')">Save Changes</button>
+      </div>
+    </div>
+
+    <div id="settingsTabUsers" style="display:none;">
+      <div class="um-stats">
+        <div class="um-stat"><div class="um-stat-val" id="umStatTotal">0</div><div class="um-stat-label">Total Users</div></div>
+        <div class="um-stat"><div class="um-stat-val" style="color:var(--green);" id="umStatActive">0</div><div class="um-stat-label">Active</div></div>
+        <div class="um-stat"><div class="um-stat-val" style="color:var(--red);" id="umStatDisabled">0</div><div class="um-stat-label">Disabled</div></div>
+        <div class="um-stat"><div class="um-stat-val" style="color:var(--accent);" id="umStatAdmins">0</div><div class="um-stat-label">Admins</div></div>
+        <div class="um-stat"><div class="um-stat-val" style="color:var(--green);" id="umStatInstructors">0</div><div class="um-stat-label">Instructors</div></div>
+        <div class="um-stat"><div class="um-stat-val" style="color:var(--blue);" id="umStatStudents">0</div><div class="um-stat-label">Students</div></div>
+      </div>
+
+      <div class="um-toolbar">
+        <button class="btn btn-primary" onclick="openModal('createUserModal')">+ Create User</button>
+        <select class="form-control" style="width:160px;" id="umRoleFilter" onchange="umSelectedIds=[];renderUserAccountsTable()"><option value="all">All Roles</option><option value="admin">Admins</option><option value="instructor">Instructors</option><option value="student">Students</option></select>
+        <select class="form-control" style="width:160px;" id="umStatusFilter" onchange="umSelectedIds=[];renderUserAccountsTable()"><option value="all">All Status</option><option value="active">Active</option><option value="disabled">Disabled</option></select>
+        <input type="text" class="form-control um-search" placeholder="Search users..." id="umSearch" onkeyup="renderUserAccountsTable()">
+        <button class="btn-export" onclick="bulkExportUsers()">📄 Export Selected</button>
+      </div>
+
+      <div class="um-bulk-bar" id="umBulkBar">
+        <span class="um-sel-count" id="umSelCount">0 users selected</span>
+        <div class="um-bulk-actions">
+          <button class="btn btn-sm btn-success" onclick="bulkActivate()">✓ Activate</button>
+          <button class="btn btn-sm btn-danger" onclick="bulkDeactivate()">✕ Deactivate</button>
+          <button class="btn btn-sm btn-secondary" onclick="bulkExportUsers()">📄 Export</button>
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="card-header"><h3>User Accounts</h3><span style="font-size:13px;color:var(--text-muted);" id="umCount">Showing 0 users</span></div>
+        <div class="table-wrapper">
+          <table class="um-table">
+            <thead><tr>
+              <th style="width:40px;"><input type="checkbox" class="um-cb" id="umSelectAllCb" onchange="toggleUmSelectAll(this.checked)"></th>
+              <th>User</th><th>Role</th><th>Username</th><th>Programme</th><th>Status</th><th>Actions</th>
+            </tr></thead>
+            <tbody id="umTableBody"></tbody>
+          </table>
+        </div>
+      </div>
     </div>
   </section>
   `;
@@ -2068,6 +2484,7 @@ function buildAdminPages() {
   renderAnnouncements();
   renderCalendar();
   renderCalendarEventList();
+  renderUserAccountsTable();
 }
 
 // ============================== BUILD STUDENT PAGES ==============================
