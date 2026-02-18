@@ -2619,6 +2619,8 @@ document.addEventListener('click', function(e) {
 
 function logout() {
   closeMobileSidebar();
+  // Release all camera/mic permissions and cleanup WebRTC
+  vcCleanupMediaIfNeeded();
   currentRole = null;
   currentStudent = null;
   currentInstructor = null;
@@ -2626,12 +2628,6 @@ function logout() {
   document.getElementById('landingPage').style.display = '';
   document.getElementById('mainContent').innerHTML = '';
   document.getElementById('sidebarNav').innerHTML = '';
-  if(videoTimerInterval) clearInterval(videoTimerInterval);
-  // Cleanup WebRTC on logout
-  if(localStream) { localStream.getTracks().forEach(function(t){t.stop();}); localStream = null; }
-  if(screenStream) { screenStream.getTracks().forEach(function(t){t.stop();}); screenStream = null; }
-  if(rtcPeer) { rtcPeer.destroy(); rtcPeer = null; }
-  peerConnections = {}; dataConnections = {}; peerNames = {};
 }
 
 function buildAdminSidebar() {
@@ -2716,7 +2712,43 @@ function buildInstructorSidebar() {
   `;
 }
 
+/* ============================== MEDIA PERMISSION CLEANUP ============================== */
+// Stops camera/mic streams if user navigates away from video pages without
+// using the Back/Leave button. This ensures the browser releases device access.
+function vcCleanupMediaIfNeeded() {
+  if(localStream) { localStream.getTracks().forEach(function(t){t.stop();}); localStream = null; }
+  if(screenStream) { screenStream.getTracks().forEach(function(t){t.stop();}); screenStream = null; }
+  // Stop remote streams
+  Object.keys(peerConnections).forEach(function(pid) {
+    if(peerConnections[pid].stream) peerConnections[pid].stream.getTracks().forEach(function(t){t.stop();});
+    if(peerConnections[pid].media) peerConnections[pid].media.close();
+    if(peerConnections[pid].data) peerConnections[pid].data.close();
+  });
+  peerConnections = {}; dataConnections = {}; peerNames = {};
+  if(rtcPeer) { rtcPeer.destroy(); rtcPeer = null; }
+  if(vcRecordingAudioCtx) { try { vcRecordingAudioCtx.close(); } catch(e){} vcRecordingAudioCtx = null; }
+  if(vcIsRecording && vcMediaRecorder && vcMediaRecorder.state !== 'inactive') { vcMediaRecorder.stop(); }
+  vcIsRecording = false;
+  if(videoTimerInterval) clearInterval(videoTimerInterval);
+  vcStopHostReconnect();
+  isRoomHost = false; currentRoomCode = '';
+  // Clear all video element srcObjects across all video room containers
+  ['videoRoom','iVideoRoom','sVideoRoom'].forEach(function(id) {
+    var el = document.getElementById(id);
+    if(el) el.querySelectorAll('video').forEach(function(v){ v.srcObject = null; });
+  });
+}
+
+// Track which pages are video-related so we know when the user leaves one
+var vcVideoPages = ['video','s-video','i-classes'];
+var vcLastPage = '';
+
 function showPage(pageId) {
+  // If navigating away from a video page, release camera/mic permissions
+  if(vcVideoPages.indexOf(vcLastPage) !== -1 && vcVideoPages.indexOf(pageId) === -1) {
+    vcCleanupMediaIfNeeded();
+  }
+  vcLastPage = pageId;
   document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
   const pg = document.getElementById('page-'+pageId);
   if(pg) pg.classList.add('active');
@@ -4715,10 +4747,16 @@ function exitVideoRoom(role) {
   if(vcRecordingAudioCtx) { try { vcRecordingAudioCtx.close(); } catch(e){} vcRecordingAudioCtx = null; }
   if(videoTimerInterval) clearInterval(videoTimerInterval);
   vcStopHostReconnect();
+
+  // Stop all local media tracks to release camera/mic permissions
   if(localStream) { localStream.getTracks().forEach(function(t){t.stop();}); localStream = null; }
   if(screenStream) { screenStream.getTracks().forEach(function(t){t.stop();}); screenStream = null; }
 
+  // Stop remote streams and close all peer connections
   Object.keys(peerConnections).forEach(function(pid) {
+    if(peerConnections[pid].stream) {
+      peerConnections[pid].stream.getTracks().forEach(function(t){t.stop();});
+    }
     if(peerConnections[pid].media) peerConnections[pid].media.close();
     if(peerConnections[pid].data) peerConnections[pid].data.close();
   });
@@ -4729,10 +4767,16 @@ function exitVideoRoom(role) {
   // It is only cleared when vcEndMeetingForAll() is called.
   isRoomHost = false; currentRoomCode = '';
 
-  var listId = role==='admin' ? 'videoClassList' : role==='instructor' ? 'iVideoClassList' : 'sVideoClassList';
+  // Clear all video element srcObjects to fully release media references
   var containerId = role==='admin' ? 'videoRoom' : role==='instructor' ? 'iVideoRoom' : 'sVideoRoom';
+  var container = document.getElementById(containerId);
+  if(container) {
+    container.querySelectorAll('video').forEach(function(v){ v.srcObject = null; });
+  }
+
+  var listId = role==='admin' ? 'videoClassList' : role==='instructor' ? 'iVideoClassList' : 'sVideoClassList';
   document.getElementById(listId).style.display = 'block';
-  document.getElementById(containerId).style.display = 'none';
+  container.style.display = 'none';
 }
 
 // ============================== CLASS SESSION FUNCTIONS ==============================
