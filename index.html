@@ -1549,6 +1549,97 @@ textarea.form-control { resize:vertical; min-height:80px; }
 
 <div id="toastContainer"></div>
 
+<!-- CLASS SESSION MODAL -->
+<div class="modal-overlay" id="createClassSessionModal">
+  <div class="modal">
+    <div class="modal-header"><h3>Create New Class Session</h3><button class="modal-close" onclick="closeModal('createClassSessionModal')">✕</button></div>
+    <div class="form-group"><label>Session Name</label><input type="text" class="form-control" id="csSessionName" placeholder="e.g. Welding Theory — Session 5"></div>
+    <div class="form-group"><label>Programme / Course</label><select class="form-control" id="csCourse"><option>Welding</option><option>Electrical Installation</option><option>Cosmetology</option><option>Business Administration</option><option>Auto Mechanics</option><option>Plumbing</option><option>Carpentry</option><option>Hospitality</option><option>Information Technology</option><option>Garment Construction</option></select></div>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;">
+      <div class="form-group"><label>Date</label><input type="date" class="form-control" id="csDate"></div>
+      <div class="form-group"><label>Start Time</label><input type="time" class="form-control" id="csTime"></div>
+    </div>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;">
+      <div class="form-group"><label>Duration (minutes)</label><input type="number" class="form-control" id="csDuration" value="90" min="15" max="300"></div>
+      <div class="form-group"><label>Type</label><select class="form-control" id="csType"><option value="theory">Theory</option><option value="practical">Practical Lab</option><option value="workshop">Workshop Review</option><option value="virtual">Virtual Class</option></select></div>
+    </div>
+    <div class="form-group"><label>Location / Room</label><input type="text" class="form-control" id="csLocation" placeholder="e.g. Virtual-01, Workshop Bay 3"></div>
+    <div style="display:flex;gap:10px;justify-content:flex-end;margin-top:20px;">
+      <button class="btn btn-secondary" onclick="closeModal('createClassSessionModal')">Cancel</button>
+      <button class="btn btn-primary" onclick="createClassSession()">Create Session</button>
+    </div>
+  </div>
+</div>
+
+<!-- ASSIGNMENT MODAL -->
+<div class="modal-overlay" id="createAssignmentModal">
+  <div class="modal">
+    <div class="modal-header"><h3>Create New Assignment</h3><button class="modal-close" onclick="closeModal('createAssignmentModal')">✕</button></div>
+    <div class="form-group"><label>Assignment Title</label><input type="text" class="form-control" id="assignTitle" placeholder="e.g. Practical Report #3"></div>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;">
+      <div class="form-group"><label>Type</label><select class="form-control" id="assignType"><option value="quiz">Quiz</option><option value="test">Test</option><option value="report">Report</option><option value="portfolio">Portfolio</option><option value="worksheet">Worksheet</option><option value="exam">Exam</option><option value="project">Project</option></select></div>
+      <div class="form-group"><label>Due Date</label><input type="date" class="form-control" id="assignDueDate"></div>
+    </div>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;">
+      <div class="form-group"><label>Max Points</label><input type="number" class="form-control" id="assignMaxPoints" value="100" min="1" max="500"></div>
+      <div class="form-group"><label>Weight (%)</label><input type="number" class="form-control" id="assignWeight" value="10" min="1" max="100"></div>
+    </div>
+    <div class="form-group"><label>Instructions</label><textarea class="form-control" id="assignInstructions" placeholder="Assignment instructions for students..."></textarea></div>
+    <div style="display:flex;gap:10px;justify-content:flex-end;margin-top:20px;">
+      <button class="btn btn-secondary" onclick="closeModal('createAssignmentModal')">Cancel</button>
+      <button class="btn btn-primary" onclick="createAssignment()">Create Assignment</button>
+    </div>
+  </div>
+</div>
+
+<!-- UPLOAD RESOURCE MODAL -->
+<div class="modal-overlay" id="uploadResourceModal">
+  <div class="modal">
+    <div class="modal-header"><h3>Upload Resource</h3><button class="modal-close" onclick="closeModal('uploadResourceModal')">✕</button></div>
+    <div class="form-group"><label>Resource Name</label><input type="text" class="form-control" id="resName" placeholder="e.g. Safety Procedures Guide"></div>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;">
+      <div class="form-group"><label>Category</label><select class="form-control" id="resCat"><option value="video">Video Lectures</option><option value="guide">Study Guides & Handbooks</option><option value="worksheet">Worksheets & Assignments</option><option value="rubric">Assessment Rubrics</option></select></div>
+      <div class="form-group"><label>File Type</label><select class="form-control" id="resType"><option value="PDF">PDF</option><option value="Video">Video</option><option value="DOC">DOC</option><option value="XLSX">XLSX</option><option value="Link">External Link</option></select></div>
+    </div>
+    <div class="form-group"><label>URL / Link (optional)</label><input type="text" class="form-control" id="resUrl" placeholder="https://..."></div>
+    <div class="form-group"><label>Description</label><textarea class="form-control" id="resDesc" placeholder="Brief description of this resource..."></textarea></div>
+    <div style="display:flex;gap:10px;justify-content:flex-end;margin-top:20px;">
+      <button class="btn btn-secondary" onclick="closeModal('uploadResourceModal')">Cancel</button>
+      <button class="btn btn-primary" onclick="uploadResource()">Upload Resource</button>
+    </div>
+  </div>
+</div>
+
+<!-- CREATE FOLDER MODAL -->
+<div class="modal-overlay" id="createFolderModal">
+  <div class="modal" style="max-width:420px;">
+    <div class="modal-header"><h3>Create New Folder</h3><button class="modal-close" onclick="closeModal('createFolderModal')">✕</button></div>
+    <div class="form-group"><label>Folder Name</label><input type="text" class="form-control" id="folderName" placeholder="e.g. Week 5 Materials"></div>
+    <div class="form-group"><label>Category</label><select class="form-control" id="folderCat"><option value="video">Video Lectures</option><option value="guide">Study Guides & Handbooks</option><option value="worksheet">Worksheets & Assignments</option><option value="rubric">Assessment Rubrics</option></select></div>
+    <div style="display:flex;gap:10px;justify-content:flex-end;margin-top:20px;">
+      <button class="btn btn-secondary" onclick="closeModal('createFolderModal')">Cancel</button>
+      <button class="btn btn-primary" onclick="createResourceFolder()">Create Folder</button>
+    </div>
+  </div>
+</div>
+
+<!-- EDIT STUDENT PROFILE MODAL -->
+<div class="modal-overlay" id="editStudentProfileModal">
+  <div class="modal">
+    <div class="modal-header"><h3>Edit Profile</h3><button class="modal-close" onclick="closeModal('editStudentProfileModal')">✕</button></div>
+    <div class="form-group"><label>Full Name</label><input type="text" class="form-control" id="editProfileName" disabled></div>
+    <div class="form-group"><label>Student ID</label><input type="text" class="form-control" id="editProfileId" disabled></div>
+    <div class="form-group"><label>Email</label><input type="email" class="form-control" id="editProfileEmail" placeholder="your.email@student.heartlms.edu.jm"></div>
+    <div class="form-group"><label>Phone</label><input type="tel" class="form-control" id="editProfilePhone" placeholder="+1 (876) 000-0000"></div>
+    <div class="form-group"><label>Emergency Contact Name</label><input type="text" class="form-control" id="editProfileEmergencyName" placeholder="Parent / Guardian name"></div>
+    <div class="form-group"><label>Emergency Contact Phone</label><input type="tel" class="form-control" id="editProfileEmergencyPhone" placeholder="+1 (876) 000-0000"></div>
+    <div style="display:flex;gap:10px;justify-content:flex-end;margin-top:20px;">
+      <button class="btn btn-secondary" onclick="closeModal('editStudentProfileModal')">Cancel</button>
+      <button class="btn btn-primary" onclick="saveStudentProfile()">Save Profile</button>
+    </div>
+  </div>
+</div>
+
 <script>
 const skillAreas = [
   {id:1,name:"Welding & Fabrication",icon:"\uD83D\uDD25",color:"#e74c3c",students:87,materials:24,desc:"SMAW, MIG, TIG welding processes and metal fabrication"},
@@ -1715,6 +1806,13 @@ let selectedCalendarDay = null;
 let announcementFormVisible = false;
 let currentAttendanceDate = '2026-02-18';
 
+// ============================== PERSISTENT DATA ARRAYS ==============================
+let classSessions = [];
+let instructorAssignments = [];
+let instructorResources = [];
+let studentProfiles = {};
+let systemSettings = { institutionName: 'C.E.S.T.I.S LMS - Community Training Intervention', adminEmail: 'admin@heartlms.edu.jm', academicYear: '2025/2026', vcProvider: 'Built-in (WebRTC)' };
+
 function saveState() {
   try {
     localStorage.setItem('voctrain_students', JSON.stringify(students));
@@ -1722,6 +1820,11 @@ function saveState() {
     localStorage.setItem('voctrain_announcements', JSON.stringify(announcements));
     localStorage.setItem('voctrain_attendance', JSON.stringify(attendanceRecords));
     localStorage.setItem('voctrain_users', JSON.stringify(userAccounts));
+    localStorage.setItem('voctrain_classSessions', JSON.stringify(classSessions));
+    localStorage.setItem('voctrain_assignments', JSON.stringify(instructorAssignments));
+    localStorage.setItem('voctrain_resources', JSON.stringify(instructorResources));
+    localStorage.setItem('voctrain_studentProfiles', JSON.stringify(studentProfiles));
+    localStorage.setItem('voctrain_systemSettings', JSON.stringify(systemSettings));
   } catch(e) { /* quota exceeded or private browsing */ }
 }
 
@@ -1731,10 +1834,20 @@ function loadState() {
     const e = localStorage.getItem('voctrain_exams');
     const a = localStorage.getItem('voctrain_announcements');
     const at = localStorage.getItem('voctrain_attendance');
+    const cs = localStorage.getItem('voctrain_classSessions');
+    const ia = localStorage.getItem('voctrain_assignments');
+    const ir = localStorage.getItem('voctrain_resources');
+    const sp = localStorage.getItem('voctrain_studentProfiles');
+    const ss = localStorage.getItem('voctrain_systemSettings');
     if(s) students = JSON.parse(s);
     if(e) exams = JSON.parse(e);
     if(a) announcements = JSON.parse(a);
     if(at) attendanceRecords = JSON.parse(at);
+    if(cs) classSessions = JSON.parse(cs);
+    if(ia) instructorAssignments = JSON.parse(ia);
+    if(ir) instructorResources = JSON.parse(ir);
+    if(sp) studentProfiles = JSON.parse(sp);
+    if(ss) systemSettings = JSON.parse(ss);
   } catch(e) { /* parse error, use generated data */ }
 }
 loadState();
@@ -2467,13 +2580,14 @@ function buildAdminPages() {
 
   <!-- VIDEO -->
   <section class="page" id="page-video">
-    <div style="display:flex;gap:12px;margin-bottom:18px;"><button class="btn btn-primary" onclick="showToast('Creating new class session...')">+ New Class Session</button><button class="btn btn-secondary">Join Existing Class</button></div>
+    <div style="display:flex;gap:12px;margin-bottom:18px;"><button class="btn btn-primary" onclick="openModal('createClassSessionModal')">+ New Class Session</button><button class="btn btn-secondary" onclick="document.getElementById('vc-join-code')?.focus();showToast('Enter a room code below and click Join to connect')">Join Existing Class</button></div>
     <div class="card" id="videoClassList"><div class="card-header"><h3>Active & Scheduled Classes</h3></div><div class="table-wrapper"><table><thead><tr><th>Class</th><th>Instructor</th><th>Time</th><th>Students</th><th>Status</th><th>Action</th></tr></thead><tbody>
       <tr><td><strong>Welding Theory L2</strong></td><td>Mr. R. Campbell</td><td>9:00 AM - 11:00 AM</td><td>24</td><td><span class="badge badge-red"><span class="badge-dot"></span>Live</span></td><td><button class="btn btn-sm btn-primary" onclick="enterVideoRoom('Welding Theory L2','admin')">Join</button></td></tr>
       <tr><td><strong>Electrical Safety</strong></td><td>Ms. J. Williams</td><td>11:30 AM - 1:00 PM</td><td>18</td><td><span class="badge badge-red"><span class="badge-dot"></span>Live</span></td><td><button class="btn btn-sm btn-primary" onclick="enterVideoRoom('Electrical Safety','admin')">Join</button></td></tr>
       <tr><td><strong>Business Admin L1</strong></td><td>Mrs. P. Morgan</td><td>2:00 PM - 4:00 PM</td><td>32</td><td><span class="badge badge-blue"><span class="badge-dot"></span>Scheduled</span></td><td><button class="btn btn-sm btn-secondary">Waiting</button></td></tr>
       <tr><td><strong>Cosmetology Basics</strong></td><td>Ms. D. Stewart</td><td>10:00 AM - 12:00 PM</td><td>22</td><td><span class="badge badge-red"><span class="badge-dot"></span>Live</span></td><td><button class="btn btn-sm btn-primary" onclick="enterVideoRoom('Cosmetology Basics','admin')">Join</button></td></tr>
     </tbody></table></div></div>
+    <div class="card" style="margin-top:18px;"><div class="card-header"><h3>My Scheduled Sessions</h3><span style="font-size:12px;color:var(--text-muted);">Custom created sessions</span></div><div class="table-wrapper"><table><thead><tr><th>Class</th><th>Created By</th><th>Date & Time</th><th>Duration</th><th>Status</th><th>Action</th></tr></thead><tbody id="adminClassSessionsList"></tbody></table></div></div>
     <div id="videoRoom" style="display:none;"></div>
   </section>
 
@@ -2497,7 +2611,7 @@ function buildAdminPages() {
 
   <!-- EXAMS -->
   <section class="page" id="page-exams">
-    <div style="display:flex;gap:12px;margin-bottom:20px;"><button class="btn btn-primary" onclick="openModal('createExamModal')">+ Create Exam</button><button class="btn btn-secondary">Export Results</button></div>
+    <div style="display:flex;gap:12px;margin-bottom:20px;"><button class="btn btn-primary" onclick="openModal('createExamModal')">+ Create Exam</button><button class="btn btn-secondary" onclick="exportExamResults()">Export Results</button></div>
     <div class="tabs"><div class="tab active" onclick="switchExamTab(this,'upcoming')">Upcoming</div><div class="tab" onclick="switchExamTab(this,'active')">Active Now</div><div class="tab" onclick="switchExamTab(this,'completed')">Completed</div></div>
     <div class="card"><div class="card-header"><h3>Scheduled Examinations</h3></div><div class="table-wrapper"><table><thead><tr><th>Exam Title</th><th>Course</th><th>Date & Time</th><th>Duration</th><th>Students</th><th>Status</th><th>Actions</th></tr></thead><tbody id="examTableBody"></tbody></table></div></div>
   </section>
@@ -2592,11 +2706,11 @@ function buildAdminPages() {
     <div id="settingsTabSystem">
       <div class="card" style="max-width:700px;">
         <div class="card-header"><h3>System Settings</h3></div>
-        <div class="form-group"><label>Institution Name</label><input type="text" class="form-control" value="C.E.S.T.I.S LMS - Community Training Intervention"></div>
-        <div class="form-group"><label>Administrator Email</label><input type="email" class="form-control" value="admin@heartlms.edu.jm"></div>
-        <div class="form-group"><label>Academic Year</label><select class="form-control"><option>2025/2026</option><option>2024/2025</option></select></div>
-        <div class="form-group"><label>Video Conference Provider</label><select class="form-control"><option>Built-in (WebRTC)</option><option>Zoom Integration</option><option>Microsoft Teams</option><option>Google Meet</option></select></div>
-        <button class="btn btn-primary" onclick="showToast('Settings saved successfully!')">Save Changes</button>
+        <div class="form-group"><label>Institution Name</label><input type="text" class="form-control" id="settInstitution" value="C.E.S.T.I.S LMS - Community Training Intervention"></div>
+        <div class="form-group"><label>Administrator Email</label><input type="email" class="form-control" id="settAdminEmail" value="admin@heartlms.edu.jm"></div>
+        <div class="form-group"><label>Academic Year</label><select class="form-control" id="settAcadYear"><option>2025/2026</option><option>2024/2025</option></select></div>
+        <div class="form-group"><label>Video Conference Provider</label><select class="form-control" id="settVcProvider"><option>Built-in (WebRTC)</option><option>Zoom Integration</option><option>Microsoft Teams</option><option>Google Meet</option></select></div>
+        <button class="btn btn-primary" onclick="saveSystemSettings()">Save Changes</button>
       </div>
     </div>
 
@@ -2660,6 +2774,7 @@ function buildAdminPages() {
   renderCalendar();
   renderCalendarEventList();
   renderUserAccountsTable();
+  renderAdminClassSessions();
 }
 
 // ============================== BUILD STUDENT PAGES ==============================
@@ -2863,7 +2978,7 @@ function buildStudentPages() {
           ${section.items.map((item,i) => `
             <li class="material-item">
               <div class="material-icon" style="background:${skill.color}22;color:${skill.color};">${section.cat.split(' ')[0]}</div>
-              <div style="flex:1;"><div style="font-size:13.5px;">${item}</div><div style="font-size:11px;color:var(--text-muted);">Updated ${Math.floor(Math.random()*10)+1} days ago • ${['PDF','Video','DOC','Link'][i%4]}</div></div>
+              <div style="flex:1;"><div style="font-size:13.5px;">${item}</div><div style="font-size:11px;color:var(--text-muted);">Course material • ${['PDF','Video','DOC','Link'][i%4]}</div></div>
               <button class="btn btn-sm btn-secondary">${section.cat.includes('Video')?'▶ Play':'Download'}</button>
             </li>
           `).join('')}
@@ -2940,7 +3055,7 @@ function buildStudentPages() {
           <span>\uD83D\uDCCD C.E.S.T.I.S LMS</span>
         </div>
       </div>
-      <button class="btn btn-secondary" onclick="showToast('Profile updated!')">Edit Profile</button>
+      <button class="btn btn-secondary" onclick="openEditStudentProfile()">Edit Profile</button>
     </div>
     <div class="stats-grid" style="grid-template-columns:repeat(4,1fr);">
       <div class="profile-stat"><div class="ps-value" style="color:var(--green);">${s.gpa}</div><div class="ps-label">GPA</div></div>
@@ -2953,8 +3068,8 @@ function buildStudentPages() {
         <h4>Personal Information</h4>
         <div class="info-row"><span class="info-label">Full Name</span><span class="info-value">${s.name}</span></div>
         <div class="info-row"><span class="info-label">Student ID</span><span class="info-value">${s.id}</span></div>
-        <div class="info-row"><span class="info-label">Email</span><span class="info-value">${s.name.split(' ')[0].toLowerCase()}.${s.name.split(' ')[1]?s.name.split(' ')[1].toLowerCase():''}@student.heartlms.edu.jm</span></div>
-        <div class="info-row"><span class="info-label">Phone</span><span class="info-value">+1 (876) ${String(Math.floor(Math.random()*900)+100)}-${String(Math.floor(Math.random()*9000)+1000)}</span></div>
+        <div class="info-row"><span class="info-label">Email</span><span class="info-value" id="sProfileEmail">${(studentProfiles[s.id]?.email) || (s.name.split(' ')[0].toLowerCase()+'.'+(s.name.split(' ')[1]?s.name.split(' ')[1].toLowerCase():'')+'@student.heartlms.edu.jm')}</span></div>
+        <div class="info-row"><span class="info-label">Phone</span><span class="info-value" id="sProfilePhone">${(studentProfiles[s.id]?.phone) || 'Not provided — Edit Profile to add'}</span></div>
       </div>
       <div class="info-section">
         <h4>Academic Information</h4>
@@ -3077,7 +3192,7 @@ function buildInstructorPages() {
 
   <!-- INSTRUCTOR CLASSES -->
   <section class="page" id="page-i-classes">
-    <div style="display:flex;gap:12px;margin-bottom:18px;"><button class="btn btn-primary" onclick="showToast('Creating new class session...')">+ New Class Session</button><button class="btn btn-secondary">Schedule Recurring</button></div>
+    <div style="display:flex;gap:12px;margin-bottom:18px;"><button class="btn btn-primary" onclick="openModal('createClassSessionModal')">+ New Class Session</button><button class="btn btn-secondary" onclick="openModal('createClassSessionModal')">Schedule Session</button></div>
     <div class="card" id="iVideoClassList"><div class="card-header"><h3>My Class Sessions</h3></div>
       <div class="class-schedule-card" style="border-color:rgba(231,76,60,0.3);">
         <div class="class-time-block" style="background:var(--red-dim);"><div class="time">9:00</div><div class="period">AM</div></div>
@@ -3097,6 +3212,9 @@ function buildInstructorPages() {
         <span class="badge badge-purple">Optional</span>
         <button class="btn btn-secondary btn-sm" disabled>Not Started</button>
       </div>
+    </div>
+    <div class="card" style="margin-top:18px;"><div class="card-header"><h3>My Scheduled Sessions</h3><span style="font-size:12px;color:var(--text-muted);">Created by you</span></div>
+      <div id="iClassSessionsList"></div>
     </div>
     <div class="card" style="margin-top:18px;"><div class="card-header"><h3>Past Recordings</h3></div>
       <div class="material-item"><div class="material-icon" style="background:var(--red-dim);color:var(--red);">\u25B6</div><div style="flex:1;"><div style="font-size:13px;">${ins.course} &mdash; Safety Fundamentals</div><div style="font-size:11px;color:var(--text-muted);">Feb 12 &bull; 1hr 20min &bull; ${myStudents.length} attended</div></div><button class="btn btn-sm btn-secondary">Watch</button></div>
@@ -3136,8 +3254,11 @@ function buildInstructorPages() {
   <!-- INSTRUCTOR GRADEBOOK -->
   <section class="page" id="page-i-gradebook">
     <div style="display:flex;gap:12px;margin-bottom:20px;">
-      <button class="btn btn-primary" onclick="showToast('Assignment creation coming soon!')">+ New Assignment</button>
+      <button class="btn btn-primary" onclick="openModal('createAssignmentModal')">+ New Assignment</button>
       <button class="btn-export" onclick="exportInstructorStudentsCSV()">📄 Export Grades</button>
+    </div>
+    <div class="card" style="margin-bottom:18px;"><div class="card-header"><h3>My Assignments</h3><span style="font-size:12px;color:var(--text-muted);">Created by you</span></div>
+      <div id="iCustomAssignmentsList"></div>
     </div>
     <div class="card"><div class="card-header"><h3>Gradebook &mdash; ${ins.course}</h3></div>
       <div class="table-wrapper"><table><thead><tr><th>Student</th><th>Safety Quiz</th><th>Tool ID Test</th><th>Theory #1</th><th>Practical #1</th><th>Mid-Term</th><th>Report #2</th><th>Portfolio</th><th>Avg</th></tr></thead><tbody id="iGradebookBody">
@@ -3184,9 +3305,10 @@ function buildInstructorPages() {
   <!-- INSTRUCTOR RESOURCES -->
   <section class="page" id="page-i-resources">
     <div style="display:flex;gap:12px;margin-bottom:18px;">
-      <button class="btn btn-primary" onclick="showToast('Upload feature coming soon!')">+ Upload Resource</button>
-      <button class="btn btn-secondary" onclick="showToast('Folder created!')">+ New Folder</button>
+      <button class="btn btn-primary" onclick="openModal('uploadResourceModal')">+ Upload Resource</button>
+      <button class="btn btn-secondary" onclick="openModal('createFolderModal')">+ New Folder</button>
     </div>
+    <div id="iCustomResourcesList" style="margin-bottom:18px;"></div>
     ${[
       {cat:'📹 Video Lectures',items:['Introduction to '+ins.course,'Safety Procedures & PPE Training','Core Techniques \u2014 Part 1','Core Techniques \u2014 Part 2','Advanced Methods & Best Practices','Industry Standards Overview']},
       {cat:'📄 Study Guides & Handbooks',items:['Course Syllabus & Learning Outcomes','Theory Handbook (Complete)','Practical Assessment Preparation Guide','Exam Revision Notes & Tips','Industry Terminology Glossary']},
@@ -3199,9 +3321,8 @@ function buildInstructorPages() {
           ${section.items.map((item,i) => `
             <li class="material-item">
               <div class="material-icon" style="background:${skill.color}22;color:${skill.color};">${section.cat.split(' ')[0]}</div>
-              <div style="flex:1;"><div style="font-size:13.5px;">${item}</div><div style="font-size:11px;color:var(--text-muted);">Updated ${Math.floor(Math.random()*10)+1} days ago &bull; ${['PDF','Video','DOC','XLSX'][i%4]}</div></div>
-              <button class="btn btn-sm btn-secondary" onclick="showToast('Opening ${item}...')">${section.cat.includes('Video')?'\u25B6 Play':'Open'}</button>
-              <button class="btn btn-sm btn-danger" style="margin-left:4px;" onclick="showToast('Deleted')">&#x2715;</button>
+              <div style="flex:1;"><div style="font-size:13.5px;">${item}</div><div style="font-size:11px;color:var(--text-muted);">Course material &bull; ${['PDF','Video','DOC','XLSX'][i%4]}</div></div>
+              <button class="btn btn-sm btn-secondary">${section.cat.includes('Video')?'\u25B6 Play':'Open'}</button>
             </li>
           `).join('')}
         </ul>
@@ -3261,7 +3382,7 @@ function buildInstructorPages() {
           <span>📍 C.E.S.T.I.S LMS</span>
         </div>
       </div>
-      <button class="btn btn-secondary" onclick="showToast('Profile updated!')">Edit Profile</button>
+      <button class="btn btn-secondary" onclick="openEditStudentProfile()">Edit Profile</button>
     </div>
     <div class="stats-grid" style="grid-template-columns:repeat(4,1fr);">
       <div class="profile-stat"><div class="ps-value" style="color:var(--green);">${ins.yearsExp}</div><div class="ps-label">Years Experience</div></div>
@@ -3293,6 +3414,9 @@ function buildInstructorPages() {
   renderInstructorAttendance();
   renderInstructorAnnouncements();
   renderInstructorCalendar();
+  renderInstructorClassSessions();
+  renderInstructorGradebook();
+  renderInstructorCustomResources();
   } catch(err) {
     console.error('buildInstructorPages error:', err);
     document.getElementById('mainContent').innerHTML = '<div class="card" style="margin:40px;padding:40px;text-align:center;"><h3>Error loading instructor portal</h3><p style="color:var(--text-muted);margin-top:8px;">'+err.message+'</p><button class="btn btn-primary" style="margin-top:16px;" onclick="logout()">Go Back</button></div>';
@@ -4254,6 +4378,365 @@ function exitVideoRoom(role) {
   document.getElementById(containerId).style.display = 'none';
 }
 
+// ============================== CLASS SESSION FUNCTIONS ==============================
+function createClassSession() {
+  const name = document.getElementById('csSessionName')?.value?.trim();
+  const course = document.getElementById('csCourse')?.value;
+  const date = document.getElementById('csDate')?.value;
+  const time = document.getElementById('csTime')?.value;
+  const duration = parseInt(document.getElementById('csDuration')?.value) || 90;
+  const type = document.getElementById('csType')?.value || 'theory';
+  const location = document.getElementById('csLocation')?.value?.trim() || 'Virtual-01';
+
+  if(!name) { showToast('Please enter a session name'); return; }
+  if(!date) { showToast('Please select a date'); return; }
+  if(!time) { showToast('Please select a start time'); return; }
+
+  const session = {
+    id: 'CS-' + Date.now(),
+    name: name,
+    course: course,
+    date: date,
+    time: time,
+    duration: duration,
+    type: type,
+    location: location,
+    status: 'scheduled',
+    createdBy: currentRole === 'instructor' ? currentInstructor?.name : 'Admin',
+    createdAt: new Date().toISOString()
+  };
+
+  classSessions.push(session);
+  saveState();
+  closeModal('createClassSessionModal');
+  showToast('Class session "' + name + '" created successfully');
+
+  // Reset form fields
+  document.getElementById('csSessionName').value = '';
+  document.getElementById('csDate').value = '';
+  document.getElementById('csTime').value = '';
+  document.getElementById('csDuration').value = '90';
+  document.getElementById('csLocation').value = '';
+
+  // Refresh the class sessions display
+  if(currentRole === 'instructor') renderInstructorClassSessions();
+  if(currentRole === 'admin') renderAdminClassSessions();
+}
+
+function renderInstructorClassSessions() {
+  const container = document.getElementById('iClassSessionsList');
+  if(!container) return;
+  const ins = currentInstructor;
+  const mySessions = classSessions.filter(s => s.course === ins?.course || s.createdBy === ins?.name);
+  const typeLabels = {theory:'Theory Session',practical:'Practical Lab',workshop:'Workshop Review',virtual:'Virtual Class'};
+  const typeColors = {theory:'var(--blue)',practical:'var(--green)',workshop:'var(--purple)',virtual:'var(--red)'};
+
+  if(mySessions.length === 0) {
+    container.innerHTML = '<p style="color:var(--text-muted);padding:16px;">No custom class sessions created yet. Click "+ New Class Session" to get started.</p>';
+    return;
+  }
+
+  container.innerHTML = mySessions.map(s => {
+    const timeStr = s.time ? new Date('2000-01-01T'+s.time).toLocaleTimeString([],{hour:'numeric',minute:'2-digit'}) : s.time;
+    const timeParts = timeStr.split(' ');
+    return '<div class="class-schedule-card">' +
+      '<div class="class-time-block" style="background:'+((typeColors[s.type]||'var(--blue)')+'22')+';">' +
+        '<div class="time" style="font-size:13px;">'+(timeParts[0]||s.time)+'</div><div class="period">'+(timeParts[1]||'')+'</div></div>' +
+      '<div style="flex:1;"><div style="font-size:14px;font-weight:600;">' + s.name + '</div>' +
+        '<div style="font-size:12px;color:var(--text-muted);">' + s.date + ' &bull; ' + s.duration + 'min &bull; ' + s.location + '</div></div>' +
+      '<span class="badge badge-blue">' + (typeLabels[s.type]||s.type) + '</span>' +
+      '<button class="btn btn-sm btn-danger" onclick="deleteClassSession(\''+s.id+'\')">Delete</button>' +
+    '</div>';
+  }).join('');
+}
+
+function renderAdminClassSessions() {
+  const container = document.getElementById('adminClassSessionsList');
+  if(!container) return;
+
+  if(classSessions.length === 0) {
+    container.innerHTML = '<p style="color:var(--text-muted);padding:16px;">No custom class sessions created yet.</p>';
+    return;
+  }
+
+  container.innerHTML = classSessions.map(s => {
+    const timeStr = s.time ? new Date('2000-01-01T'+s.time).toLocaleTimeString([],{hour:'numeric',minute:'2-digit'}) : s.time;
+    return '<tr><td><strong>' + s.name + '</strong></td><td>' + (s.createdBy||'Admin') + '</td><td>' + s.date + ' ' + timeStr + '</td><td>' + s.duration + 'min</td><td><span class="badge badge-blue">Scheduled</span></td><td><button class="btn btn-sm btn-danger" onclick="deleteClassSession(\''+s.id+'\')">Delete</button></td></tr>';
+  }).join('');
+}
+
+function deleteClassSession(id) {
+  classSessions = classSessions.filter(s => s.id !== id);
+  saveState();
+  showToast('Class session deleted');
+  if(currentRole === 'instructor') renderInstructorClassSessions();
+  if(currentRole === 'admin') renderAdminClassSessions();
+}
+
+// ============================== ASSIGNMENT FUNCTIONS ==============================
+function createAssignment() {
+  const title = document.getElementById('assignTitle')?.value?.trim();
+  const type = document.getElementById('assignType')?.value;
+  const dueDate = document.getElementById('assignDueDate')?.value;
+  const maxPoints = parseInt(document.getElementById('assignMaxPoints')?.value) || 100;
+  const weight = parseInt(document.getElementById('assignWeight')?.value) || 10;
+  const instructions = document.getElementById('assignInstructions')?.value?.trim();
+
+  if(!title) { showToast('Please enter an assignment title'); return; }
+  if(!dueDate) { showToast('Please select a due date'); return; }
+
+  const ins = currentInstructor;
+  const assignment = {
+    id: 'ASN-' + Date.now(),
+    title: title,
+    type: type,
+    course: ins?.course || 'General',
+    dueDate: dueDate,
+    maxPoints: maxPoints,
+    weight: weight,
+    instructions: instructions || '',
+    createdBy: ins?.name || 'Instructor',
+    createdAt: new Date().toISOString(),
+    grades: {}
+  };
+
+  instructorAssignments.push(assignment);
+  saveState();
+  closeModal('createAssignmentModal');
+  showToast('Assignment "' + title + '" created successfully');
+
+  // Reset form
+  document.getElementById('assignTitle').value = '';
+  document.getElementById('assignDueDate').value = '';
+  document.getElementById('assignMaxPoints').value = '100';
+  document.getElementById('assignWeight').value = '10';
+  document.getElementById('assignInstructions').value = '';
+
+  renderInstructorGradebook();
+}
+
+function renderInstructorGradebook() {
+  const container = document.getElementById('iCustomAssignmentsList');
+  if(!container) return;
+  const ins = currentInstructor;
+  const myAssignments = instructorAssignments.filter(a => a.course === ins?.course || a.createdBy === ins?.name);
+  const typeLabels = {quiz:'Quiz',test:'Test',report:'Report',portfolio:'Portfolio',worksheet:'Worksheet',exam:'Exam',project:'Project'};
+
+  if(myAssignments.length === 0) {
+    container.innerHTML = '<p style="color:var(--text-muted);padding:16px;">No custom assignments created yet. Click "+ New Assignment" to create one.</p>';
+    return;
+  }
+
+  container.innerHTML = '<div class="table-wrapper"><table><thead><tr><th>Assignment</th><th>Type</th><th>Due Date</th><th>Max Points</th><th>Weight</th><th>Actions</th></tr></thead><tbody>' +
+    myAssignments.map(a => {
+      return '<tr><td><strong>' + a.title + '</strong></td><td>' + (typeLabels[a.type]||a.type) + '</td><td>' + a.dueDate + '</td><td>' + a.maxPoints + '</td><td>' + a.weight + '%</td><td><button class="btn btn-sm btn-danger" onclick="deleteAssignment(\''+a.id+'\')">Delete</button></td></tr>';
+    }).join('') +
+  '</tbody></table></div>';
+}
+
+function deleteAssignment(id) {
+  instructorAssignments = instructorAssignments.filter(a => a.id !== id);
+  saveState();
+  showToast('Assignment deleted');
+  renderInstructorGradebook();
+}
+
+// ============================== RESOURCE FUNCTIONS ==============================
+function uploadResource() {
+  const name = document.getElementById('resName')?.value?.trim();
+  const cat = document.getElementById('resCat')?.value;
+  const type = document.getElementById('resType')?.value;
+  const url = document.getElementById('resUrl')?.value?.trim();
+  const desc = document.getElementById('resDesc')?.value?.trim();
+
+  if(!name) { showToast('Please enter a resource name'); return; }
+
+  const ins = currentInstructor;
+  const resource = {
+    id: 'RES-' + Date.now(),
+    name: name,
+    category: cat,
+    type: type,
+    url: url || '',
+    description: desc || '',
+    course: ins?.course || 'General',
+    createdBy: ins?.name || 'Instructor',
+    createdAt: new Date().toISOString()
+  };
+
+  instructorResources.push(resource);
+  saveState();
+  closeModal('uploadResourceModal');
+  showToast('Resource "' + name + '" uploaded successfully');
+
+  // Reset form
+  document.getElementById('resName').value = '';
+  document.getElementById('resUrl').value = '';
+  document.getElementById('resDesc').value = '';
+
+  renderInstructorCustomResources();
+}
+
+function createResourceFolder() {
+  const name = document.getElementById('folderName')?.value?.trim();
+  const cat = document.getElementById('folderCat')?.value;
+
+  if(!name) { showToast('Please enter a folder name'); return; }
+
+  const ins = currentInstructor;
+  const folder = {
+    id: 'FLD-' + Date.now(),
+    name: name,
+    category: cat,
+    type: 'Folder',
+    url: '',
+    description: 'Folder',
+    course: ins?.course || 'General',
+    createdBy: ins?.name || 'Instructor',
+    createdAt: new Date().toISOString(),
+    isFolder: true
+  };
+
+  instructorResources.push(folder);
+  saveState();
+  closeModal('createFolderModal');
+  showToast('Folder "' + name + '" created successfully');
+  document.getElementById('folderName').value = '';
+
+  renderInstructorCustomResources();
+}
+
+function renderInstructorCustomResources() {
+  const container = document.getElementById('iCustomResourcesList');
+  if(!container) return;
+  const ins = currentInstructor;
+  const myResources = instructorResources.filter(r => r.course === ins?.course || r.createdBy === ins?.name);
+  const catLabels = {video:'Video Lectures',guide:'Study Guides & Handbooks',worksheet:'Worksheets & Assignments',rubric:'Assessment Rubrics'};
+  const catIcons = {video:'📹',guide:'📄',worksheet:'📝',rubric:'📊'};
+
+  if(myResources.length === 0) {
+    container.innerHTML = '<p style="color:var(--text-muted);padding:16px;">No custom resources uploaded yet. Click "+ Upload Resource" to add materials.</p>';
+    return;
+  }
+
+  // Group by category
+  const grouped = {};
+  myResources.forEach(function(r) {
+    var key = r.category || 'guide';
+    if(!grouped[key]) grouped[key] = [];
+    grouped[key].push(r);
+  });
+
+  var html = '';
+  Object.keys(grouped).forEach(function(cat) {
+    html += '<div class="card" style="margin-bottom:12px;">' +
+      '<div class="card-header"><h3>' + (catIcons[cat]||'📁') + ' ' + (catLabels[cat]||cat) + ' (Custom)</h3><span style="font-size:12px;color:var(--text-muted);">' + grouped[cat].length + ' items</span></div>' +
+      '<ul class="material-list">';
+    grouped[cat].forEach(function(r) {
+      var icon = r.isFolder ? '📁' : (catIcons[r.category]||'📄');
+      var dateStr = r.createdAt ? new Date(r.createdAt).toLocaleDateString() : 'Recently';
+      html += '<li class="material-item">' +
+        '<div class="material-icon" style="background:var(--accent-dim);color:var(--accent);">' + icon + '</div>' +
+        '<div style="flex:1;"><div style="font-size:13.5px;">' + r.name + '</div>' +
+        '<div style="font-size:11px;color:var(--text-muted);">Added ' + dateStr + ' &bull; ' + r.type + (r.description && r.description !== 'Folder' ? ' &bull; ' + r.description : '') + '</div></div>';
+      if(r.url) {
+        html += '<button class="btn btn-sm btn-secondary" onclick="window.open(\'' + r.url.replace(/'/g,"\\'") + '\',\'_blank\')">' + (r.type==='Video'?'▶ Play':'Open') + '</button>';
+      }
+      html += '<button class="btn btn-sm btn-danger" style="margin-left:4px;" onclick="deleteResource(\'' + r.id + '\')">✕</button></li>';
+    });
+    html += '</ul></div>';
+  });
+
+  container.innerHTML = html;
+}
+
+function deleteResource(id) {
+  instructorResources = instructorResources.filter(r => r.id !== id);
+  saveState();
+  showToast('Resource deleted');
+  renderInstructorCustomResources();
+}
+
+// ============================== STUDENT PROFILE FUNCTIONS ==============================
+function openEditStudentProfile() {
+  const s = currentStudent;
+  if(!s) return;
+  const profile = studentProfiles[s.id] || {};
+  var firstName = s.name.split(' ')[0] || '';
+  var lastName = s.name.split(' ').slice(1).join(' ') || '';
+
+  document.getElementById('editProfileName').value = s.name;
+  document.getElementById('editProfileId').value = s.id;
+  document.getElementById('editProfileEmail').value = profile.email || (firstName.toLowerCase() + '.' + lastName.toLowerCase() + '@student.heartlms.edu.jm');
+  document.getElementById('editProfilePhone').value = profile.phone || '';
+  document.getElementById('editProfileEmergencyName').value = profile.emergencyName || '';
+  document.getElementById('editProfileEmergencyPhone').value = profile.emergencyPhone || '';
+  openModal('editStudentProfileModal');
+}
+
+function saveStudentProfile() {
+  const s = currentStudent;
+  if(!s) return;
+
+  const email = document.getElementById('editProfileEmail')?.value?.trim();
+  const phone = document.getElementById('editProfilePhone')?.value?.trim();
+  const emergencyName = document.getElementById('editProfileEmergencyName')?.value?.trim();
+  const emergencyPhone = document.getElementById('editProfileEmergencyPhone')?.value?.trim();
+
+  if(!email) { showToast('Please enter an email address'); return; }
+
+  studentProfiles[s.id] = {
+    email: email,
+    phone: phone,
+    emergencyName: emergencyName,
+    emergencyPhone: emergencyPhone,
+    updatedAt: new Date().toISOString()
+  };
+
+  saveState();
+  closeModal('editStudentProfileModal');
+  showToast('Profile updated successfully');
+
+  // Update the displayed profile info if visible
+  var emailEl = document.getElementById('sProfileEmail');
+  var phoneEl = document.getElementById('sProfilePhone');
+  if(emailEl) emailEl.textContent = email;
+  if(phoneEl) phoneEl.textContent = phone || 'Not provided';
+}
+
+// ============================== SYSTEM SETTINGS FUNCTIONS ==============================
+function saveSystemSettings() {
+  var instName = document.getElementById('settInstitution')?.value?.trim();
+  var adminEmail = document.getElementById('settAdminEmail')?.value?.trim();
+  var acadYear = document.getElementById('settAcadYear')?.value;
+  var vcProvider = document.getElementById('settVcProvider')?.value;
+
+  systemSettings.institutionName = instName || systemSettings.institutionName;
+  systemSettings.adminEmail = adminEmail || systemSettings.adminEmail;
+  systemSettings.academicYear = acadYear || systemSettings.academicYear;
+  systemSettings.vcProvider = vcProvider || systemSettings.vcProvider;
+
+  saveState();
+  showToast('Settings saved successfully');
+}
+
+// ============================== EXPORT FUNCTIONS ==============================
+function exportExamResults() {
+  if(exams.length === 0) { showToast('No exam data to export'); return; }
+  var csv = 'Exam Title,Course,Date,Time,Duration (min),Questions,Pass Mark (%),Status,Students,Pass Rate\n';
+  exams.forEach(function(e) {
+    csv += '"' + (e.title||'') + '","' + (e.course||'') + '","' + (e.date||'') + '","' + (e.time||'') + '",' + (e.duration||'') + ',' + (e.questions||'') + ',' + (e.passMark||'') + ',"' + (e.status||'') + '",' + (e.students||'') + ',"' + (e.passRate||'') + '"\n';
+  });
+  var blob = new Blob([csv], {type:'text/csv'});
+  var a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = 'CESTIS_Exam_Results_' + new Date().toISOString().split('T')[0] + '.csv';
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  showToast('Exam results exported');
+}
+
 // ============================== ADMIN FUNCTIONS ==============================
 function renderStudents(data) {
   const tbody = document.getElementById('studentTableBody');
@@ -5095,11 +5578,43 @@ async function checkCloudForChanges() {
   return null;
 }
 
-// Browse backup files placeholder
-function browseBackupFiles() {
+// Browse backup files in Google Drive
+async function browseBackupFiles() {
   const menu = document.getElementById('cloudDropdownMenu');
   menu.classList.remove('show');
-  alert('📁 Browse Backups\n\nYour backups are stored in Google Drive.\nFile: ' + GOOGLE_DRIVE_CONFIG.BACKUP_FILE_NAME + '\nFolder ID: ' + GOOGLE_DRIVE_CONFIG.FOLDER_ID);
+
+  if (!isCloudConnected || !googleAccessToken) {
+    alert('Please connect to Google Drive first to browse backup files.');
+    return;
+  }
+
+  try {
+    showToast('Loading backup files from Google Drive...');
+    const query = encodeURIComponent("'" + GOOGLE_DRIVE_CONFIG.FOLDER_ID + "' in parents and trashed=false");
+    const resp = await fetch('https://www.googleapis.com/drive/v3/files?q=' + query + '&fields=files(id,name,modifiedTime,size)&orderBy=modifiedTime desc&pageSize=20', {
+      headers: { 'Authorization': 'Bearer ' + googleAccessToken }
+    });
+
+    if (!resp.ok) throw new Error('Failed to list files');
+    const data = await resp.json();
+    const files = data.files || [];
+
+    if (files.length === 0) {
+      alert('No backup files found in your Google Drive folder.');
+      return;
+    }
+
+    var msg = 'Backup Files in Google Drive:\n\n';
+    files.forEach(function(f, i) {
+      var date = f.modifiedTime ? new Date(f.modifiedTime).toLocaleString() : 'Unknown';
+      var sizeMB = f.size ? (parseInt(f.size) / 1024 / 1024).toFixed(2) + ' MB' : 'N/A';
+      msg += (i + 1) + '. ' + f.name + '\n   Modified: ' + date + ' | Size: ' + sizeMB + '\n\n';
+    });
+    alert(msg);
+  } catch(err) {
+    console.error('Browse backup files error:', err);
+    alert('Failed to browse backup files: ' + err.message);
+  }
 }
 
 // ============================================
