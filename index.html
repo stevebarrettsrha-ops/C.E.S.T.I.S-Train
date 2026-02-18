@@ -40,7 +40,7 @@
   --topbar-h: 64px;
 }
 * { margin:0; padding:0; box-sizing:border-box; }
-body { font-family:'DM Sans',sans-serif; background:var(--bg-primary); color:var(--text-primary); overflow:hidden; height:100vh; }
+body { font-family:'DM Sans',sans-serif; background:var(--bg-primary); color:var(--text-primary); overflow-x:hidden; overflow-y:hidden; height:100vh; }
 h1,h2,h3,h4 { font-family:'Playfair Display',serif; }
 ::-webkit-scrollbar { width:6px; }
 ::-webkit-scrollbar-track { background:transparent; }
@@ -1151,6 +1151,12 @@ textarea.form-control { resize:vertical; min-height:80px; }
 .deadline-item .dl-countdown.dl-soon .dl-time { color:var(--accent); }
 .deadline-item .dl-countdown.dl-ok .dl-time { color:var(--green); }
 
+/* ============================== RESPONSIVE GRID UTILITIES ============================== */
+.grid-2col { display:grid; grid-template-columns:1fr 1fr; gap:18px; }
+.grid-sidebar { display:grid; grid-template-columns:1fr 320px; gap:18px; }
+.grid-sidebar-sm { display:grid; grid-template-columns:1fr 300px; gap:18px; }
+.stats-grid-4 { grid-template-columns:repeat(4,1fr); }
+
 @media(max-width:1080px) {
   .role-card { width:280px; padding:28px 24px; }
   .role-card h2 { font-size:20px; }
@@ -1165,13 +1171,11 @@ textarea.form-control { resize:vertical; min-height:80px; }
 @media(max-width:768px) {
   .sidebar { transform:translateX(-100%); }
   .main-content, .topbar { margin-left:0; left:0; }
-  .stats-grid { grid-template-columns:1fr 1fr; }
   .pipeline { flex-wrap:wrap; }
   .pipeline-stage { min-width:calc(33% - 2px); }
   .notification-dropdown { width:300px; }
   .profile-header { flex-direction:column; text-align:center; }
   .profile-header .profile-details .profile-meta { justify-content:center; }
-  .quick-actions { grid-template-columns:repeat(3,1fr); }
 }
 
 /* ============================== USER MANAGEMENT ============================== */
@@ -1311,8 +1315,8 @@ textarea.form-control { resize:vertical; min-height:80px; }
   .logout-btn { padding:7px 10px; font-size:0; gap:0; }
   .logout-btn svg { width:16px; height:16px; }
 
-  /* Main content: reduce padding */
-  .main-content { padding:16px 12px; }
+  /* Main content: reduce padding, prevent horizontal overflow */
+  .main-content { padding:16px 12px; overflow-x:hidden; }
 
   /* Notification dropdown: full width on mobile */
   .notification-dropdown { width:calc(100vw - 24px); right:-60px; }
@@ -1323,8 +1327,8 @@ textarea.form-control { resize:vertical; min-height:80px; }
   .um-table { min-width:600px; }
   .attendance-table { min-width:500px; }
 
-  /* Stats grid: single column on narrow phones */
-  .stats-grid { grid-template-columns:1fr; }
+  /* Stats grid: 2 columns, override inline 4-col */
+  .stats-grid, .stats-grid.stats-grid-4 { grid-template-columns:1fr 1fr; }
 
   /* Form rows: stack on mobile */
   .um-form-row { grid-template-columns:1fr; }
@@ -1384,6 +1388,29 @@ textarea.form-control { resize:vertical; min-height:80px; }
   /* Welcome banner */
   .student-welcome-banner { padding:20px 16px; }
   .student-welcome-banner h2 { font-size:20px; }
+  .student-welcome-banner p { font-size:12px; word-break:break-word; }
+
+  /* Two-column grids stack on mobile */
+  .grid-2col { grid-template-columns:1fr; }
+  .grid-sidebar, .grid-sidebar-sm { grid-template-columns:1fr; }
+
+  /* Class schedule cards: wrap for mobile */
+  .class-schedule-card { flex-wrap:wrap; gap:10px; }
+
+  /* Flex toolbars: allow wrapping */
+  [style*="display:flex"][style*="gap"] { flex-wrap:wrap; }
+
+  /* Fixed width form controls: responsive */
+  .form-control[style*="width:200px"],
+  .form-control[style*="width:220px"],
+  .form-control[style*="width:260px"],
+  .form-control[style*="width:180px"],
+  .form-control[style*="width:160px"] { width:100% !important; min-width:0; max-width:100%; }
+
+  /* Progress ring: smaller on tablets */
+  .progress-ring { width:100px; height:100px; }
+  .progress-ring svg { width:100%; height:100%; max-width:100px; max-height:100px; }
+  .progress-ring .ring-value { font-size:22px; }
 }
 
 /* Extra small phones (< 480px) */
@@ -1405,8 +1432,8 @@ textarea.form-control { resize:vertical; min-height:80px; }
   .role-card p { font-size:12px; margin-bottom:18px; }
   .role-enter-btn { padding:10px 22px; font-size:13px; }
 
-  /* Stats grid: single column */
-  .stats-grid { grid-template-columns:1fr; }
+  /* Stats grid: single column, override inline 4-col */
+  .stats-grid, .stats-grid.stats-grid-4 { grid-template-columns:1fr; }
   .cert-status-grid { grid-template-columns:1fr; }
 
   /* Quick actions: 2 columns tight */
@@ -1432,8 +1459,21 @@ textarea.form-control { resize:vertical; min-height:80px; }
   .modal { padding:16px 12px; }
 
   /* Progress ring smaller on tiny screens */
-  .progress-ring { width:100px; height:100px; }
-  .progress-ring .ring-value { font-size:22px; }
+  .progress-ring { width:80px; height:80px; }
+  .progress-ring svg { width:100%; height:100%; max-width:80px; max-height:80px; }
+  .progress-ring .ring-value { font-size:18px; }
+
+  /* Stat card value even smaller */
+  .stat-card .stat-value { font-size:18px; }
+
+  /* Welcome banner */
+  .student-welcome-banner { padding:16px 12px; }
+  .student-welcome-banner h2 { font-size:18px; }
+  .student-welcome-banner p { font-size:11px; }
+
+  /* Class schedule cards: fully stacked */
+  .class-schedule-card { flex-direction:column; align-items:flex-start; }
+  .class-time-block { min-width:auto; width:100%; }
 }
 </style>
 <script src="https://unpkg.com/peerjs@1.5.4/dist/peerjs.min.js"></script>
@@ -1643,7 +1683,7 @@ textarea.form-control { resize:vertical; min-height:80px; }
     <div class="modal-header"><h3>Create New Exam</h3><button class="modal-close" onclick="closeModal('createExamModal')">✕</button></div>
     <div class="form-group"><label>Exam Title</label><input type="text" class="form-control" id="examTitle" placeholder="e.g. Welding Level 2 — Final Assessment"></div>
     <div class="form-group"><label>Programme</label><select class="form-control" id="examCourse"><option>Welding</option><option>Electrical Installation</option><option>Cosmetology</option><option>Business Administration</option><option>Auto Mechanics</option><option>Plumbing</option><option>Carpentry</option><option>Hospitality</option><option>Information Technology</option></select></div>
-    <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;"><div class="form-group"><label>Date</label><input type="date" class="form-control" id="examDate"></div><div class="form-group"><label>Start Time</label><input type="time" class="form-control" id="examTime"></div></div>
+    <div class="grid-2col" style="gap:12px;"><div class="form-group"><label>Date</label><input type="date" class="form-control" id="examDate"></div><div class="form-group"><label>Start Time</label><input type="time" class="form-control" id="examTime"></div></div>
     <div class="form-group"><label>Duration (minutes)</label><input type="number" class="form-control" id="examDuration" value="90" min="15" max="300"></div>
     <div class="form-group"><label>Number of Questions</label><input type="number" class="form-control" id="examQuestions" value="50" min="5" max="200"></div>
     <div class="form-group"><label>Pass Mark (%)</label><input type="number" class="form-control" id="examPassMark" value="60" min="1" max="100"></div>
@@ -1720,11 +1760,11 @@ textarea.form-control { resize:vertical; min-height:80px; }
     <div class="modal-header"><h3>Create New Class Session</h3><button class="modal-close" onclick="closeModal('createClassSessionModal')">✕</button></div>
     <div class="form-group"><label>Session Name</label><input type="text" class="form-control" id="csSessionName" placeholder="e.g. Welding Theory — Session 5"></div>
     <div class="form-group"><label>Programme / Course</label><select class="form-control" id="csCourse"><option>Welding</option><option>Electrical Installation</option><option>Cosmetology</option><option>Business Administration</option><option>Auto Mechanics</option><option>Plumbing</option><option>Carpentry</option><option>Hospitality</option><option>Information Technology</option><option>Garment Construction</option></select></div>
-    <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;">
+    <div class="grid-2col" style="gap:12px;">
       <div class="form-group"><label>Date</label><input type="date" class="form-control" id="csDate"></div>
       <div class="form-group"><label>Start Time</label><input type="time" class="form-control" id="csTime"></div>
     </div>
-    <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;">
+    <div class="grid-2col" style="gap:12px;">
       <div class="form-group"><label>Duration (minutes)</label><input type="number" class="form-control" id="csDuration" value="90" min="15" max="300"></div>
       <div class="form-group"><label>Type</label><select class="form-control" id="csType"><option value="theory">Theory</option><option value="practical">Practical Lab</option><option value="workshop">Workshop Review</option><option value="virtual">Virtual Class</option></select></div>
     </div>
@@ -1741,11 +1781,11 @@ textarea.form-control { resize:vertical; min-height:80px; }
   <div class="modal">
     <div class="modal-header"><h3>Create New Assignment</h3><button class="modal-close" onclick="closeModal('createAssignmentModal')">✕</button></div>
     <div class="form-group"><label>Assignment Title</label><input type="text" class="form-control" id="assignTitle" placeholder="e.g. Practical Report #3"></div>
-    <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;">
+    <div class="grid-2col" style="gap:12px;">
       <div class="form-group"><label>Type</label><select class="form-control" id="assignType"><option value="quiz">Quiz</option><option value="test">Test</option><option value="report">Report</option><option value="portfolio">Portfolio</option><option value="worksheet">Worksheet</option><option value="exam">Exam</option><option value="project">Project</option></select></div>
       <div class="form-group"><label>Due Date</label><input type="date" class="form-control" id="assignDueDate"></div>
     </div>
-    <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;">
+    <div class="grid-2col" style="gap:12px;">
       <div class="form-group"><label>Max Points</label><input type="number" class="form-control" id="assignMaxPoints" value="100" min="1" max="500"></div>
       <div class="form-group"><label>Weight (%)</label><input type="number" class="form-control" id="assignWeight" value="10" min="1" max="100"></div>
     </div>
@@ -1762,7 +1802,7 @@ textarea.form-control { resize:vertical; min-height:80px; }
   <div class="modal">
     <div class="modal-header"><h3>Upload Resource</h3><button class="modal-close" onclick="closeModal('uploadResourceModal')">✕</button></div>
     <div class="form-group"><label>Resource Name</label><input type="text" class="form-control" id="resName" placeholder="e.g. Safety Procedures Guide"></div>
-    <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;">
+    <div class="grid-2col" style="gap:12px;">
       <div class="form-group"><label>Category</label><select class="form-control" id="resCat"><option value="video">Video Lectures</option><option value="guide">Study Guides & Handbooks</option><option value="worksheet">Worksheets & Assignments</option><option value="rubric">Assessment Rubrics</option></select></div>
       <div class="form-group"><label>File Type</label><select class="form-control" id="resType"><option value="PDF">PDF</option><option value="Video">Video</option><option value="DOC">DOC</option><option value="XLSX">XLSX</option><option value="Link">External Link</option></select></div>
     </div>
@@ -2728,7 +2768,7 @@ function buildAdminPages() {
     <div class="card"><div class="card-header"><h3>Student Progress Pipeline</h3><button class="btn btn-secondary btn-sm" onclick="showPage('students')">View All \u2192</button></div>
       <div class="pipeline"><div class="pipeline-stage s-test"><span class="count" id="pTest">0</span>Testing</div><div class="pipeline-stage s-interview"><span class="count" id="pInterview">0</span>Interview</div><div class="pipeline-stage s-training"><span class="count" id="pTraining">0</span>In Training</div><div class="pipeline-stage s-certified"><span class="count" id="pCertified">0</span>Certified</div><div class="pipeline-stage s-collected"><span class="count" id="pCollected">0</span>Collected</div><div class="pipeline-stage s-incomplete"><span class="count" id="pIncomplete">0</span>Incomplete</div></div>
     </div>
-    <div style="display:grid;grid-template-columns:1fr 1fr;gap:18px;">
+    <div class="grid-2col">
       <div class="card"><div class="card-header"><h3>System Alerts</h3></div>
         <div class="alert-item alert-danger"><div class="alert-icon">\u26A0\uFE0F</div><div class="alert-body"><div class="alert-msg">${lowAttendance} student${lowAttendance!==1?'s':''} below 70% attendance</div><div class="alert-time">Needs attention</div></div></div>
         <div class="alert-item alert-warning"><div class="alert-icon">\uD83D\uDCDD</div><div class="alert-body"><div class="alert-msg">${upcomingExams} exams scheduled this period</div><div class="alert-time">Review schedule</div></div></div>
@@ -2749,7 +2789,7 @@ function buildAdminPages() {
         }).join('')}
       </div>
     </div>
-    <div style="display:grid;grid-template-columns:1fr 1fr;gap:18px;">
+    <div class="grid-2col">
       <div class="card"><div class="card-header"><h3>Recent Activity</h3></div>
         <div style="display:flex;flex-direction:column;gap:12px;">
           <div style="display:flex;align-items:center;gap:12px;padding:8px 0;border-bottom:1px solid var(--border);"><div style="width:8px;height:8px;border-radius:50%;background:var(--green);flex-shrink:0;"></div><div><div style="font-size:13px;">Keisha Brown completed <strong>Welding Level 2</strong> exam</div><div style="font-size:11px;color:var(--text-muted);">Score: 87% \u2014 15 min ago</div></div></div>
@@ -2840,7 +2880,7 @@ function buildAdminPages() {
   </section>
 
   <section class="page" id="page-calendar">
-    <div style="display:grid;grid-template-columns:1fr 320px;gap:18px;">
+    <div class="grid-sidebar">
       <div class="card">
         <div class="cal-header">
           <div class="cal-nav"><button onclick="changeCalMonth(-1)">\u2190</button></div>
@@ -2865,15 +2905,15 @@ function buildAdminPages() {
 
   <section class="page" id="page-reports">
     <div class="stats-grid" id="reportStats"></div>
-    <div style="display:grid;grid-template-columns:1fr 1fr;gap:18px;">
+    <div class="grid-2col">
       <div class="card"><div class="card-header"><h3>Student Stage Distribution</h3><button class="btn-export" onclick="exportReportCSV()">\uD83D\uDCC4 Export</button></div><div id="donutChartContainer" style="display:flex;align-items:center;gap:24px;justify-content:center;"></div></div>
       <div class="card"><div class="card-header"><h3>Pass Rate by Programme</h3></div><div id="passRateChart"></div></div>
     </div>
-    <div style="display:grid;grid-template-columns:1fr 1fr;gap:18px;">
+    <div class="grid-2col">
       <div class="card"><div class="card-header"><h3>Enrollment by Course</h3></div><div id="enrollmentBarChart" class="bar-chart"></div></div>
       <div class="card"><div class="card-header"><h3>Overall Completion Rate</h3></div><div id="gaugeContainer" style="display:flex;flex-direction:column;align-items:center;gap:24px;padding:20px 0;"></div></div>
     </div>
-    <div style="display:grid;grid-template-columns:1fr 1fr;gap:18px;">
+    <div class="grid-2col">
       <div class="card"><div class="card-header"><h3>Attendance Heatmap</h3></div><div id="attendanceHeatmap"></div></div>
       <div class="card"><div class="card-header"><h3>Gender Distribution</h3></div><div style="display:flex;align-items:center;justify-content:center;gap:32px;padding:20px;">
         <div style="text-align:center;"><div style="width:80px;height:80px;border-radius:50%;background:var(--blue-dim);display:flex;align-items:center;justify-content:center;font-size:32px;margin:0 auto 8px;">\u2642</div><div style="font-size:20px;font-weight:700;font-family:'Playfair Display',serif;">52%</div><div style="font-size:12px;color:var(--text-muted);">Male</div></div>
@@ -2983,7 +3023,7 @@ function buildStudentPages() {
       <p>Programme: <strong>${s.course}</strong> &nbsp;•&nbsp; ID: <strong>${s.id}</strong> &nbsp;•&nbsp; Instructor: <strong>${s.instructor}</strong></p>
     </div>
 
-    <div class="stats-grid" style="grid-template-columns:repeat(4,1fr);">
+    <div class="stats-grid stats-grid-4">
       <div class="stat-card" style="text-align:center;">
         <div class="progress-ring-container">
           <div class="progress-ring">
@@ -3042,7 +3082,7 @@ function buildStudentPages() {
       </div>
     </div>
 
-    <div style="display:grid;grid-template-columns:1fr 1fr;gap:18px;">
+    <div class="grid-2col">
       <div class="card"><div class="card-header"><h3>Announcements</h3><button class="btn btn-sm btn-secondary" onclick="showPage('s-profile')">View All</button></div>
         ${announcements.slice(0,3).map(a => `
           <div style="padding:10px 0;border-bottom:1px solid var(--border);">
@@ -3097,7 +3137,7 @@ function buildStudentPages() {
 
   <!-- STUDENT PROGRESS -->
   <section class="page" id="page-s-progress">
-    <div class="stats-grid" style="grid-template-columns:repeat(4,1fr);">
+    <div class="stats-grid stats-grid-4">
       <div class="stat-card"><div class="stat-icon" style="background:var(--accent-dim);color:var(--accent);">📊</div><div class="stat-value">${s.progress}%</div><div class="stat-label">Overall Progress</div></div>
       <div class="stat-card"><div class="stat-icon" style="background:var(--blue-dim);color:var(--blue);">📅</div><div class="stat-value">${s.attendance}%</div><div class="stat-label">Attendance</div></div>
       <div class="stat-card"><div class="stat-icon" style="background:var(--green-dim);color:var(--green);">✅</div><div class="stat-value">${s.score || 'N/A'}</div><div class="stat-label">Last Test Score</div></div>
@@ -3243,7 +3283,7 @@ function buildStudentPages() {
       </div>
       <button class="btn btn-secondary" onclick="openEditStudentProfile()">Edit Profile</button>
     </div>
-    <div class="stats-grid" style="grid-template-columns:repeat(4,1fr);">
+    <div class="stats-grid stats-grid-4">
       <div class="profile-stat"><div class="ps-value" style="color:var(--green);">${s.gpa}</div><div class="ps-label">GPA</div></div>
       <div class="profile-stat"><div class="ps-value" style="color:var(--blue);">${s.attendance}%</div><div class="ps-label">Attendance</div></div>
       <div class="profile-stat"><div class="ps-value" style="color:var(--accent);">${s.assignments}/${s.assignmentsTotal}</div><div class="ps-label">Assignments</div></div>
@@ -3268,7 +3308,7 @@ function buildStudentPages() {
   </section>
 
   <section class="page" id="page-s-calendar">
-    <div style="display:grid;grid-template-columns:1fr 300px;gap:18px;">
+    <div class="grid-sidebar-sm">
       <div class="card">
         <div class="cal-header">
           <div class="cal-nav"><button onclick="changeCalMonth(-1)">\u2190</button></div>
@@ -3314,7 +3354,7 @@ function buildInstructorPages() {
       <p>Programme: <strong>${ins.course}</strong> &nbsp;&bull;&nbsp; Staff ID: <strong>${ins.id}</strong> &nbsp;&bull;&nbsp; ${ins.specialization}</p>
     </div>
 
-    <div class="stats-grid" style="grid-template-columns:repeat(4,1fr);">
+    <div class="stats-grid stats-grid-4">
       <div class="stat-card"><div class="stat-icon" style="background:var(--blue-dim);color:var(--blue);">👥</div><div class="stat-value" data-count="${myStudents.length}">0</div><div class="stat-label">My Students</div><div class="stat-change" style="color:var(--text-muted);">Assigned to you</div></div>
       <div class="stat-card"><div class="stat-icon" style="background:var(--green-dim);color:var(--green);">🎓</div><div class="stat-value" data-count="${certifiedCount}">0</div><div class="stat-label">Certified</div><div class="stat-change" style="color:var(--green);">This year</div></div>
       <div class="stat-card"><div class="stat-icon" style="background:var(--accent-dim);color:var(--accent);">📊</div><div class="stat-value" data-count="${avgAttendance}" data-suffix="%">0</div><div class="stat-label">Avg Attendance</div><div class="stat-change" style="color:${avgAttendance>=80?'var(--green)':'var(--red)'};">${avgAttendance>=80?'On track':'Needs attention'}</div></div>
@@ -3330,7 +3370,7 @@ function buildInstructorPages() {
       <div class="quick-action-btn" onclick="showPage('i-calendar')"><div class="qa-icon">📅</div><div class="qa-label">Calendar</div></div>
     </div>
 
-    <div style="display:grid;grid-template-columns:1fr 1fr;gap:18px;">
+    <div class="grid-2col">
       <div class="card"><div class="card-header"><h3>Student Stage Overview</h3><button class="btn btn-secondary btn-sm" onclick="showPage('i-students')">View All &rarr;</button></div>
         <div class="pipeline"><div class="pipeline-stage s-test"><span class="count">${myStudents.filter(s=>s.stage==='testing').length}</span>Testing</div><div class="pipeline-stage s-interview"><span class="count">${myStudents.filter(s=>s.stage==='interview').length}</span>Interview</div><div class="pipeline-stage s-training"><span class="count">${myStudents.filter(s=>s.stage==='training').length}</span>Training</div><div class="pipeline-stage s-certified"><span class="count">${myStudents.filter(s=>s.stage==='certified').length}</span>Certified</div><div class="pipeline-stage s-collected"><span class="count">${myStudents.filter(s=>s.stage==='collected').length}</span>Collected</div><div class="pipeline-stage s-incomplete"><span class="count">${myStudents.filter(s=>s.stage==='incomplete').length}</span>Incomplete</div></div>
       </div>
@@ -3345,7 +3385,7 @@ function buildInstructorPages() {
       </div>
     </div>
 
-    <div style="display:grid;grid-template-columns:1fr 1fr;gap:18px;">
+    <div class="grid-2col">
       <div class="card"><div class="card-header"><h3>Alerts</h3></div>
         ${lowAttStudents.length > 0 ? `<div class="alert-item alert-danger"><div class="alert-icon">⚠️</div><div class="alert-body"><div class="alert-msg">${lowAttStudents.length} student${lowAttStudents.length!==1?'s':''} below 70% attendance</div><div class="alert-time">Needs follow-up</div></div></div>` : ''}
         <div class="alert-item alert-info"><div class="alert-icon">📝</div><div class="alert-body"><div class="alert-msg">${upcomingExams.length} exam${upcomingExams.length!==1?'s':''} scheduled for ${ins.course}</div><div class="alert-time">Review schedule</div></div></div>
@@ -3464,7 +3504,7 @@ function buildInstructorPages() {
         }).join('')}
       </tbody></table></div>
     </div>
-    <div style="display:grid;grid-template-columns:1fr 1fr;gap:18px;">
+    <div class="grid-2col">
       <div class="card"><div class="card-header"><h3>Grade Distribution</h3></div>
         <div style="display:flex;gap:16px;justify-content:center;padding:16px 0;">
           ${[{label:'A (80-100%)',color:'var(--green)',pct:35},{label:'B (70-79%)',color:'var(--blue)',pct:30},{label:'C (60-69%)',color:'var(--accent)',pct:20},{label:'D (50-59%)',color:'var(--orange)',pct:10},{label:'F (<50%)',color:'var(--red)',pct:5}].map(g => `
@@ -3538,7 +3578,7 @@ function buildInstructorPages() {
 
   <!-- INSTRUCTOR CALENDAR -->
   <section class="page" id="page-i-calendar">
-    <div style="display:grid;grid-template-columns:1fr 320px;gap:18px;">
+    <div class="grid-sidebar">
       <div class="card">
         <div class="cal-header">
           <div class="cal-nav"><button onclick="changeCalMonth(-1)">\u2190</button></div>
@@ -3570,7 +3610,7 @@ function buildInstructorPages() {
       </div>
       <button class="btn btn-secondary" onclick="openEditStudentProfile()">Edit Profile</button>
     </div>
-    <div class="stats-grid" style="grid-template-columns:repeat(4,1fr);">
+    <div class="stats-grid stats-grid-4">
       <div class="profile-stat"><div class="ps-value" style="color:var(--green);">${ins.yearsExp}</div><div class="ps-label">Years Experience</div></div>
       <div class="profile-stat"><div class="ps-value" style="color:var(--blue);">${myStudents.length}</div><div class="ps-label">Students Assigned</div></div>
       <div class="profile-stat"><div class="ps-value" style="color:var(--accent);">${certifiedCount}</div><div class="ps-label">Students Certified</div></div>
@@ -4209,7 +4249,7 @@ function vcShowConference(title, role) {
         <div style="font-size:13px;color:var(--text-muted);" id="vTimer-${role}">00:00:00</div>
       </div>
     </div>
-    <div style="display:grid;grid-template-columns:1fr 320px;gap:18px;">
+    <div class="grid-sidebar">
       <div>
         <div class="video-grid" id="vc-video-grid">
           <div class="video-tile local" id="vc-tile-local" style="border:2px solid var(--accent);">
@@ -5125,7 +5165,7 @@ function showSkillDetail(id) {
   d.style.display='block';
   const mats = [{t:'📹 Video Lectures',items:['Introduction','Safety & PPE','Core Techniques Pt.1','Core Techniques Pt.2','Advanced Methods']},{t:'📄 Study Guides',items:['Syllabus','Theory Handbook','Assessment Guide','Exam Notes']},{t:'📝 Worksheets',items:['Exercise Set 1','Exercise Set 2','Self-Assessment','Revision Qs']},{t:'📊 Rubrics',items:['Practical Rubric','Exam Blueprint','Portfolio Requirements']}];
   d.innerHTML = `<div style="display:flex;align-items:center;gap:16px;margin-bottom:24px;"><button style="background:rgba(255,255,255,0.06);border:1px solid var(--border-light);color:var(--text-secondary);width:36px;height:36px;border-radius:var(--radius-sm);display:flex;align-items:center;justify-content:center;cursor:pointer;" onclick="backToSkills()">←</button><div class="skill-icon" style="background:${skill.color}22;color:${skill.color};width:48px;height:48px;border-radius:12px;display:flex;align-items:center;justify-content:center;font-size:22px;">${skill.icon}</div><div><h2 style="font-size:22px;">${skill.name}</h2><p style="font-size:13px;color:var(--text-muted);">${skill.desc}</p></div></div>
-  <div class="stats-grid" style="grid-template-columns:repeat(4,1fr);margin-bottom:24px;"><div class="stat-card"><div class="stat-value" style="font-size:22px;">${skill.students}</div><div class="stat-label">Students</div></div><div class="stat-card"><div class="stat-value" style="font-size:22px;">${skill.materials}</div><div class="stat-label">Materials</div></div><div class="stat-card"><div class="stat-value" style="font-size:22px;">L1-3</div><div class="stat-label">Levels</div></div><div class="stat-card"><div class="stat-value" style="font-size:22px;">78%</div><div class="stat-label">Pass Rate</div></div></div>
+  <div class="stats-grid stats-grid-4" style="margin-bottom:24px;"><div class="stat-card"><div class="stat-value" style="font-size:22px;">${skill.students}</div><div class="stat-label">Students</div></div><div class="stat-card"><div class="stat-value" style="font-size:22px;">${skill.materials}</div><div class="stat-label">Materials</div></div><div class="stat-card"><div class="stat-value" style="font-size:22px;">L1-3</div><div class="stat-label">Levels</div></div><div class="stat-card"><div class="stat-value" style="font-size:22px;">78%</div><div class="stat-label">Pass Rate</div></div></div>
   ${mats.map(mt=>`<div class="card"><div class="card-header"><h3>${mt.t}</h3></div><ul class="material-list">${mt.items.map(item=>`<li class="material-item"><div class="material-icon" style="background:${skill.color}22;color:${skill.color};">${mt.t.split(' ')[0]}</div><div style="flex:1;"><div style="font-size:13.5px;">${item}</div><div style="font-size:11px;color:var(--text-muted);">Updated ${Math.floor(Math.random()*14)+1} days ago</div></div><button class="btn btn-sm btn-secondary">Open</button></li>`).join('')}</ul></div>`).join('')}`;
 }
 function backToSkills() { document.getElementById('trainingOverview').style.display='block'; document.getElementById('skillDetailPage').style.display='none'; }
