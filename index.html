@@ -136,7 +136,7 @@ h1,h2,h3,h4 { font-family:'Playfair Display',serif; }
   to { opacity:1; transform:translateY(0); }
 }
 .role-cards {
-  display:flex; gap:28px;
+  display:flex; gap:28px; flex-wrap:wrap; justify-content:center;
   animation:fadeSlideUp 0.7s ease 0.35s both;
 }
 @keyframes fadeSlideUp {
@@ -166,6 +166,7 @@ h1,h2,h3,h4 { font-family:'Playfair Display',serif; }
 }
 .role-card.admin-card::before { background:linear-gradient(135deg, rgba(240,165,0,0.08), transparent); }
 .role-card.student-card::before { background:linear-gradient(135deg, rgba(52,152,219,0.08), transparent); }
+.role-card.instructor-card::before { background:linear-gradient(135deg, rgba(46,204,113,0.08), transparent); }
 .role-card:hover {
   transform:translateY(-6px);
   box-shadow:0 16px 48px rgba(0,0,0,0.4);
@@ -183,11 +184,13 @@ h1,h2,h3,h4 { font-family:'Playfair Display',serif; }
 }
 .admin-card .role-icon { background:var(--accent-dim); }
 .student-card .role-icon { background:var(--blue-dim); }
+.instructor-card .role-icon { background:var(--green-dim); }
 .role-card h2 {
   font-size:22px; margin-bottom:8px;
 }
 .admin-card h2 { color:var(--accent); }
 .student-card h2 { color:var(--blue); }
+.instructor-card h2 { color:var(--green); }
 .role-card p {
   font-size:13.5px;
   color:var(--text-muted);
@@ -213,6 +216,10 @@ h1,h2,h3,h4 { font-family:'Playfair Display',serif; }
 }
 .student-card .role-enter-btn {
   background:linear-gradient(135deg, var(--blue), #2980b9);
+  color:#fff;
+}
+.instructor-card .role-enter-btn {
+  background:linear-gradient(135deg, var(--green), #27ae60);
   color:#fff;
 }
 .role-enter-btn:hover { transform:translateY(-1px); box-shadow:0 4px 16px rgba(0,0,0,0.3); }
@@ -1098,9 +1105,14 @@ textarea.form-control { resize:vertical; min-height:80px; }
 .deadline-item .dl-countdown.dl-soon .dl-time { color:var(--accent); }
 .deadline-item .dl-countdown.dl-ok .dl-time { color:var(--green); }
 
+@media(max-width:1080px) {
+  .role-card { width:280px; padding:28px 24px; }
+  .role-card h2 { font-size:20px; }
+  .role-card p { font-size:12.5px; }
+}
 @media(max-width:900px) {
   .role-cards { flex-direction:column; align-items:center; }
-  .role-card { width:100%; max-width:360px; }
+  .role-card { width:100%; max-width:360px; padding:36px 32px; }
   .profile-info-grid { grid-template-columns:1fr; }
   .announcement-form .ann-form-row { grid-template-columns:1fr; }
 }
@@ -1183,6 +1195,26 @@ textarea.form-control { resize:vertical; min-height:80px; }
           </div>
         </div>
         <button class="role-enter-btn" onclick="handleStudentClick()">Enter as Student →</button>
+      </div>
+
+      <!-- INSTRUCTOR CARD -->
+      <div class="role-card instructor-card" id="instructorCard">
+        <div class="role-icon">📚</div>
+        <h2>Instructor</h2>
+        <p>Manage your classes, track student progress, mark attendance, grade assignments, and schedule sessions.</p>
+        <div class="role-login" id="instructorLogin">
+          <div class="form-group">
+            <label>Select Instructor</label>
+            <select id="instructorSelect">
+              <option value="">— Choose Instructor —</option>
+            </select>
+          </div>
+          <div class="form-group">
+            <label>Staff ID</label>
+            <input type="text" placeholder="INS-2026XXX" id="instructorId">
+          </div>
+        </div>
+        <button class="role-enter-btn" onclick="handleInstructorClick()">Enter as Instructor →</button>
       </div>
     </div>
   </div>
@@ -1354,12 +1386,12 @@ let exams = [
 ];
 
 let announcements = [
-  {id:1,title:"Campus Closure - Independence Day",body:"The campus will be closed on February 20th for Independence Day celebrations. All classes and exams scheduled for that day will be rescheduled. Please check your updated timetable.",priority:"urgent",date:"2026-02-17",author:"Admin",forRoles:['admin','student']},
-  {id:2,title:"Welding Workshop Equipment Upgrade",body:"New TIG welding stations have been installed in Workshop Bay 2. All Welding students are required to attend orientation on Feb 22 at 9AM.",priority:"info",date:"2026-02-16",author:"Mr. R. Campbell",forRoles:['admin','student']},
-  {id:3,title:"Midterm Exam Schedule Released",body:"The midterm examination schedule for all programmes has been finalized. Students can view their exam dates in the Exams section. Please arrive 15 minutes early.",priority:"urgent",date:"2026-02-15",author:"Admin",forRoles:['admin','student']},
-  {id:4,title:"IT Lab Maintenance Notice",body:"The IT lab will undergo maintenance on Feb 23-24. Data Operations and IT students should plan accordingly and use the library computers.",priority:"info",date:"2026-02-14",author:"Ms. J. Williams",forRoles:['admin','student']},
-  {id:5,title:"Certificate Collection Reminder",body:"Students who completed their programmes in January are reminded to collect their certificates from the admin office. Bring your student ID.",priority:"general",date:"2026-02-13",author:"Admin",forRoles:['admin','student']},
-  {id:6,title:"Guest Lecture: Industry Trends",body:"A guest lecture on emerging industry trends will be held on March 1 in the main auditorium. All programmes welcome. Attendance counts toward professional development hours.",priority:"general",date:"2026-02-12",author:"Mrs. P. Morgan",forRoles:['admin','student']}
+  {id:1,title:"Campus Closure - Independence Day",body:"The campus will be closed on February 20th for Independence Day celebrations. All classes and exams scheduled for that day will be rescheduled. Please check your updated timetable.",priority:"urgent",date:"2026-02-17",author:"Admin",forRoles:['admin','student','instructor']},
+  {id:2,title:"Welding Workshop Equipment Upgrade",body:"New TIG welding stations have been installed in Workshop Bay 2. All Welding students are required to attend orientation on Feb 22 at 9AM.",priority:"info",date:"2026-02-16",author:"Mr. R. Campbell",forRoles:['admin','student','instructor']},
+  {id:3,title:"Midterm Exam Schedule Released",body:"The midterm examination schedule for all programmes has been finalized. Students can view their exam dates in the Exams section. Please arrive 15 minutes early.",priority:"urgent",date:"2026-02-15",author:"Admin",forRoles:['admin','student','instructor']},
+  {id:4,title:"IT Lab Maintenance Notice",body:"The IT lab will undergo maintenance on Feb 23-24. Data Operations and IT students should plan accordingly and use the library computers.",priority:"info",date:"2026-02-14",author:"Ms. J. Williams",forRoles:['admin','student','instructor']},
+  {id:5,title:"Certificate Collection Reminder",body:"Students who completed their programmes in January are reminded to collect their certificates from the admin office. Bring your student ID.",priority:"general",date:"2026-02-13",author:"Admin",forRoles:['admin','student','instructor']},
+  {id:6,title:"Guest Lecture: Industry Trends",body:"A guest lecture on emerging industry trends will be held on March 1 in the main auditorium. All programmes welcome. Attendance counts toward professional development hours.",priority:"general",date:"2026-02-12",author:"Mrs. P. Morgan",forRoles:['admin','student','instructor']}
 ];
 
 let notifications = [
@@ -1400,8 +1432,20 @@ function generateAttendance() {
 }
 generateAttendance();
 
+const instructorData = [
+  {id:'INS-2026001',name:'Mr. R. Campbell',course:'Welding',email:'r.campbell@heartlms.edu.jm',specialization:'SMAW, MIG, TIG Welding',yearsExp:12,phone:'+1 (876) 555-0101'},
+  {id:'INS-2026002',name:'Ms. J. Williams',course:'Electrical Installation',email:'j.williams@heartlms.edu.jm',specialization:'Residential & Commercial Wiring',yearsExp:9,phone:'+1 (876) 555-0102'},
+  {id:'INS-2026003',name:'Mrs. P. Morgan',course:'Business Administration',email:'p.morgan@heartlms.edu.jm',specialization:'Office Management & Accounting',yearsExp:15,phone:'+1 (876) 555-0103'},
+  {id:'INS-2026004',name:'Ms. D. Stewart',course:'Cosmetology',email:'d.stewart@heartlms.edu.jm',specialization:'Hair Care & Salon Management',yearsExp:8,phone:'+1 (876) 555-0104'},
+  {id:'INS-2026005',name:'Mr. K. Edwards',course:'Auto Mechanics',email:'k.edwards@heartlms.edu.jm',specialization:'Engine Repair & Diagnostics',yearsExp:11,phone:'+1 (876) 555-0105'},
+  {id:'INS-2026006',name:'Mr. L. Brown',course:'Plumbing',email:'l.brown@heartlms.edu.jm',specialization:'Pipe Fitting & Drainage Systems',yearsExp:10,phone:'+1 (876) 555-0106'},
+  {id:'INS-2026007',name:'Mrs. A. Reid',course:'Carpentry',email:'a.reid@heartlms.edu.jm',specialization:'Furniture Making & Roof Framing',yearsExp:7,phone:'+1 (876) 555-0107'},
+  {id:'INS-2026008',name:'Mr. T. Henry',course:'Hospitality',email:'t.henry@heartlms.edu.jm',specialization:'Food & Beverage, Front Office',yearsExp:14,phone:'+1 (876) 555-0108'}
+];
+
 let currentRole = null;
 let currentStudent = null;
+let currentInstructor = null;
 let videoTimerInterval = null;
 let videoSeconds = 0;
 let calendarMonth = 1;
@@ -1602,7 +1646,16 @@ function populateStudentSelect() {
   });
 }
 
-let adminLoginShown = false, studentLoginShown = false;
+function populateInstructorSelect() {
+  const sel = document.getElementById('instructorSelect');
+  instructorData.forEach((ins,i) => {
+    const opt = document.createElement('option');
+    opt.value = i; opt.textContent = ins.name + ' \u2014 ' + ins.course;
+    sel.appendChild(opt);
+  });
+}
+
+let adminLoginShown = false, studentLoginShown = false, instructorLoginShown = false;
 function handleAdminClick() {
   try {
     if(!adminLoginShown) {
@@ -1627,6 +1680,19 @@ function handleStudentClick() {
     enterApp('student');
   } catch(err) { console.error('handleStudentClick error:', err); alert('Error: ' + err.message); }
 }
+function handleInstructorClick() {
+  try {
+    if(!instructorLoginShown) {
+      document.getElementById('instructorLogin').classList.add('active');
+      instructorLoginShown = true;
+      return;
+    }
+    const idx = document.getElementById('instructorSelect').value;
+    if(idx === '') { alert('Please select your name from the dropdown'); return; }
+    currentInstructor = instructorData[parseInt(idx)];
+    enterApp('instructor');
+  } catch(err) { console.error('handleInstructorClick error:', err); alert('Error: ' + err.message); }
+}
 
 function enterApp(role) {
   try {
@@ -1643,6 +1709,16 @@ function enterApp(role) {
       document.getElementById('sidebarUserName').textContent = 'Administrator';
       document.getElementById('sidebarUserRole').textContent = 'System Admin';
       showPage('dashboard');
+    } else if(role === 'instructor') {
+      buildInstructorSidebar();
+      buildInstructorPages();
+      var iInitials = currentInstructor.name.split(' ').map(function(n){return n[0];}).join('').replace('.','');
+      document.getElementById('sidebarRoleLabel').textContent = 'Instructor Portal';
+      document.getElementById('sidebarAvatar').textContent = iInitials;
+      document.getElementById('sidebarAvatar').style.background = 'linear-gradient(135deg,var(--green),var(--teal))';
+      document.getElementById('sidebarUserName').textContent = currentInstructor.name;
+      document.getElementById('sidebarUserRole').textContent = currentInstructor.course + ' Instructor';
+      showPage('i-dashboard');
     } else {
       buildStudentSidebar();
       buildStudentPages();
@@ -1668,6 +1744,7 @@ function enterApp(role) {
 function logout() {
   currentRole = null;
   currentStudent = null;
+  currentInstructor = null;
   document.getElementById('appShell').classList.remove('active');
   document.getElementById('landingPage').style.display = '';
   document.getElementById('mainContent').innerHTML = '';
@@ -1730,6 +1807,33 @@ function buildStudentSidebar() {
   `;
 }
 
+function buildInstructorSidebar() {
+  document.getElementById('sidebarNav').innerHTML = `
+    <div class="nav-section-label">Overview</div>
+    <div class="nav-item active" data-page="i-dashboard" onclick="showPage('i-dashboard')">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/></svg>Dashboard</div>
+    <div class="nav-item" data-page="i-classes" onclick="showPage('i-classes')">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="23 7 16 12 23 17 23 7"/><rect x="1" y="5" width="15" height="14" rx="2"/></svg>My Classes<span class="nav-badge">LIVE</span></div>
+    <div class="nav-item" data-page="i-students" onclick="showPage('i-students')">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>My Students</div>
+    <div class="nav-section-label">Teaching</div>
+    <div class="nav-item" data-page="i-attendance" onclick="showPage('i-attendance')">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M16 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="8.5" cy="7" r="4"/><polyline points="17 11 19 13 23 9"/></svg>Attendance</div>
+    <div class="nav-item" data-page="i-gradebook" onclick="showPage('i-gradebook')">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg>Gradebook</div>
+    <div class="nav-item" data-page="i-resources" onclick="showPage('i-resources')">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/></svg>Resources</div>
+    <div class="nav-section-label">Communication</div>
+    <div class="nav-item" data-page="i-announcements" onclick="showPage('i-announcements')">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 17H2a3 3 0 0 0 3-3V9a7 7 0 0 1 14 0v5a3 3 0 0 0 3 3zm-8.27 4a2 2 0 0 1-3.46 0"/></svg>Announcements</div>
+    <div class="nav-item" data-page="i-calendar" onclick="showPage('i-calendar')">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>Calendar</div>
+    <div class="nav-section-label">Account</div>
+    <div class="nav-item" data-page="i-profile" onclick="showPage('i-profile')">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>My Profile</div>
+  `;
+}
+
 function showPage(pageId) {
   document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
   const pg = document.getElementById('page-'+pageId);
@@ -1744,7 +1848,10 @@ function showPage(pageId) {
     attendance:'Attendance Management',announcements:'Announcements',calendar:'Calendar & Schedule',
     's-dashboard':'My Dashboard','s-video':'My Classes','s-progress':'My Progress',
     's-resources':'My Resources','s-exams':'My Exams','s-certificate':'My Certificate',
-    's-profile':'My Profile','s-calendar':'My Calendar'
+    's-profile':'My Profile','s-calendar':'My Calendar',
+    'i-dashboard':'Instructor Dashboard','i-classes':'My Classes','i-students':'My Students',
+    'i-attendance':'Class Attendance','i-gradebook':'Gradebook','i-resources':'Course Resources',
+    'i-announcements':'Announcements','i-calendar':'Calendar','i-profile':'My Profile'
   };
   document.getElementById('topbarTitle').textContent = titles[pageId]||pageId;
   setTimeout(animateAllCounters, 50);
@@ -2291,6 +2398,472 @@ function buildStudentPages() {
   renderStudentCalendar();
 }
 
+// ============================== BUILD INSTRUCTOR PAGES ==============================
+function buildInstructorPages() {
+  try {
+  const ins = currentInstructor;
+  const myStudents = students.filter(s => s.instructor === ins.name);
+  const myCourseStudents = students.filter(s => s.course === ins.course);
+  const myExams = exams.filter(e => e.course === ins.course);
+  const certifiedCount = myStudents.filter(s => s.stage === 'certified' || s.stage === 'collected').length;
+  const avgAttendance = myStudents.length ? Math.round(myStudents.reduce((a,s) => a + s.attendance, 0) / myStudents.length) : 0;
+  const avgGpa = myStudents.length ? (myStudents.reduce((a,s) => a + parseFloat(s.gpa), 0) / myStudents.length).toFixed(1) : '0.0';
+  const lowAttStudents = myStudents.filter(s => s.attendance < 70);
+  const upcomingExams = myExams.filter(e => e.status === 'upcoming');
+  const skill = skillAreas.find(sk => ins.course.toLowerCase().indexOf(sk.name.split(' ')[0].toLowerCase()) !== -1) || skillAreas[0];
+
+  const mc = document.getElementById('mainContent');
+  mc.innerHTML = `
+  <!-- INSTRUCTOR DASHBOARD -->
+  <section class="page active" id="page-i-dashboard">
+    <div class="student-welcome-banner" style="background:linear-gradient(135deg,rgba(46,204,113,0.12),rgba(26,188,156,0.05));border-color:rgba(46,204,113,0.2);">
+      <h2>Welcome, ${ins.name.split(' ').slice(1).join(' ')}!</h2>
+      <p>Programme: <strong>${ins.course}</strong> &nbsp;&bull;&nbsp; Staff ID: <strong>${ins.id}</strong> &nbsp;&bull;&nbsp; ${ins.specialization}</p>
+    </div>
+
+    <div class="stats-grid" style="grid-template-columns:repeat(4,1fr);">
+      <div class="stat-card"><div class="stat-icon" style="background:var(--blue-dim);color:var(--blue);">👥</div><div class="stat-value" data-count="${myStudents.length}">0</div><div class="stat-label">My Students</div><div class="stat-change" style="color:var(--text-muted);">Assigned to you</div></div>
+      <div class="stat-card"><div class="stat-icon" style="background:var(--green-dim);color:var(--green);">🎓</div><div class="stat-value" data-count="${certifiedCount}">0</div><div class="stat-label">Certified</div><div class="stat-change" style="color:var(--green);">This year</div></div>
+      <div class="stat-card"><div class="stat-icon" style="background:var(--accent-dim);color:var(--accent);">📊</div><div class="stat-value" data-count="${avgAttendance}" data-suffix="%">0</div><div class="stat-label">Avg Attendance</div><div class="stat-change" style="color:${avgAttendance>=80?'var(--green)':'var(--red)'};">${avgAttendance>=80?'On track':'Needs attention'}</div></div>
+      <div class="stat-card"><div class="stat-icon" style="background:var(--purple-dim);color:var(--purple);">⭐</div><div class="stat-value" data-count="${avgGpa}">0</div><div class="stat-label">Avg GPA</div><div class="stat-change" style="color:var(--text-muted);">Class average</div></div>
+    </div>
+
+    <div class="quick-actions">
+      <div class="quick-action-btn" onclick="showPage('i-classes')"><div class="qa-icon">📹</div><div class="qa-label">Start Class</div></div>
+      <div class="quick-action-btn" onclick="showPage('i-attendance')"><div class="qa-icon">✅</div><div class="qa-label">Take Attendance</div></div>
+      <div class="quick-action-btn" onclick="showPage('i-gradebook')"><div class="qa-icon">📝</div><div class="qa-label">Grade Work</div></div>
+      <div class="quick-action-btn" onclick="showPage('i-announcements')"><div class="qa-icon">📢</div><div class="qa-label">Announcement</div></div>
+      <div class="quick-action-btn" onclick="showPage('i-resources')"><div class="qa-icon">📚</div><div class="qa-label">Resources</div></div>
+      <div class="quick-action-btn" onclick="showPage('i-calendar')"><div class="qa-icon">📅</div><div class="qa-label">Calendar</div></div>
+    </div>
+
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:18px;">
+      <div class="card"><div class="card-header"><h3>Student Stage Overview</h3><button class="btn btn-secondary btn-sm" onclick="showPage('i-students')">View All &rarr;</button></div>
+        <div class="pipeline"><div class="pipeline-stage s-test"><span class="count">${myStudents.filter(s=>s.stage==='testing').length}</span>Testing</div><div class="pipeline-stage s-interview"><span class="count">${myStudents.filter(s=>s.stage==='interview').length}</span>Interview</div><div class="pipeline-stage s-training"><span class="count">${myStudents.filter(s=>s.stage==='training').length}</span>Training</div><div class="pipeline-stage s-certified"><span class="count">${myStudents.filter(s=>s.stage==='certified').length}</span>Certified</div><div class="pipeline-stage s-collected"><span class="count">${myStudents.filter(s=>s.stage==='collected').length}</span>Collected</div><div class="pipeline-stage s-incomplete"><span class="count">${myStudents.filter(s=>s.stage==='incomplete').length}</span>Incomplete</div></div>
+      </div>
+      <div class="card"><div class="card-header"><h3>Upcoming Exams</h3></div>
+        ${upcomingExams.length > 0 ? upcomingExams.slice(0,3).map(e => `
+          <div class="class-schedule-card" style="border-left:3px solid var(--accent);">
+            <div class="class-time-block"><div class="time" style="font-size:13px;">${e.date.split('-').slice(1).join('/')}</div><div class="period">${e.time}</div></div>
+            <div style="flex:1;"><div style="font-size:14px;font-weight:600;">${e.title}</div><div style="font-size:12px;color:var(--text-muted);">${e.duration} min &bull; ${e.questions} questions &bull; Pass: ${e.passMark}%</div></div>
+            <span class="badge badge-amber">Upcoming</span>
+          </div>
+        `).join('') : '<p style="color:var(--text-muted);padding:16px;">No upcoming exams for your programme.</p>'}
+      </div>
+    </div>
+
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:18px;">
+      <div class="card"><div class="card-header"><h3>Alerts</h3></div>
+        ${lowAttStudents.length > 0 ? `<div class="alert-item alert-danger"><div class="alert-icon">⚠️</div><div class="alert-body"><div class="alert-msg">${lowAttStudents.length} student${lowAttStudents.length!==1?'s':''} below 70% attendance</div><div class="alert-time">Needs follow-up</div></div></div>` : ''}
+        <div class="alert-item alert-info"><div class="alert-icon">📝</div><div class="alert-body"><div class="alert-msg">${upcomingExams.length} exam${upcomingExams.length!==1?'s':''} scheduled for ${ins.course}</div><div class="alert-time">Review schedule</div></div></div>
+        <div class="alert-item alert-warning"><div class="alert-icon">📋</div><div class="alert-body"><div class="alert-msg">${myStudents.filter(s=>s.stage==='incomplete').length} student${myStudents.filter(s=>s.stage==='incomplete').length!==1?'s':''} marked incomplete</div><div class="alert-time">Review progress</div></div></div>
+        <div class="alert-item alert-info"><div class="alert-icon">🔔</div><div class="alert-body"><div class="alert-msg">Today's class: ${ins.course} Theory Session</div><div class="alert-time">9:00 AM</div></div></div>
+      </div>
+      <div class="card"><div class="card-header"><h3>Top Students</h3></div>
+        ${[...myStudents].sort((a,b)=>parseFloat(b.gpa)-parseFloat(a.gpa)).slice(0,5).map((s,i) => {
+          const colors = ['linear-gradient(135deg,#f0a500,#d4900a)','linear-gradient(135deg,#bdc3c7,#95a5a6)','linear-gradient(135deg,#e67e22,#d35400)','linear-gradient(135deg,var(--blue),#2980b9)','linear-gradient(135deg,var(--teal),#16a085)'];
+          const initials = s.name.split(' ').map(n=>n[0]).join('');
+          return `<div class="performer-row">
+            <div class="rank ${i<3?'rank-'+(i+1):''}">${i+1}</div>
+            <div class="perf-avatar" style="background:${colors[i]};">${initials}</div>
+            <div class="perf-info"><div class="perf-name">${s.name}</div><div class="perf-course">${s.course}</div></div>
+            <div class="perf-score"><div class="score-val">${s.gpa} GPA</div><div class="score-bar"><div class="score-fill" style="width:${(parseFloat(s.gpa)/4*100).toFixed(0)}%;"></div></div></div>
+          </div>`;
+        }).join('') || '<p style="color:var(--text-muted);padding:16px;">No students assigned yet.</p>'}
+      </div>
+    </div>
+
+    <div class="card"><div class="card-header"><h3>Recent Activity</h3></div>
+      <div style="display:flex;flex-direction:column;gap:12px;">
+        <div style="display:flex;align-items:center;gap:12px;padding:8px 0;border-bottom:1px solid var(--border);"><div style="width:8px;height:8px;border-radius:50%;background:var(--green);flex-shrink:0;"></div><div><div style="font-size:13px;">Attendance marked for <strong>${ins.course}</strong> Theory class</div><div style="font-size:11px;color:var(--text-muted);">Today &mdash; ${myStudents.length} students</div></div></div>
+        <div style="display:flex;align-items:center;gap:12px;padding:8px 0;border-bottom:1px solid var(--border);"><div style="width:8px;height:8px;border-radius:50%;background:var(--blue);flex-shrink:0;"></div><div><div style="font-size:13px;">Practical Report #2 graded for <strong>${myStudents.length > 0 ? myStudents[0].name : 'N/A'}</strong></div><div style="font-size:11px;color:var(--text-muted);">2 hours ago</div></div></div>
+        <div style="display:flex;align-items:center;gap:12px;padding:8px 0;border-bottom:1px solid var(--border);"><div style="width:8px;height:8px;border-radius:50%;background:var(--accent);flex-shrink:0;"></div><div><div style="font-size:13px;">New resource uploaded: <strong>${ins.course} Safety Guide</strong></div><div style="font-size:11px;color:var(--text-muted);">Yesterday</div></div></div>
+        <div style="display:flex;align-items:center;gap:12px;padding:8px 0;"><div style="width:8px;height:8px;border-radius:50%;background:var(--purple);flex-shrink:0;"></div><div><div style="font-size:13px;">Video class completed: <strong>${ins.course} Workshop Review</strong></div><div style="font-size:11px;color:var(--text-muted);">Yesterday &mdash; 1hr 15min</div></div></div>
+      </div>
+    </div>
+  </section>
+
+  <!-- INSTRUCTOR CLASSES -->
+  <section class="page" id="page-i-classes">
+    <div style="display:flex;gap:12px;margin-bottom:18px;"><button class="btn btn-primary" onclick="showToast('Creating new class session...')">+ New Class Session</button><button class="btn btn-secondary">Schedule Recurring</button></div>
+    <div class="card" id="iVideoClassList"><div class="card-header"><h3>My Class Sessions</h3></div>
+      <div class="class-schedule-card" style="border-color:rgba(231,76,60,0.3);">
+        <div class="class-time-block" style="background:var(--red-dim);"><div class="time">9:00</div><div class="period">AM</div></div>
+        <div style="flex:1;"><div style="font-size:14px;font-weight:600;">${ins.course} &mdash; Theory Session</div><div style="font-size:12px;color:var(--text-muted);">${myStudents.length} students enrolled &bull; Virtual-01</div></div>
+        <span class="badge badge-red"><span class="live-dot"></span>&nbsp;Live Now</span>
+        <button class="btn btn-primary" onclick="enterVideoRoom('${ins.course} \u2014 Theory','instructor')">Join Class &rarr;</button>
+      </div>
+      <div class="class-schedule-card">
+        <div class="class-time-block"><div class="time">1:00</div><div class="period">PM</div></div>
+        <div style="flex:1;"><div style="font-size:14px;font-weight:600;">${ins.course} &mdash; Practical Lab</div><div style="font-size:12px;color:var(--text-muted);">${myStudents.length} students &bull; Workshop Bay 3</div></div>
+        <span class="badge badge-blue">Scheduled</span>
+        <button class="btn btn-secondary btn-sm" disabled>Not Started</button>
+      </div>
+      <div class="class-schedule-card">
+        <div class="class-time-block"><div class="time">3:30</div><div class="period">PM</div></div>
+        <div style="flex:1;"><div style="font-size:14px;font-weight:600;">${ins.course} &mdash; Workshop Review</div><div style="font-size:12px;color:var(--text-muted);">Group session &bull; Virtual-02</div></div>
+        <span class="badge badge-purple">Optional</span>
+        <button class="btn btn-secondary btn-sm" disabled>Not Started</button>
+      </div>
+    </div>
+    <div class="card" style="margin-top:18px;"><div class="card-header"><h3>Past Recordings</h3></div>
+      <div class="material-item"><div class="material-icon" style="background:var(--red-dim);color:var(--red);">\u25B6</div><div style="flex:1;"><div style="font-size:13px;">${ins.course} &mdash; Safety Fundamentals</div><div style="font-size:11px;color:var(--text-muted);">Feb 12 &bull; 1hr 20min &bull; ${myStudents.length} attended</div></div><button class="btn btn-sm btn-secondary">Watch</button></div>
+      <div class="material-item"><div class="material-icon" style="background:var(--red-dim);color:var(--red);">\u25B6</div><div style="flex:1;"><div style="font-size:13px;">${ins.course} &mdash; Core Techniques Review</div><div style="font-size:11px;color:var(--text-muted);">Feb 10 &bull; 55min &bull; ${myStudents.length - 2} attended</div></div><button class="btn btn-sm btn-secondary">Watch</button></div>
+      <div class="material-item"><div class="material-icon" style="background:var(--red-dim);color:var(--red);">\u25B6</div><div style="flex:1;"><div style="font-size:13px;">${ins.course} &mdash; Tool Identification</div><div style="font-size:11px;color:var(--text-muted);">Feb 7 &bull; 1hr 5min &bull; ${myStudents.length - 1} attended</div></div><button class="btn btn-sm btn-secondary">Watch</button></div>
+    </div>
+    <div id="iVideoRoom" style="display:none;"></div>
+  </section>
+
+  <!-- INSTRUCTOR STUDENTS -->
+  <section class="page" id="page-i-students">
+    <div style="display:flex;gap:12px;margin-bottom:20px;flex-wrap:wrap;">
+      <select class="form-control" style="width:200px;" id="iFilterStage" onchange="filterInstructorStudents()"><option value="all">All Stages</option><option value="testing">Testing</option><option value="interview">Interview</option><option value="training">In Training</option><option value="certified">Certified</option><option value="collected">Cert. Collected</option><option value="incomplete">Incomplete</option></select>
+      <input type="text" class="form-control" style="width:220px;" placeholder="Search student name..." id="iStudentSearch" onkeyup="filterInstructorStudents()">
+      <button class="btn-export" onclick="exportInstructorStudentsCSV()">📄 Export CSV</button>
+    </div>
+    <div class="pipeline" style="margin-bottom:20px;"><div class="pipeline-stage s-test"><span class="count" id="ipTest">0</span>Testing</div><div class="pipeline-stage s-interview"><span class="count" id="ipInterview">0</span>Interview</div><div class="pipeline-stage s-training"><span class="count" id="ipTraining">0</span>Training</div><div class="pipeline-stage s-certified"><span class="count" id="ipCertified">0</span>Certified</div><div class="pipeline-stage s-collected"><span class="count" id="ipCollected">0</span>Collected</div><div class="pipeline-stage s-incomplete"><span class="count" id="ipIncomplete">0</span>Incomplete</div></div>
+    <div class="card"><div class="card-header"><h3>My Students</h3><span style="font-size:13px;color:var(--text-muted);" id="iStudentCount">Showing ${myStudents.length} students</span></div><div class="table-wrapper"><table><thead><tr><th>Student</th><th>ID</th><th>Stage</th><th>Test Score</th><th>Attendance</th><th>GPA</th><th>Progress</th></tr></thead><tbody id="iStudentTableBody"></tbody></table></div></div>
+  </section>
+
+  <!-- INSTRUCTOR ATTENDANCE -->
+  <section class="page" id="page-i-attendance">
+    <div class="attendance-summary" id="iAttendanceSummary"></div>
+    <div style="display:flex;gap:12px;margin-bottom:20px;align-items:center;">
+      <label style="font-size:13px;font-weight:600;">Date:</label>
+      <input type="date" class="form-control" style="width:180px;" id="iAttendanceDate" value="2026-02-18">
+      <button class="btn btn-primary" onclick="saveInstructorAttendance()">Save Attendance</button>
+    </div>
+    <div class="card"><div class="card-header"><h3>Class Attendance &mdash; ${ins.course}</h3><span style="font-size:13px;color:var(--text-muted);" id="iAttCount">${myStudents.length} students</span></div>
+      <div class="table-wrapper"><table class="attendance-table"><thead><tr><th>Student</th><th>ID</th><th>Mon</th><th>Tue</th><th>Wed</th><th>Thu</th><th>Fri</th></tr></thead><tbody id="iAttendanceTableBody"></tbody></table></div>
+    </div>
+    <div class="card"><div class="card-header"><h3>Attendance Overview</h3></div>
+      <div class="bar-chart" id="iWeeklyAttChart"></div>
+    </div>
+  </section>
+
+  <!-- INSTRUCTOR GRADEBOOK -->
+  <section class="page" id="page-i-gradebook">
+    <div style="display:flex;gap:12px;margin-bottom:20px;">
+      <button class="btn btn-primary" onclick="showToast('Assignment creation coming soon!')">+ New Assignment</button>
+      <button class="btn-export" onclick="exportInstructorStudentsCSV()">📄 Export Grades</button>
+    </div>
+    <div class="card"><div class="card-header"><h3>Gradebook &mdash; ${ins.course}</h3></div>
+      <div class="table-wrapper"><table><thead><tr><th>Student</th><th>Safety Quiz</th><th>Tool ID Test</th><th>Theory #1</th><th>Practical #1</th><th>Mid-Term</th><th>Report #2</th><th>Portfolio</th><th>Avg</th></tr></thead><tbody id="iGradebookBody">
+        ${myStudents.map(s => {
+          const grades = [
+            Math.floor(Math.random()*25)+75,
+            Math.floor(Math.random()*25)+70,
+            Math.floor(Math.random()*30)+65,
+            Math.floor(Math.random()*20)+75,
+            parseInt(s.score)||Math.floor(Math.random()*25)+70,
+            s.stage==='training'||s.stage==='certified'||s.stage==='collected'?Math.floor(Math.random()*20)+75:null,
+            null
+          ];
+          const validGrades = grades.filter(g => g !== null);
+          const avg = validGrades.length > 0 ? Math.round(validGrades.reduce((a,b)=>a+b,0)/validGrades.length) : 0;
+          return `<tr><td><strong>${s.name}</strong></td>${grades.map(g => `<td style="text-align:center;${g!==null?(g>=80?'color:var(--green);':g>=60?'color:var(--accent);':''):'color:var(--text-muted);'}">${g !== null ? g + '%' : '\u2014'}</td>`).join('')}<td style="text-align:center;font-weight:700;color:${avg>=80?'var(--green)':avg>=60?'var(--accent)':'var(--red)'};">${avg}%</td></tr>`;
+        }).join('')}
+      </tbody></table></div>
+    </div>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:18px;">
+      <div class="card"><div class="card-header"><h3>Grade Distribution</h3></div>
+        <div style="display:flex;gap:16px;justify-content:center;padding:16px 0;">
+          ${[{label:'A (80-100%)',color:'var(--green)',pct:35},{label:'B (70-79%)',color:'var(--blue)',pct:30},{label:'C (60-69%)',color:'var(--accent)',pct:20},{label:'D (50-59%)',color:'var(--orange)',pct:10},{label:'F (<50%)',color:'var(--red)',pct:5}].map(g => `
+            <div style="text-align:center;">
+              <div style="width:48px;height:${g.pct*2}px;background:${g.color};border-radius:4px 4px 0 0;margin:0 auto ${(100-g.pct*2)}px;min-height:10px;"></div>
+              <div style="font-size:11px;font-weight:600;color:${g.color};">${g.pct}%</div>
+              <div style="font-size:10px;color:var(--text-muted);margin-top:2px;">${g.label}</div>
+            </div>
+          `).join('')}
+        </div>
+      </div>
+      <div class="card"><div class="card-header"><h3>Class Statistics</h3></div>
+        <div style="padding:16px 0;">
+          <div style="display:flex;justify-content:space-between;padding:10px 0;border-bottom:1px solid var(--border);"><span style="font-size:13px;color:var(--text-secondary);">Highest Score</span><span style="font-size:13px;font-weight:600;color:var(--green);">${myStudents.length > 0 ? Math.max(...myStudents.map(s=>parseInt(s.score)||0)) : 0}%</span></div>
+          <div style="display:flex;justify-content:space-between;padding:10px 0;border-bottom:1px solid var(--border);"><span style="font-size:13px;color:var(--text-secondary);">Lowest Score</span><span style="font-size:13px;font-weight:600;color:var(--red);">${myStudents.length > 0 ? Math.min(...myStudents.filter(s=>s.score).map(s=>parseInt(s.score))) || 'N/A' : 'N/A'}%</span></div>
+          <div style="display:flex;justify-content:space-between;padding:10px 0;border-bottom:1px solid var(--border);"><span style="font-size:13px;color:var(--text-secondary);">Class Average GPA</span><span style="font-size:13px;font-weight:600;">${avgGpa}</span></div>
+          <div style="display:flex;justify-content:space-between;padding:10px 0;border-bottom:1px solid var(--border);"><span style="font-size:13px;color:var(--text-secondary);">Assignments Graded</span><span style="font-size:13px;font-weight:600;">${myStudents.length * 5}</span></div>
+          <div style="display:flex;justify-content:space-between;padding:10px 0;"><span style="font-size:13px;color:var(--text-secondary);">Pending Submissions</span><span style="font-size:13px;font-weight:600;color:var(--accent);">${myStudents.length * 2}</span></div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- INSTRUCTOR RESOURCES -->
+  <section class="page" id="page-i-resources">
+    <div style="display:flex;gap:12px;margin-bottom:18px;">
+      <button class="btn btn-primary" onclick="showToast('Upload feature coming soon!')">+ Upload Resource</button>
+      <button class="btn btn-secondary" onclick="showToast('Folder created!')">+ New Folder</button>
+    </div>
+    ${[
+      {cat:'📹 Video Lectures',items:['Introduction to '+ins.course,'Safety Procedures & PPE Training','Core Techniques \u2014 Part 1','Core Techniques \u2014 Part 2','Advanced Methods & Best Practices','Industry Standards Overview']},
+      {cat:'📄 Study Guides & Handbooks',items:['Course Syllabus & Learning Outcomes','Theory Handbook (Complete)','Practical Assessment Preparation Guide','Exam Revision Notes & Tips','Industry Terminology Glossary']},
+      {cat:'📝 Worksheets & Assignments',items:['Practice Exercise Set 1','Practice Exercise Set 2','Self-Assessment Checklist','Mock Exam Questions','Past Paper \u2014 2025']},
+      {cat:'📊 Assessment Rubrics',items:['Practical Rubric','Exam Blueprint','Portfolio Requirements','Grading Criteria']}
+    ].map(section => `
+      <div class="card">
+        <div class="card-header"><h3>${section.cat}</h3><span style="font-size:12px;color:var(--text-muted);">${section.items.length} items</span></div>
+        <ul class="material-list">
+          ${section.items.map((item,i) => `
+            <li class="material-item">
+              <div class="material-icon" style="background:${skill.color}22;color:${skill.color};">${section.cat.split(' ')[0]}</div>
+              <div style="flex:1;"><div style="font-size:13.5px;">${item}</div><div style="font-size:11px;color:var(--text-muted);">Updated ${Math.floor(Math.random()*10)+1} days ago &bull; ${['PDF','Video','DOC','XLSX'][i%4]}</div></div>
+              <button class="btn btn-sm btn-secondary" onclick="showToast('Opening ${item}...')">${section.cat.includes('Video')?'\u25B6 Play':'Open'}</button>
+              <button class="btn btn-sm btn-danger" style="margin-left:4px;" onclick="showToast('Deleted')">&#x2715;</button>
+            </li>
+          `).join('')}
+        </ul>
+      </div>
+    `).join('')}
+  </section>
+
+  <!-- INSTRUCTOR ANNOUNCEMENTS -->
+  <section class="page" id="page-i-announcements">
+    <div style="display:flex;gap:12px;margin-bottom:20px;align-items:center;">
+      <button class="btn btn-primary" onclick="toggleInstructorAnnouncementForm()">+ New Announcement</button>
+      <select class="form-control" style="width:200px;" id="iAnnPriorityFilter" onchange="renderInstructorAnnouncements()"><option value="all">All Priorities</option><option value="urgent">Urgent</option><option value="info">Info</option><option value="general">General</option></select>
+    </div>
+    <div id="iAnnouncementForm" style="display:none;">
+      <div class="announcement-form">
+        <div class="ann-form-header"><h3>Create Announcement</h3><button class="btn btn-sm btn-secondary" onclick="toggleInstructorAnnouncementForm()">\u2715 Close</button></div>
+        <div class="form-group"><label>Title</label><input type="text" class="form-control" id="iAnnTitle" placeholder="Announcement title..."></div>
+        <div class="form-group"><label>Body</label><textarea class="form-control" id="iAnnBody" placeholder="Announcement details..."></textarea></div>
+        <div class="ann-form-row">
+          <div class="form-group"><label>Priority</label><select class="form-control" id="iAnnPriority"><option value="general">General</option><option value="info">Info</option><option value="urgent">Urgent</option></select></div>
+        </div>
+        <button class="btn btn-primary" onclick="createInstructorAnnouncement()">Publish Announcement</button>
+      </div>
+    </div>
+    <div id="iAnnouncementsList"></div>
+  </section>
+
+  <!-- INSTRUCTOR CALENDAR -->
+  <section class="page" id="page-i-calendar">
+    <div style="display:grid;grid-template-columns:1fr 320px;gap:18px;">
+      <div class="card">
+        <div class="cal-header">
+          <div class="cal-nav"><button onclick="changeCalMonth(-1)">\u2190</button></div>
+          <div class="cal-title" id="iCalTitle"></div>
+          <div class="cal-nav"><button onclick="changeCalMonth(1)">\u2192</button></div>
+        </div>
+        <div class="calendar-grid" id="iCalGrid"></div>
+      </div>
+      <div>
+        <div class="card"><div class="card-header"><h3 id="iCalDayTitle">Select a Day</h3></div><div id="iCalDayEvents"><p style="font-size:13px;color:var(--text-muted);">Click a day to see events</p></div></div>
+        <button class="btn btn-primary" style="width:100%;margin-top:8px;" onclick="promptAddEvent()">+ Add Event</button>
+        <div class="card" style="margin-top:12px;"><div class="card-header"><h3>My Schedule</h3></div><div id="iCalEventList"></div></div>
+      </div>
+    </div>
+  </section>
+
+  <!-- INSTRUCTOR PROFILE -->
+  <section class="page" id="page-i-profile">
+    <div class="profile-header">
+      <div class="profile-avatar" style="background:linear-gradient(135deg,var(--green),var(--teal));">${ins.name.split(' ').map(n=>n[0]).join('').replace('.','')}</div>
+      <div class="profile-details">
+        <h2>${ins.name}</h2>
+        <div class="profile-subtitle">${ins.course} Instructor</div>
+        <div class="profile-meta">
+          <span>🆔 ${ins.id}</span>
+          <span>📧 ${ins.email}</span>
+          <span>📍 HEART/NSTA Trust</span>
+        </div>
+      </div>
+      <button class="btn btn-secondary" onclick="showToast('Profile updated!')">Edit Profile</button>
+    </div>
+    <div class="stats-grid" style="grid-template-columns:repeat(4,1fr);">
+      <div class="profile-stat"><div class="ps-value" style="color:var(--green);">${ins.yearsExp}</div><div class="ps-label">Years Experience</div></div>
+      <div class="profile-stat"><div class="ps-value" style="color:var(--blue);">${myStudents.length}</div><div class="ps-label">Students Assigned</div></div>
+      <div class="profile-stat"><div class="ps-value" style="color:var(--accent);">${certifiedCount}</div><div class="ps-label">Students Certified</div></div>
+      <div class="profile-stat"><div class="ps-value" style="color:var(--purple);">${avgGpa}</div><div class="ps-label">Class Avg GPA</div></div>
+    </div>
+    <div class="profile-info-grid">
+      <div class="info-section">
+        <h4>Personal Information</h4>
+        <div class="info-row"><span class="info-label">Full Name</span><span class="info-value">${ins.name}</span></div>
+        <div class="info-row"><span class="info-label">Staff ID</span><span class="info-value">${ins.id}</span></div>
+        <div class="info-row"><span class="info-label">Email</span><span class="info-value">${ins.email}</span></div>
+        <div class="info-row"><span class="info-label">Phone</span><span class="info-value">${ins.phone}</span></div>
+      </div>
+      <div class="info-section">
+        <h4>Professional Information</h4>
+        <div class="info-row"><span class="info-label">Programme</span><span class="info-value">${ins.course}</span></div>
+        <div class="info-row"><span class="info-label">Specialization</span><span class="info-value">${ins.specialization}</span></div>
+        <div class="info-row"><span class="info-label">Experience</span><span class="info-value">${ins.yearsExp} years</span></div>
+        <div class="info-row"><span class="info-label">Joined</span><span class="info-value">${2026 - ins.yearsExp}</span></div>
+      </div>
+    </div>
+  </section>
+  `;
+
+  renderInstructorStudents(myStudents);
+  updateInstructorPipeline();
+  renderInstructorAttendance();
+  renderInstructorAnnouncements();
+  renderInstructorCalendar();
+  } catch(err) {
+    console.error('buildInstructorPages error:', err);
+    document.getElementById('mainContent').innerHTML = '<div class="card" style="margin:40px;padding:40px;text-align:center;"><h3>Error loading instructor portal</h3><p style="color:var(--text-muted);margin-top:8px;">'+err.message+'</p><button class="btn btn-primary" style="margin-top:16px;" onclick="logout()">Go Back</button></div>';
+  }
+}
+
+function renderInstructorStudents(data) {
+  const tbody = document.getElementById('iStudentTableBody');
+  if(!tbody) return;
+  tbody.innerHTML = data.map(s => `
+    <tr><td><strong>${s.name}</strong></td><td style="font-family:monospace;font-size:12px;color:var(--text-muted);">${s.id}</td>
+    <td><span class="badge ${stageBadge[s.stage]}"><span class="badge-dot"></span>${stageLabels[s.stage]}</span></td><td>${s.score||'\u2014'}</td>
+    <td><div style="display:flex;align-items:center;gap:8px;"><div class="progress-bar" style="width:60px;"><div class="fill" style="width:${s.attendance}%;background:${s.attendance>=80?'var(--green)':s.attendance>=70?'var(--accent)':'var(--red)'};"></div></div><span style="font-size:12px;">${s.attendance}%</span></div></td>
+    <td style="font-weight:600;color:${parseFloat(s.gpa)>=3.0?'var(--green)':'var(--accent)'};">${s.gpa}</td>
+    <td><div style="display:flex;align-items:center;gap:8px;"><div class="progress-bar" style="width:80px;"><div class="fill" style="width:${s.progress}%;background:${s.progress>=80?'var(--green)':s.progress>=40?'var(--accent)':'var(--red)'};"></div></div><span style="font-size:12px;color:var(--text-muted);">${s.progress}%</span></div></td></tr>
+  `).join('');
+  const sc = document.getElementById('iStudentCount');
+  if(sc) sc.textContent = 'Showing ' + data.length + ' students';
+}
+
+function filterInstructorStudents() {
+  if(!currentInstructor) return;
+  let filtered = students.filter(s => s.instructor === currentInstructor.name);
+  const stage = document.getElementById('iFilterStage')?.value;
+  const search = document.getElementById('iStudentSearch')?.value?.toLowerCase();
+  if(stage && stage !== 'all') filtered = filtered.filter(s => s.stage === stage);
+  if(search) filtered = filtered.filter(s => s.name.toLowerCase().includes(search));
+  renderInstructorStudents(filtered);
+}
+
+function updateInstructorPipeline() {
+  if(!currentInstructor) return;
+  const myStudents = students.filter(s => s.instructor === currentInstructor.name);
+  stages.forEach(s => {
+    const count = myStudents.filter(st => st.stage === s).length;
+    const el = document.getElementById('ip' + s.charAt(0).toUpperCase() + s.slice(1));
+    if(el) el.textContent = count;
+  });
+}
+
+function exportInstructorStudentsCSV() {
+  if(!currentInstructor) return;
+  const myStudents = students.filter(s => s.instructor === currentInstructor.name);
+  const headers = ['name','id','course','stage','score','progress','attendance','gpa'];
+  exportCSV(myStudents, headers, 'my_students_export.csv');
+  showToast('Students CSV exported!');
+}
+
+function renderInstructorAttendance() {
+  if(!currentInstructor) return;
+  const myRecords = attendanceRecords.filter(r => {
+    const student = students.find(s => s.id === r.studentId);
+    return student && student.instructor === currentInstructor.name;
+  });
+  const tbody = document.getElementById('iAttendanceTableBody');
+  if(!tbody) return;
+  const days = ['Mon','Tue','Wed','Thu','Fri'];
+  tbody.innerHTML = myRecords.map(r => {
+    return '<tr><td><strong>' + r.studentName + '</strong></td><td style="font-family:monospace;font-size:12px;">' + r.studentId + '</td>' +
+    days.map(d => {
+      const st = r.days[d];
+      return '<td><select class="form-control" style="width:90px;padding:4px 6px;font-size:11px;" data-sid="' + r.studentId + '" data-day="' + d + '" onchange="updateAttendanceCell(this)">' +
+        '<option value="present"' + (st==='present'?' selected':'') + '>Present</option>' +
+        '<option value="absent"' + (st==='absent'?' selected':'') + '>Absent</option>' +
+        '<option value="late"' + (st==='late'?' selected':'') + '>Late</option></select></td>';
+    }).join('') + '</tr>';
+  }).join('');
+  const countEl = document.getElementById('iAttCount');
+  if(countEl) countEl.textContent = myRecords.length + ' students';
+  renderInstructorAttSummary(myRecords);
+  renderInstructorWeeklyChart(myRecords);
+}
+
+function renderInstructorAttSummary(records) {
+  const el = document.getElementById('iAttendanceSummary');
+  if(!el) return;
+  const days = ['Mon','Tue','Wed','Thu','Fri'];
+  let totalPresent = 0, totalAbsent = 0, totalLate = 0, totalSlots = 0;
+  records.forEach(r => { days.forEach(d => { totalSlots++; if(r.days[d]==='present') totalPresent++; else if(r.days[d]==='absent') totalAbsent++; else totalLate++; }); });
+  const pctPresent = totalSlots > 0 ? Math.round(totalPresent/totalSlots*100) : 0;
+  el.innerHTML = '<div class="att-stat"><div class="att-dot" style="background:var(--green);"></div><div><div class="att-val">' + pctPresent + '%</div><div class="att-label">Present Rate</div></div></div>' +
+    '<div class="att-stat"><div class="att-dot" style="background:var(--red);"></div><div><div class="att-val">' + totalAbsent + '</div><div class="att-label">Total Absences</div></div></div>' +
+    '<div class="att-stat"><div class="att-dot" style="background:var(--accent);"></div><div><div class="att-val">' + totalLate + '</div><div class="att-label">Late Arrivals</div></div></div>' +
+    '<div class="att-stat"><div class="att-dot" style="background:var(--blue);"></div><div><div class="att-val">' + records.length + '</div><div class="att-label">Students</div></div></div>';
+}
+
+function renderInstructorWeeklyChart(records) {
+  const el = document.getElementById('iWeeklyAttChart');
+  if(!el) return;
+  const days = ['Mon','Tue','Wed','Thu','Fri'];
+  const maxR = records.length || 1;
+  el.innerHTML = days.map(d => {
+    const present = records.filter(r => r.days[d] === 'present').length;
+    const pct = (present/maxR*100).toFixed(0);
+    return '<div class="bar-col"><div class="bar" style="height:' + pct + '%;background:var(--green);"></div><div class="bar-label">' + d + ' (' + pct + '%)</div></div>';
+  }).join('');
+}
+
+function saveInstructorAttendance() {
+  saveState();
+  showToast('Attendance saved!');
+  renderInstructorAttendance();
+}
+
+let iAnnouncementFormVisible = false;
+function toggleInstructorAnnouncementForm() {
+  iAnnouncementFormVisible = !iAnnouncementFormVisible;
+  const form = document.getElementById('iAnnouncementForm');
+  if(form) form.style.display = iAnnouncementFormVisible ? 'block' : 'none';
+}
+
+function createInstructorAnnouncement() {
+  const title = document.getElementById('iAnnTitle')?.value.trim();
+  const body = document.getElementById('iAnnBody')?.value.trim();
+  if(!title || !body) { alert('Please fill in title and body'); return; }
+  const priority = document.getElementById('iAnnPriority')?.value || 'general';
+  announcements.unshift({
+    id: Date.now(), title, body, priority, date: '2026-02-18', author: currentInstructor.name, forRoles: ['admin','student','instructor']
+  });
+  document.getElementById('iAnnTitle').value = '';
+  document.getElementById('iAnnBody').value = '';
+  toggleInstructorAnnouncementForm();
+  renderInstructorAnnouncements();
+  saveState();
+  showToast('Announcement published!');
+}
+
+function renderInstructorAnnouncements() {
+  const el = document.getElementById('iAnnouncementsList');
+  if(!el) return;
+  const filter = document.getElementById('iAnnPriorityFilter')?.value || 'all';
+  let filtered = filter === 'all' ? announcements : announcements.filter(a => a.priority === filter);
+  el.innerHTML = filtered.map(a => `
+    <div class="announcement-card priority-${a.priority}">
+      <div class="ann-header">
+        <span class="announcement-badge badge-${a.priority}">${a.priority}</span>
+        <h4>${a.title}</h4>
+        <span class="ann-date">${a.date}</span>
+      </div>
+      <div class="ann-body">${a.body}</div>
+      <div class="ann-footer">
+        <span style="font-size:11px;color:var(--text-muted);">By ${a.author}</span>
+        ${a.author === (currentInstructor ? currentInstructor.name : '') ? '<button class="btn btn-sm btn-danger" style="margin-left:auto;" onclick="deleteAnnouncement(' + a.id + ');renderInstructorAnnouncements();">Delete</button>' : ''}
+      </div>
+    </div>
+  `).join('');
+}
+
+function renderInstructorCalendar() {
+  const titleEl = document.getElementById('iCalTitle');
+  const gridEl = document.getElementById('iCalGrid');
+  if(!titleEl || !gridEl) return;
+  renderCalendarGrid(calendarYear, calendarMonth, titleEl, gridEl, 'iCalDayTitle', 'iCalDayEvents');
+  const eventListEl = document.getElementById('iCalEventList');
+  if(eventListEl) {
+    eventListEl.innerHTML = calendarEvents.sort((a,b)=>a.date.localeCompare(b.date)).slice(0,8).map(e =>
+      '<div style="display:flex;align-items:center;gap:10px;padding:8px 0;border-bottom:1px solid var(--border);">' +
+        '<div style="width:8px;height:8px;border-radius:50%;background:' + e.color + ';flex-shrink:0;"></div>' +
+        '<div><div style="font-size:13px;">' + e.title + '</div><div style="font-size:11px;color:var(--text-muted);">' + e.date + ' @ ' + e.time + '</div></div></div>'
+    ).join('');
+  }
+}
+
 function hexToRgb(hex) {
   var result = /^#?([a-f\d]{2})([a-f\d]{2})([a-f\d]{2})$/i.exec(hex);
   return result ? parseInt(result[1],16)+','+parseInt(result[2],16)+','+parseInt(result[3],16) : '52,152,219';
@@ -2298,14 +2871,14 @@ function hexToRgb(hex) {
 
 // ============================== SHARED FUNCTIONS ==============================
 function enterVideoRoom(title, role) {
-  const listId = role==='admin' ? 'videoClassList' : 'sVideoClassList';
-  const roomId = role==='admin' ? 'videoRoom' : 'sVideoRoom';
+  const listId = role==='admin' ? 'videoClassList' : role==='instructor' ? 'iVideoClassList' : 'sVideoClassList';
+  const roomId = role==='admin' ? 'videoRoom' : role==='instructor' ? 'iVideoRoom' : 'sVideoRoom';
   document.getElementById(listId).style.display = 'none';
   const room = document.getElementById(roomId);
   room.style.display = 'block';
 
-  const userName = role==='admin' ? 'Admin' : currentStudent.name;
-  const userInitials = role==='admin' ? 'A' : currentStudent.name.split(' ').map(n=>n[0]).join('');
+  const userName = role==='admin' ? 'Admin' : role==='instructor' ? currentInstructor.name : currentStudent.name;
+  const userInitials = role==='admin' ? 'A' : role==='instructor' ? currentInstructor.name.split(' ').map(n=>n[0]).join('').replace('.','') : currentStudent.name.split(' ').map(n=>n[0]).join('');
 
   room.innerHTML = `
     <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px;">
@@ -2372,8 +2945,8 @@ function enterVideoRoom(title, role) {
 
 function exitVideoRoom(role) {
   if(videoTimerInterval) clearInterval(videoTimerInterval);
-  const listId = role==='admin' ? 'videoClassList' : 'sVideoClassList';
-  const roomId = role==='admin' ? 'videoRoom' : 'sVideoRoom';
+  const listId = role==='admin' ? 'videoClassList' : role==='instructor' ? 'iVideoClassList' : 'sVideoClassList';
+  const roomId = role==='admin' ? 'videoRoom' : role==='instructor' ? 'iVideoRoom' : 'sVideoRoom';
   document.getElementById(listId).style.display = 'block';
   document.getElementById(roomId).style.display = 'none';
 }
@@ -2814,6 +3387,7 @@ function changeCalMonth(delta) {
   if(calendarMonth < 0) { calendarMonth = 11; calendarYear--; }
   selectedCalendarDay = null;
   if(currentRole === 'admin') renderCalendar();
+  else if(currentRole === 'instructor') renderInstructorCalendar();
   else renderStudentCalendar();
 }
 
@@ -2852,6 +3426,7 @@ function showToast(message) {
 }
 
 populateStudentSelect();
+populateInstructorSelect();
 </script>
 </body>
 </html>
