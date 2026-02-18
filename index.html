@@ -1221,12 +1221,16 @@ textarea.form-control { resize:vertical; min-height:80px; }
     <div class="topbar-search">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
       <input type="text" placeholder="Search..." id="globalSearch">
+      <div class="search-results" id="searchResults"></div>
     </div>
     <div class="topbar-right">
-      <button class="topbar-btn" title="Notifications">
-        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/></svg>
-        <span class="dot"></span>
-      </button>
+      <div style="position:relative;">
+        <button class="topbar-btn" title="Notifications" onclick="toggleNotifications()">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/></svg>
+          <span class="dot" id="notifDot"></span>
+        </button>
+        <div class="notification-dropdown" id="notifDropdown"></div>
+      </div>
       <button class="logout-btn" onclick="logout()">
         <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg>
         Sign Out
@@ -1270,28 +1274,27 @@ textarea.form-control { resize:vertical; min-height:80px; }
 <div id="toastContainer"></div>
 
 <script>
-// ============================== DATA ==============================
 const skillAreas = [
-  {id:1,name:"Welding & Fabrication",icon:"🔥",color:"#e74c3c",students:87,materials:24,desc:"SMAW, MIG, TIG welding processes and metal fabrication"},
-  {id:2,name:"Electrical Installation",icon:"⚡",color:"#f1c40f",students:72,materials:31,desc:"Residential and commercial wiring, conduit bending, circuits"},
-  {id:3,name:"Cosmetology",icon:"💇",color:"#e91e63",students:65,materials:28,desc:"Hair care, styling, chemical treatments, salon management"},
-  {id:4,name:"Business Administration",icon:"💼",color:"#3498db",students:93,materials:35,desc:"Office management, accounting, business communication"},
-  {id:5,name:"Auto Mechanics",icon:"🔧",color:"#e67e22",students:58,materials:22,desc:"Engine repair, diagnostics, brake and suspension systems"},
-  {id:6,name:"Plumbing",icon:"🔩",color:"#1abc9c",students:44,materials:18,desc:"Pipe fitting, drainage systems, water supply installation"},
-  {id:7,name:"Carpentry",icon:"🪚",color:"#8d6e63",students:51,materials:20,desc:"Furniture making, roof framing, cabinet installation"},
-  {id:8,name:"Hospitality & Tourism",icon:"🏨",color:"#9b59b6",students:76,materials:26,desc:"Food & beverage service, front office, housekeeping"},
-  {id:9,name:"Information Technology",icon:"💻",color:"#2196f3",students:88,materials:40,desc:"Networking, hardware repair, software applications"},
-  {id:10,name:"Garment Construction",icon:"🧵",color:"#ff7043",students:39,materials:19,desc:"Pattern drafting, sewing techniques, fashion design basics"},
-  {id:11,name:"Refrigeration & AC",icon:"❄️",color:"#00bcd4",students:42,materials:21,desc:"AC installation, refrigerant handling, system maintenance"},
-  {id:12,name:"Heavy Equipment Ops",icon:"🚜",color:"#ff9800",students:31,materials:15,desc:"Excavator, loader, bulldozer operation and safety"},
-  {id:13,name:"Commercial Cooking",icon:"👨‍🍳",color:"#4caf50",students:68,materials:32,desc:"Culinary arts, food safety, menu planning, pastry arts"},
-  {id:14,name:"Beauty Therapy",icon:"💆",color:"#ce93d8",students:55,materials:24,desc:"Facial treatments, body massage, nail technology"},
-  {id:15,name:"Data Operations",icon:"📊",color:"#42a5f5",students:47,materials:22,desc:"Data entry, spreadsheets, database management"},
-  {id:16,name:"Agriculture",icon:"🌾",color:"#66bb6a",students:36,materials:18,desc:"Crop production, livestock management, agribusiness"},
-  {id:17,name:"Masonry",icon:"🧱",color:"#a1887f",students:29,materials:14,desc:"Block laying, plastering, tiling, concrete work"},
-  {id:18,name:"Solar Energy Tech",icon:"☀️",color:"#fdd835",students:33,materials:16,desc:"PV installation, solar system design, inverter setup"},
-  {id:19,name:"Early Childhood Ed",icon:"👶",color:"#ef9a9a",students:61,materials:27,desc:"Child development, lesson planning, classroom management"},
-  {id:20,name:"Customer Service",icon:"🎯",color:"#7e57c2",students:54,materials:20,desc:"Communication skills, conflict resolution, CRM systems"}
+  {id:1,name:"Welding & Fabrication",icon:"\uD83D\uDD25",color:"#e74c3c",students:87,materials:24,desc:"SMAW, MIG, TIG welding processes and metal fabrication"},
+  {id:2,name:"Electrical Installation",icon:"\u26A1",color:"#f1c40f",students:72,materials:31,desc:"Residential and commercial wiring, conduit bending, circuits"},
+  {id:3,name:"Cosmetology",icon:"\uD83D\uDC87",color:"#e91e63",students:65,materials:28,desc:"Hair care, styling, chemical treatments, salon management"},
+  {id:4,name:"Business Administration",icon:"\uD83D\uDCBC",color:"#3498db",students:93,materials:35,desc:"Office management, accounting, business communication"},
+  {id:5,name:"Auto Mechanics",icon:"\uD83D\uDD27",color:"#e67e22",students:58,materials:22,desc:"Engine repair, diagnostics, brake and suspension systems"},
+  {id:6,name:"Plumbing",icon:"\uD83D\uDD29",color:"#1abc9c",students:44,materials:18,desc:"Pipe fitting, drainage systems, water supply installation"},
+  {id:7,name:"Carpentry",icon:"\uD83E\uDE9A",color:"#8d6e63",students:51,materials:20,desc:"Furniture making, roof framing, cabinet installation"},
+  {id:8,name:"Hospitality & Tourism",icon:"\uD83C\uDFE8",color:"#9b59b6",students:76,materials:26,desc:"Food & beverage service, front office, housekeeping"},
+  {id:9,name:"Information Technology",icon:"\uD83D\uDCBB",color:"#2196f3",students:88,materials:40,desc:"Networking, hardware repair, software applications"},
+  {id:10,name:"Garment Construction",icon:"\uD83E\uDDF5",color:"#ff7043",students:39,materials:19,desc:"Pattern drafting, sewing techniques, fashion design basics"},
+  {id:11,name:"Refrigeration & AC",icon:"\u2744\uFE0F",color:"#00bcd4",students:42,materials:21,desc:"AC installation, refrigerant handling, system maintenance"},
+  {id:12,name:"Heavy Equipment Ops",icon:"\uD83D\uDE9C",color:"#ff9800",students:31,materials:15,desc:"Excavator, loader, bulldozer operation and safety"},
+  {id:13,name:"Commercial Cooking",icon:"\uD83D\uDC68\u200D\uD83C\uDF73",color:"#4caf50",students:68,materials:32,desc:"Culinary arts, food safety, menu planning, pastry arts"},
+  {id:14,name:"Beauty Therapy",icon:"\uD83D\uDC86",color:"#ce93d8",students:55,materials:24,desc:"Facial treatments, body massage, nail technology"},
+  {id:15,name:"Data Operations",icon:"\uD83D\uDCCA",color:"#42a5f5",students:47,materials:22,desc:"Data entry, spreadsheets, database management"},
+  {id:16,name:"Agriculture",icon:"\uD83C\uDF3E",color:"#66bb6a",students:36,materials:18,desc:"Crop production, livestock management, agribusiness"},
+  {id:17,name:"Masonry",icon:"\uD83E\uDDF1",color:"#a1887f",students:29,materials:14,desc:"Block laying, plastering, tiling, concrete work"},
+  {id:18,name:"Solar Energy Tech",icon:"\u2600\uFE0F",color:"#fdd835",students:33,materials:16,desc:"PV installation, solar system design, inverter setup"},
+  {id:19,name:"Early Childhood Ed",icon:"\uD83D\uDC76",color:"#ef9a9a",students:61,materials:27,desc:"Child development, lesson planning, classroom management"},
+  {id:20,name:"Customer Service",icon:"\uD83C\uDFAF",color:"#7e57c2",students:54,materials:20,desc:"Communication skills, conflict resolution, CRM systems"}
 ];
 
 const studentNames = [
@@ -1308,7 +1311,7 @@ const studentNames = [
 const stages = ['testing','interview','training','certified','collected','incomplete'];
 const stageLabels = {testing:'Testing',interview:'Interview',training:'In Training',certified:'Certified',collected:'Collected',incomplete:'Incomplete'};
 const stageBadge = {testing:'badge-blue',interview:'badge-purple',training:'badge-amber',certified:'badge-green',collected:'badge-green',incomplete:'badge-red'};
-const stageIcons = {testing:'📝',interview:'🗣️',training:'📚',certified:'🎓',collected:'✅',incomplete:'⚠️'};
+const stageIcons = {testing:'\uD83D\uDCDD',interview:'\uD83D\uDDE3\uFE0F',training:'\uD83D\uDCDA',certified:'\uD83C\uDF93',collected:'\u2705',incomplete:'\u26A0\uFE0F'};
 const courses = ['Welding','Electrical Installation','Cosmetology','Business Administration','Auto Mechanics','Plumbing','Carpentry','Hospitality'];
 
 let students = [];
@@ -1336,31 +1339,265 @@ function generateStudents() {
 generateStudents();
 
 let exams = [
-  {title:"Welding Level 2 — Final Theory",course:"Welding",date:"2026-02-18",time:"09:00",duration:90,students:24,status:"upcoming",questions:50,passMark:60},
-  {title:"Electrical Installation L3 — Safety",course:"Electrical Installation",date:"2026-02-20",time:"10:00",duration:60,students:18,status:"upcoming",questions:40,passMark:70},
-  {title:"Business Admin L1 — Midterm",course:"Business Administration",date:"2026-02-22",time:"14:00",duration:120,students:32,status:"upcoming",questions:80,passMark:55},
-  {title:"Cosmetology L1 — Practical Theory",course:"Cosmetology",date:"2026-02-25",time:"09:30",duration:75,students:22,status:"upcoming",questions:45,passMark:60},
-  {title:"Auto Mechanics — Diagnostics",course:"Auto Mechanics",date:"2026-02-15",time:"08:00",duration:90,students:19,status:"active",questions:50,passMark:65},
-  {title:"Welding L1 — Safety Fundamentals",course:"Welding",date:"2026-02-10",time:"09:00",duration:60,students:26,status:"completed",questions:35,passMark:60,passRate:"84%"},
-  {title:"Hospitality — Food Safety",course:"Hospitality",date:"2026-02-08",time:"11:00",duration:45,students:30,status:"completed",questions:30,passMark:70,passRate:"90%"},
-  {title:"IT Fundamentals — Networking",course:"Information Technology",date:"2026-02-05",time:"14:00",duration:90,students:25,status:"completed",questions:60,passMark:60,passRate:"72%"},
-  {title:"Plumbing L2 — Pipe Systems",course:"Plumbing",date:"2026-03-01",time:"10:00",duration:75,students:15,status:"upcoming",questions:40,passMark:60},
-  {title:"Carpentry — Joints & Framing",course:"Carpentry",date:"2026-03-04",time:"09:00",duration:90,students:20,status:"upcoming",questions:55,passMark:60},
-  {title:"Beauty Therapy — Skin Analysis",course:"Cosmetology",date:"2026-03-06",time:"13:00",duration:60,students:28,status:"upcoming",questions:35,passMark:65},
-  {title:"Data Operations — Spreadsheets",course:"Information Technology",date:"2026-03-10",time:"10:00",duration:60,students:22,status:"upcoming",questions:40,passMark:60},
+  {title:"Welding Level 2 \u2014 Final Theory",course:"Welding",date:"2026-02-18",time:"09:00",duration:90,students:24,status:"upcoming",questions:50,passMark:60},
+  {title:"Electrical Installation L3 \u2014 Safety",course:"Electrical Installation",date:"2026-02-20",time:"10:00",duration:60,students:18,status:"upcoming",questions:40,passMark:70},
+  {title:"Business Admin L1 \u2014 Midterm",course:"Business Administration",date:"2026-02-22",time:"14:00",duration:120,students:32,status:"upcoming",questions:80,passMark:55},
+  {title:"Cosmetology L1 \u2014 Practical Theory",course:"Cosmetology",date:"2026-02-25",time:"09:30",duration:75,students:22,status:"upcoming",questions:45,passMark:60},
+  {title:"Auto Mechanics \u2014 Diagnostics",course:"Auto Mechanics",date:"2026-02-15",time:"08:00",duration:90,students:19,status:"active",questions:50,passMark:65},
+  {title:"Welding L1 \u2014 Safety Fundamentals",course:"Welding",date:"2026-02-10",time:"09:00",duration:60,students:26,status:"completed",questions:35,passMark:60,passRate:"84%"},
+  {title:"Hospitality \u2014 Food Safety",course:"Hospitality",date:"2026-02-08",time:"11:00",duration:45,students:30,status:"completed",questions:30,passMark:70,passRate:"90%"},
+  {title:"IT Fundamentals \u2014 Networking",course:"Information Technology",date:"2026-02-05",time:"14:00",duration:90,students:25,status:"completed",questions:60,passMark:60,passRate:"72%"},
+  {title:"Plumbing L2 \u2014 Pipe Systems",course:"Plumbing",date:"2026-03-01",time:"10:00",duration:75,students:15,status:"upcoming",questions:40,passMark:60},
+  {title:"Carpentry \u2014 Joints & Framing",course:"Carpentry",date:"2026-03-04",time:"09:00",duration:90,students:20,status:"upcoming",questions:55,passMark:60},
+  {title:"Beauty Therapy \u2014 Skin Analysis",course:"Cosmetology",date:"2026-03-06",time:"13:00",duration:60,students:28,status:"upcoming",questions:35,passMark:65},
+  {title:"Data Operations \u2014 Spreadsheets",course:"Information Technology",date:"2026-03-10",time:"10:00",duration:60,students:22,status:"upcoming",questions:40,passMark:60},
 ];
 
-let currentRole = null; // 'admin' or 'student'
+let announcements = [
+  {id:1,title:"Campus Closure - Independence Day",body:"The campus will be closed on February 20th for Independence Day celebrations. All classes and exams scheduled for that day will be rescheduled. Please check your updated timetable.",priority:"urgent",date:"2026-02-17",author:"Admin",forRoles:['admin','student']},
+  {id:2,title:"Welding Workshop Equipment Upgrade",body:"New TIG welding stations have been installed in Workshop Bay 2. All Welding students are required to attend orientation on Feb 22 at 9AM.",priority:"info",date:"2026-02-16",author:"Mr. R. Campbell",forRoles:['admin','student']},
+  {id:3,title:"Midterm Exam Schedule Released",body:"The midterm examination schedule for all programmes has been finalized. Students can view their exam dates in the Exams section. Please arrive 15 minutes early.",priority:"urgent",date:"2026-02-15",author:"Admin",forRoles:['admin','student']},
+  {id:4,title:"IT Lab Maintenance Notice",body:"The IT lab will undergo maintenance on Feb 23-24. Data Operations and IT students should plan accordingly and use the library computers.",priority:"info",date:"2026-02-14",author:"Ms. J. Williams",forRoles:['admin','student']},
+  {id:5,title:"Certificate Collection Reminder",body:"Students who completed their programmes in January are reminded to collect their certificates from the admin office. Bring your student ID.",priority:"general",date:"2026-02-13",author:"Admin",forRoles:['admin','student']},
+  {id:6,title:"Guest Lecture: Industry Trends",body:"A guest lecture on emerging industry trends will be held on March 1 in the main auditorium. All programmes welcome. Attendance counts toward professional development hours.",priority:"general",date:"2026-02-12",author:"Mrs. P. Morgan",forRoles:['admin','student']}
+];
+
+let notifications = [
+  {id:1,text:"Keisha Brown scored 87% on Welding L2 exam",time:"15 min ago",read:false,icon:"\uD83C\uDF1F",type:"success"},
+  {id:2,text:"3 students below 70% attendance threshold",time:"1 hr ago",read:false,icon:"\u26A0\uFE0F",type:"warning"},
+  {id:3,text:"New exam scheduled: Electrical Installation L3",time:"2 hrs ago",read:false,icon:"\uD83D\uDCDD",type:"info"},
+  {id:4,text:"Certificate collected: Marlon Davis - Auto Mechanics",time:"3 hrs ago",read:false,icon:"\u2705",type:"success"},
+  {id:5,text:"5 students marked incomplete in Cosmetology L1",time:"4 hrs ago",read:false,icon:"\uD83D\uDED1",type:"warning"},
+  {id:6,text:"System backup completed successfully",time:"5 hrs ago",read:false,icon:"\uD83D\uDCBE",type:"info"},
+  {id:7,text:"New student enrolled: Crystal Nelson - Hospitality",time:"6 hrs ago",read:false,icon:"\uD83D\uDC64",type:"info"},
+  {id:8,text:"Exam results published for Welding L1 Safety",time:"1 day ago",read:false,icon:"\uD83D\uDCCB",type:"success"}
+];
+
+let calendarEvents = [
+  {title:"Welding L2 Final Theory",date:"2026-02-18",time:"09:00 AM",type:"exam",color:"var(--red)"},
+  {title:"Electrical Safety Class",date:"2026-02-18",time:"11:30 AM",type:"class",color:"var(--blue)"},
+  {title:"Business Admin Midterm",date:"2026-02-22",time:"02:00 PM",type:"exam",color:"var(--red)"},
+  {title:"Cosmetology Practical",date:"2026-02-25",time:"09:30 AM",type:"exam",color:"var(--red)"},
+  {title:"Workshop Portfolio Due",date:"2026-02-22",time:"11:59 PM",type:"deadline",color:"var(--accent)"},
+  {title:"Staff Meeting",date:"2026-02-19",time:"03:00 PM",type:"meeting",color:"var(--purple)"},
+  {title:"Final Project Due",date:"2026-03-05",time:"11:59 PM",type:"deadline",color:"var(--accent)"},
+  {title:"Plumbing L2 Pipe Systems",date:"2026-03-01",time:"10:00 AM",type:"exam",color:"var(--red)"},
+  {title:"Guest Lecture: Industry Trends",date:"2026-03-01",time:"02:00 PM",type:"meeting",color:"var(--purple)"},
+  {title:"Carpentry Joints Exam",date:"2026-03-04",time:"09:00 AM",type:"exam",color:"var(--red)"}
+];
+
+let attendanceRecords = [];
+function generateAttendance() {
+  const dayLabels = ['Mon','Tue','Wed','Thu','Fri'];
+  attendanceRecords = students.map(s => {
+    const days = {};
+    dayLabels.forEach(d => {
+      const r = Math.random();
+      days[d] = r < 0.75 ? 'present' : r < 0.9 ? 'late' : 'absent';
+    });
+    return {studentId:s.id, studentName:s.name, course:s.course, days};
+  });
+}
+generateAttendance();
+
+let currentRole = null;
 let currentStudent = null;
 let videoTimerInterval = null;
 let videoSeconds = 0;
+let calendarMonth = 1;
+let calendarYear = 2026;
+let selectedCalendarDay = null;
+let announcementFormVisible = false;
+let currentAttendanceDate = '2026-02-18';
 
-// ============================== LANDING ==============================
+function saveState() {
+  try {
+    localStorage.setItem('voctrain_students', JSON.stringify(students));
+    localStorage.setItem('voctrain_exams', JSON.stringify(exams));
+    localStorage.setItem('voctrain_announcements', JSON.stringify(announcements));
+    localStorage.setItem('voctrain_attendance', JSON.stringify(attendanceRecords));
+  } catch(e) { /* quota exceeded or private browsing */ }
+}
+
+function loadState() {
+  try {
+    const s = localStorage.getItem('voctrain_students');
+    const e = localStorage.getItem('voctrain_exams');
+    const a = localStorage.getItem('voctrain_announcements');
+    const at = localStorage.getItem('voctrain_attendance');
+    if(s) students = JSON.parse(s);
+    if(e) exams = JSON.parse(e);
+    if(a) announcements = JSON.parse(a);
+    if(at) attendanceRecords = JSON.parse(at);
+  } catch(e) { /* parse error, use generated data */ }
+}
+loadState();
+
+function animateCounter(element, target, duration) {
+  duration = duration || 1000;
+  const start = 0;
+  const startTime = performance.now();
+  const isFloat = String(target).includes('.');
+  const suffix = element.getAttribute('data-suffix') || '';
+  element.classList.add('counter-animate','counting');
+  function update(now) {
+    const elapsed = now - startTime;
+    const pct = Math.min(elapsed / duration, 1);
+    const eased = 1 - Math.pow(1 - pct, 3);
+    const current = start + (target - start) * eased;
+    element.textContent = (isFloat ? current.toFixed(1) : Math.round(current).toLocaleString()) + suffix;
+    if(pct < 1) { requestAnimationFrame(update); }
+    else { element.classList.remove('counting'); element.classList.add('done'); setTimeout(()=>element.classList.remove('done'),300); }
+  }
+  requestAnimationFrame(update);
+}
+
+function animateAllCounters() {
+  document.querySelectorAll('.stat-value[data-count]').forEach(el => {
+    const target = parseFloat(el.getAttribute('data-count'));
+    if(!isNaN(target)) animateCounter(el, target, 800);
+  });
+}
+
+function initGlobalSearch() {
+  const input = document.getElementById('globalSearch');
+  if(!input) return;
+  let dropdown = document.querySelector('.search-results');
+  if(!dropdown) {
+    dropdown = document.createElement('div');
+    dropdown.className = 'search-results';
+    input.parentElement.appendChild(dropdown);
+  }
+  input.addEventListener('input', function() {
+    const q = this.value.trim().toLowerCase();
+    if(q.length < 2) { dropdown.classList.remove('active'); return; }
+    let results = [];
+    students.forEach(s => {
+      if(s.name.toLowerCase().includes(q) || s.id.toLowerCase().includes(q) || s.course.toLowerCase().includes(q)) {
+        results.push({title:s.name,desc:s.id+' - '+s.course,icon:stageIcons[s.stage],page:currentRole==='admin'?'students':'s-progress',cat:'Student',catClass:'cat-student'});
+      }
+    });
+    exams.forEach(e => {
+      if(e.title.toLowerCase().includes(q) || e.course.toLowerCase().includes(q)) {
+        results.push({title:e.title,desc:e.course+' - '+e.date,icon:'\uD83D\uDCDD',page:currentRole==='admin'?'exams':'s-exams',cat:'Exam',catClass:''});
+      }
+    });
+    skillAreas.forEach(sk => {
+      if(sk.name.toLowerCase().includes(q)) {
+        results.push({title:sk.name,desc:sk.desc.substring(0,50)+'...',icon:sk.icon,page:'training',cat:'Course',catClass:'cat-course'});
+      }
+    });
+    results = results.slice(0,8);
+    if(results.length === 0) {
+      dropdown.innerHTML = '<div class="search-empty">No results found</div>';
+    } else {
+      dropdown.innerHTML = '<div class="search-label">Results</div>' + results.map(r =>
+        `<div class="search-result-item" onclick="showPage('${r.page}');document.querySelector('.search-results').classList.remove('active');document.getElementById('globalSearch').value='';">
+          <div class="sr-icon">${r.icon}</div>
+          <div class="sr-text"><div class="sr-title">${r.title}</div><div class="sr-desc">${r.desc}</div></div>
+          <span class="sr-category ${r.catClass}">${r.cat}</span>
+        </div>`
+      ).join('');
+    }
+    dropdown.classList.add('active');
+  });
+  input.addEventListener('keydown', function(e) { if(e.key==='Escape') dropdown.classList.remove('active'); });
+  document.addEventListener('click', function(e) { if(!input.parentElement.contains(e.target)) dropdown.classList.remove('active'); });
+}
+
+function toggleNotifications() {
+  const btn = document.querySelector('.topbar-btn[title="Notifications"]');
+  if(!btn) return;
+  let dropdown = btn.querySelector('.notification-dropdown');
+  if(!dropdown) {
+    dropdown = document.createElement('div');
+    dropdown.className = 'notification-dropdown';
+    btn.style.position = 'relative';
+    btn.appendChild(dropdown);
+  }
+  if(dropdown.classList.contains('active')) { dropdown.classList.remove('active'); return; }
+  const unreadCount = notifications.filter(n=>!n.read).length;
+  dropdown.innerHTML = `
+    <div class="notif-header"><span>Notifications ${unreadCount>0?'('+unreadCount+')':''}</span><button class="mark-read" onclick="event.stopPropagation();markAllNotificationsRead()">Mark all read</button></div>
+    ${notifications.length === 0 ? '<div class="notif-empty">No notifications</div>' :
+      notifications.map((n,i) => `
+        <div class="notif-item ${n.read?'':'unread'}" onclick="event.stopPropagation();markNotificationRead(${i})">
+          <div class="notif-icon" style="background:${n.type==='success'?'var(--green-dim)':n.type==='warning'?'var(--accent-dim)':'var(--blue-dim)'};">${n.icon}</div>
+          <div class="notif-content"><div class="notif-text">${n.text}</div><div class="notif-time">${n.time}</div></div>
+          ${n.read?'':'<div class="notif-dot"></div>'}
+        </div>
+      `).join('')}
+  `;
+  dropdown.classList.add('active');
+  document.addEventListener('click', function handler(e) {
+    if(!btn.contains(e.target)) { dropdown.classList.remove('active'); document.removeEventListener('click', handler); }
+  });
+}
+
+function markNotificationRead(idx) {
+  notifications[idx].read = true;
+  updateNotificationDot();
+  toggleNotifications();
+  toggleNotifications();
+}
+
+function markAllNotificationsRead() {
+  notifications.forEach(n => n.read = true);
+  updateNotificationDot();
+  toggleNotifications();
+  toggleNotifications();
+}
+
+function updateNotificationDot() {
+  const dot = document.querySelector('.topbar-btn[title="Notifications"] .dot');
+  if(!dot) return;
+  const unread = notifications.filter(n=>!n.read).length;
+  dot.style.display = unread > 0 ? '' : 'none';
+}
+
+function exportCSV(data, headers, filename) {
+  const csvRows = [headers.join(',')];
+  data.forEach(row => {
+    csvRows.push(headers.map(h => {
+      let val = row[h] !== undefined && row[h] !== null ? String(row[h]) : '';
+      if(val.includes(',') || val.includes('"') || val.includes('\n')) val = '"' + val.replace(/"/g,'""') + '"';
+      return val;
+    }).join(','));
+  });
+  const blob = new Blob([csvRows.join('\n')], {type:'text/csv;charset=utf-8;'});
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url; a.download = filename; a.style.display = 'none';
+  document.body.appendChild(a); a.click(); document.body.removeChild(a);
+  URL.revokeObjectURL(url);
+}
+
+function exportStudentsCSV() {
+  const headers = ['name','id','course','stage','score','progress','attendance','gpa','instructor'];
+  exportCSV(students, headers, 'students_export.csv');
+  showToast('Students CSV exported!');
+}
+
+function exportCertsCSV() {
+  const certs = students.filter(s=>s.certNo).map(s=>({name:s.name,certNo:s.certNo,course:s.course,certDate:s.certDate,collected:s.certCollected?'Yes':'No'}));
+  exportCSV(certs, ['name','certNo','course','certDate','collected'], 'certificates_export.csv');
+  showToast('Certificates CSV exported!');
+}
+
+function exportReportCSV() {
+  const data = courses.map(c => {
+    const cs = students.filter(s=>s.course===c);
+    return {course:c,enrolled:cs.length,certified:cs.filter(s=>s.stage==='certified'||s.stage==='collected').length,avgAttendance:cs.length?Math.round(cs.reduce((a,s)=>a+s.attendance,0)/cs.length):0};
+  });
+  exportCSV(data, ['course','enrolled','certified','avgAttendance'], 'report_export.csv');
+  showToast('Report CSV exported!');
+}
+
 function populateStudentSelect() {
   const sel = document.getElementById('studentSelect');
   students.forEach((s,i) => {
     const opt = document.createElement('option');
-    opt.value = i; opt.textContent = s.name + ' — ' + s.course;
+    opt.value = i; opt.textContent = s.name + ' \u2014 ' + s.course;
     sel.appendChild(opt);
   });
 }
@@ -1397,7 +1634,6 @@ function enterApp(role) {
     document.getElementById('landingPage').style.display = 'none';
     document.getElementById('appShell').classList.add('active');
     document.body.style.overflow = 'hidden';
-
     if(role === 'admin') {
       buildAdminSidebar();
       buildAdminPages();
@@ -1418,6 +1654,11 @@ function enterApp(role) {
       document.getElementById('sidebarUserRole').textContent = currentStudent.course;
       showPage('s-dashboard');
     }
+    initGlobalSearch();
+    const bellBtn = document.querySelector('.topbar-btn[title="Notifications"]');
+    if(bellBtn) bellBtn.onclick = function(e) { e.stopPropagation(); toggleNotifications(); };
+    updateNotificationDot();
+    setTimeout(animateAllCounters, 100);
   } catch(err) {
     console.error('enterApp error:', err);
     alert('Error entering app: ' + err.message);
@@ -1434,7 +1675,6 @@ function logout() {
   if(videoTimerInterval) clearInterval(videoTimerInterval);
 }
 
-// ============================== NAV ==============================
 function buildAdminSidebar() {
   document.getElementById('sidebarNav').innerHTML = `
     <div class="nav-section-label">Main</div>
@@ -1449,6 +1689,13 @@ function buildAdminSidebar() {
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/></svg>Training Centres</div>
     <div class="nav-item" data-page="exams" onclick="showPage('exams')">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg>Online Exams</div>
+    <div class="nav-section-label">Management</div>
+    <div class="nav-item" data-page="attendance" onclick="showPage('attendance')">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M16 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="8.5" cy="7" r="4"/><polyline points="17 11 19 13 23 9"/></svg>Attendance</div>
+    <div class="nav-item" data-page="announcements" onclick="showPage('announcements')">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 17H2a3 3 0 0 0 3-3V9a7 7 0 0 1 14 0v5a3 3 0 0 0 3 3zm-8.27 4a2 2 0 0 1-3.46 0"/></svg>Announcements</div>
+    <div class="nav-item" data-page="calendar" onclick="showPage('calendar')">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>Calendar</div>
     <div class="nav-section-label">Administration</div>
     <div class="nav-item" data-page="certificates" onclick="showPage('certificates')">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="8" r="7"/><polyline points="8.21 13.89 7 23 12 20 17 23 15.79 13.88"/></svg>Certificates</div>
@@ -1475,6 +1722,11 @@ function buildStudentSidebar() {
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg>My Exams</div>
     <div class="nav-item" data-page="s-certificate" onclick="showPage('s-certificate')">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="8" r="7"/><polyline points="8.21 13.89 7 23 12 20 17 23 15.79 13.88"/></svg>My Certificate</div>
+    <div class="nav-section-label">Account</div>
+    <div class="nav-item" data-page="s-profile" onclick="showPage('s-profile')">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>My Profile</div>
+    <div class="nav-item" data-page="s-calendar" onclick="showPage('s-calendar')">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>My Calendar</div>
   `;
 }
 
@@ -1483,40 +1735,78 @@ function showPage(pageId) {
   const pg = document.getElementById('page-'+pageId);
   if(pg) pg.classList.add('active');
   document.querySelectorAll('.nav-item').forEach(n => n.classList.remove('active'));
-  const navItem = document.querySelector(`.nav-item[data-page="${pageId}"]`);
+  const navItem = document.querySelector('.nav-item[data-page="'+pageId+'"]');
   if(navItem) navItem.classList.add('active');
   const titles = {
     dashboard:'Dashboard',video:'Video Conference',students:'Student Progress',
     training:'Training Centres',exams:'Online Exams',certificates:'Certificate Tracking',
     reports:'Reports & Analytics',settings:'Settings',
+    attendance:'Attendance Management',announcements:'Announcements',calendar:'Calendar & Schedule',
     's-dashboard':'My Dashboard','s-video':'My Classes','s-progress':'My Progress',
-    's-resources':'My Resources','s-exams':'My Exams','s-certificate':'My Certificate'
+    's-resources':'My Resources','s-exams':'My Exams','s-certificate':'My Certificate',
+    's-profile':'My Profile','s-calendar':'My Calendar'
   };
   document.getElementById('topbarTitle').textContent = titles[pageId]||pageId;
+  setTimeout(animateAllCounters, 50);
 }
 
-// ============================== BUILD ADMIN PAGES ==============================
 function buildAdminPages() {
+  const totalEnrolled = students.length;
+  const totalCertified = students.filter(s=>s.stage==='certified'||s.stage==='collected').length;
+  const upcomingExams = exams.filter(e=>e.status==='upcoming').length;
+  const topPerformers = [...students].sort((a,b)=>parseFloat(b.gpa)-parseFloat(a.gpa)).slice(0,5);
+  const incompleteCount = students.filter(s=>s.stage==='incomplete').length;
+  const lowAttendance = students.filter(s=>s.attendance<70).length;
+  const pendingCerts = students.filter(s=>s.stage==='certified'&&!s.certCollected).length;
+  const nextExam = exams.filter(e=>e.status==='upcoming').sort((a,b)=>a.date.localeCompare(b.date))[0];
   const mc = document.getElementById('mainContent');
   mc.innerHTML = `
-  <!-- DASHBOARD -->
   <section class="page active" id="page-dashboard">
     <div class="stats-grid">
-      <div class="stat-card"><div class="stat-icon" style="background:var(--blue-dim);color:var(--blue);">👥</div><div class="stat-value">1,247</div><div class="stat-label">Total Enrolled Students</div><div class="stat-change" style="color:var(--green);">↑ 12% this quarter</div></div>
-      <div class="stat-card"><div class="stat-icon" style="background:var(--green-dim);color:var(--green);">🎓</div><div class="stat-value">384</div><div class="stat-label">Certified This Year</div><div class="stat-change" style="color:var(--green);">↑ 8% vs last year</div></div>
-      <div class="stat-card"><div class="stat-icon" style="background:var(--accent-dim);color:var(--accent);">📝</div><div class="stat-value">12</div><div class="stat-label">Upcoming Exams</div><div class="stat-change" style="color:var(--text-muted);">Next: Feb 18</div></div>
-      <div class="stat-card"><div class="stat-icon" style="background:var(--purple-dim);color:var(--purple);">📹</div><div class="stat-value">3</div><div class="stat-label">Live Classes Now</div><div class="stat-change" style="color:var(--red);"><span class="live-dot"></span>&nbsp;In Session</div></div>
+      <div class="stat-card"><div class="stat-icon" style="background:var(--blue-dim);color:var(--blue);">\uD83D\uDC65</div><div class="stat-value" data-count="${totalEnrolled}">0</div><div class="stat-label">Total Enrolled Students</div><div class="stat-change" style="color:var(--green);">\u2191 12% this quarter</div></div>
+      <div class="stat-card"><div class="stat-icon" style="background:var(--green-dim);color:var(--green);">\uD83C\uDF93</div><div class="stat-value" data-count="${totalCertified}">0</div><div class="stat-label">Certified This Year</div><div class="stat-change" style="color:var(--green);">\u2191 8% vs last year</div></div>
+      <div class="stat-card"><div class="stat-icon" style="background:var(--accent-dim);color:var(--accent);">\uD83D\uDCDD</div><div class="stat-value" data-count="${upcomingExams}">0</div><div class="stat-label">Upcoming Exams</div><div class="stat-change" style="color:var(--text-muted);">Next: ${nextExam?nextExam.date.slice(5):''}</div></div>
+      <div class="stat-card"><div class="stat-icon" style="background:var(--purple-dim);color:var(--purple);">\uD83D\uDCF9</div><div class="stat-value" data-count="3">0</div><div class="stat-label">Live Classes Now</div><div class="stat-change" style="color:var(--red);"><span class="live-dot"></span>&nbsp;In Session</div></div>
     </div>
-    <div class="card"><div class="card-header"><h3>Student Progress Pipeline</h3><button class="btn btn-secondary btn-sm" onclick="showPage('students')">View All →</button></div>
+    <div class="quick-actions">
+      <div class="quick-action-btn" onclick="openModal('addStudentModal')"><div class="qa-icon">\uD83D\uDC64</div><div class="qa-label">Add Student</div></div>
+      <div class="quick-action-btn" onclick="openModal('createExamModal')"><div class="qa-icon">\uD83D\uDCDD</div><div class="qa-label">Create Exam</div></div>
+      <div class="quick-action-btn" onclick="showPage('announcements')"><div class="qa-icon">\uD83D\uDCE2</div><div class="qa-label">New Announcement</div></div>
+      <div class="quick-action-btn" onclick="exportReportCSV()"><div class="qa-icon">\uD83D\uDCC4</div><div class="qa-label">Export Report</div></div>
+      <div class="quick-action-btn" onclick="showPage('attendance')"><div class="qa-icon">\u2705</div><div class="qa-label">Take Attendance</div></div>
+      <div class="quick-action-btn" onclick="showPage('calendar')"><div class="qa-icon">\uD83D\uDCC5</div><div class="qa-label">View Calendar</div></div>
+    </div>
+    <div class="card"><div class="card-header"><h3>Student Progress Pipeline</h3><button class="btn btn-secondary btn-sm" onclick="showPage('students')">View All \u2192</button></div>
       <div class="pipeline"><div class="pipeline-stage s-test"><span class="count" id="pTest">0</span>Testing</div><div class="pipeline-stage s-interview"><span class="count" id="pInterview">0</span>Interview</div><div class="pipeline-stage s-training"><span class="count" id="pTraining">0</span>In Training</div><div class="pipeline-stage s-certified"><span class="count" id="pCertified">0</span>Certified</div><div class="pipeline-stage s-collected"><span class="count" id="pCollected">0</span>Collected</div><div class="pipeline-stage s-incomplete"><span class="count" id="pIncomplete">0</span>Incomplete</div></div>
+    </div>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:18px;">
+      <div class="card"><div class="card-header"><h3>System Alerts</h3></div>
+        <div class="alert-item alert-danger"><div class="alert-icon">\u26A0\uFE0F</div><div class="alert-body"><div class="alert-msg">${lowAttendance} student${lowAttendance!==1?'s':''} below 70% attendance</div><div class="alert-time">Needs attention</div></div></div>
+        <div class="alert-item alert-warning"><div class="alert-icon">\uD83D\uDCDD</div><div class="alert-body"><div class="alert-msg">${upcomingExams} exams scheduled this period</div><div class="alert-time">Review schedule</div></div></div>
+        <div class="alert-item alert-info"><div class="alert-icon">\uD83C\uDF93</div><div class="alert-body"><div class="alert-msg">${pendingCerts} certificates pending collection</div><div class="alert-time">Notify students</div></div></div>
+        <div class="alert-item alert-warning"><div class="alert-icon">\uD83D\uDCCA</div><div class="alert-body"><div class="alert-msg">${incompleteCount} students marked incomplete</div><div class="alert-time">Follow up required</div></div></div>
+        <div class="alert-item alert-info"><div class="alert-icon">\uD83D\uDD04</div><div class="alert-body"><div class="alert-msg">System backup scheduled for tonight</div><div class="alert-time">Automated</div></div></div>
+      </div>
+      <div class="card"><div class="card-header"><h3>Top Performers</h3></div>
+        ${topPerformers.map((s,i) => {
+          const colors = ['linear-gradient(135deg,#f0a500,#d4900a)','linear-gradient(135deg,#bdc3c7,#95a5a6)','linear-gradient(135deg,#e67e22,#d35400)','linear-gradient(135deg,var(--blue),#2980b9)','linear-gradient(135deg,var(--teal),#16a085)'];
+          const initials = s.name.split(' ').map(n=>n[0]).join('');
+          return `<div class="performer-row">
+            <div class="rank ${i<3?'rank-'+(i+1):''}">${i+1}</div>
+            <div class="perf-avatar" style="background:${colors[i]};">${initials}</div>
+            <div class="perf-info"><div class="perf-name">${s.name}</div><div class="perf-course">${s.course}</div></div>
+            <div class="perf-score"><div class="score-val">${s.gpa} GPA</div><div class="score-bar"><div class="score-fill" style="width:${(parseFloat(s.gpa)/4*100).toFixed(0)}%;"></div></div></div>
+          </div>`;
+        }).join('')}
+      </div>
     </div>
     <div style="display:grid;grid-template-columns:1fr 1fr;gap:18px;">
       <div class="card"><div class="card-header"><h3>Recent Activity</h3></div>
         <div style="display:flex;flex-direction:column;gap:12px;">
-          <div style="display:flex;align-items:center;gap:12px;padding:8px 0;border-bottom:1px solid var(--border);"><div style="width:8px;height:8px;border-radius:50%;background:var(--green);flex-shrink:0;"></div><div><div style="font-size:13px;">Keisha Brown completed <strong>Welding Level 2</strong> exam</div><div style="font-size:11px;color:var(--text-muted);">Score: 87% — 15 min ago</div></div></div>
-          <div style="display:flex;align-items:center;gap:12px;padding:8px 0;border-bottom:1px solid var(--border);"><div style="width:8px;height:8px;border-radius:50%;background:var(--blue);flex-shrink:0;"></div><div><div style="font-size:13px;">New class started: <strong>Electrical Installation L3</strong></div><div style="font-size:11px;color:var(--text-muted);">28 students enrolled — 1 hour ago</div></div></div>
-          <div style="display:flex;align-items:center;gap:12px;padding:8px 0;border-bottom:1px solid var(--border);"><div style="width:8px;height:8px;border-radius:50%;background:var(--accent);flex-shrink:0;"></div><div><div style="font-size:13px;">Marlon Davis collected certificate for <strong>Auto Mechanics</strong></div><div style="font-size:11px;color:var(--text-muted);">Certificate #AM-2026-0392 — 3 hours ago</div></div></div>
-          <div style="display:flex;align-items:center;gap:12px;padding:8px 0;"><div style="width:8px;height:8px;border-radius:50%;background:var(--red);flex-shrink:0;"></div><div><div style="font-size:13px;">5 students marked <strong>incomplete</strong> in Cosmetology L1</div><div style="font-size:11px;color:var(--text-muted);">Attendance below threshold — Today</div></div></div>
+          <div style="display:flex;align-items:center;gap:12px;padding:8px 0;border-bottom:1px solid var(--border);"><div style="width:8px;height:8px;border-radius:50%;background:var(--green);flex-shrink:0;"></div><div><div style="font-size:13px;">Keisha Brown completed <strong>Welding Level 2</strong> exam</div><div style="font-size:11px;color:var(--text-muted);">Score: 87% \u2014 15 min ago</div></div></div>
+          <div style="display:flex;align-items:center;gap:12px;padding:8px 0;border-bottom:1px solid var(--border);"><div style="width:8px;height:8px;border-radius:50%;background:var(--blue);flex-shrink:0;"></div><div><div style="font-size:13px;">New class started: <strong>Electrical Installation L3</strong></div><div style="font-size:11px;color:var(--text-muted);">28 students enrolled \u2014 1 hour ago</div></div></div>
+          <div style="display:flex;align-items:center;gap:12px;padding:8px 0;border-bottom:1px solid var(--border);"><div style="width:8px;height:8px;border-radius:50%;background:var(--accent);flex-shrink:0;"></div><div><div style="font-size:13px;">Marlon Davis collected certificate for <strong>Auto Mechanics</strong></div><div style="font-size:11px;color:var(--text-muted);">Certificate #AM-2026-0392 \u2014 3 hours ago</div></div></div>
+          <div style="display:flex;align-items:center;gap:12px;padding:8px 0;"><div style="width:8px;height:8px;border-radius:50%;background:var(--red);flex-shrink:0;"></div><div><div style="font-size:13px;">5 students marked <strong>incomplete</strong> in Cosmetology L1</div><div style="font-size:11px;color:var(--text-muted);">Attendance below threshold \u2014 Today</div></div></div>
         </div>
       </div>
       <div class="card"><div class="card-header"><h3>Certifications by Month</h3></div>
@@ -1562,29 +1852,83 @@ function buildAdminPages() {
     <div class="card"><div class="card-header"><h3>Scheduled Examinations</h3></div><div class="table-wrapper"><table><thead><tr><th>Exam Title</th><th>Course</th><th>Date & Time</th><th>Duration</th><th>Students</th><th>Status</th><th>Actions</th></tr></thead><tbody id="examTableBody"></tbody></table></div></div>
   </section>
 
-  <!-- CERTIFICATES -->
-  <section class="page" id="page-certificates">
-    <div class="cert-status-grid">
-      <div class="cert-stat"><div class="num" style="color:var(--green);">384</div><div style="font-size:12px;color:var(--text-muted);margin-top:4px;">Total Certified</div></div>
-      <div class="cert-stat"><div class="num" style="color:var(--accent);">301</div><div style="font-size:12px;color:var(--text-muted);margin-top:4px;">Certificates Collected</div></div>
-      <div class="cert-stat"><div class="num" style="color:var(--red);">83</div><div style="font-size:12px;color:var(--text-muted);margin-top:4px;">Awaiting Collection</div></div>
-      <div class="cert-stat"><div class="num" style="color:var(--blue);">78%</div><div style="font-size:12px;color:var(--text-muted);margin-top:4px;">Collection Rate</div></div>
+  <section class="page" id="page-attendance">
+    <div class="attendance-summary" id="attendanceSummary"></div>
+    <div style="display:flex;gap:12px;margin-bottom:20px;align-items:center;">
+      <label style="font-size:13px;font-weight:600;">Date:</label>
+      <input type="date" class="form-control" style="width:180px;" id="attendanceDate" value="2026-02-18" onchange="currentAttendanceDate=this.value;renderAttendancePage()">
+      <select class="form-control" style="width:200px;" id="attendanceCourseFilter" onchange="renderAttendancePage()"><option value="all">All Courses</option>${courses.map(c=>'<option>'+c+'</option>').join('')}</select>
+      <button class="btn btn-primary" onclick="saveAttendance()">Save Attendance</button>
+      <button class="btn-export" onclick="exportStudentsCSV()">\uD83D\uDCC4 Export</button>
     </div>
-    <div style="display:flex;gap:12px;margin-bottom:20px;"><select class="form-control" style="width:200px;" id="certFilter" onchange="filterCerts()"><option value="all">All Certificates</option><option value="collected">Collected</option><option value="pending">Awaiting Collection</option></select><input type="text" class="form-control" style="width:260px;" placeholder="Search by name or cert number..." id="certSearch" onkeyup="filterCerts()"></div>
-    <div class="card"><div class="card-header"><h3>Certificate Registry</h3><button class="btn btn-secondary btn-sm">Export CSV</button></div><div class="table-wrapper"><table><thead><tr><th>Student</th><th>Certificate No.</th><th>Programme</th><th>Level</th><th>Date Certified</th><th>Collection Status</th><th>Actions</th></tr></thead><tbody id="certTableBody"></tbody></table></div></div>
+    <div class="card"><div class="card-header"><h3>Daily Attendance</h3><span style="font-size:13px;color:var(--text-muted);" id="attCount"></span></div>
+      <div class="table-wrapper"><table class="attendance-table"><thead><tr><th>Student</th><th>ID</th><th>Course</th><th>Mon</th><th>Tue</th><th>Wed</th><th>Thu</th><th>Fri</th></tr></thead><tbody id="attendanceTableBody"></tbody></table></div>
+    </div>
+    <div class="card"><div class="card-header"><h3>Weekly Attendance Chart</h3></div>
+      <div class="bar-chart" id="weeklyAttChart"></div>
+    </div>
   </section>
 
-  <!-- REPORTS -->
+  <section class="page" id="page-announcements">
+    <div style="display:flex;gap:12px;margin-bottom:20px;align-items:center;">
+      <button class="btn btn-primary" onclick="toggleAnnouncementForm()">+ New Announcement</button>
+      <select class="form-control" style="width:200px;" id="annPriorityFilter" onchange="renderAnnouncements()"><option value="all">All Priorities</option><option value="urgent">Urgent</option><option value="info">Info</option><option value="general">General</option></select>
+    </div>
+    <div id="announcementForm" style="display:none;">
+      <div class="announcement-form">
+        <div class="ann-form-header"><h3>Create Announcement</h3><button class="btn btn-sm btn-secondary" onclick="toggleAnnouncementForm()">\u2715 Close</button></div>
+        <div class="form-group"><label>Title</label><input type="text" class="form-control" id="annTitle" placeholder="Announcement title..."></div>
+        <div class="form-group"><label>Body</label><textarea class="form-control" id="annBody" placeholder="Announcement details..."></textarea></div>
+        <div class="ann-form-row">
+          <div class="form-group"><label>Priority</label><select class="form-control" id="annPriority"><option value="general">General</option><option value="info">Info</option><option value="urgent">Urgent</option></select></div>
+          <div class="form-group"><label>Author</label><input type="text" class="form-control" id="annAuthor" value="Admin"></div>
+        </div>
+        <button class="btn btn-primary" onclick="createAnnouncement()">Publish Announcement</button>
+      </div>
+    </div>
+    <div id="announcementsList"></div>
+  </section>
+
+  <section class="page" id="page-calendar">
+    <div style="display:grid;grid-template-columns:1fr 320px;gap:18px;">
+      <div class="card">
+        <div class="cal-header">
+          <div class="cal-nav"><button onclick="changeCalMonth(-1)">\u2190</button></div>
+          <div class="cal-title" id="calTitle"></div>
+          <div class="cal-nav"><button onclick="changeCalMonth(1)">\u2192</button></div>
+        </div>
+        <div class="calendar-grid" id="calGrid"></div>
+      </div>
+      <div>
+        <div class="card"><div class="card-header"><h3 id="calDayTitle">Select a Day</h3></div><div id="calDayEvents"><p style="font-size:13px;color:var(--text-muted);">Click a day to see events</p></div></div>
+        <button class="btn btn-primary" style="width:100%;margin-top:8px;" onclick="promptAddEvent()">+ Add Event</button>
+        <div class="card" style="margin-top:12px;"><div class="card-header"><h3>All Events</h3></div><div id="calEventList"></div></div>
+      </div>
+    </div>
+  </section>
+
+  <section class="page" id="page-certificates">
+    <div class="cert-status-grid" id="certStats"></div>
+    <div style="display:flex;gap:12px;margin-bottom:20px;"><select class="form-control" style="width:200px;" id="certFilter" onchange="filterCerts()"><option value="all">All Certificates</option><option value="collected">Collected</option><option value="pending">Awaiting Collection</option></select><input type="text" class="form-control" style="width:260px;" placeholder="Search by name or cert number..." id="certSearch" onkeyup="filterCerts()"></div>
+    <div class="card"><div class="card-header"><h3>Certificate Registry</h3><button class="btn-export" onclick="exportCertsCSV()">\uD83D\uDCC4 Export CSV</button></div><div class="table-wrapper"><table><thead><tr><th>Student</th><th>Certificate No.</th><th>Programme</th><th>Level</th><th>Date Certified</th><th>Collection Status</th><th>Actions</th></tr></thead><tbody id="certTableBody"></tbody></table></div></div>
+  </section>
+
   <section class="page" id="page-reports">
-    <div class="stats-grid">
-      <div class="stat-card"><div class="stat-icon" style="background:var(--green-dim);color:var(--green);">📊</div><div class="stat-value">76%</div><div class="stat-label">Overall Pass Rate</div></div>
-      <div class="stat-card"><div class="stat-icon" style="background:var(--accent-dim);color:var(--accent);">⏱️</div><div class="stat-value">4.2</div><div class="stat-label">Avg. Months to Cert</div></div>
-      <div class="stat-card"><div class="stat-icon" style="background:var(--blue-dim);color:var(--blue);">📈</div><div class="stat-value">89%</div><div class="stat-label">Attendance Rate</div></div>
-      <div class="stat-card"><div class="stat-icon" style="background:var(--red-dim);color:var(--red);">⚠️</div><div class="stat-value">6.7%</div><div class="stat-label">Dropout Rate</div></div>
+    <div class="stats-grid" id="reportStats"></div>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:18px;">
+      <div class="card"><div class="card-header"><h3>Student Stage Distribution</h3><button class="btn-export" onclick="exportReportCSV()">\uD83D\uDCC4 Export</button></div><div id="donutChartContainer" style="display:flex;align-items:center;gap:24px;justify-content:center;"></div></div>
+      <div class="card"><div class="card-header"><h3>Pass Rate by Programme</h3></div><div id="passRateChart"></div></div>
     </div>
     <div style="display:grid;grid-template-columns:1fr 1fr;gap:18px;">
-      <div class="card"><div class="card-header"><h3>Pass Rate by Programme</h3></div><div id="passRateChart"></div></div>
-      <div class="card"><div class="card-header"><h3>Enrollment Trends</h3></div><div class="bar-chart"><div class="bar-col"><div class="bar" style="height:55%;background:var(--blue);"></div><div class="bar-label">Q1</div></div><div class="bar-col"><div class="bar" style="height:70%;background:var(--blue);"></div><div class="bar-label">Q2</div></div><div class="bar-col"><div class="bar" style="height:90%;background:var(--blue);"></div><div class="bar-label">Q3</div></div><div class="bar-col"><div class="bar" style="height:65%;background:var(--accent);"></div><div class="bar-label">Q4</div></div></div></div>
+      <div class="card"><div class="card-header"><h3>Enrollment by Course</h3></div><div id="enrollmentBarChart" class="bar-chart"></div></div>
+      <div class="card"><div class="card-header"><h3>Overall Completion Rate</h3></div><div id="gaugeContainer" style="display:flex;flex-direction:column;align-items:center;gap:24px;padding:20px 0;"></div></div>
+    </div>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:18px;">
+      <div class="card"><div class="card-header"><h3>Attendance Heatmap</h3></div><div id="attendanceHeatmap"></div></div>
+      <div class="card"><div class="card-header"><h3>Gender Distribution</h3></div><div style="display:flex;align-items:center;justify-content:center;gap:32px;padding:20px;">
+        <div style="text-align:center;"><div style="width:80px;height:80px;border-radius:50%;background:var(--blue-dim);display:flex;align-items:center;justify-content:center;font-size:32px;margin:0 auto 8px;">\u2642</div><div style="font-size:20px;font-weight:700;font-family:'Playfair Display',serif;">52%</div><div style="font-size:12px;color:var(--text-muted);">Male</div></div>
+        <div style="text-align:center;"><div style="width:80px;height:80px;border-radius:50%;background:var(--purple-dim);display:flex;align-items:center;justify-content:center;font-size:32px;margin:0 auto 8px;">\u2640</div><div style="font-size:20px;font-weight:700;font-family:'Playfair Display',serif;">48%</div><div style="font-size:12px;color:var(--text-muted);">Female</div></div>
+      </div></div>
     </div>
   </section>
 
@@ -1601,13 +1945,22 @@ function buildAdminPages() {
   </section>
   `;
 
-  // Populate data
   renderStudents(students);
   renderSkills();
   renderExams('upcoming');
   renderCerts('all','');
   renderPassRates();
   updatePipelineCounts();
+  renderCertStats();
+  renderReportStats();
+  renderDonutChart();
+  renderEnrollmentBars();
+  renderGaugeChart();
+  renderAttendanceHeatmap();
+  renderAttendancePage();
+  renderAnnouncements();
+  renderCalendar();
+  renderCalendarEventList();
 }
 
 // ============================== BUILD STUDENT PAGES ==============================
@@ -1686,6 +2039,33 @@ function buildStudentPages() {
         <div class="class-time-block"><div class="time">3:30</div><div class="period">PM</div></div>
         <div style="flex:1;"><div style="font-size:14px;font-weight:600;">Study Group — Exam Prep</div><div style="font-size:12px;color:var(--text-muted);">Self-directed &nbsp;•&nbsp; Library</div></div>
         <span class="badge badge-purple">Optional</span>
+      </div>
+    </div>
+
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:18px;">
+      <div class="card"><div class="card-header"><h3>Announcements</h3><button class="btn btn-sm btn-secondary" onclick="showPage('s-profile')">View All</button></div>
+        ${announcements.slice(0,3).map(a => `
+          <div style="padding:10px 0;border-bottom:1px solid var(--border);">
+            <div style="display:flex;align-items:center;gap:8px;margin-bottom:4px;">
+              <span class="announcement-badge badge-${a.priority}">${a.priority}</span>
+              <span style="font-size:13px;font-weight:600;">${a.title}</span>
+            </div>
+            <div style="font-size:12px;color:var(--text-muted);">${a.body.substring(0,80)}...</div>
+          </div>
+        `).join('')}
+      </div>
+      <div class="card"><div class="card-header"><h3>Upcoming Deadlines</h3></div>
+        <div class="deadline-item"><div class="dl-indicator dl-warning"></div><div class="dl-info"><div class="dl-title">Workshop Portfolio</div><div class="dl-meta">${s.course} \u2014 Feb 22</div></div><div class="dl-countdown dl-soon"><div class="dl-time">4</div><div class="dl-unit">days</div></div></div>
+        <div class="deadline-item"><div class="dl-indicator dl-normal"></div><div class="dl-info"><div class="dl-title">Final Project</div><div class="dl-meta">${s.course} \u2014 Mar 5</div></div><div class="dl-countdown dl-ok"><div class="dl-time">15</div><div class="dl-unit">days</div></div></div>
+        <div class="deadline-item"><div class="dl-indicator dl-normal"></div><div class="dl-info"><div class="dl-title">Mid-Term Review</div><div class="dl-meta">${s.course} \u2014 Mar 10</div></div><div class="dl-countdown dl-ok"><div class="dl-time">20</div><div class="dl-unit">days</div></div></div>
+      </div>
+    </div>
+
+    <div class="card"><div class="card-header"><h3>Performance Trend</h3><span class="trend-indicator trend-up">+4.2%</span></div>
+      <div style="display:flex;align-items:center;gap:16px;">
+        <span style="font-size:12px;color:var(--text-muted);">Last 5 scores:</span>
+        <div class="sparkline">${[92,88,76,85,parseInt(s.score)||82].map(v => `<div class="spark-bar" style="height:${v*0.24}px;${v>=85?'background:var(--green);':''}"></div>`).join('')}</div>
+        <span style="font-size:13px;font-weight:600;">Avg: ${Math.round([92,88,76,85,parseInt(s.score)||82].reduce((a,b)=>a+b,0)/5)}%</span>
       </div>
     </div>
   </section>
@@ -1848,11 +2228,67 @@ function buildStudentPages() {
       </div>
     `}
   </section>
+
+  <section class="page" id="page-s-profile">
+    <div class="profile-header">
+      <div class="profile-avatar" style="background:linear-gradient(135deg,var(--blue),var(--teal));">${s.name.split(' ').map(n=>n[0]).join('')}</div>
+      <div class="profile-details">
+        <h2>${s.name}</h2>
+        <div class="profile-subtitle">${s.course} Programme</div>
+        <div class="profile-meta">
+          <span>\uD83C\uDD94 ${s.id}</span>
+          <span>\uD83D\uDC68\u200D\uD83C\uDFEB ${s.instructor}</span>
+          <span>\uD83D\uDCCD HEART/NSTA Trust</span>
+        </div>
+      </div>
+      <button class="btn btn-secondary" onclick="showToast('Profile updated!')">Edit Profile</button>
+    </div>
+    <div class="stats-grid" style="grid-template-columns:repeat(4,1fr);">
+      <div class="profile-stat"><div class="ps-value" style="color:var(--green);">${s.gpa}</div><div class="ps-label">GPA</div></div>
+      <div class="profile-stat"><div class="ps-value" style="color:var(--blue);">${s.attendance}%</div><div class="ps-label">Attendance</div></div>
+      <div class="profile-stat"><div class="ps-value" style="color:var(--accent);">${s.assignments}/${s.assignmentsTotal}</div><div class="ps-label">Assignments</div></div>
+      <div class="profile-stat"><div class="ps-value" style="color:${s.stage==='certified'||s.stage==='collected'?'var(--green)':'var(--accent)'};">${stageLabels[s.stage]}</div><div class="ps-label">Current Stage</div></div>
+    </div>
+    <div class="profile-info-grid">
+      <div class="info-section">
+        <h4>Personal Information</h4>
+        <div class="info-row"><span class="info-label">Full Name</span><span class="info-value">${s.name}</span></div>
+        <div class="info-row"><span class="info-label">Student ID</span><span class="info-value">${s.id}</span></div>
+        <div class="info-row"><span class="info-label">Email</span><span class="info-value">${s.name.split(' ')[0].toLowerCase()}.${s.name.split(' ')[1]?s.name.split(' ')[1].toLowerCase():''}@student.heartlms.edu.jm</span></div>
+        <div class="info-row"><span class="info-label">Phone</span><span class="info-value">+1 (876) ${String(Math.floor(Math.random()*900)+100)}-${String(Math.floor(Math.random()*9000)+1000)}</span></div>
+      </div>
+      <div class="info-section">
+        <h4>Academic Information</h4>
+        <div class="info-row"><span class="info-label">Programme</span><span class="info-value">${s.course}</span></div>
+        <div class="info-row"><span class="info-label">Instructor</span><span class="info-value">${s.instructor}</span></div>
+        <div class="info-row"><span class="info-label">Enrolled Since</span><span class="info-value">Sep 2025</span></div>
+        <div class="info-row"><span class="info-label">Expected Completion</span><span class="info-value">Jun 2026</span></div>
+      </div>
+    </div>
+  </section>
+
+  <section class="page" id="page-s-calendar">
+    <div style="display:grid;grid-template-columns:1fr 300px;gap:18px;">
+      <div class="card">
+        <div class="cal-header">
+          <div class="cal-nav"><button onclick="changeCalMonth(-1)">\u2190</button></div>
+          <div class="cal-title" id="sCalTitle"></div>
+          <div class="cal-nav"><button onclick="changeCalMonth(1)">\u2192</button></div>
+        </div>
+        <div class="calendar-grid" id="sCalGrid"></div>
+      </div>
+      <div>
+        <div class="card"><div class="card-header"><h3 id="sCalDayTitle">Select a Day</h3></div><div id="sCalDayEvents"><p style="font-size:13px;color:var(--text-muted);">Click a day to see events</p></div></div>
+        <div class="card" style="margin-top:12px;"><div class="card-header"><h3>My Events</h3></div><div id="sCalEventList"></div></div>
+      </div>
+    </div>
+  </section>
   `;
   } catch(err) {
     console.error('buildStudentPages error:', err);
     document.getElementById('mainContent').innerHTML = '<div class="card" style="margin:40px;padding:40px;text-align:center;"><h3>Error loading student portal</h3><p style="color:var(--text-muted);margin-top:8px;">'+err.message+'</p><button class="btn btn-primary" style="margin-top:16px;" onclick="logout()">Go Back</button></div>';
   }
+  renderStudentCalendar();
 }
 
 function hexToRgb(hex) {
@@ -1995,6 +2431,7 @@ function updateStudentStage(idx) {
   if(newStage==='incomplete')students[idx].progress=Math.min(students[idx].progress,40);
   closeModal('updateStageModal');filterStudents();updatePipelineCounts();
   showToast(`${students[idx].name} moved to ${stageLabels[newStage]}`);
+  saveState();
 }
 function updatePipelineCounts() {
   stages.forEach(s => {
@@ -2007,6 +2444,7 @@ function addStudent() {
   if(!name){alert('Please enter a name');return;}
   students.unshift({id:'STU-'+String(2026000+students.length),name,stage:document.getElementById('newStudentStage').value,course:document.getElementById('newStudentCourse').value,score:'',progress:10,certNo:null,certDate:null,certCollected:false,attendance:0,assignments:0,assignmentsTotal:8,gpa:'0.0',instructor:'Mr. R. Campbell'});
   closeModal('addStudentModal');filterStudents();updatePipelineCounts();showToast(`${name} added!`);document.getElementById('newStudentName').value='';
+  saveState();
 }
 
 function renderSkills() {
@@ -2038,6 +2476,7 @@ function createExam() {
   if(!title){alert('Please enter exam title');return;}
   exams.unshift({title,course:document.getElementById('examCourse').value,date:document.getElementById('examDate').value||'2026-03-15',time:document.getElementById('examTime').value||'09:00',duration:parseInt(document.getElementById('examDuration').value)||90,students:0,status:'upcoming',questions:parseInt(document.getElementById('examQuestions').value)||50,passMark:parseInt(document.getElementById('examPassMark').value)||60});
   closeModal('createExamModal');renderExams('upcoming');showToast(`Exam "${title}" scheduled!`);document.getElementById('examTitle').value='';
+  saveState();
 }
 
 function renderCerts(filter,search) {
@@ -2050,7 +2489,7 @@ function renderCerts(filter,search) {
   tbody.innerHTML = certs.map(s=>`<tr><td><strong>${s.name}</strong></td><td style="font-family:monospace;font-size:12px;">${s.certNo}</td><td>${s.course}</td><td>Level ${Math.floor(Math.random()*3)+1}</td><td>${s.certDate}</td><td>${s.certCollected?'<span class="badge badge-green"><span class="badge-dot"></span>Collected</span>':'<span class="badge badge-amber"><span class="badge-dot"></span>Pending</span>'}</td><td>${!s.certCollected?`<button class="btn btn-sm btn-success" onclick="markCollected(${students.indexOf(s)})">Mark Collected</button>`:'<span style="font-size:12px;color:var(--text-muted);">✓ Done</span>'}</td></tr>`).join('');
 }
 function filterCerts() { renderCerts(document.getElementById('certFilter')?.value,document.getElementById('certSearch')?.value?.toLowerCase()); }
-function markCollected(idx) { students[idx].certCollected=true;students[idx].stage='collected';students[idx].progress=100;filterCerts();updatePipelineCounts();showToast(`Certificate collected: ${students[idx].name}`); }
+function markCollected(idx) { students[idx].certCollected=true;students[idx].stage='collected';students[idx].progress=100;filterCerts();updatePipelineCounts();renderCertStats();showToast(`Certificate collected: ${students[idx].name}`);saveState(); }
 
 function renderPassRates() {
   const progs=[{name:'Welding',rate:82},{name:'Electrical',rate:76},{name:'Cosmetology',rate:88},{name:'Business Admin',rate:71},{name:'Auto Mechanics',rate:79},{name:'Hospitality',rate:90},{name:'IT',rate:72},{name:'Plumbing',rate:84}];
@@ -2059,16 +2498,359 @@ function renderPassRates() {
   el.innerHTML = progs.map(p=>`<div style="display:flex;align-items:center;gap:12px;"><div style="width:100px;font-size:12px;color:var(--text-secondary);text-align:right;">${p.name}</div><div class="progress-bar" style="flex:1;height:10px;"><div class="fill" style="width:${p.rate}%;background:${p.rate>=80?'var(--green)':p.rate>=70?'var(--accent)':'var(--red)'};border-radius:5px;"></div></div><div style="width:40px;font-size:12px;font-weight:700;color:${p.rate>=80?'var(--green)':p.rate>=70?'var(--accent)':'var(--red)'};">${p.rate}%</div></div>`).join('');
 }
 
-// ============================== UTILITIES ==============================
+function renderCertStats() {
+  const el = document.getElementById('certStats');
+  if(!el) return;
+  const totalCert = students.filter(s=>s.certNo).length;
+  const collected = students.filter(s=>s.certCollected).length;
+  const pending = totalCert - collected;
+  const rate = totalCert > 0 ? Math.round(collected/totalCert*100) : 0;
+  el.innerHTML = `
+    <div class="cert-stat"><div class="num" style="color:var(--green);">${totalCert}</div><div style="font-size:12px;color:var(--text-muted);margin-top:4px;">Total Certified</div></div>
+    <div class="cert-stat"><div class="num" style="color:var(--accent);">${collected}</div><div style="font-size:12px;color:var(--text-muted);margin-top:4px;">Certificates Collected</div></div>
+    <div class="cert-stat"><div class="num" style="color:var(--red);">${pending}</div><div style="font-size:12px;color:var(--text-muted);margin-top:4px;">Awaiting Collection</div></div>
+    <div class="cert-stat"><div class="num" style="color:var(--blue);">${rate}%</div><div style="font-size:12px;color:var(--text-muted);margin-top:4px;">Collection Rate</div></div>
+  `;
+}
+
+function renderReportStats() {
+  const el = document.getElementById('reportStats');
+  if(!el) return;
+  const avgAtt = students.length ? Math.round(students.reduce((a,s)=>a+s.attendance,0)/students.length) : 0;
+  const dropoutRate = students.length ? (students.filter(s=>s.stage==='incomplete').length/students.length*100).toFixed(1) : 0;
+  el.innerHTML = `
+    <div class="stat-card"><div class="stat-icon" style="background:var(--green-dim);color:var(--green);">\uD83D\uDCCA</div><div class="stat-value" data-count="76" data-suffix="%">0</div><div class="stat-label">Overall Pass Rate</div></div>
+    <div class="stat-card"><div class="stat-icon" style="background:var(--accent-dim);color:var(--accent);">\u23F1\uFE0F</div><div class="stat-value" data-count="4.2">0</div><div class="stat-label">Avg. Months to Cert</div></div>
+    <div class="stat-card"><div class="stat-icon" style="background:var(--blue-dim);color:var(--blue);">\uD83D\uDCC8</div><div class="stat-value" data-count="${avgAtt}" data-suffix="%">0</div><div class="stat-label">Attendance Rate</div></div>
+    <div class="stat-card"><div class="stat-icon" style="background:var(--red-dim);color:var(--red);">\u26A0\uFE0F</div><div class="stat-value" data-count="${dropoutRate}" data-suffix="%">0</div><div class="stat-label">Dropout Rate</div></div>
+  `;
+}
+
+function renderDonutChart() {
+  const el = document.getElementById('donutChartContainer');
+  if(!el) return;
+  const counts = {};
+  stages.forEach(st => counts[st] = students.filter(s=>s.stage===st).length);
+  const total = students.length;
+  const colors = {testing:'var(--blue)',interview:'var(--purple)',training:'var(--accent)',certified:'var(--green)',collected:'#27ae60',incomplete:'var(--red)'};
+  let gradientParts = [];
+  let cumPct = 0;
+  stages.forEach(st => {
+    const pct = total > 0 ? (counts[st]/total)*100 : 0;
+    gradientParts.push(`${colors[st]} ${cumPct}% ${cumPct+pct}%`);
+    cumPct += pct;
+  });
+  el.innerHTML = `
+    <div class="donut-chart" style="background:conic-gradient(${gradientParts.join(',')});">
+      <div class="donut-hole"><div class="donut-val">${total}</div><div class="donut-label">Students</div></div>
+    </div>
+    <div style="display:flex;flex-direction:column;gap:6px;">
+      ${stages.map(st => `<div class="donut-legend-item"><div class="donut-color" style="background:${colors[st]};"></div>${stageLabels[st]}: ${counts[st]}</div>`).join('')}
+    </div>
+  `;
+}
+
+function renderEnrollmentBars() {
+  const el = document.getElementById('enrollmentBarChart');
+  if(!el) return;
+  const courseCounts = courses.map(c => ({name:c.substring(0,8),count:students.filter(s=>s.course===c).length}));
+  const maxC = Math.max(...courseCounts.map(c=>c.count),1);
+  el.innerHTML = courseCounts.map(c =>
+    `<div class="bar-col"><div class="bar" style="height:${(c.count/maxC*100).toFixed(0)}%;background:var(--blue);"></div><div class="bar-label">${c.name}</div></div>`
+  ).join('');
+}
+
+function renderGaugeChart() {
+  const el = document.getElementById('gaugeContainer');
+  if(!el) return;
+  const completionRate = students.length > 0 ? Math.round(students.filter(s=>s.stage==='certified'||s.stage==='collected').length / students.length * 100) : 0;
+  const rotation = (completionRate / 100) * 180;
+  el.innerHTML = `
+    <div class="gauge-chart">
+      <div class="gauge-bg"></div>
+      <div class="gauge-fill" style="background:var(--green);transform:rotate(${rotation-180}deg);"></div>
+      <div class="gauge-cover"></div>
+      <div class="gauge-value">${completionRate}%</div>
+      <div class="gauge-min">0%</div>
+      <div class="gauge-max">100%</div>
+    </div>
+    <div class="gauge-label" style="font-size:12px;color:var(--text-muted);margin-top:20px;">Overall Completion Rate</div>
+  `;
+}
+
+function renderAttendanceHeatmap() {
+  const el = document.getElementById('attendanceHeatmap');
+  if(!el) return;
+  const days = ['Mon','Tue','Wed','Thu','Fri'];
+  let html = '';
+  courses.forEach(c => {
+    const courseStudents = attendanceRecords.filter(r=>r.course===c);
+    html += `<div class="heatmap-label">${c}</div><div class="heatmap-grid" style="grid-template-columns:repeat(5,1fr);margin-bottom:8px;">`;
+    days.forEach(d => {
+      const present = courseStudents.filter(r=>r.days[d]==='present').length;
+      const total = courseStudents.length || 1;
+      const pct = present/total;
+      const heat = pct >= 0.9 ? 'heat-4' : pct >= 0.75 ? 'heat-3' : pct >= 0.6 ? 'heat-2' : pct >= 0.4 ? 'heat-1' : 'heat-absent';
+      html += `<div class="heatmap-cell ${heat}" title="${c} ${d}: ${Math.round(pct*100)}%"></div>`;
+    });
+    html += '</div>';
+  });
+  html += `<div style="display:flex;gap:4px;margin-top:8px;font-size:10px;color:var(--text-muted);">${days.map(d=>`<div style="flex:1;text-align:center;">${d}</div>`).join('')}</div>`;
+  el.innerHTML = html;
+}
+
+function renderAttendancePage() {
+  const tbody = document.getElementById('attendanceTableBody');
+  if(!tbody) return;
+  const courseFilter = document.getElementById('attendanceCourseFilter')?.value || 'all';
+  let records = [...attendanceRecords];
+  if(courseFilter && courseFilter !== 'all') records = records.filter(r=>r.course===courseFilter);
+  const days = ['Mon','Tue','Wed','Thu','Fri'];
+  tbody.innerHTML = records.slice(0,40).map((r,idx) => {
+    return `<tr><td><strong>${r.studentName}</strong></td><td style="font-family:monospace;font-size:12px;">${r.studentId}</td><td>${r.course}</td>
+    ${days.map(d => {
+      const st = r.days[d];
+      return `<td><select class="form-control" style="width:90px;padding:4px 6px;font-size:11px;" data-sid="${r.studentId}" data-day="${d}" onchange="updateAttendanceCell(this)">
+        <option value="present" ${st==='present'?'selected':''}>Present</option>
+        <option value="absent" ${st==='absent'?'selected':''}>Absent</option>
+        <option value="late" ${st==='late'?'selected':''}>Late</option>
+      </select></td>`;
+    }).join('')}</tr>`;
+  }).join('');
+  const countEl = document.getElementById('attCount');
+  if(countEl) countEl.textContent = `${records.length} students`;
+  renderAttendanceSummary(records);
+  renderWeeklyAttChart(records);
+}
+
+function renderAttendanceSummary(records) {
+  const el = document.getElementById('attendanceSummary');
+  if(!el) return;
+  const days = ['Mon','Tue','Wed','Thu','Fri'];
+  let totalPresent = 0, totalAbsent = 0, totalLate = 0, totalSlots = 0;
+  records.forEach(r => {
+    days.forEach(d => {
+      totalSlots++;
+      if(r.days[d]==='present') totalPresent++;
+      else if(r.days[d]==='absent') totalAbsent++;
+      else totalLate++;
+    });
+  });
+  const pctPresent = totalSlots > 0 ? Math.round(totalPresent/totalSlots*100) : 0;
+  el.innerHTML = `
+    <div class="att-stat"><div class="att-dot" style="background:var(--green);"></div><div><div class="att-val">${pctPresent}%</div><div class="att-label">Present Today</div></div></div>
+    <div class="att-stat"><div class="att-dot" style="background:var(--red);"></div><div><div class="att-val">${totalAbsent}</div><div class="att-label">Total Absences</div></div></div>
+    <div class="att-stat"><div class="att-dot" style="background:var(--accent);"></div><div><div class="att-val">${totalLate}</div><div class="att-label">Late Arrivals</div></div></div>
+    <div class="att-stat"><div class="att-dot" style="background:var(--blue);"></div><div><div class="att-val">${records.length}</div><div class="att-label">Students Tracked</div></div></div>
+  `;
+}
+
+function renderWeeklyAttChart(records) {
+  const el = document.getElementById('weeklyAttChart');
+  if(!el) return;
+  const days = ['Mon','Tue','Wed','Thu','Fri'];
+  const maxR = records.length || 1;
+  el.innerHTML = days.map(d => {
+    const present = records.filter(r=>r.days[d]==='present').length;
+    const pct = (present/maxR*100).toFixed(0);
+    return `<div class="bar-col"><div class="bar" style="height:${pct}%;background:var(--green);"></div><div class="bar-label">${d} (${pct}%)</div></div>`;
+  }).join('');
+}
+
+function updateAttendanceCell(sel) {
+  const sid = sel.getAttribute('data-sid');
+  const day = sel.getAttribute('data-day');
+  const rec = attendanceRecords.find(r=>r.studentId===sid);
+  if(rec) rec.days[day] = sel.value;
+}
+
+function saveAttendance() {
+  saveState();
+  showToast('Attendance saved!');
+  const courseFilter = document.getElementById('attendanceCourseFilter')?.value || 'all';
+  let records = courseFilter==='all' ? attendanceRecords : attendanceRecords.filter(r=>r.course===courseFilter);
+  renderAttendanceSummary(records);
+  renderWeeklyAttChart(records);
+}
+
+function toggleAnnouncementForm() {
+  announcementFormVisible = !announcementFormVisible;
+  const form = document.getElementById('announcementForm');
+  if(form) form.style.display = announcementFormVisible ? 'block' : 'none';
+}
+
+function createAnnouncement() {
+  const title = document.getElementById('annTitle')?.value.trim();
+  const body = document.getElementById('annBody')?.value.trim();
+  if(!title || !body) { alert('Please fill in title and body'); return; }
+  const priority = document.getElementById('annPriority')?.value || 'general';
+  const author = document.getElementById('annAuthor')?.value || 'Admin';
+  announcements.unshift({
+    id: Date.now(), title, body, priority, date: '2026-02-18', author, forRoles: ['admin','student']
+  });
+  document.getElementById('annTitle').value = '';
+  document.getElementById('annBody').value = '';
+  toggleAnnouncementForm();
+  renderAnnouncements();
+  saveState();
+  showToast('Announcement published!');
+}
+
+function deleteAnnouncement(id) {
+  announcements = announcements.filter(a => a.id !== id);
+  renderAnnouncements();
+  saveState();
+  showToast('Announcement deleted');
+}
+
+function renderAnnouncements() {
+  const el = document.getElementById('announcementsList');
+  if(!el) return;
+  const filter = document.getElementById('annPriorityFilter')?.value || 'all';
+  let filtered = filter === 'all' ? announcements : announcements.filter(a=>a.priority===filter);
+  el.innerHTML = filtered.map(a => `
+    <div class="announcement-card priority-${a.priority}">
+      <div class="ann-header">
+        <span class="announcement-badge badge-${a.priority}">${a.priority}</span>
+        <h4>${a.title}</h4>
+        <span class="ann-date">${a.date}</span>
+      </div>
+      <div class="ann-body">${a.body}</div>
+      <div class="ann-footer">
+        <span style="font-size:11px;color:var(--text-muted);">By ${a.author}</span>
+        <button class="btn btn-sm btn-danger" style="margin-left:auto;" onclick="deleteAnnouncement(${a.id})">Delete</button>
+      </div>
+    </div>
+  `).join('');
+}
+
+function renderCalendar() {
+  const titleEl = document.getElementById('calTitle');
+  const gridEl = document.getElementById('calGrid');
+  if(!titleEl || !gridEl) return;
+  renderCalendarGrid(calendarYear, calendarMonth, titleEl, gridEl, 'calDayTitle', 'calDayEvents');
+  renderCalendarEventList();
+}
+
+function renderStudentCalendar() {
+  const titleEl = document.getElementById('sCalTitle');
+  const gridEl = document.getElementById('sCalGrid');
+  if(!titleEl || !gridEl) return;
+  const studentEvents = currentStudent ? calendarEvents.filter(e => {
+    if(e.type==='class' || e.type==='meeting') return true;
+    const examMatch = exams.find(ex => ex.title === e.title && ex.course === currentStudent.course);
+    if(examMatch) return true;
+    if(e.type === 'deadline') return true;
+    return false;
+  }) : calendarEvents;
+  renderCalendarGrid(calendarYear, calendarMonth, titleEl, gridEl, 'sCalDayTitle', 'sCalDayEvents', studentEvents);
+  const eventListEl = document.getElementById('sCalEventList');
+  if(eventListEl) {
+    eventListEl.innerHTML = studentEvents.slice(0,6).map(e =>
+      `<div style="display:flex;align-items:center;gap:10px;padding:8px 0;border-bottom:1px solid var(--border);">
+        <div style="width:8px;height:8px;border-radius:50%;background:${e.color};flex-shrink:0;"></div>
+        <div><div style="font-size:13px;">${e.title}</div><div style="font-size:11px;color:var(--text-muted);">${e.date} @ ${e.time}</div></div>
+      </div>`
+    ).join('');
+  }
+}
+
+function renderCalendarGrid(year, month, titleEl, gridEl, dayTitleId, dayEventsId, eventSource) {
+  const months = ['January','February','March','April','May','June','July','August','September','October','November','December'];
+  titleEl.textContent = months[month] + ' ' + year;
+  const firstDay = new Date(year, month, 1).getDay();
+  const daysInMonth = new Date(year, month+1, 0).getDate();
+  const daysInPrev = new Date(year, month, 0).getDate();
+  const today = new Date();
+  const events = eventSource || calendarEvents;
+  const dayLabels = ['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];
+  let html = dayLabels.map(d => `<div class="cal-day-label">${d}</div>`).join('');
+  for(let i = 0; i < firstDay; i++) {
+    html += `<div class="cal-day cal-other">${daysInPrev - firstDay + i + 1}</div>`;
+  }
+  for(let d = 1; d <= daysInMonth; d++) {
+    const dateStr = `${year}-${String(month+1).padStart(2,'0')}-${String(d).padStart(2,'0')}`;
+    const dayEvents = events.filter(e => e.date === dateStr);
+    const isToday = d === today.getDate() && month === today.getMonth() && year === today.getFullYear();
+    const isSelected = selectedCalendarDay === dateStr;
+    const typeColors = {exam:'dot-red',class:'dot-blue',deadline:'dot-amber',meeting:'dot-green'};
+    html += `<div class="cal-day ${isToday?'cal-today':''} ${isSelected?'cal-selected':''}" onclick="selectCalDay('${dateStr}','${dayTitleId}','${dayEventsId}',${eventSource?'true':'false'})">${d}`;
+    if(dayEvents.length > 0) {
+      html += `<div class="cal-dots">${dayEvents.slice(0,3).map(e => `<div class="cal-event-dot ${typeColors[e.type]||'dot-blue'}"></div>`).join('')}</div>`;
+    }
+    html += '</div>';
+  }
+  const totalCells = firstDay + daysInMonth;
+  const remaining = totalCells % 7 === 0 ? 0 : 7 - (totalCells % 7);
+  for(let i = 1; i <= remaining; i++) {
+    html += `<div class="cal-day cal-other">${i}</div>`;
+  }
+  gridEl.innerHTML = html;
+}
+
+function selectCalDay(dateStr, titleId, eventsId, isStudent) {
+  selectedCalendarDay = dateStr;
+  const titleEl = document.getElementById(titleId);
+  const eventsEl = document.getElementById(eventsId);
+  if(titleEl) titleEl.textContent = dateStr;
+  const events = isStudent && currentStudent ?
+    calendarEvents.filter(e => e.date === dateStr && (e.type==='deadline' || e.type==='meeting' || e.type==='class' || exams.find(ex=>ex.title===e.title && ex.course===currentStudent.course))) :
+    calendarEvents.filter(e => e.date === dateStr);
+  if(eventsEl) {
+    eventsEl.innerHTML = events.length === 0 ? '<p style="font-size:13px;color:var(--text-muted);">No events</p>' :
+      events.map(e => `
+        <div style="display:flex;align-items:center;gap:10px;padding:10px 0;border-bottom:1px solid var(--border);">
+          <div style="width:4px;height:32px;border-radius:2px;background:${e.color};flex-shrink:0;"></div>
+          <div><div style="font-size:13px;font-weight:600;">${e.title}</div><div style="font-size:11px;color:var(--text-muted);">${e.time} \u2022 ${e.type}</div></div>
+        </div>
+      `).join('');
+  }
+  if(isStudent) renderStudentCalendar(); else renderCalendar();
+}
+
+function changeCalMonth(delta) {
+  calendarMonth += delta;
+  if(calendarMonth > 11) { calendarMonth = 0; calendarYear++; }
+  if(calendarMonth < 0) { calendarMonth = 11; calendarYear--; }
+  selectedCalendarDay = null;
+  if(currentRole === 'admin') renderCalendar();
+  else renderStudentCalendar();
+}
+
+function renderCalendarEventList() {
+  const el = document.getElementById('calEventList');
+  if(!el) return;
+  el.innerHTML = calendarEvents.sort((a,b)=>a.date.localeCompare(b.date)).map(e =>
+    `<div style="display:flex;align-items:center;gap:10px;padding:8px 0;border-bottom:1px solid var(--border);">
+      <div style="width:8px;height:8px;border-radius:50%;background:${e.color};flex-shrink:0;"></div>
+      <div style="flex:1;"><div style="font-size:13px;">${e.title}</div><div style="font-size:11px;color:var(--text-muted);">${e.date} @ ${e.time}</div></div>
+      <span class="badge ${e.type==='exam'?'badge-red':e.type==='class'?'badge-blue':e.type==='deadline'?'badge-amber':'badge-purple'}" style="font-size:10px;">${e.type}</span>
+    </div>`
+  ).join('');
+}
+
+function promptAddEvent() {
+  const title = prompt('Event title:');
+  if(!title) return;
+  const date = prompt('Date (YYYY-MM-DD):', `${calendarYear}-${String(calendarMonth+1).padStart(2,'0')}-18`);
+  if(!date) return;
+  const time = prompt('Time:', '09:00 AM') || '09:00 AM';
+  const type = prompt('Type (class/exam/deadline/meeting):', 'meeting') || 'meeting';
+  const colors = {class:'var(--blue)',exam:'var(--red)',deadline:'var(--accent)',meeting:'var(--purple)'};
+  calendarEvents.push({title, date, time, type, color: colors[type] || 'var(--blue)'});
+  renderCalendar();
+  saveState();
+  showToast('Event added!');
+}
+
 function openModal(id) { document.getElementById(id).classList.add('active'); }
 function closeModal(id) { document.getElementById(id).classList.remove('active'); }
 function showToast(message) {
   const c = document.getElementById('toastContainer');
-  const t = document.createElement('div'); t.className='toast'; t.innerHTML=`✓ ${message}`;
+  const t = document.createElement('div'); t.className='toast'; t.innerHTML='\u2713 ' + message;
   c.appendChild(t); setTimeout(()=>t.remove(),3000);
 }
 
-// ============================== INIT ==============================
 populateStudentSelect();
 </script>
 </body>
