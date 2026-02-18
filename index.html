@@ -1800,6 +1800,8 @@ let peerNames = {};
 let dataConnections = {};
 let vcCurrentRole = '';
 let vcCurrentUserName = '';
+let activeHostRoom = null; // {code, title, role} - persists when host leaves so they can rejoin
+let vcHostReconnectInterval = null; // interval for participants to reconnect to host
 let calendarMonth = 1;
 let calendarYear = 2026;
 let selectedCalendarDay = null;
@@ -3628,6 +3630,14 @@ function enterVideoRoom(title, role) {
         <button class="vc-btn active" id="vc-lobby-cam" onclick="toggleLobbyDevice('video')" title="Camera">&#x1F4F9;</button>
       </div>
       <div id="vc-status" class="vc-status">Ready to connect</div>
+      ${role !== 'student' && activeHostRoom ? `
+        <div style="text-align:center;background:var(--accent-dim);border:1px solid var(--accent);border-radius:var(--radius);padding:16px;margin-bottom:12px;">
+          <div style="font-size:13px;color:var(--accent);margin-bottom:4px;font-weight:600;">You have an active room</div>
+          <div style="font-family:monospace;font-size:22px;letter-spacing:4px;margin-bottom:10px;color:var(--accent);">${activeHostRoom.code}</div>
+          <button class="btn btn-primary" onclick="vcRejoinRoom('${title.replace(/'/g,"\\'")}','${role}')">Rejoin Room</button>
+          <div style="font-size:11px;color:var(--text-muted);margin-top:8px;">or create a new room below</div>
+        </div>
+      ` : ''}
       ${role !== 'student' ? `
         <div style="text-align:center;">
           <div style="font-size:13px;color:var(--text-muted);margin-bottom:8px;">Start a new session for this class</div>
@@ -3689,6 +3699,7 @@ function vcUpdateStatus(type, message) {
 async function vcCreateRoom(title, role) {
   currentRoomCode = generateRoomCode();
   isRoomHost = true;
+  activeHostRoom = {code: currentRoomCode, title: title, role: role};
   vcUpdateStatus('connecting', 'Creating room...');
 
   try {
@@ -3724,6 +3735,50 @@ async function vcCreateRoom(title, role) {
   }
 }
 
+// ── Rejoin Room as Host ──
+async function vcRejoinRoom(title, role) {
+  if (!activeHostRoom) return;
+  currentRoomCode = activeHostRoom.code;
+  isRoomHost = true;
+  vcUpdateStatus('connecting', 'Rejoining room ' + currentRoomCode + '...');
+
+  try {
+    rtcPeer = new Peer('cestis-' + currentRoomCode + '-host', {
+      config: { iceServers: [{urls:'stun:stun.l.google.com:19302'},{urls:'stun:stun1.l.google.com:19302'}] }
+    });
+
+    rtcPeer.on('open', function() {
+      vcShowConference(title, role);
+      showToast('Rejoined room ' + currentRoomCode + ' as host');
+    });
+
+    rtcPeer.on('call', function(call) {
+      if(localStream) call.answer(localStream); else call.answer();
+      call.on('stream', function(rs) {
+        var pid = call.peer;
+        if(!peerConnections[pid]) peerConnections[pid] = {};
+        peerConnections[pid].media = call;
+        peerConnections[pid].stream = rs;
+        vcAddVideo(pid, rs, peerNames[pid] || 'Participant');
+      });
+      call.on('close', function() { vcRemoveVideo(call.peer); });
+    });
+
+    rtcPeer.on('connection', function(conn) { vcHandleDataConn(conn); });
+
+    rtcPeer.on('error', function(err) {
+      console.error('Peer error:', err);
+      if(err.type === 'unavailable-id') {
+        vcUpdateStatus('error', 'Room host ID is still active. Try again in a moment.');
+      } else {
+        vcUpdateStatus('error', 'Connection error: ' + err.type);
+      }
+    });
+  } catch(err) {
+    vcUpdateStatus('error', 'Failed to rejoin room');
+  }
+}
+
 // ── Join Room ──
 async function vcJoinRoom(title, role) {
   var code = (document.getElementById('vc-join-code')?.value || '').toUpperCase().trim();
@@ -3749,7 +3804,11 @@ async function vcJoinRoom(title, role) {
         dataConnections[hostId] = conn;
         conn.send(JSON.stringify({type:'name', name:vcCurrentUserName, role:vcCurrentRole}));
         conn.on('data', function(data) { vcOnData(data, hostId); });
-        conn.on('close', function() { vcRemoveVideo(hostId); delete peerConnections[hostId]; delete dataConnections[hostId]; vcUpdateParticipants(); });
+        conn.on('close', function() {
+          vcRemoveVideo(hostId); delete peerConnections[hostId]; delete dataConnections[hostId]; vcUpdateParticipants();
+          showToast('Host has disconnected. Waiting for host to return...');
+          vcStartHostReconnect(code, hostId);
+        });
         vcShowConference(title, role);
       });
       conn.on('error', function() { vcUpdateStatus('error', 'Room not found. Check code and try again.'); });
@@ -3788,6 +3847,55 @@ async function vcJoinRoom(title, role) {
   } catch(err) {
     vcUpdateStatus('error', 'Failed to join room');
   }
+}
+
+// ── Participant reconnect to host ──
+function vcStartHostReconnect(code, hostId) {
+  if(vcHostReconnectInterval) clearInterval(vcHostReconnectInterval);
+  var attempts = 0;
+  var maxAttempts = 30; // try for ~5 minutes (every 10s)
+  vcHostReconnectInterval = setInterval(function() {
+    attempts++;
+    if(attempts > maxAttempts || !rtcPeer || rtcPeer.destroyed) {
+      clearInterval(vcHostReconnectInterval);
+      vcHostReconnectInterval = null;
+      showToast('Host did not return. You may leave the room.');
+      return;
+    }
+    // Try to connect to host
+    var conn = rtcPeer.connect(hostId, {reliable:true});
+    conn.on('open', function() {
+      clearInterval(vcHostReconnectInterval);
+      vcHostReconnectInterval = null;
+      if(!peerConnections[hostId]) peerConnections[hostId] = {};
+      peerConnections[hostId].data = conn;
+      dataConnections[hostId] = conn;
+      conn.send(JSON.stringify({type:'name', name:vcCurrentUserName, role:vcCurrentRole}));
+      conn.on('data', function(data) { vcOnData(data, hostId); });
+      conn.on('close', function() {
+        vcRemoveVideo(hostId); delete peerConnections[hostId]; delete dataConnections[hostId]; vcUpdateParticipants();
+        showToast('Host has disconnected again. Waiting for host to return...');
+        vcStartHostReconnect(code, hostId);
+      });
+      // Re-establish media connection
+      if(localStream) {
+        var call = rtcPeer.call(hostId, localStream);
+        call.on('stream', function(rs) {
+          if(!peerConnections[hostId]) peerConnections[hostId] = {};
+          peerConnections[hostId].media = call;
+          peerConnections[hostId].stream = rs;
+          vcAddVideo(hostId, rs, peerNames[hostId] || 'Host');
+        });
+        call.on('close', function() { vcRemoveVideo(hostId); });
+      }
+      showToast('Host has reconnected!');
+    });
+    conn.on('error', function() { /* host not back yet, will retry */ });
+  }, 10000);
+}
+
+function vcStopHostReconnect() {
+  if(vcHostReconnectInterval) { clearInterval(vcHostReconnectInterval); vcHostReconnectInterval = null; }
 }
 
 // ── Handle incoming data connection ──
@@ -3863,6 +3971,11 @@ function vcOnData(raw, fromId) {
     case 'hand-raise':
       showToast(msg.name + (msg.raised ? ' raised their hand' : ' lowered their hand'));
       break;
+    case 'end-meeting':
+      vcStopHostReconnect();
+      alert('The meeting has been ended by the host.');
+      exitVideoRoom(vcCurrentRole);
+      break;
   }
 }
 
@@ -3928,6 +4041,9 @@ function vcShowConference(title, role) {
             ? `<button class="vc-btn" id="vc-hand-btn" onclick="vcToggleHand()" title="Raise Hand">&#x270B;</button>`
             : `<button class="vc-btn" id="vc-rec-btn" onclick="vcToggleRecord()" title="Record Session">&#x23FA;&#xFE0F;</button>`}
           <button class="vc-btn danger" onclick="exitVideoRoom('${role}')" title="Leave Call">&#x1F4DE;</button>
+          ${(role==='instructor' || role==='admin') && isRoomHost
+            ? `<button class="vc-btn danger" onclick="vcEndMeetingForAll()" title="End Meeting for All" style="font-size:11px;width:auto;border-radius:8px;padding:8px 14px;">End All</button>`
+            : ''}
         </div>
       </div>
       <div>
@@ -4094,7 +4210,7 @@ function vcCopyCode() {
 }
 
 // ── Video Recording ──
-const VC_RECORDINGS_FOLDER_ID = '1lNpI00Et1BN5c4eaV5WfQwuQVhCMBtv8';
+const VC_RECORDINGS_FOLDER_ID = '1Yp9aLXGGjhojF1J04QxoNG-9yEgaiS-A';
 let vcRecTimerInterval = null;
 
 function vcGetSupportedMimeType() {
@@ -4351,6 +4467,20 @@ function sendChatMsg(role, sender) {
   input.value = '';
 }
 
+// ── End Meeting for All Participants (Host only) ──
+function vcEndMeetingForAll() {
+  if(!confirm('Are you sure you want to end the meeting for all participants?')) return;
+  // Broadcast end-meeting to all participants
+  Object.keys(dataConnections).forEach(function(pid) {
+    if(dataConnections[pid] && dataConnections[pid].open)
+      dataConnections[pid].send(JSON.stringify({type:'end-meeting'}));
+  });
+  // Clear active room since meeting is intentionally ended
+  activeHostRoom = null;
+  // Small delay to ensure messages are sent before cleanup
+  setTimeout(function() { exitVideoRoom(vcCurrentRole); }, 500);
+}
+
 // ── Exit / Cleanup ──
 function exitVideoRoom(role) {
   // Stop recording if active
@@ -4360,6 +4490,7 @@ function exitVideoRoom(role) {
   vcIsRecording = false;
   if(vcRecordingAudioCtx) { try { vcRecordingAudioCtx.close(); } catch(e){} vcRecordingAudioCtx = null; }
   if(videoTimerInterval) clearInterval(videoTimerInterval);
+  vcStopHostReconnect();
   if(localStream) { localStream.getTracks().forEach(function(t){t.stop();}); localStream = null; }
   if(screenStream) { screenStream.getTracks().forEach(function(t){t.stop();}); screenStream = null; }
 
@@ -4370,6 +4501,8 @@ function exitVideoRoom(role) {
   peerConnections = {}; dataConnections = {}; peerNames = {};
 
   if(rtcPeer) { rtcPeer.destroy(); rtcPeer = null; }
+  // Note: activeHostRoom is intentionally preserved here so instructors can rejoin.
+  // It is only cleared when vcEndMeetingForAll() is called.
   isRoomHost = false; currentRoomCode = '';
 
   var listId = role==='admin' ? 'videoClassList' : role==='instructor' ? 'iVideoClassList' : 'sVideoClassList';
