@@ -6843,158 +6843,233 @@ function detectQuestionsFromText() {
   if(!text.trim()) { alert('No text to parse. Please go back and upload a file.'); return; }
 
   importedQuestions = [];
-  var lines = text.split('\n').map(function(l){return l.trim();}).filter(function(l){return l.length > 0;});
 
-  var currentQuestion = null;
-  var currentOptions = [];
-  var correctAnswerIdx = -1;
+  // ---- Phase 0: Clean & normalize the raw text ----
+  var cleaned = text
+    .replace(/\r\n/g, '\n')
+    .replace(/--- Page Break ---/g, '\n')
+    .replace(/^\s*page\s+\d+\s*(of\s+\d+)?\s*$/gim, '')         // remove page numbers
+    .replace(/^\s*[-─═]{5,}\s*$/gm, '\n')                        // remove horizontal rules
+    .replace(/\n{3,}/g, '\n\n');                                  // collapse excessive blank lines
+
+  var rawLines = cleaned.split('\n');
+
+  // ---- Phase 1: Extract answer key if present at end ----
   var answerKeyMap = {};
-
-  // First pass: look for an answer key section at the bottom
   var answerKeyStart = -1;
-  for(var a=0; a<lines.length; a++) {
-    if(/^(answer\s*key|answers|answer\s*sheet|marking\s*(guide|scheme))\s*[:\-]?\s*$/i.test(lines[a])) {
+  for(var a = 0; a < rawLines.length; a++) {
+    if(/^(answer\s*key|answers|answer\s*sheet|marking\s*(guide|scheme|memo))\s*[:\-]?\s*$/i.test(rawLines[a].trim())) {
       answerKeyStart = a;
       break;
     }
   }
   if(answerKeyStart >= 0) {
-    for(var ak=answerKeyStart+1; ak<lines.length; ak++) {
-      // Match patterns like: 1. B, 1) A, Q1: C, 1. True, 1 - B
-      var akMatch = lines[ak].match(/^\s*(?:Q\.?\s*)?(\d+)\s*[\.\)\:\-]\s*([A-Ea-e]|True|False)\s*$/i);
+    for(var ak = answerKeyStart + 1; ak < rawLines.length; ak++) {
+      var akLine = rawLines[ak].trim();
+      // "1. B", "1) A", "Q1: C", "1 - B", "1. True", also "1 B" or "1.B"
+      var akMatch = akLine.match(/^\s*(?:Q\.?\s*)?(\d+)\s*[\.\)\:\-]?\s*([A-Ha-h]|True|False)\s*$/i);
       if(akMatch) {
-        var qNum = parseInt(akMatch[1]);
-        var ans = akMatch[2].trim();
-        answerKeyMap[qNum] = ans;
+        answerKeyMap[parseInt(akMatch[1])] = akMatch[2].trim();
       }
     }
-    // Remove answer key lines from processing
-    lines = lines.slice(0, answerKeyStart);
+    rawLines = rawLines.slice(0, answerKeyStart);
   }
 
-  var questionNumber = 0;
+  // ---- Phase 2: Classify each line ----
+  //  'question' | 'option_letter' | 'answer_line' | 'blank' | 'text'
+  var LINE_QUESTION     = 1;
+  var LINE_OPTION       = 2;
+  var LINE_ANSWER       = 3;
+  var LINE_BLANK        = 4;
+  var LINE_TEXT          = 5;
 
-  for(var i=0; i<lines.length; i++) {
-    var line = lines[i];
+  // Option regex: A. / A) / (A) / [A] / a: followed by text — letters A–H
+  var optionRe = /^[\(\[]?\s*([A-Ha-h])\s*[\.\)\]\:]\s*(.+)/;
+  // Question regex: must start with Q/Question + number, or just number — text must be 15+ chars
+  // This prevents short values like "4 m³" being detected as questions
+  var questionRe = /^(?:Q\.?\s*)?(?:Question\s*)?(\d+)\s*[\.\)\:\-]\s*(.+)/i;
+  // Answer line: "Answer: B", "Correct: A", "Correct Answer: C"
+  var answerLineRe = /^(?:Answer|Correct|Correct\s+Answer)\s*[\:\-]\s*([A-Ha-h]|True|False)/i;
 
-    // Detect question start patterns:
-    // "1.", "1)", "Q1.", "Q1)", "Q1:", "Question 1:", "1 -", "1."
-    var qMatch = line.match(/^(?:Q\.?\s*)?(?:Question\s*)?(\d+)\s*[\.\)\:\-]\s*(.+)/i);
+  var classified = [];
+  for(var li = 0; li < rawLines.length; li++) {
+    var raw = rawLines[li];
+    var trimmed = raw.trim();
 
-    if(qMatch) {
-      // Save previous question
-      if(currentQuestion) {
-        saveDetectedQuestion(currentQuestion, currentOptions, correctAnswerIdx, answerKeyMap, questionNumber);
-      }
-      questionNumber = parseInt(qMatch[1]);
-      currentQuestion = qMatch[2].trim();
-      currentOptions = [];
-      correctAnswerIdx = -1;
+    if(trimmed.length === 0) {
+      classified.push({type: LINE_BLANK, text: '', num: 0, letter: '', raw: raw});
       continue;
     }
 
-    // Detect option patterns:
-    // "A.", "A)", "(A)", "a.", "a)", "(a)" followed by text
-    var optMatch = line.match(/^[\(\[]?\s*([A-Ea-e])\s*[\.\)\]\:]\s*(.+)/i);
-
-    if(optMatch && currentQuestion) {
-      var optText = optMatch[2].trim();
-      var isMarkedCorrect = false;
-
-      // Check for correct answer markers: *, [correct], (correct), ✓, ✔
-      if(optText.match(/^\*\s*/) || optText.match(/\s*\*\s*$/) ||
-         optText.match(/\[correct\]/i) || optText.match(/\(correct\)/i) ||
-         optText.match(/✓|✔|√/)) {
-        isMarkedCorrect = true;
-        optText = optText.replace(/^\*\s*/, '').replace(/\s*\*\s*$/, '')
-                         .replace(/\s*\[correct\]\s*/i, '').replace(/\s*\(correct\)\s*/i, '')
-                         .replace(/\s*[✓✔√]\s*/g, '').trim();
-      }
-
-      if(isMarkedCorrect) correctAnswerIdx = currentOptions.length;
-      currentOptions.push(optText);
+    // Try answer line first (most specific)
+    var am = trimmed.match(answerLineRe);
+    if(am) {
+      classified.push({type: LINE_ANSWER, text: am[1].trim(), num: 0, letter: '', raw: raw});
       continue;
     }
 
-    // Detect inline answer pattern: "Answer: B" or "Correct: A"
-    var ansMatch = line.match(/^(?:Answer|Correct|Correct Answer)\s*[\:\-]\s*([A-Ea-e]|True|False)/i);
-    if(ansMatch && currentQuestion) {
-      var ansVal = ansMatch[1].trim().toUpperCase();
-      if(ansVal === 'TRUE' || ansVal === 'FALSE') {
-        // Will be handled as T/F
+    // Try option (before question, since "A. text" should be option not question)
+    var om = trimmed.match(optionRe);
+    if(om) {
+      classified.push({type: LINE_OPTION, text: om[2].trim(), num: 0, letter: om[1].toUpperCase(), raw: raw});
+      continue;
+    }
+
+    // Try question — but ONLY if the captured text is long enough to be a real question
+    var qm = trimmed.match(questionRe);
+    if(qm) {
+      var qText = qm[2].trim();
+      var qNum = parseInt(qm[1]);
+      // A real question text should be at least 15 characters or contain a question word
+      // Short texts like "m³", "4 m²", "True" are NOT questions
+      var looksLikeQuestion = qText.length >= 15 ||
+        /\?$/.test(qText) ||
+        /^(what|which|who|where|when|why|how|name|state|list|explain|describe|define|calculate|determine|identify|give|mention|outline|discuss|compare|evaluate|assess|analyse|analyze|differentiate|distinguish|select|choose)/i.test(qText);
+
+      if(looksLikeQuestion) {
+        classified.push({type: LINE_QUESTION, text: qText, num: qNum, letter: '', raw: raw});
+        continue;
+      }
+      // If it doesn't look like a question, fall through to TEXT
+    }
+
+    classified.push({type: LINE_TEXT, text: trimmed, num: 0, letter: '', raw: raw});
+  }
+
+  // ---- Phase 3: Group lines into question blocks ----
+  // A question block starts at a LINE_QUESTION and contains everything until the next LINE_QUESTION
+  var blocks = [];
+  var currentBlock = null;
+
+  for(var ci = 0; ci < classified.length; ci++) {
+    var cl = classified[ci];
+
+    if(cl.type === LINE_QUESTION) {
+      if(currentBlock) blocks.push(currentBlock);
+      currentBlock = { num: cl.num, questionLines: [cl.text], options: [], correctIdx: -1, answerVal: '' };
+    } else if(currentBlock) {
+      if(cl.type === LINE_OPTION) {
+        var optText = cl.text;
+        var markedCorrect = false;
+        // Check for correct markers
+        if(/^\*\s*/.test(optText) || /\s*\*\s*$/.test(optText) ||
+           /\[correct\]/i.test(optText) || /\(correct\)/i.test(optText) ||
+           /[✓✔√]/.test(optText)) {
+          markedCorrect = true;
+          optText = optText.replace(/^\*\s*/, '').replace(/\s*\*\s*$/, '')
+                           .replace(/\s*\[correct\]\s*/gi, '').replace(/\s*\(correct\)\s*/gi, '')
+                           .replace(/\s*[✓✔√]\s*/g, '').trim();
+        }
+        if(markedCorrect) currentBlock.correctIdx = currentBlock.options.length;
+        currentBlock.options.push({letter: cl.letter, text: optText});
+      } else if(cl.type === LINE_ANSWER) {
+        currentBlock.answerVal = cl.text;
+      } else if(cl.type === LINE_TEXT) {
+        // If no options yet, this is continuation of the question text
+        if(currentBlock.options.length === 0) {
+          currentBlock.questionLines.push(cl.text);
+        }
+        // If we already have options, this could be continuation of the last option
+        else {
+          var lastOpt = currentBlock.options[currentBlock.options.length - 1];
+          lastOpt.text += ' ' + cl.text;
+        }
+      }
+      // LINE_BLANK: just skip
+    }
+  }
+  if(currentBlock) blocks.push(currentBlock);
+
+  // ---- Phase 4: Resolve correct answers & build question objects ----
+  for(var bi = 0; bi < blocks.length; bi++) {
+    var b = blocks[bi];
+    var fullText = b.questionLines.join(' ').trim();
+    if(!fullText) continue;
+
+    var q = {
+      id: 'IQ-' + Date.now() + '-' + Math.random().toString(36).substr(2, 4),
+      text: fullText,
+      points: 1,
+      type: 'mcq',
+      options: [],
+      correctAnswer: 0
+    };
+
+    var opts = b.options.map(function(o){ return o.text; });
+    var correctIdx = b.correctIdx;
+
+    // Resolve answer from inline "Answer: X" line
+    if(b.answerVal) {
+      var av = b.answerVal.toUpperCase();
+      if(av === 'TRUE' || av === 'FALSE') {
+        q.type = 'tf';
+        q.correctAnswer = av === 'TRUE';
+        importedQuestions.push(q);
+        continue;
       } else {
-        correctAnswerIdx = ansVal.charCodeAt(0) - 65;
+        // Map letter to option index: find the option with that letter
+        var letterIdx = -1;
+        for(var oi = 0; oi < b.options.length; oi++) {
+          if(b.options[oi].letter === av) { letterIdx = oi; break; }
+        }
+        if(letterIdx >= 0) correctIdx = letterIdx;
+        else correctIdx = av.charCodeAt(0) - 65; // fallback: A=0, B=1...
       }
-      continue;
     }
 
-    // If we have a current question and this line doesn't match any pattern,
-    // append it to the question text (multi-line question)
-    if(currentQuestion && currentOptions.length === 0 && line.length > 5) {
-      currentQuestion += ' ' + line;
+    // Resolve answer from answer key map
+    if(answerKeyMap[b.num] !== undefined) {
+      var keyAns = answerKeyMap[b.num].toUpperCase();
+      if(keyAns === 'TRUE' || keyAns === 'FALSE') {
+        q.type = 'tf';
+        q.correctAnswer = keyAns === 'TRUE';
+        importedQuestions.push(q);
+        continue;
+      } else {
+        var keyLetterIdx = -1;
+        for(var ki = 0; ki < b.options.length; ki++) {
+          if(b.options[ki].letter === keyAns) { keyLetterIdx = ki; break; }
+        }
+        if(keyLetterIdx >= 0) correctIdx = keyLetterIdx;
+        else correctIdx = keyAns.charCodeAt(0) - 65;
+      }
     }
-  }
 
-  // Save last question
-  if(currentQuestion) {
-    saveDetectedQuestion(currentQuestion, currentOptions, correctAnswerIdx, answerKeyMap, questionNumber);
+    // Determine question type
+    if(opts.length >= 2) {
+      // Check if True/False
+      if(opts.length === 2 && /^true$/i.test(opts[0]) && /^false$/i.test(opts[1])) {
+        q.type = 'tf';
+        q.correctAnswer = correctIdx === 0;
+      } else {
+        q.type = 'mcq';
+        q.options = opts;
+        q.correctAnswer = (correctIdx >= 0 && correctIdx < opts.length) ? correctIdx : 0;
+      }
+    } else if(opts.length === 0) {
+      if(fullText.indexOf('___') !== -1) {
+        q.type = 'fill';
+        q.correctAnswer = '';
+      } else {
+        q.type = 'short';
+        q.correctAnswer = '';
+      }
+    } else {
+      // 1 option only — treat as short answer (malformed MCQ)
+      q.type = 'short';
+      q.correctAnswer = '';
+    }
+
+    importedQuestions.push(q);
   }
 
   if(importedQuestions.length === 0) {
-    alert('No questions could be detected. Try editing the text to follow the numbered format (1. Question text) with lettered options (A. Option).');
+    alert('No questions could be detected.\n\nMake sure your questions are numbered like:\n  1. What is the capital of France?\n  A. London\n  B. Paris\n  C. Berlin\n  D. Madrid\n\nThe question text after the number must be at least 15 characters long.');
     return;
   }
 
   renderImportPreview();
   goToImportStep(3);
-}
-
-function saveDetectedQuestion(questionText, options, correctIdx, answerKeyMap, qNum) {
-  var q = {
-    id: 'IQ-' + Date.now() + '-' + Math.random().toString(36).substr(2, 4),
-    text: questionText,
-    points: 1,
-    type: 'mcq',
-    options: [],
-    correctAnswer: 0
-  };
-
-  // Check answer key map
-  if(answerKeyMap[qNum] !== undefined) {
-    var keyAns = answerKeyMap[qNum].toUpperCase();
-    if(keyAns === 'TRUE' || keyAns === 'FALSE') {
-      q.type = 'tf';
-      q.correctAnswer = keyAns === 'TRUE';
-      q.options = [];
-    } else {
-      correctIdx = keyAns.charCodeAt(0) - 65;
-    }
-  }
-
-  if(options.length > 0 && q.type !== 'tf') {
-    // Check if True/False
-    if(options.length === 2 &&
-       options[0].match(/^true$/i) && options[1].match(/^false$/i)) {
-      q.type = 'tf';
-      q.correctAnswer = correctIdx === 0;
-      q.options = [];
-    } else {
-      q.type = 'mcq';
-      q.options = options;
-      q.correctAnswer = correctIdx >= 0 && correctIdx < options.length ? correctIdx : 0;
-    }
-  } else if(options.length === 0 && q.type !== 'tf') {
-    // No options — check if it's fill-in-blank
-    if(questionText.indexOf('___') !== -1 || questionText.indexOf('____') !== -1) {
-      q.type = 'fill';
-      q.correctAnswer = '';
-    } else {
-      q.type = 'short';
-      q.correctAnswer = '';
-    }
-  }
-
-  importedQuestions.push(q);
 }
 
 // ---- Import Preview Rendering ----
