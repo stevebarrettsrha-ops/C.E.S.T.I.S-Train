@@ -10230,8 +10230,9 @@ function setLoginSyncBtnState(syncing) {
 // Pre-login sync: pull data from all Google Drive folders before user logs in
 async function loginPageSync() {
   isLoginPageSync = true;
+  var isAdmin = adminLoginShown;
   setLoginSyncBtnState(true);
-  updateLoginSyncStatus('Connecting to Google Drive...', '');
+  updateLoginSyncStatus(isAdmin ? 'Connecting to Google Drive...' : 'Syncing...', '');
 
   // Step 1: Ensure we have a Google access token
   if (!isCloudConnected || !googleAccessToken) {
@@ -10246,7 +10247,7 @@ async function loginPageSync() {
       try {
         var token = await loginPageGoogleAuth();
         if (!token) {
-          updateLoginSyncStatus('Google sign-in was cancelled or failed.', 'error');
+          updateLoginSyncStatus(isAdmin ? 'Google sign-in was cancelled or failed.' : 'Sign-in cancelled.', 'error');
           setLoginSyncBtnState(false);
           isLoginPageSync = false;
           return;
@@ -10254,7 +10255,7 @@ async function loginPageSync() {
         googleAccessToken = token;
         isCloudConnected = true;
       } catch (err) {
-        updateLoginSyncStatus('Failed to connect: ' + err.message, 'error');
+        updateLoginSyncStatus(isAdmin ? 'Failed to connect: ' + err.message : 'Connection failed. Try again.', 'error');
         setLoginSyncBtnState(false);
         isLoginPageSync = false;
         return;
@@ -10262,7 +10263,9 @@ async function loginPageSync() {
     }
   }
 
-  updateLoginSyncStatus('Connected. Syncing data from all Drive folders...', '');
+  if (isAdmin) {
+    updateLoginSyncStatus('Connected. Syncing data from all Drive folders...', '');
+  }
 
   try {
     var totalMerged = 0;
@@ -10272,7 +10275,9 @@ async function loginPageSync() {
     for (var i = 0; i < ALL_DRIVE_FOLDERS.length; i++) {
       var folder = ALL_DRIVE_FOLDERS[i];
       try {
-        updateLoginSyncStatus('Syncing from ' + folder.label + ' (' + (i + 1) + '/' + ALL_DRIVE_FOLDERS.length + ')...', '');
+        if (isAdmin) {
+          updateLoginSyncStatus('Syncing from ' + folder.label + ' (' + (i + 1) + '/' + ALL_DRIVE_FOLDERS.length + ')...', '');
+        }
         var fileId = await findBackupFileInFolder(folder.id);
         if (fileId) {
           var changed = await silentMergeFromBackup(fileId);
@@ -10286,7 +10291,9 @@ async function loginPageSync() {
 
     // Step 3: Also sync chat-specific data from chat folder
     try {
-      updateLoginSyncStatus('Syncing chat data...', '');
+      if (isAdmin) {
+        updateLoginSyncStatus('Syncing chat data...', '');
+      }
       await lmsChatSyncFromDrive();
     } catch (e) {
       console.warn('[LoginSync] Chat sync error:', e);
@@ -10301,25 +10308,29 @@ async function loginPageSync() {
     lastSyncTime = new Date();
     localStorage.setItem('schoolDashboardLastSyncTime', lastSyncTime.toISOString());
 
-    // Step 6: Show success status
-    var accountCount = userAccounts.length;
-    var statusMsg = 'Sync complete! ' + foldersSynced + ' folder(s) synced. ' + accountCount + ' user account(s) available.';
-    if (totalMerged > 0) {
-      statusMsg += ' New data was merged.';
+    // Step 6: Show success status — detailed for admin, simple for others
+    if (isAdmin) {
+      var accountCount = userAccounts.length;
+      var statusMsg = 'Sync complete! ' + foldersSynced + ' folder(s) synced. ' + accountCount + ' user account(s) available.';
+      if (totalMerged > 0) {
+        statusMsg += ' New data was merged.';
+      }
+      updateLoginSyncStatus(statusMsg, 'success');
+    } else {
+      updateLoginSyncStatus('Sync complete! You may now log in.', 'success');
     }
-    updateLoginSyncStatus(statusMsg, 'success');
 
     console.log('[LoginSync] Pre-login sync complete. Folders synced: ' + foldersSynced + ', Data changed in: ' + totalMerged);
   } catch (err) {
     console.error('[LoginSync] Sync failed:', err);
     if (err.message && (err.message.includes('invalid_token') || err.message.includes('Invalid Credentials'))) {
-      updateLoginSyncStatus('Session expired. Please try again.', 'error');
+      updateLoginSyncStatus(isAdmin ? 'Session expired. Please try again.' : 'Session expired. Try again.', 'error');
       googleAccessToken = null;
       isCloudConnected = false;
       localStorage.removeItem('schoolDashboardGoogleAccessToken');
       localStorage.removeItem('schoolDashboardGoogleTokenExpiry');
     } else {
-      updateLoginSyncStatus('Sync failed: ' + err.message, 'error');
+      updateLoginSyncStatus(isAdmin ? 'Sync failed: ' + err.message : 'Sync failed. Try again.', 'error');
     }
   } finally {
     setLoginSyncBtnState(false);
