@@ -1593,6 +1593,74 @@ textarea.form-control { resize:vertical; min-height:80px; }
   max-width:480px; width:90%; padding:24px; box-shadow:0 20px 60px rgba(0,0,0,0.5);
 }
 
+/* ============================== GMAIL REGISTRATION & VERIFY USERS ============================== */
+.gmail-divider {
+  display:flex; align-items:center; gap:12px; margin:12px 0 8px;
+  font-size:11px; color:var(--text-muted); text-transform:uppercase; letter-spacing:0.5px;
+}
+.gmail-divider::before, .gmail-divider::after {
+  content:''; flex:1; height:1px; background:var(--border-light);
+}
+.gmail-btn {
+  display:flex; align-items:center; justify-content:center; gap:8px;
+  width:100%; padding:10px 16px; border:1px solid var(--border-light);
+  border-radius:8px; background:var(--bg-input); color:var(--text-primary);
+  font-size:13px; font-weight:600; cursor:pointer; transition:all var(--transition);
+}
+.gmail-btn:hover { background:rgba(255,255,255,0.08); border-color:var(--accent); }
+.gmail-btn img, .gmail-btn svg { width:18px; height:18px; }
+.register-link {
+  display:block; text-align:center; margin-top:10px; font-size:12px;
+  color:var(--accent); cursor:pointer; text-decoration:underline;
+}
+.register-link:hover { color:var(--text-primary); }
+/* Registration modal */
+.reg-modal-overlay {
+  position:fixed; top:0; left:0; width:100%; height:100%;
+  background:rgba(0,0,0,0.7); z-index:10002;
+  display:flex; align-items:center; justify-content:center;
+  animation:fadeInModal 0.2s ease;
+}
+@keyframes fadeInModal { from { opacity:0; } to { opacity:1; } }
+.reg-modal {
+  background:var(--bg-card); border:1px solid var(--border);
+  border-radius:var(--radius-lg); max-width:440px; width:92%;
+  padding:32px; box-shadow:0 20px 60px rgba(0,0,0,0.5);
+  animation:slideUp 0.25s ease;
+}
+@keyframes slideUp { from { transform:translateY(20px); opacity:0; } to { transform:translateY(0); opacity:1; } }
+.reg-modal h3 { font-size:20px; margin-bottom:6px; }
+.reg-modal .reg-subtitle { font-size:13px; color:var(--text-muted); margin-bottom:20px; }
+.reg-modal .form-group { margin-bottom:14px; }
+.reg-modal label { font-size:11px; font-weight:600; color:var(--text-secondary); margin-bottom:5px; display:block; text-transform:uppercase; letter-spacing:0.5px; }
+.reg-modal input, .reg-modal select {
+  width:100%; padding:10px 14px; border:1px solid var(--border-light);
+  border-radius:var(--radius-sm); background:var(--bg-input);
+  color:var(--text-primary); font-size:13px; outline:none;
+}
+.reg-modal input:focus, .reg-modal select:focus { border-color:var(--accent); }
+.reg-modal .reg-actions { display:flex; gap:10px; margin-top:20px; }
+.reg-modal .reg-actions button { flex:1; }
+/* Pending approval screen */
+.pending-screen {
+  position:fixed; top:0; left:0; width:100%; height:100%;
+  background:var(--bg-primary); z-index:9999;
+  display:flex; align-items:center; justify-content:center;
+}
+.pending-card {
+  background:var(--bg-card); border:1px solid var(--border);
+  border-radius:var(--radius-lg); max-width:520px; width:92%;
+  padding:48px 40px; text-align:center;
+  box-shadow:0 20px 60px rgba(0,0,0,0.3);
+}
+.pending-card .pending-icon { font-size:64px; margin-bottom:20px; }
+.pending-card h2 { font-size:24px; margin-bottom:8px; color:var(--accent); }
+.pending-card .pending-msg { font-size:14px; color:var(--text-secondary); line-height:1.7; margin-bottom:24px; }
+.pending-card .pending-email { font-size:13px; color:var(--text-muted); margin-bottom:24px; }
+/* Verify users table */
+.verify-action-btns { display:flex; gap:4px; }
+.verify-action-btns button { font-size:12px; }
+
 /* ============================== MOBILE MENU BUTTON & SIDEBAR OVERLAY ============================== */
 .mobile-menu-btn {
   display:none; background:none; border:none; color:var(--text-primary);
@@ -1832,7 +1900,7 @@ textarea.form-control { resize:vertical; min-height:80px; }
         <div class="role-login" id="adminLogin">
           <div class="form-group">
             <label>Admin Username</label>
-            <input type="text" placeholder="admin@heartlms.edu.jm" id="adminUser">
+            <input type="text" placeholder="cestisadmin" id="adminUser">
           </div>
           <div class="form-group">
             <label>Password</label>
@@ -1849,15 +1917,19 @@ textarea.form-control { resize:vertical; min-height:80px; }
         <p>Access your classes, join live sessions, view progress, download resources, and track your certification.</p>
         <div class="role-login" id="studentLogin">
           <div class="form-group">
-            <label>Select Your Name</label>
-            <select id="studentSelect">
-              <option value="">— Choose Student —</option>
-            </select>
+            <label>Email or Username</label>
+            <input type="text" placeholder="your.email@gmail.com" id="studentUser">
           </div>
           <div class="form-group">
-            <label>Student ID</label>
-            <input type="text" placeholder="STU-2026XXX" id="studentId">
+            <label>Password</label>
+            <input type="password" placeholder="••••••••" id="studentPass">
           </div>
+          <div class="gmail-divider">or</div>
+          <button class="gmail-btn" type="button" onclick="gmailSignIn('student')">
+            <svg viewBox="0 0 24 24"><path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92a5.06 5.06 0 0 1-2.2 3.32v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.1z"/><path fill="#34A853" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"/><path fill="#FBBC05" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z"/><path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z"/></svg>
+            Sign in with Google
+          </button>
+          <span class="register-link" onclick="openRegistrationModal('student')">New student? Register here</span>
         </div>
         <button class="role-enter-btn" onclick="handleStudentClick()">Enter as Student →</button>
       </div>
@@ -1869,15 +1941,19 @@ textarea.form-control { resize:vertical; min-height:80px; }
         <p>Manage your classes, track student progress, mark attendance, grade assignments, and schedule sessions.</p>
         <div class="role-login" id="instructorLogin">
           <div class="form-group">
-            <label>Select Instructor</label>
-            <select id="instructorSelect">
-              <option value="">— Choose Instructor —</option>
-            </select>
+            <label>Email or Username</label>
+            <input type="text" placeholder="your.email@gmail.com" id="instructorUser">
           </div>
           <div class="form-group">
-            <label>Staff ID</label>
-            <input type="text" placeholder="INS-2026XXX" id="instructorId">
+            <label>Password</label>
+            <input type="password" placeholder="••••••••" id="instructorPass">
           </div>
+          <div class="gmail-divider">or</div>
+          <button class="gmail-btn" type="button" onclick="gmailSignIn('instructor')">
+            <svg viewBox="0 0 24 24"><path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92a5.06 5.06 0 0 1-2.2 3.32v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.1z"/><path fill="#34A853" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"/><path fill="#FBBC05" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z"/><path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z"/></svg>
+            Sign in with Google
+          </button>
+          <span class="register-link" onclick="openRegistrationModal('instructor')">New instructor? Register here</span>
         </div>
         <button class="role-enter-btn" onclick="handleInstructorClick()">Enter as Instructor →</button>
       </div>
@@ -2413,7 +2489,7 @@ loadState();
 
 // ============================== USER ACCOUNTS MANAGEMENT ==============================
 let userAccounts = [
-  {id:'USR-001',name:'Administrator',role:'admin',username:'admin',password:'admin123',email:'admin@heartlms.edu.jm',programme:'',status:'active',createdAt:'2026-01-01'},
+  {id:'USR-001',name:'Administrator',role:'admin',username:'cestisadmin',password:'cestisadmin123$',email:'admin@heartlms.edu.jm',programme:'',status:'active',createdAt:'2026-01-01'},
   {id:'USR-002',name:'Mr. R. Campbell',role:'instructor',username:'r.campbell',password:'instr123',email:'r.campbell@heartlms.edu.jm',programme:'Welding',status:'active',createdAt:'2026-01-02'},
   {id:'USR-003',name:'Ms. J. Williams',role:'instructor',username:'j.williams',password:'instr123',email:'j.williams@heartlms.edu.jm',programme:'Electrical Installation',status:'active',createdAt:'2026-01-02'},
   {id:'USR-004',name:'Mrs. P. Morgan',role:'instructor',username:'p.morgan',password:'instr123',email:'p.morgan@heartlms.edu.jm',programme:'Business Administration',status:'active',createdAt:'2026-01-02'},
@@ -2836,24 +2912,6 @@ function switchSettingsTab(tab, which) {
   if(which === 'users') renderUserAccountsTable();
 }
 
-function populateStudentSelect() {
-  const sel = document.getElementById('studentSelect');
-  students.forEach((s,i) => {
-    const opt = document.createElement('option');
-    opt.value = i; opt.textContent = s.name + ' \u2014 ' + s.course;
-    sel.appendChild(opt);
-  });
-}
-
-function populateInstructorSelect() {
-  const sel = document.getElementById('instructorSelect');
-  instructorData.forEach((ins,i) => {
-    const opt = document.createElement('option');
-    opt.value = i; opt.textContent = ins.name + ' \u2014 ' + ins.course;
-    sel.appendChild(opt);
-  });
-}
-
 let adminLoginShown = false, studentLoginShown = false, instructorLoginShown = false;
 function handleAdminClick() {
   try {
@@ -2881,11 +2939,32 @@ function handleStudentClick() {
     if(!studentLoginShown) {
       document.getElementById('studentLogin').classList.add('active');
       studentLoginShown = true;
+      document.getElementById('studentUser').focus();
       return;
     }
-    const idx = document.getElementById('studentSelect').value;
-    if(idx === '') { alert('Please select your name from the dropdown'); return; }
-    currentStudent = students[parseInt(idx)];
+    var uname = (document.getElementById('studentUser').value || '').trim();
+    var pw = document.getElementById('studentPass').value;
+    if(!uname || !pw) { alert('Please enter your email/username and password.'); return; }
+    // Look up in userAccounts
+    var userAccount = userAccounts.find(function(u) {
+      return u.role === 'student' && (u.username === uname || u.email === uname) && u.password === pw;
+    });
+    if(!userAccount) {
+      var anyMatch = userAccounts.find(function(u) { return u.role === 'student' && (u.username === uname || u.email === uname); });
+      if(anyMatch && anyMatch.status === 'disabled') { alert('This account has been disabled. Contact an administrator.'); return; }
+      if(anyMatch && anyMatch.status === 'pending') { showPendingApprovalScreen(anyMatch); return; }
+      alert('Invalid email/username or password.'); return;
+    }
+    if(userAccount.status === 'disabled') { alert('This account has been disabled. Contact an administrator.'); return; }
+    if(userAccount.status === 'pending') { showPendingApprovalScreen(userAccount); return; }
+    // Find matching student data
+    var studentMatch = students.find(function(s) { return s.name === userAccount.name || s.id === userAccount.studentDataId; });
+    if(!studentMatch) {
+      // Create a student data entry for this account
+      studentMatch = createStudentDataForAccount(userAccount);
+    }
+    currentStudent = studentMatch;
+    currentLoggedInUser = userAccount;
     enterApp('student');
   } catch(err) { console.error('handleStudentClick error:', err); alert('Error: ' + err.message); }
 }
@@ -2894,11 +2973,30 @@ function handleInstructorClick() {
     if(!instructorLoginShown) {
       document.getElementById('instructorLogin').classList.add('active');
       instructorLoginShown = true;
+      document.getElementById('instructorUser').focus();
       return;
     }
-    const idx = document.getElementById('instructorSelect').value;
-    if(idx === '') { alert('Please select your name from the dropdown'); return; }
-    currentInstructor = instructorData[parseInt(idx)];
+    var uname = (document.getElementById('instructorUser').value || '').trim();
+    var pw = document.getElementById('instructorPass').value;
+    if(!uname || !pw) { alert('Please enter your email/username and password.'); return; }
+    var userAccount = userAccounts.find(function(u) {
+      return u.role === 'instructor' && (u.username === uname || u.email === uname) && u.password === pw;
+    });
+    if(!userAccount) {
+      var anyMatch = userAccounts.find(function(u) { return u.role === 'instructor' && (u.username === uname || u.email === uname); });
+      if(anyMatch && anyMatch.status === 'disabled') { alert('This account has been disabled. Contact an administrator.'); return; }
+      if(anyMatch && anyMatch.status === 'pending') { showPendingApprovalScreen(anyMatch); return; }
+      alert('Invalid email/username or password.'); return;
+    }
+    if(userAccount.status === 'disabled') { alert('This account has been disabled. Contact an administrator.'); return; }
+    if(userAccount.status === 'pending') { showPendingApprovalScreen(userAccount); return; }
+    // Find matching instructor data
+    var insMatch = instructorData.find(function(ins) { return ins.name === userAccount.name || ins.email === userAccount.email; });
+    if(!insMatch) {
+      insMatch = createInstructorDataForAccount(userAccount);
+    }
+    currentInstructor = insMatch;
+    currentLoggedInUser = userAccount;
     enterApp('instructor');
   } catch(err) { console.error('handleInstructorClick error:', err); alert('Error: ' + err.message); }
 }
@@ -2948,6 +3046,331 @@ function enterApp(role) {
     console.error('enterApp error:', err);
     alert('Error entering app: ' + err.message);
   }
+}
+
+// ============================== GMAIL REGISTRATION & VERIFY USERS ==============================
+var currentLoggedInUser = null;
+
+// ----- Gmail Sign-In via Google Identity Services -----
+function gmailSignIn(role) {
+  if(typeof google === 'undefined' || !google.accounts || !google.accounts.oauth2) {
+    alert('Google Sign-In is not available. Please check your internet connection and reload the page.');
+    return;
+  }
+  var client = google.accounts.oauth2.initTokenClient({
+    client_id: GOOGLE_DRIVE_CONFIG.CLIENT_ID,
+    scope: 'https://www.googleapis.com/auth/userinfo.email https://www.googleapis.com/auth/userinfo.profile',
+    callback: function(tokenResponse) {
+      if(tokenResponse.error) { alert('Google sign-in failed: ' + tokenResponse.error); return; }
+      // Fetch user info from Google
+      fetch('https://www.googleapis.com/oauth2/v3/userinfo', {
+        headers: { Authorization: 'Bearer ' + tokenResponse.access_token }
+      }).then(function(r){ return r.json(); }).then(function(profile) {
+        handleGmailProfile(profile, role);
+      }).catch(function(err) {
+        alert('Failed to get Google profile: ' + err.message);
+      });
+    },
+    error_callback: function(err) { alert('Google sign-in error: ' + (err.message || 'Unknown error')); }
+  });
+  client.requestAccessToken();
+}
+
+function handleGmailProfile(profile, role) {
+  var email = profile.email;
+  var name = profile.name || email.split('@')[0];
+
+  // Check if account already exists
+  var existing = userAccounts.find(function(u) { return u.email === email; });
+  if(existing) {
+    if(existing.status === 'pending') {
+      showPendingApprovalScreen(existing);
+      return;
+    }
+    if(existing.status === 'disabled') {
+      alert('This account has been disabled. Contact an administrator.');
+      return;
+    }
+    // Active account — log them in
+    if(existing.role === 'student') {
+      var studentMatch = students.find(function(s) { return s.name === existing.name || s.id === existing.studentDataId; });
+      if(!studentMatch) studentMatch = createStudentDataForAccount(existing);
+      currentStudent = studentMatch;
+      currentLoggedInUser = existing;
+      enterApp('student');
+    } else if(existing.role === 'instructor') {
+      var insMatch = instructorData.find(function(ins) { return ins.name === existing.name || ins.email === existing.email; });
+      if(!insMatch) insMatch = createInstructorDataForAccount(existing);
+      currentInstructor = insMatch;
+      currentLoggedInUser = existing;
+      enterApp('instructor');
+    } else if(existing.role === 'admin') {
+      enterApp('admin');
+    }
+    return;
+  }
+
+  // New account — register with pending status
+  openRegistrationModal(role, name, email);
+}
+
+// ----- Registration Modal -----
+function openRegistrationModal(role, prefillName, prefillEmail) {
+  // Remove any existing modal
+  closeRegistrationModal();
+  var roleLabel = role === 'student' ? 'Student' : 'Instructor';
+  var programmes = ['Welding','Electrical Installation','Cosmetology','Business Administration','Auto Mechanics','Plumbing','Carpentry','Hospitality','Information Technology'];
+  var programmeOptions = programmes.map(function(p){ return '<option value="'+p+'">'+p+'</option>'; }).join('');
+
+  var html = '<div class="reg-modal-overlay" id="regModalOverlay" onclick="if(event.target===this)closeRegistrationModal()">' +
+    '<div class="reg-modal">' +
+    '<h3>Register as '+roleLabel+'</h3>' +
+    '<div class="reg-subtitle">Create your account. An administrator will review and approve your registration.</div>' +
+    '<div class="form-group"><label>Full Name</label><input type="text" id="regName" placeholder="e.g. John Smith" value="'+escapeAttr(prefillName||'')+'"></div>' +
+    '<div class="form-group"><label>Email Address</label><input type="email" id="regEmail" placeholder="your.email@gmail.com" value="'+escapeAttr(prefillEmail||'')+'" '+(prefillEmail?'readonly style="opacity:0.7;"':'')+'></div>' +
+    '<div class="form-group"><label>Programme</label><select id="regProgramme"><option value="">— Select Programme —</option>'+programmeOptions+'</select></div>' +
+    '<div class="form-group"><label>Password</label><input type="password" id="regPassword" placeholder="Create a password (min 6 characters)"></div>' +
+    '<div class="form-group"><label>Confirm Password</label><input type="password" id="regPasswordConfirm" placeholder="Confirm your password"></div>' +
+    '<input type="hidden" id="regRole" value="'+role+'">' +
+    '<div class="reg-actions">' +
+    '<button class="btn btn-secondary" onclick="closeRegistrationModal()">Cancel</button>' +
+    '<button class="btn btn-primary" onclick="submitRegistration()">Register</button>' +
+    '</div></div></div>';
+  document.body.insertAdjacentHTML('beforeend', html);
+}
+
+function closeRegistrationModal() {
+  var modal = document.getElementById('regModalOverlay');
+  if(modal) modal.remove();
+}
+
+function submitRegistration() {
+  var name = (document.getElementById('regName').value || '').trim();
+  var email = (document.getElementById('regEmail').value || '').trim();
+  var programme = document.getElementById('regProgramme').value;
+  var password = document.getElementById('regPassword').value;
+  var passwordConfirm = document.getElementById('regPasswordConfirm').value;
+  var role = document.getElementById('regRole').value;
+
+  if(!name || name.length < 2) { alert('Please enter your full name.'); return; }
+  if(!email || !email.includes('@')) { alert('Please enter a valid email address.'); return; }
+  if(!programme) { alert('Please select a programme.'); return; }
+  if(!password || password.length < 6) { alert('Password must be at least 6 characters.'); return; }
+  if(password !== passwordConfirm) { alert('Passwords do not match.'); return; }
+
+  // Check for duplicate email
+  var dup = userAccounts.find(function(u) { return u.email === email; });
+  if(dup) { alert('An account with this email already exists. Please sign in instead.'); return; }
+
+  // Create the user account with pending status
+  var newUser = {
+    id: 'USR-' + Date.now(),
+    name: name,
+    role: role,
+    username: email.split('@')[0],
+    password: password,
+    email: email,
+    programme: programme,
+    status: 'pending',
+    createdAt: new Date().toISOString().split('T')[0],
+    registeredVia: 'registration'
+  };
+
+  userAccounts.push(newUser);
+  saveState();
+
+  closeRegistrationModal();
+  showPendingApprovalScreen(newUser);
+}
+
+// ----- Pending Approval Screen -----
+function showPendingApprovalScreen(user) {
+  // Remove existing
+  var existing = document.getElementById('pendingApprovalScreen');
+  if(existing) existing.remove();
+
+  var html = '<div class="pending-screen" id="pendingApprovalScreen">' +
+    '<div class="pending-card">' +
+    '<div class="pending-icon">📋</div>' +
+    '<h2>Thank You for Registering!</h2>' +
+    '<div class="pending-msg">' +
+    'Thank you for registering your account, please note that the system administrators will review your account and approval will be given once you are a verified staff/student.' +
+    '</div>' +
+    '<div class="pending-email">Registered as: <strong>' + escapeHtml(user.email) + '</strong> (' + user.role + ')</div>' +
+    '<div style="font-size:12px;color:var(--text-muted);margin-bottom:24px;">Programme: ' + escapeHtml(user.programme || '—') + ' &bull; Registered: ' + user.createdAt + '</div>' +
+    '<button class="btn btn-primary" onclick="closePendingScreen()" style="padding:12px 32px;">Back to Login</button>' +
+    '</div></div>';
+  document.body.insertAdjacentHTML('beforeend', html);
+}
+
+function closePendingScreen() {
+  var el = document.getElementById('pendingApprovalScreen');
+  if(el) el.remove();
+}
+
+// ----- Create student/instructor data entries for approved accounts -----
+function createStudentDataForAccount(userAccount) {
+  var newStudent = {
+    id: 'STU-' + Date.now(),
+    name: userAccount.name,
+    stage: 'training',
+    course: userAccount.programme || 'Welding',
+    score: '0%',
+    progress: 5,
+    certNo: '',
+    certDate: '',
+    certCollected: false,
+    attendance: 0,
+    assignments: 0,
+    assignmentsTotal: 10,
+    gpa: '0.0',
+    instructor: instructorData.find(function(ins){ return ins.course === userAccount.programme; }) ? instructorData.find(function(ins){ return ins.course === userAccount.programme; }).name : instructorData[0].name
+  };
+  students.push(newStudent);
+  userAccount.studentDataId = newStudent.id;
+  saveState();
+  return newStudent;
+}
+
+function createInstructorDataForAccount(userAccount) {
+  var newInstructor = {
+    id: 'INS-' + Date.now(),
+    name: userAccount.name,
+    course: userAccount.programme || 'Welding',
+    email: userAccount.email,
+    specialization: userAccount.programme + ' Instruction',
+    yearsExp: 1,
+    phone: ''
+  };
+  instructorData.push(newInstructor);
+  saveState();
+  return newInstructor;
+}
+
+// ----- Verify Users Page (Admin) -----
+function renderVerifyUsersPage() {
+  var pending = userAccounts.filter(function(u) { return u.status === 'pending'; });
+  var recentlyProcessed = userAccounts.filter(function(u) {
+    return (u.status === 'active' || u.status === 'rejected') && u.approvedAt;
+  }).sort(function(a, b) { return (b.approvedAt || '').localeCompare(a.approvedAt || ''); }).slice(0, 10);
+
+  // Update badge
+  var badge = document.getElementById('pendingUsersBadge');
+  if(badge) {
+    if(pending.length > 0) {
+      badge.style.display = 'inline';
+      badge.textContent = pending.length;
+    } else {
+      badge.style.display = 'none';
+    }
+  }
+
+  // Stats
+  var statsEl = document.getElementById('verifyUsersStats');
+  if(statsEl) {
+    var totalPending = pending.length;
+    var pendingStudents = pending.filter(function(u){ return u.role === 'student'; }).length;
+    var pendingInstructors = pending.filter(function(u){ return u.role === 'instructor'; }).length;
+    var totalApproved = userAccounts.filter(function(u){ return u.approvedAt && u.status === 'active'; }).length;
+    statsEl.innerHTML =
+      '<div class="stat-card"><div class="stat-icon" style="background:var(--accent-dim);color:var(--accent);">⏳</div><div class="stat-value">'+totalPending+'</div><div class="stat-label">Pending Approval</div></div>' +
+      '<div class="stat-card"><div class="stat-icon" style="background:var(--blue-dim);color:var(--blue);">🎓</div><div class="stat-value">'+pendingStudents+'</div><div class="stat-label">Pending Students</div></div>' +
+      '<div class="stat-card"><div class="stat-icon" style="background:var(--green-dim);color:var(--green);">📚</div><div class="stat-value">'+pendingInstructors+'</div><div class="stat-label">Pending Instructors</div></div>' +
+      '<div class="stat-card"><div class="stat-icon" style="background:var(--green-dim);color:var(--green);">✅</div><div class="stat-value">'+totalApproved+'</div><div class="stat-label">Total Approved</div></div>';
+  }
+
+  // Table
+  var tbody = document.getElementById('verifyUsersTableBody');
+  if(tbody) {
+    if(pending.length === 0) {
+      tbody.innerHTML = '<tr><td colspan="6" style="text-align:center;color:var(--text-muted);padding:24px;">No pending accounts to review.</td></tr>';
+    } else {
+      tbody.innerHTML = pending.map(function(u) {
+        var roleBadge = u.role === 'student' ? 'badge-blue' : 'badge-green';
+        return '<tr>' +
+          '<td><strong>' + escapeHtml(u.name) + '</strong></td>' +
+          '<td style="font-size:12px;">' + escapeHtml(u.email) + '</td>' +
+          '<td><span class="badge ' + roleBadge + '"><span class="badge-dot"></span>' + u.role.charAt(0).toUpperCase() + u.role.slice(1) + '</span></td>' +
+          '<td>' + escapeHtml(u.programme || '—') + '</td>' +
+          '<td style="font-size:12px;color:var(--text-muted);">' + u.createdAt + '</td>' +
+          '<td><div class="verify-action-btns">' +
+          '<button class="btn btn-sm btn-primary" onclick="approveUser(\'' + escapeAttr(u.id) + '\')">Approve</button>' +
+          '<button class="btn btn-sm btn-secondary" style="background:var(--red-dim);color:var(--red);border-color:var(--red);" onclick="rejectUser(\'' + escapeAttr(u.id) + '\')">Reject</button>' +
+          '</div></td></tr>';
+      }).join('');
+    }
+  }
+
+  // Recent actions
+  var recentDiv = document.getElementById('recentVerifyActions');
+  if(recentDiv) {
+    if(recentlyProcessed.length === 0) {
+      recentDiv.innerHTML = '<span style="color:var(--text-muted);">No recent actions.</span>';
+    } else {
+      recentDiv.innerHTML = recentlyProcessed.map(function(u) {
+        var icon = u.status === 'active' ? '✅' : '❌';
+        var action = u.status === 'active' ? 'Approved' : 'Rejected';
+        return '<div style="display:flex;align-items:center;gap:10px;padding:8px 0;border-bottom:1px solid var(--border-light);">' +
+          '<span>' + icon + '</span>' +
+          '<div style="flex:1;"><strong>' + escapeHtml(u.name) + '</strong> <span class="badge ' + (u.role === 'student' ? 'badge-blue' : 'badge-green') + '" style="font-size:10px;"><span class="badge-dot"></span>' + u.role + '</span></div>' +
+          '<span style="font-size:12px;color:' + (u.status === 'active' ? 'var(--green)' : 'var(--red)') + ';font-weight:600;">' + action + '</span>' +
+          '<span style="font-size:11px;color:var(--text-muted);">' + (u.approvedAt || '') + '</span></div>';
+      }).join('');
+    }
+  }
+}
+
+function approveUser(userId) {
+  var user = userAccounts.find(function(u) { return u.id === userId; });
+  if(!user) return;
+  user.status = 'active';
+  user.approvedAt = new Date().toISOString().split('T')[0];
+  user.approvedBy = 'admin';
+  saveState();
+  renderVerifyUsersPage();
+  showToast('Account approved: ' + user.name + ' (' + user.role + ')');
+}
+
+function rejectUser(userId) {
+  var user = userAccounts.find(function(u) { return u.id === userId; });
+  if(!user) return;
+  if(!confirm('Reject the account for "' + user.name + '"? They will not be able to log in.')) return;
+  user.status = 'rejected';
+  user.approvedAt = new Date().toISOString().split('T')[0];
+  user.approvedBy = 'admin';
+  saveState();
+  renderVerifyUsersPage();
+  showToast('Account rejected: ' + user.name);
+}
+
+function approveAllPending() {
+  var pending = userAccounts.filter(function(u) { return u.status === 'pending'; });
+  if(pending.length === 0) { alert('No pending accounts to approve.'); return; }
+  if(!confirm('Approve all ' + pending.length + ' pending account(s)?')) return;
+  var dateStr = new Date().toISOString().split('T')[0];
+  pending.forEach(function(u) {
+    u.status = 'active';
+    u.approvedAt = dateStr;
+    u.approvedBy = 'admin';
+  });
+  saveState();
+  renderVerifyUsersPage();
+  showToast(pending.length + ' account(s) approved!');
+}
+
+function rejectAllPending() {
+  var pending = userAccounts.filter(function(u) { return u.status === 'pending'; });
+  if(pending.length === 0) { alert('No pending accounts to reject.'); return; }
+  if(!confirm('Reject all ' + pending.length + ' pending account(s)?')) return;
+  var dateStr = new Date().toISOString().split('T')[0];
+  pending.forEach(function(u) {
+    u.status = 'rejected';
+    u.approvedAt = dateStr;
+    u.approvedBy = 'admin';
+  });
+  saveState();
+  renderVerifyUsersPage();
+  showToast(pending.length + ' account(s) rejected.');
 }
 
 /* ============================== MOBILE SIDEBAR TOGGLE ============================== */
@@ -3005,6 +3428,8 @@ function buildAdminSidebar() {
     <div class="nav-item" data-page="calendar" onclick="showPage('calendar')">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>Calendar</div>
     <div class="nav-section-label">Administration</div>
+    <div class="nav-item" data-page="verify-users" onclick="showPage('verify-users')">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M16 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="8.5" cy="7" r="4"/><path d="M20 8v6"/><path d="M23 11h-6"/></svg>Verify Users<span class="nav-badge" id="pendingUsersBadge" style="display:none;background:var(--red);">0</span></div>
     <div class="nav-item" data-page="certificates" onclick="showPage('certificates')">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="8" r="7"/><polyline points="8.21 13.89 7 23 12 20 17 23 15.79 13.88"/></svg>Certificates</div>
     <div class="nav-item" data-page="reports" onclick="showPage('reports')">
@@ -3111,7 +3536,7 @@ function showPage(pageId) {
   const titles = {
     dashboard:'Dashboard',video:'Video Conference',students:'Student Progress',
     training:'Training Centres',exams:'Online Exams','import-exam':'Import Exam',certificates:'Certificate Tracking',
-    reports:'Reports & Analytics',settings:'Settings',
+    reports:'Reports & Analytics','verify-users':'Verify Users',settings:'Settings',
     attendance:'Attendance Management',announcements:'Announcements',calendar:'Calendar & Schedule',
     's-dashboard':'My Dashboard','s-video':'My Classes','s-progress':'My Progress',
     's-resources':'My Resources','s-exams':'My Exams','s-certificate':'My Certificate',
@@ -3121,11 +3546,13 @@ function showPage(pageId) {
     'i-announcements':'Announcements','i-calendar':'Calendar','i-profile':'My Profile'
   };
   document.getElementById('topbarTitle').textContent = titles[pageId]||pageId;
+  if(pageId === 'verify-users') renderVerifyUsersPage();
   setTimeout(animateAllCounters, 50);
 }
 
 function buildAdminPages() {
   resolveExamStatuses();
+  setTimeout(renderVerifyUsersPage, 200);
   const totalEnrolled = students.length;
   const totalCertified = students.filter(s=>s.stage==='certified'||s.stage==='collected').length;
   const upcomingExams = exams.filter(e=>e.status==='upcoming').length;
@@ -3423,6 +3850,30 @@ function buildAdminPages() {
   </section>
 
   <!-- SETTINGS -->
+  <!-- VERIFY USERS PAGE -->
+  <section class="page" id="page-verify-users">
+    <div class="stats-grid stats-grid-4" id="verifyUsersStats"></div>
+    <div class="card">
+      <div class="card-header">
+        <h3>Pending Account Approvals</h3>
+        <div style="display:flex;gap:8px;">
+          <button class="btn btn-sm btn-primary" onclick="approveAllPending()">Approve All</button>
+          <button class="btn btn-sm btn-secondary" onclick="rejectAllPending()">Reject All</button>
+        </div>
+      </div>
+      <div class="table-wrapper">
+        <table>
+          <thead><tr><th>Name</th><th>Email</th><th>Role</th><th>Programme</th><th>Registered</th><th>Actions</th></tr></thead>
+          <tbody id="verifyUsersTableBody"><tr><td colspan="6" style="text-align:center;color:var(--text-muted);padding:24px;">No pending accounts</td></tr></tbody>
+        </table>
+      </div>
+    </div>
+    <div class="card" style="margin-top:18px;">
+      <div class="card-header"><h3>Recently Approved / Rejected</h3></div>
+      <div id="recentVerifyActions" style="padding:16px;color:var(--text-muted);font-size:13px;">No recent actions.</div>
+    </div>
+  </section>
+
   <section class="page" id="page-settings">
     <div class="tabs">
       <div class="tab active" onclick="switchSettingsTab(this,'system')">System Settings</div>
@@ -7099,8 +7550,6 @@ function showToast(message) {
   c.appendChild(t); setTimeout(()=>t.remove(),3000);
 }
 
-populateStudentSelect();
-populateInstructorSelect();
 
 // ============================== EXAM IMPORT ENGINE ==============================
 var importedQuestions = [];
