@@ -11532,6 +11532,12 @@ function lmsEmojiClickOutside(e) {
   if(picker.contains(e.target)) return;
   // Check if clicked the emoji button itself
   if(e.target.closest && e.target.closest('.emoji-btn')) return;
+  // Check if click landed within the picker's bounding rect — handles the case
+  // where innerHTML replacement detaches the original e.target from the DOM
+  // (e.g. clicking a category button re-renders the picker content)
+  var rect = picker.getBoundingClientRect();
+  if(e.clientX >= rect.left && e.clientX <= rect.right &&
+     e.clientY >= rect.top  && e.clientY <= rect.bottom) return;
   picker.classList.remove('open');
   document.removeEventListener('click', lmsEmojiClickOutside);
 }
