@@ -3068,6 +3068,7 @@ function showPage(pageId) {
 }
 
 function buildAdminPages() {
+  resolveExamStatuses();
   const totalEnrolled = students.length;
   const totalCertified = students.filter(s=>s.stage==='certified'||s.stage==='collected').length;
   const upcomingExams = exams.filter(e=>e.status==='upcoming').length;
@@ -3448,6 +3449,7 @@ function buildAdminPages() {
 // ============================== BUILD STUDENT PAGES ==============================
 function buildStudentPages() {
   try {
+  resolveExamStatuses();
   const s = currentStudent;
   const skill = skillAreas.find(function(sk) { return s.course.toLowerCase().indexOf(sk.name.split(' ')[0].toLowerCase()) !== -1; }) || skillAreas[0];
   const stageOrder = ['testing','interview','training','certified','collected'];
@@ -3659,19 +3661,30 @@ function buildStudentPages() {
   <section class="page" id="page-s-exams">
     <div id="studentExamListView">
       <div class="card">
-        <div class="card-header"><h3>My Upcoming Exams</h3></div>
+        <div class="card-header"><h3>My Exams</h3></div>
         ${exams.filter(e => e.course === s.course && (e.status === 'upcoming' || e.status === 'active')).map((e,idx) => {
           const examIdx = exams.indexOf(e);
           const hasQuestions = e.questionData && e.questionData.length > 0;
           const alreadyTaken = (examResults||[]).some(r => r.examId === e.id && r.studentId === s.id);
+          const examStart = parseExamDateTime(e.date, e.time);
+          const examNow = new Date();
+          const isTimePassed = examStart && examNow >= examStart;
+          let badgeHtml = '';
+          if(alreadyTaken) {
+            badgeHtml = '<span class="badge badge-green"><span class="badge-dot"></span>Completed</span>';
+          } else if(e.status === 'active' && hasQuestions) {
+            badgeHtml = '<button class="btn btn-sm btn-primary" onclick="startStudentExam('+examIdx+')">Take Exam</button>';
+          } else if(isTimePassed && !hasQuestions) {
+            badgeHtml = '<span class="badge badge-amber">Awaiting Questions</span>';
+          } else if(isTimePassed) {
+            badgeHtml = '<span class="badge badge-blue">Ready Soon</span>';
+          } else {
+            badgeHtml = '<span class="badge badge-amber">Upcoming &bull; '+(e.date.split('-').slice(1).join('/'))+'</span>';
+          }
           return '<div class="class-schedule-card" style="border-left:3px solid '+(e.status==='active'?'var(--green)':'var(--accent)')+';">' +
             '<div class="class-time-block"><div class="time" style="font-size:13px;">'+e.date.split('-').slice(1).join('/')+'</div><div class="period">'+e.time+'</div></div>' +
             '<div style="flex:1;"><div style="font-size:14px;font-weight:600;">'+e.title+'</div><div style="font-size:12px;color:var(--text-muted);">'+e.duration+' minutes &nbsp;•&nbsp; '+(e.questionData?e.questionData.length:e.questions)+' questions &nbsp;•&nbsp; Pass: '+e.passMark+'%</div></div>' +
-            (e.status==='active' && hasQuestions && !alreadyTaken
-              ? '<button class="btn btn-sm btn-primary" onclick="startStudentExam('+examIdx+')">Take Exam</button>'
-              : alreadyTaken
-                ? '<span class="badge badge-green"><span class="badge-dot"></span>Completed</span>'
-                : '<span class="badge badge-amber">'+(e.status==='active'?'No Questions':'Upcoming')+'</span>') +
+            badgeHtml +
             '</div>';
         }).join('') || '<p style="color:var(--text-muted);padding:16px;">No upcoming exams for your programme.</p>'}
       </div>
@@ -3803,6 +3816,7 @@ function buildStudentPages() {
 // ============================== BUILD INSTRUCTOR PAGES ==============================
 function buildInstructorPages() {
   try {
+  resolveExamStatuses();
   const ins = currentInstructor;
   const myStudents = students.filter(s => s.instructor === ins.name);
   const myCourseStudents = students.filter(s => s.course === ins.course);
@@ -5661,7 +5675,70 @@ function showSkillDetail(id) {
 }
 function backToSkills() { document.getElementById('trainingOverview').style.display='block'; document.getElementById('skillDetailPage').style.display='none'; }
 
+// ============================== AUTO EXAM STATUS RESOLUTION ==============================
+// Automatically transitions exam statuses based on scheduled date/time:
+//   upcoming → active  : when current time >= exam date+time
+//   active → completed : when current time >= exam date+time + duration
+function resolveExamStatuses() {
+  var now = new Date();
+  var changed = false;
+  exams.forEach(function(e) {
+    if(e.status === 'completed') return; // already done
+
+    // Parse the exam start time
+    var examStart = parseExamDateTime(e.date, e.time);
+    if(!examStart) return;
+
+    // Calculate exam end time (start + duration in minutes)
+    var examEnd = new Date(examStart.getTime() + (e.duration || 90) * 60000);
+
+    if(e.status === 'upcoming') {
+      // Transition to active when the exam window has opened
+      // Only auto-activate if questions have been added
+      if(now >= examStart && e.questionData && e.questionData.length > 0) {
+        e.status = 'active';
+        changed = true;
+      }
+    }
+
+    if(e.status === 'active') {
+      // Transition to completed when the exam duration has fully elapsed
+      if(now >= examEnd) {
+        e.status = 'completed';
+        // Calculate pass rate from results
+        var results = examResults.filter(function(r){ return r.examId === e.id; });
+        if(results.length > 0) {
+          var passed = results.filter(function(r){ return r.passed; }).length;
+          e.passRate = Math.round(passed / results.length * 100) + '%';
+        }
+        changed = true;
+      }
+    }
+  });
+  if(changed) saveState();
+}
+
+function parseExamDateTime(dateStr, timeStr) {
+  if(!dateStr) return null;
+  // dateStr: "2026-02-18", timeStr: "09:00"
+  var t = timeStr || '00:00';
+  var parts = dateStr.split('-');
+  var timeParts = t.split(':');
+  if(parts.length < 3) return null;
+  return new Date(
+    parseInt(parts[0]),
+    parseInt(parts[1]) - 1,
+    parseInt(parts[2]),
+    parseInt(timeParts[0]) || 0,
+    parseInt(timeParts[1]) || 0
+  );
+}
+
+// Run status resolution periodically (every 30 seconds) so exams go live automatically
+setInterval(resolveExamStatuses, 30000);
+
 function renderExams(filter) {
+  resolveExamStatuses();
   const filtered = exams.filter(e=>e.status===(filter||'upcoming'));
   const tbody = document.getElementById('examTableBody');
   if(!tbody) return;
