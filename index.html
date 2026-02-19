@@ -1998,13 +1998,15 @@ textarea.form-control { resize:vertical; min-height:80px; }
   padding:12px 16px; border-top:1px solid var(--border); background:var(--bg-card);
   display:flex; align-items:flex-end; gap:8px;
 }
-.lms-chat-input-area .attach-btn, .lms-chat-input-area .send-btn {
+.lms-chat-input-area .attach-btn, .lms-chat-input-area .send-btn, .lms-chat-input-area .emoji-btn {
   width:40px; height:40px; min-width:40px; border:none; border-radius:50%;
   cursor:pointer; display:flex; align-items:center; justify-content:center;
   font-size:18px; transition:var(--transition);
 }
 .lms-chat-input-area .attach-btn { background:var(--bg-input); color:var(--text-secondary); }
 .lms-chat-input-area .attach-btn:hover { background:var(--accent-dim); color:var(--accent); }
+.lms-chat-input-area .emoji-btn { background:var(--bg-input); color:var(--text-secondary); position:relative; }
+.lms-chat-input-area .emoji-btn:hover { background:var(--accent-dim); color:var(--accent); }
 .lms-chat-input-area .send-btn { background:var(--accent); color:#000; }
 .lms-chat-input-area .send-btn:hover { background:#d4900a; }
 .lms-chat-input-area .msg-input {
@@ -2014,6 +2016,43 @@ textarea.form-control { resize:vertical; min-height:80px; }
   min-height:40px; line-height:1.4; transition:var(--transition);
 }
 .lms-chat-input-area .msg-input:focus { border-color:var(--accent); }
+
+/* Emoji Picker */
+.lms-emoji-picker {
+  position:absolute; bottom:56px; left:0; width:320px; max-height:360px;
+  background:var(--bg-card); border:1px solid var(--border-light); border-radius:var(--radius);
+  box-shadow:var(--shadow); display:none; flex-direction:column; z-index:100;
+  animation:msgIn 0.15s ease;
+}
+.lms-emoji-picker.open { display:flex; }
+.lms-emoji-picker-header {
+  display:flex; gap:2px; padding:8px 8px 0; overflow-x:auto; border-bottom:1px solid var(--border);
+}
+.lms-emoji-picker-header button {
+  padding:6px 10px; border:none; background:none; cursor:pointer; font-size:16px;
+  border-radius:var(--radius-sm) var(--radius-sm) 0 0; transition:var(--transition);
+  color:var(--text-muted); white-space:nowrap; flex-shrink:0;
+}
+.lms-emoji-picker-header button:hover { background:var(--bg-card-hover); }
+.lms-emoji-picker-header button.active { background:var(--accent-dim); color:var(--accent); }
+.lms-emoji-picker-search {
+  padding:8px; border-bottom:1px solid var(--border);
+}
+.lms-emoji-picker-search input {
+  width:100%; padding:7px 10px; border:1px solid var(--border-light); border-radius:var(--radius-sm);
+  background:var(--bg-input); color:var(--text-primary); font-size:12px; outline:none;
+}
+.lms-emoji-picker-search input:focus { border-color:var(--accent); }
+.lms-emoji-picker-grid {
+  flex:1; overflow-y:auto; padding:8px; display:grid;
+  grid-template-columns:repeat(8,1fr); gap:2px;
+}
+.lms-emoji-picker-grid button {
+  width:100%; aspect-ratio:1; border:none; background:none; cursor:pointer;
+  font-size:22px; border-radius:var(--radius-sm); transition:var(--transition);
+  display:flex; align-items:center; justify-content:center;
+}
+.lms-emoji-picker-grid button:hover { background:var(--accent-dim); transform:scale(1.15); }
 
 /* Chat info panel (right side drawer) */
 .lms-chat-info-panel {
@@ -4335,6 +4374,7 @@ function buildAdminPages() {
           </div>
           <div class="lms-chat-messages" id="adminChatMessages"></div>
           <div class="lms-chat-input-area">
+            <button class="emoji-btn" onclick="lmsChatToggleEmojiPicker('admin')" title="Emoji">&#128522;</button>
             <button class="attach-btn" onclick="lmsChatAttachFile()" title="Attach File">&#128206;</button>
             <textarea class="msg-input" id="adminChatInput" placeholder="Type a message..." rows="1" onkeydown="lmsChatInputKeydown(event,'admin')"></textarea>
             <button class="send-btn" onclick="lmsChatSendMessage('admin')" title="Send">&#10148;</button>
@@ -4775,6 +4815,7 @@ function buildStudentPages() {
           </div>
           <div class="lms-chat-messages" id="studentChatMessages"></div>
           <div class="lms-chat-input-area">
+            <button class="emoji-btn" onclick="lmsChatToggleEmojiPicker('student')" title="Emoji">&#128522;</button>
             <button class="attach-btn" onclick="lmsChatAttachFile()" title="Attach File">&#128206;</button>
             <textarea class="msg-input" id="studentChatInput" placeholder="Type a message..." rows="1" onkeydown="lmsChatInputKeydown(event,'student')"></textarea>
             <button class="send-btn" onclick="lmsChatSendMessage('student')" title="Send">&#10148;</button>
@@ -5160,6 +5201,7 @@ function buildInstructorPages() {
           </div>
           <div class="lms-chat-messages" id="instructorChatMessages"></div>
           <div class="lms-chat-input-area">
+            <button class="emoji-btn" onclick="lmsChatToggleEmojiPicker('instructor')" title="Emoji">&#128522;</button>
             <button class="attach-btn" onclick="lmsChatAttachFile()" title="Attach File">&#128206;</button>
             <textarea class="msg-input" id="instructorChatInput" placeholder="Type a message..." rows="1" onkeydown="lmsChatInputKeydown(event,'instructor')"></textarea>
             <button class="send-btn" onclick="lmsChatSendMessage('instructor')" title="Send">&#10148;</button>
@@ -10620,6 +10662,135 @@ async function lmsChatSyncFromDrive() {
     console.error('Chat sync from Drive error:', err);
     showToast('Failed to sync chat from Drive');
   }
+}
+
+// ============================================
+// EMOJI PICKER
+// ============================================
+var lmsEmojiCategories = {
+  'Smileys':  ['😀','😃','😄','😁','😆','😅','🤣','😂','🙂','😊','😇','🥰','😍','🤩','😘','😗','😚','😙','🥲','😋','😛','😜','🤪','😝','🤑','🤗','🤭','🤫','🤔','🫡','🤐','🤨','😐','😑','😶','🫥','😏','😒','🙄','😬','🤥','😌','😔','😪','🤤','😴','😷','🤒','🤕','🤢','🤮','🥵','🥶','🥴','😵','🤯','🤠','🥳','🥸','😎','🤓','🧐','😕','🫤','😟','🙁','😮','😯','😲','😳','🥺','🥹','😦','😧','😨','😰','😥','😢','😭','😱','😖','😣','😞','😓','😩','😫','🥱','😤','😡','😠','🤬','😈','👿','💀','☠️','💩','🤡','👹','👺','👻','👽','👾','🤖'],
+  'Gestures': ['👋','🤚','🖐️','✋','🖖','🫱','🫲','🫳','🫴','👌','🤌','🤏','✌️','🤞','🫰','🤟','🤘','🤙','👈','👉','👆','🖕','👇','☝️','🫵','👍','👎','✊','👊','🤛','🤜','👏','🙌','🫶','👐','🤲','🤝','🙏','✍️','💪','🦾','🦿','🦵','🦶','👂','🦻','👃','🧠','🫀','🫁','🦷','🦴','👀','👁️','👅','👄'],
+  'People':   ['👶','🧒','👦','👧','🧑','👱','👨','🧔','👩','🧓','👴','👵','🙍','🙎','🙅','🙆','💁','🙋','🧏','🙇','🤦','🤷','👮','🕵️','💂','🥷','👷','🫅','🤴','👸','👳','👲','🧕','🤵','👰','🤰','🫃','🫄','🤱','👼','🎅','🤶','🦸','🦹','🧙','🧚','🧛','🧜','🧝','🧞','🧟','🧌','💆','💇','🚶','🧍','🧎','🏃','💃','🕺','👯','🧖','🧗','🤸','⛹️','🏋️','🚴','🚵','🤼','🤽','🤾','🤺','⛷️','🏂','🏌️','🏇','🏊','🤹'],
+  'Nature':   ['🐶','🐱','🐭','🐹','🐰','🦊','🐻','🐼','🐻‍❄️','🐨','🐯','🦁','🐮','🐷','🐸','🐵','🙈','🙉','🙊','🐒','🐔','🐧','🐦','🐤','🐣','🐥','🦆','🦅','🦉','🦇','🐺','🐗','🐴','🦄','🐝','🪱','🐛','🦋','🐌','🐞','🐜','🪰','🪲','🪳','🦟','🦗','🕷️','🦂','🐢','🐍','🦎','🦖','🦕','🐙','🦑','🦐','🦞','🦀','🐡','🐠','🐟','🐬','🐳','🐋','🦈','🪸','🐊','🐅','🐆','🦓','🦍','🦧','🐘','🦛','🦏','🐪','🐫','🦒','🦘','🦬','🐃','🐂','🐄','🐎','🐖','🐏','🐑','🦙','🐐','🦌','🐕','🐩','🦮','🐕‍🦺','🐈','🐈‍⬛','🪶','🐓','🦃','🦤','🦚','🦜','🦢','🦩','🕊️','🐇','🦝','🦨','🦡','🦫','🦦','🦥','🐁','🐀','🐿️','🦔','🐾','🐉','🐲','🌵','🎄','🌲','🌳','🌴','🪵','🌱','🌿','☘️','🍀','🎍','🪴','🎋','🍃','🍂','🍁','🪺','🪹','🍄','🌾','💐','🌷','🌹','🥀','🌺','🌸','🌼','🌻','🌞','🌝','🌛','🌜','🌚','🌕','🌖','🌗','🌘','🌑','🌒','🌓','🌔','🌙','🌎','🌍','🌏','🪐','💫','⭐','🌟','✨','⚡','☄️','💥','🔥','🌪️','🌈','☀️','🌤️','⛅','🌥️','☁️','🌦️','🌧️','⛈️','🌩️','🌨️','❄️','☃️','⛄','🌬️','💨','💧','💦','🫧','☔','☂️','🌊','🌫️'],
+  'Food':     ['🍏','🍎','🍐','🍊','🍋','🍌','🍉','🍇','🍓','🫐','🍈','🍒','🍑','🥭','🍍','🥥','🥝','🍅','🍆','🥑','🥦','🥬','🥒','🌶️','🫑','🌽','🥕','🫒','🧄','🧅','🥔','🍠','🫘','🥐','🍞','🥖','🥨','🧀','🥚','🍳','🧈','🥞','🧇','🥓','🥩','🍗','🍖','🦴','🌭','🍔','🍟','🍕','🫓','🥪','🥙','🧆','🌮','🌯','🫔','🥗','🥘','🫕','🥫','🍝','🍜','🍲','🍛','🍣','🍱','🥟','🦪','🍤','🍙','🍚','🍘','🍥','🥠','🥮','🍢','🍡','🍧','🍨','🍦','🥧','🧁','🍰','🎂','🍮','🍭','🍬','🍫','🍿','🍩','🍪','🌰','🥜','🍯','🥛','🍼','🫖','☕','🍵','🧃','🥤','🧋','🫙','🍶','🍺','🍻','🥂','🍷','🫗','🥃','🍸','🍹','🧉','🍾','🧊','🥄','🍴','🍽️','🥣','🥡','🥢','🧂'],
+  'Activities':['⚽','🏀','🏈','⚾','🥎','🎾','🏐','🏉','🥏','🎱','🪀','🏓','🏸','🏒','🏑','🥍','🏏','🪃','🥅','⛳','🪁','🏹','🎣','🤿','🥊','🥋','🎽','🛹','🛼','🛷','⛸️','🥌','🎿','⛷️','🏂','🪂','🏋️','🤼','🤸','⛹️','🤺','🤾','🏌️','🏇','🧘','🏄','🏊','🤽','🚣','🧗','🚵','🚴','🏆','🥇','🥈','🥉','🏅','🎖️','🏵️','🎗️','🎫','🎟️','🎪','🤹','🎭','🩰','🎨','🎬','🎤','🎧','🎼','🎹','🥁','🪘','🎷','🎺','🪗','🎸','🪕','🎻','🪈','🎲','♟️','🎯','🎳','🎮','🕹️','🧩','🪅','🪩','🪆'],
+  'Objects':  ['📱','💻','⌨️','🖥️','🖨️','🖱️','🖲️','💾','💿','📀','📸','📹','🎥','📽️','🎞️','📞','☎️','📟','📠','📺','📻','🎙️','🎚️','🎛️','🧭','⏱️','⏲️','⏰','🕰️','⌛','📡','🔋','🪫','🔌','💡','🔦','🕯️','🪔','🧯','🛢️','💸','💵','💴','💶','💷','🪙','💰','💳','💎','⚖️','🪜','🧰','🪛','🔧','🔨','⚒️','🛠️','⛏️','🪚','🔩','⚙️','🪤','🧱','⛓️','🧲','🔫','💣','🧨','🪓','🔪','🗡️','⚔️','🛡️','🚬','⚰️','🪦','⚱️','🏺','🔮','📿','🧿','🪬','💈','⚗️','🔭','🔬','🕳️','🩹','🩺','🩻','🩼','💊','💉','🩸','🧬','🦠','🧫','🧪','🌡️','🧹','🪠','🧺','🧻','🧼','🪥','🧽','🧴','🛎️','🔑','🗝️','🚪','🪑','🛋️','🛏️','🛌','🧸','🪆','🖼️','🪞','🪟','🛍️','🛒','🎁','🎈','🎏','🎀','🪄','🪅','🎊','🎉','🎎','🏮','🎐','🧧','✉️','📩','📨','📧','💌','📥','📤','📦','🏷️','🪧','📪','📫','📬','📭','📮','📯','📜','📃','📄','📑','🧾','📊','📈','📉','🗒️','🗓️','📆','📅','🗑️','📇','🗃️','🗳️','🗄️','📋','📁','📂','🗂️','🗞️','📰','📓','📔','📒','📕','📗','📘','📙','📚','📖','🔖','🧷','🔗','📎','🖇️','📐','📏','🧮','📌','📍','✂️','🖊️','🖋️','✒️','🖌️','🖍️','📝','✏️','🔍','🔎','🔏','🔐','🔒','🔓'],
+  'Symbols':  ['❤️','🧡','💛','💚','💙','💜','🖤','🤍','🤎','💔','❤️‍🔥','❤️‍🩹','❣️','💕','💞','💓','💗','💖','💘','💝','💟','☮️','✝️','☪️','🕉️','☸️','✡️','🔯','🕎','☯️','☦️','🛐','⛎','♈','♉','♊','♋','♌','♍','♎','♏','♐','♑','♒','♓','🆔','⚛️','🉑','☢️','☣️','📴','📳','🈶','🈚','🈸','🈺','🈷️','✴️','🆚','💮','🉐','㊙️','㊗️','🈴','🈵','🈹','🈲','🅰️','🅱️','🆎','🆑','🅾️','🆘','❌','⭕','🛑','⛔','📛','🚫','💯','💢','♨️','🚷','🚯','🚳','🚱','🔞','📵','🚭','❗','❕','❓','❔','‼️','⁉️','🔅','🔆','〽️','⚠️','🚸','🔱','⚜️','🔰','♻️','✅','🈯','💹','❇️','✳️','❎','🌐','💠','Ⓜ️','🌀','💤','🏧','🚾','♿','🅿️','🛗','🈳','🈂️','🛂','🛃','🛄','🛅','🚹','🚺','🚻','🚼','🚮','🎦','📶','🈁','🔣','ℹ️','🔤','🔡','🔠','🆖','🆗','🆙','🆒','🆕','🆓','0️⃣','1️⃣','2️⃣','3️⃣','4️⃣','5️⃣','6️⃣','7️⃣','8️⃣','9️⃣','🔟','🔢','#️⃣','*️⃣','⏏️','▶️','⏸️','⏯️','⏹️','⏺️','⏭️','⏮️','⏩','⏪','⏫','⏬','◀️','🔼','🔽','➡️','⬅️','⬆️','⬇️','↗️','↘️','↙️','↖️','↕️','↔️','↩️','↪️','⤴️','⤵️','🔀','🔁','🔂','🔄','🔃','🎵','🎶','➕','➖','➗','✖️','🟰','♾️','💲','💱','™️','©️','®️','〰️','➰','➿','🔚','🔙','🔛','🔝','🔜','✔️','☑️','🔘','🔴','🟠','🟡','🟢','🔵','🟣','⚫','⚪','🟤','🔺','🔻','🔸','🔹','🔶','🔷','🔳','🔲','▪️','▫️','◾','◽','◼️','◻️','🟥','🟧','🟨','🟩','🟦','🟪','⬛','⬜','🟫','🔈','🔇','🔉','🔊','🔔','🔕','📣','📢','👁️‍🗨️','💬','💭','🗯️','♠️','♣️','♥️','♦️','🃏','🎴','🀄','🕐','🕑','🕒','🕓','🕔','🕕','🕖','🕗','🕘','🕙','🕚','🕛']
+};
+
+var lmsEmojiPickerPrefix = null;
+
+function lmsChatToggleEmojiPicker(prefix) {
+  var btn = document.querySelector('#'+prefix+'ChatActive .emoji-btn');
+  if(!btn) return;
+
+  var existing = document.getElementById('lmsEmojiPicker');
+  if(existing && existing.classList.contains('open') && lmsEmojiPickerPrefix === prefix) {
+    existing.classList.remove('open');
+    return;
+  }
+
+  lmsEmojiPickerPrefix = prefix;
+
+  if(!existing) {
+    existing = document.createElement('div');
+    existing.id = 'lmsEmojiPicker';
+    existing.className = 'lms-emoji-picker';
+    document.body.appendChild(existing);
+  }
+
+  // Position near the emoji button
+  var rect = btn.getBoundingClientRect();
+  existing.style.position = 'fixed';
+  existing.style.bottom = (window.innerHeight - rect.top + 8) + 'px';
+  existing.style.left = Math.max(8, rect.left) + 'px';
+
+  lmsEmojiRenderPicker(existing, Object.keys(lmsEmojiCategories)[0]);
+  existing.classList.add('open');
+
+  // Close when clicking outside
+  setTimeout(function() {
+    document.addEventListener('click', lmsEmojiClickOutside);
+  }, 10);
+}
+
+function lmsEmojiClickOutside(e) {
+  var picker = document.getElementById('lmsEmojiPicker');
+  if(!picker) return;
+  if(picker.contains(e.target)) return;
+  // Check if clicked the emoji button itself
+  if(e.target.closest && e.target.closest('.emoji-btn')) return;
+  picker.classList.remove('open');
+  document.removeEventListener('click', lmsEmojiClickOutside);
+}
+
+function lmsEmojiRenderPicker(container, activeCategory) {
+  var cats = Object.keys(lmsEmojiCategories);
+  var catIcons = {'Smileys':'😀','Gestures':'👋','People':'👤','Nature':'🌿','Food':'🍕','Activities':'⚽','Objects':'💡','Symbols':'❤️'};
+
+  var html = '<div class="lms-emoji-picker-header">';
+  cats.forEach(function(cat) {
+    html += '<button '+(cat===activeCategory?'class="active"':'')+' onclick="lmsEmojiSwitchCategory(\''+cat+'\')" title="'+cat+'">'+(catIcons[cat]||'📁')+'</button>';
+  });
+  html += '</div>';
+  html += '<div class="lms-emoji-picker-search"><input type="text" placeholder="Search emoji..." oninput="lmsEmojiSearch(this.value)"></div>';
+  html += '<div class="lms-emoji-picker-grid" id="lmsEmojiGrid">';
+
+  var emojis = lmsEmojiCategories[activeCategory] || [];
+  emojis.forEach(function(emoji) {
+    html += '<button onclick="lmsEmojiInsert(\''+emoji+'\')">'+emoji+'</button>';
+  });
+  html += '</div>';
+
+  container.innerHTML = html;
+}
+
+function lmsEmojiSwitchCategory(cat) {
+  var picker = document.getElementById('lmsEmojiPicker');
+  if(!picker) return;
+  lmsEmojiRenderPicker(picker, cat);
+  picker.classList.add('open');
+}
+
+function lmsEmojiSearch(query) {
+  var grid = document.getElementById('lmsEmojiGrid');
+  if(!grid) return;
+  var q = query.toLowerCase().trim();
+  if(!q) {
+    lmsEmojiSwitchCategory(Object.keys(lmsEmojiCategories)[0]);
+    return;
+  }
+  // Simple name-based lookup — search all categories
+  var all = [];
+  Object.keys(lmsEmojiCategories).forEach(function(cat) {
+    if(cat.toLowerCase().indexOf(q) !== -1) {
+      all = all.concat(lmsEmojiCategories[cat]);
+    }
+  });
+  // If no category match, show all emojis (user can scroll)
+  if(!all.length) {
+    Object.keys(lmsEmojiCategories).forEach(function(cat) {
+      all = all.concat(lmsEmojiCategories[cat]);
+    });
+  }
+  var html = '';
+  all.forEach(function(emoji) {
+    html += '<button onclick="lmsEmojiInsert(\''+emoji+'\')">'+emoji+'</button>';
+  });
+  grid.innerHTML = html;
+}
+
+function lmsEmojiInsert(emoji) {
+  if(!lmsEmojiPickerPrefix) return;
+  var input = document.getElementById(lmsEmojiPickerPrefix+'ChatInput');
+  if(!input) return;
+
+  var start = input.selectionStart;
+  var end = input.selectionEnd;
+  var text = input.value;
+  input.value = text.substring(0, start) + emoji + text.substring(end);
+  input.selectionStart = input.selectionEnd = start + emoji.length;
+  input.focus();
 }
 
 </script>
