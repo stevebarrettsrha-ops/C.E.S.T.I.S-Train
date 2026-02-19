@@ -42,6 +42,7 @@
   --topbar-h: 64px;
 }
 * { margin:0; padding:0; box-sizing:border-box; }
+*:focus-visible { outline:2px solid var(--accent); outline-offset:2px; }
 body { font-family:'DM Sans',sans-serif; background:var(--bg-primary); color:var(--text-primary); overflow-x:hidden; overflow-y:hidden; height:100vh; }
 h1,h2,h3,h4 { font-family:'Playfair Display',serif; }
 ::-webkit-scrollbar { width:6px; }
@@ -2378,7 +2379,8 @@ function saveState() {
     localStorage.setItem('voctrain_studentProfiles', JSON.stringify(studentProfiles));
     localStorage.setItem('voctrain_systemSettings', JSON.stringify(systemSettings));
     localStorage.setItem('voctrain_examResults', JSON.stringify(examResults));
-  } catch(e) { /* quota exceeded or private browsing */ }
+    localStorage.setItem('voctrain_calendarEvents', JSON.stringify(calendarEvents));
+  } catch(e) { console.warn('saveState: storage quota exceeded or unavailable'); }
 }
 
 function loadState() {
@@ -2393,6 +2395,7 @@ function loadState() {
     const sp = localStorage.getItem('voctrain_studentProfiles');
     const ss = localStorage.getItem('voctrain_systemSettings');
     const er = localStorage.getItem('voctrain_examResults');
+    const ce = localStorage.getItem('voctrain_calendarEvents');
     if(s) students = JSON.parse(s);
     if(e) exams = JSON.parse(e);
     if(a) announcements = JSON.parse(a);
@@ -2403,6 +2406,7 @@ function loadState() {
     if(sp) studentProfiles = JSON.parse(sp);
     if(ss) systemSettings = JSON.parse(ss);
     if(er) examResults = JSON.parse(er);
+    if(ce) calendarEvents = JSON.parse(ce);
   } catch(e) { /* parse error, use generated data */ }
 }
 loadState();
@@ -2634,11 +2638,11 @@ function renderUserAccountsTable() {
     var initials = u.name.split(' ').map(function(n){return n[0];}).join('').substring(0,2).toUpperCase();
     var checked = umSelectedIds.indexOf(u.id) > -1 ? 'checked' : '';
     return '<tr>' +
-      '<td><input type="checkbox" class="um-cb um-row-cb" data-uid="'+u.id+'" '+checked+' onchange="toggleUmCheckbox(\''+u.id+'\')"></td>' +
-      '<td><div class="um-user-cell"><div class="um-avatar" style="background:'+roleColors[u.role]+';">'+initials+'</div><div><div class="um-name">'+u.name+'</div><div class="um-email">'+(u.email||u.username)+'</div></div></div></td>' +
+      '<td><input type="checkbox" class="um-cb um-row-cb" data-uid="'+escapeAttr(u.id)+'" '+checked+' onchange="toggleUmCheckbox(\''+escapeAttr(u.id)+'\')"></td>' +
+      '<td><div class="um-user-cell"><div class="um-avatar" style="background:'+roleColors[u.role]+';">'+escapeHtml(initials)+'</div><div><div class="um-name">'+escapeHtml(u.name)+'</div><div class="um-email">'+escapeHtml(u.email||u.username)+'</div></div></div></td>' +
       '<td><span class="um-role-badge '+roleBadges[u.role]+'">'+roleLabels[u.role]+'</span></td>' +
-      '<td>'+u.username+'</td>' +
-      '<td>'+(u.programme||'—')+'</td>' +
+      '<td>'+escapeHtml(u.username)+'</td>' +
+      '<td>'+escapeHtml(u.programme||'—')+'</td>' +
       '<td><label class="um-toggle"><input type="checkbox" '+(u.status==='active'?'checked':'')+' onchange="toggleUserStatus(\''+u.id+'\')"><span class="um-slider"></span></label></td>' +
       '<td><div class="um-actions">' +
         '<button title="Edit" onclick="openEditUser(\''+u.id+'\')">✏️</button>' +
@@ -2723,10 +2727,10 @@ function initGlobalSearch() {
       dropdown.innerHTML = '<div class="search-empty">No results found</div>';
     } else {
       dropdown.innerHTML = '<div class="search-label">Results</div>' + results.map(r =>
-        `<div class="search-result-item" onclick="showPage('${r.page}');document.querySelector('.search-results').classList.remove('active');document.getElementById('globalSearch').value='';">
+        `<div class="search-result-item" onclick="showPage('${escapeAttr(r.page)}');document.querySelector('.search-results').classList.remove('active');document.getElementById('globalSearch').value='';">
           <div class="sr-icon">${r.icon}</div>
-          <div class="sr-text"><div class="sr-title">${r.title}</div><div class="sr-desc">${r.desc}</div></div>
-          <span class="sr-category ${r.catClass}">${r.cat}</span>
+          <div class="sr-text"><div class="sr-title">${escapeHtml(r.title)}</div><div class="sr-desc">${escapeHtml(r.desc)}</div></div>
+          <span class="sr-category ${r.catClass}">${escapeHtml(r.cat)}</span>
         </div>`
       ).join('');
     }
@@ -2863,8 +2867,7 @@ function handleAdminClick() {
     var pw = document.getElementById('adminPass').value;
     var adminUser = userAccounts.find(function(u){ return u.role==='admin' && (u.username===uname || u.email===uname) && u.password===pw; });
     if(!adminUser) {
-      // Fallback: allow blank for backwards compat
-      if(uname === '' && pw === '') { enterApp('admin'); return; }
+      if(!uname || !pw) { alert('Please enter both username and password.'); return; }
       var anyAdmin = userAccounts.find(function(u){ return u.role==='admin' && (u.username===uname || u.email===uname); });
       if(anyAdmin && anyAdmin.status==='disabled') { alert('This account has been disabled. Contact a system administrator.'); return; }
       alert('Invalid username or password.'); return;
@@ -4003,7 +4006,7 @@ function buildInstructorPages() {
     <div class="attendance-summary" id="iAttendanceSummary"></div>
     <div style="display:flex;gap:12px;margin-bottom:20px;align-items:center;">
       <label style="font-size:13px;font-weight:600;">Date:</label>
-      <input type="date" class="form-control" style="width:180px;" id="iAttendanceDate" value="2026-02-18">
+      <input type="date" class="form-control" style="width:180px;" id="iAttendanceDate" value="${new Date().toISOString().split('T')[0]}">
       <button class="btn btn-primary" onclick="saveInstructorAttendance()">Save Attendance</button>
     </div>
     <div class="card"><div class="card-header"><h3>Class Attendance &mdash; ${ins.course}</h3><span style="font-size:13px;color:var(--text-muted);" id="iAttCount">${myStudents.length} students</span></div>
@@ -5977,7 +5980,7 @@ function createExam() {
     students: 0,
     status: 'upcoming',
     questions: examBuilderQuestions.length || 0,
-    passMark: parseInt(document.getElementById('examPassMark').value)||60,
+    passMark: Math.min(100, Math.max(1, parseInt(document.getElementById('examPassMark').value)||60)),
     questionData: JSON.parse(JSON.stringify(examBuilderQuestions)),
     shuffleQuestions: document.getElementById('examShuffle').value === 'true',
     instructions: document.getElementById('examInstructions').value
@@ -6338,11 +6341,7 @@ function submitGrading() {
 
   // Update student score
   var student = students.find(function(s){ return s.id === result.studentId; });
-  if(student) {
-    student.score = result.score + '%';
-    var studentIdx = students.indexOf(student);
-    if(studentIdx >= 0) students[studentIdx].score = result.score + '%';
-  }
+  if(student) student.score = result.score + '%';
 
   examResults[resultIdx] = result;
   saveState();
@@ -6360,7 +6359,9 @@ var currentExamSession = null;
 var examTimerInterval = null;
 
 function startStudentExam(examIdx) {
+  if(examIdx < 0 || examIdx >= exams.length) { alert('Exam not found.'); return; }
   var e = exams[examIdx];
+  if(!e) { alert('Exam not found.'); return; }
   if(!e.questionData || e.questionData.length === 0) { alert('This exam has no questions yet.'); return; }
   // Check if already taken
   var alreadyTaken = examResults.some(function(r){return r.examId===e.id && r.studentId===currentStudent.id;});
@@ -6616,8 +6617,6 @@ function submitExam() {
 
   // Update student score
   currentStudent.score = score + '%';
-  var studentIdx = students.findIndex(function(st){return st.id===currentStudent.id;});
-  if(studentIdx>=0) students[studentIdx].score = score + '%';
 
   // Update exam student count
   if(exam) {
@@ -7680,7 +7679,7 @@ function finalizeImportExam() {
     students: 0,
     status: 'upcoming',
     questions: importedQuestions.length,
-    passMark: parseInt(document.getElementById('importExamPassMark').value) || 60,
+    passMark: Math.min(100, Math.max(1, parseInt(document.getElementById('importExamPassMark').value) || 60)),
     questionData: JSON.parse(JSON.stringify(importedQuestions)),
     shuffleQuestions: document.getElementById('importExamShuffle').value === 'true',
     instructions: ''
@@ -7811,10 +7810,14 @@ function setCloudSyncing(syncing) {
 // Toggle cloud dropdown menu
 function toggleCloudMenu() {
   const menu = document.getElementById('cloudDropdownMenu');
+  // Remove any existing listener first to prevent accumulation
+  document.removeEventListener('click', closeCloudMenuOnClickOutside);
   menu.classList.toggle('show');
-  setTimeout(() => {
-    document.addEventListener('click', closeCloudMenuOnClickOutside);
-  }, 0);
+  if(menu.classList.contains('show')) {
+    setTimeout(() => {
+      document.addEventListener('click', closeCloudMenuOnClickOutside);
+    }, 0);
+  }
 }
 
 function closeCloudMenuOnClickOutside(e) {
