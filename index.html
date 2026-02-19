@@ -416,8 +416,10 @@ h1,h2,h3,h4 { font-family:'Playfair Display',serif; }
 }
 .topbar-btn:hover { background:rgba(255,255,255,0.06); color:var(--text-primary); }
 .topbar-btn .dot {
-  position:absolute; top:6px; right:6px; width:8px; height:8px;
-  background:var(--red); border-radius:50%; border:2px solid var(--bg-primary);
+  position:absolute; top:2px; right:2px; min-width:16px; height:16px; padding:0 4px;
+  background:var(--red); border-radius:8px; border:2px solid var(--bg-primary);
+  font-size:9px; font-weight:700; color:#fff; display:flex; align-items:center; justify-content:center;
+  line-height:1; box-sizing:border-box;
 }
 .logout-btn {
   display:flex; align-items:center; gap:6px;
@@ -2760,16 +2762,48 @@ let announcements = [
   {id:6,title:"Guest Lecture: Industry Trends",body:"A guest lecture on emerging industry trends will be held on March 1 in the main auditorium. All programmes welcome. Attendance counts toward professional development hours.",priority:"general",date:"2026-02-12",author:"Mrs. P. Morgan",forRoles:['admin','student','instructor']}
 ];
 
-let notifications = [
-  {id:1,text:"Keisha Brown scored 87% on Welding L2 exam",time:"15 min ago",read:false,icon:"\uD83C\uDF1F",type:"success"},
-  {id:2,text:"3 students below 70% attendance threshold",time:"1 hr ago",read:false,icon:"\u26A0\uFE0F",type:"warning"},
-  {id:3,text:"New exam scheduled: Electrical Installation L3",time:"2 hrs ago",read:false,icon:"\uD83D\uDCDD",type:"info"},
-  {id:4,text:"Certificate collected: Marlon Davis - Auto Mechanics",time:"3 hrs ago",read:false,icon:"\u2705",type:"success"},
-  {id:5,text:"5 students marked incomplete in Cosmetology L1",time:"4 hrs ago",read:false,icon:"\uD83D\uDED1",type:"warning"},
-  {id:6,text:"System backup completed successfully",time:"5 hrs ago",read:false,icon:"\uD83D\uDCBE",type:"info"},
-  {id:7,text:"New student enrolled: Crystal Nelson - Hospitality",time:"6 hrs ago",read:false,icon:"\uD83D\uDC64",type:"info"},
-  {id:8,text:"Exam results published for Welding L1 Safety",time:"1 day ago",read:false,icon:"\uD83D\uDCCB",type:"success"}
-];
+let notifications = [];
+
+function addNotification(text, type, icon) {
+  type = type || 'info';
+  var icons = {success:'\u2705',warning:'\u26A0\uFE0F',info:'\uD83D\uDD14',exam:'\uD83D\uDCDD',student:'\uD83D\uDC64',cert:'\uD83C\uDF93',announce:'\uD83D\uDCE2',calendar:'\uD83D\uDCC5',attendance:'\uD83D\uDCCB',resource:'\uD83D\uDCC1',grade:'\uD83C\uDF1F'};
+  notifications.unshift({
+    id: Date.now() + Math.random(),
+    text: text,
+    timestamp: Date.now(),
+    time: 'Just now',
+    read: false,
+    icon: icon || icons[type] || icons.info,
+    type: type === 'warning' ? 'warning' : type === 'success' || type === 'grade' || type === 'cert' ? 'success' : 'info'
+  });
+  if(notifications.length > 50) notifications = notifications.slice(0, 50);
+  updateNotificationDot();
+  saveNotifications();
+}
+
+function getRelativeTime(ts) {
+  var diff = Math.floor((Date.now() - ts) / 1000);
+  if(diff < 60) return 'Just now';
+  if(diff < 3600) return Math.floor(diff/60) + ' min ago';
+  if(diff < 86400) return Math.floor(diff/3600) + ' hr' + (Math.floor(diff/3600)>1?'s':'') + ' ago';
+  if(diff < 604800) return Math.floor(diff/86400) + ' day' + (Math.floor(diff/86400)>1?'s':'') + ' ago';
+  return new Date(ts).toLocaleDateString();
+}
+
+function refreshNotificationTimes() {
+  notifications.forEach(function(n) { if(n.timestamp) n.time = getRelativeTime(n.timestamp); });
+}
+
+function saveNotifications() {
+  try { localStorage.setItem('voctrain_notifications', JSON.stringify(notifications)); } catch(e) {}
+}
+
+function loadNotifications() {
+  try {
+    var saved = localStorage.getItem('voctrain_notifications');
+    if(saved) { notifications = JSON.parse(saved); refreshNotificationTimes(); }
+  } catch(e) {}
+}
 
 let examResults = [];
 
@@ -2981,6 +3015,8 @@ function loadState() {
   } catch(e) { /* parse error, use generated data */ }
 }
 loadState();
+loadNotifications();
+updateNotificationDot();
 
 // ============================== USER ACCOUNTS MANAGEMENT ==============================
 let userAccounts = [
@@ -3056,6 +3092,7 @@ function createUserAccount() {
   document.getElementById('newUserProgramme').value='';
   renderUserAccountsTable();
   showToast('User account created successfully!');
+  addNotification('New user account created: ' + name + ' (' + role + ')', 'student');
 }
 
 function openEditUser(userId) {
@@ -3329,10 +3366,11 @@ function toggleNotifications() {
     btn.appendChild(dropdown);
   }
   if(dropdown.classList.contains('active')) { dropdown.classList.remove('active'); return; }
+  refreshNotificationTimes();
   const unreadCount = notifications.filter(n=>!n.read).length;
   dropdown.innerHTML = `
-    <div class="notif-header"><span>Notifications ${unreadCount>0?'('+unreadCount+')':''}</span><button class="mark-read" onclick="event.stopPropagation();markAllNotificationsRead()">Mark all read</button></div>
-    ${notifications.length === 0 ? '<div class="notif-empty">No notifications</div>' :
+    <div class="notif-header"><span>Notifications ${unreadCount>0?'('+unreadCount+')':''}</span><div style="display:flex;gap:8px;"><button class="mark-read" onclick="event.stopPropagation();markAllNotificationsRead()">Mark all read</button>${notifications.length>0?'<button class="mark-read" style="color:var(--red);" onclick="event.stopPropagation();clearAllNotifications()">Clear all</button>':''}</div></div>
+    ${notifications.length === 0 ? '<div class="notif-empty">No notifications yet.<br><span style="font-size:11px;color:var(--text-muted);margin-top:4px;display:block;">Notifications will appear here as you use the system.</span></div>' :
       notifications.map((n,i) => `
         <div class="notif-item ${n.read?'':'unread'}" onclick="event.stopPropagation();markNotificationRead(${i})">
           <div class="notif-icon" style="background:${n.type==='success'?'var(--green-dim)':n.type==='warning'?'var(--accent-dim)':'var(--blue-dim)'};">${n.icon}</div>
@@ -3350,6 +3388,7 @@ function toggleNotifications() {
 function markNotificationRead(idx) {
   notifications[idx].read = true;
   updateNotificationDot();
+  saveNotifications();
   toggleNotifications();
   toggleNotifications();
 }
@@ -3357,6 +3396,15 @@ function markNotificationRead(idx) {
 function markAllNotificationsRead() {
   notifications.forEach(n => n.read = true);
   updateNotificationDot();
+  saveNotifications();
+  toggleNotifications();
+  toggleNotifications();
+}
+
+function clearAllNotifications() {
+  notifications = [];
+  updateNotificationDot();
+  saveNotifications();
   toggleNotifications();
   toggleNotifications();
 }
@@ -3365,7 +3413,8 @@ function updateNotificationDot() {
   const dot = document.querySelector('.topbar-btn[title="Notifications"] .dot');
   if(!dot) return;
   const unread = notifications.filter(n=>!n.read).length;
-  dot.style.display = unread > 0 ? '' : 'none';
+  dot.style.display = unread > 0 ? 'flex' : 'none';
+  dot.textContent = unread > 99 ? '99+' : unread;
 }
 
 function exportCSV(data, headers, filename) {
@@ -3862,6 +3911,7 @@ function approveUser(userId) {
   saveState();
   renderVerifyUsersPage();
   showToast('Account approved: ' + user.name + ' (' + user.role + ')');
+  addNotification('Account approved: ' + user.name + ' (' + user.role + ')', 'success');
 }
 
 function rejectUser(userId) {
@@ -3874,6 +3924,7 @@ function rejectUser(userId) {
   saveState();
   renderVerifyUsersPage();
   showToast('Account rejected: ' + user.name);
+  addNotification('Account rejected: ' + user.name, 'warning');
 }
 
 function approveAllPending() {
@@ -3889,6 +3940,7 @@ function approveAllPending() {
   saveState();
   renderVerifyUsersPage();
   showToast(pending.length + ' account(s) approved!');
+  addNotification(pending.length + ' user account(s) approved', 'success');
 }
 
 function rejectAllPending() {
@@ -3904,6 +3956,7 @@ function rejectAllPending() {
   saveState();
   renderVerifyUsersPage();
   showToast(pending.length + ' account(s) rejected.');
+  addNotification(pending.length + ' user account(s) rejected', 'warning');
 }
 
 /* ============================== MOBILE SIDEBAR TOGGLE ============================== */
@@ -5473,6 +5526,7 @@ function renderInstructorWeeklyChart(records) {
 function saveInstructorAttendance() {
   saveState();
   showToast('Attendance saved!');
+  addNotification('Attendance records updated', 'attendance');
   renderInstructorAttendance();
 }
 
@@ -5497,6 +5551,7 @@ function createInstructorAnnouncement() {
   renderInstructorAnnouncements();
   saveState();
   showToast('Announcement published!');
+  addNotification('New announcement: "' + title + '"' + (priority==='urgent' ? ' (URGENT)' : ''), priority==='urgent' ? 'warning' : 'announce');
 }
 
 function renderInstructorAnnouncements() {
@@ -6508,6 +6563,7 @@ function createClassSession() {
   saveState();
   closeModal('createClassSessionModal');
   showToast('Class session "' + name + '" created successfully');
+  addNotification('New class session: "' + name + '"', 'calendar');
 
   // Reset form fields
   document.getElementById('csSessionName').value = '';
@@ -6602,6 +6658,7 @@ function createAssignment() {
   saveState();
   closeModal('createAssignmentModal');
   showToast('Assignment "' + title + '" created successfully');
+  addNotification('New assignment created: "' + title + '"', 'exam');
 
   // Reset form
   document.getElementById('assignTitle').value = '';
@@ -6666,6 +6723,7 @@ function uploadResource() {
   saveState();
   closeModal('uploadResourceModal');
   showToast('Resource "' + name + '" uploaded successfully');
+  addNotification('New resource uploaded: "' + name + '"', 'resource');
 
   // Reset form
   document.getElementById('resName').value = '';
@@ -6888,6 +6946,9 @@ function updateStudentStage(idx) {
   if(newStage==='incomplete')students[idx].progress=Math.min(students[idx].progress,40);
   closeModal('updateStageModal');filterStudents();updatePipelineCounts();
   showToast(`${students[idx].name} moved to ${stageLabels[newStage]}`);
+  if(newStage==='certified') addNotification('Certificate issued: ' + students[idx].name + ' — ' + students[idx].course, 'cert');
+  else if(newStage==='collected') addNotification('Certificate collected: ' + students[idx].name, 'cert');
+  else addNotification(students[idx].name + ' moved to ' + stageLabels[newStage], 'student');
   saveState();
 }
 function updatePipelineCounts() {
@@ -6901,6 +6962,7 @@ function addStudent() {
   if(!name){alert('Please enter a name');return;}
   students.unshift({id:'STU-'+String(2026000+students.length),name,stage:document.getElementById('newStudentStage').value,course:document.getElementById('newStudentCourse').value,score:'',progress:10,certNo:null,certDate:null,certCollected:false,attendance:0,assignments:0,assignmentsTotal:8,gpa:'0.0',instructor:'Mr. R. Campbell'});
   closeModal('addStudentModal');filterStudents();updatePipelineCounts();showToast(`${name} added!`);document.getElementById('newStudentName').value='';
+  addNotification('New student enrolled: ' + name + ' — ' + document.getElementById('newStudentCourse').value, 'student');
   saveState();
 }
 
@@ -7166,9 +7228,11 @@ function createExam() {
     if(newExam.title) exams[editingExamIdx].title = newExam.title;
     exams[editingExamIdx].instructions = newExam.instructions;
     showToast('Exam updated with '+newExam.questionData.length+' questions!');
+    addNotification('Exam updated: "' + exams[editingExamIdx].title + '" — ' + newExam.questionData.length + ' questions', 'exam');
   } else {
     exams.unshift(newExam);
     showToast('Exam "'+title+'" created with '+newExam.questionData.length+' questions!');
+    addNotification('New exam created: "' + title + '" — ' + newExam.questionData.length + ' questions', 'exam');
   }
 
   editingExamIdx = -1;
@@ -7207,6 +7271,7 @@ function activateExam(idx) {
   exams[idx].status = 'active';
   renderExams('upcoming');
   showToast('Exam "'+e.title+'" is now ACTIVE!');
+  addNotification('Exam activated: "' + e.title + '" — students can now take this exam', 'exam');
   saveState();
 }
 
@@ -7222,6 +7287,7 @@ function completeExam(idx) {
   }
   renderExams('active');
   showToast('Exam "'+e.title+'" marked as completed');
+  addNotification('Exam completed: "' + e.title + '"' + (exams[idx].passRate ? ' — pass rate: ' + exams[idx].passRate : ''), 'exam');
   saveState();
 }
 
@@ -7520,6 +7586,7 @@ function submitGrading() {
 
   closeGradingPanel();
   showToast('Grades saved! Final score: ' + result.score + '% — ' + (result.passed ? 'PASSED' : 'NOT PASSED'));
+  addNotification('Grading completed: ' + result.studentName + ' scored ' + result.score + '% — ' + (result.passed ? 'PASSED' : 'NOT PASSED'), result.passed ? 'grade' : 'warning');
 
   // Refresh the results view if visible
   var examIdx = exams.indexOf(exam);
@@ -7798,6 +7865,7 @@ function submitExam() {
 
   localStorage.removeItem('voctrain_examInProgress');
   currentExamSession = null;
+  addNotification(result.studentName + ' scored ' + result.score + '% on ' + (exam ? exam.title : 'exam') + (result.passed ? ' — PASSED' : result.needsReview ? ' — pending review' : ' — NOT PASSED'), result.passed ? 'grade' : result.needsReview ? 'info' : 'warning');
   saveState();
 
   // Show results
@@ -7908,7 +7976,7 @@ function renderCerts(filter,search) {
   tbody.innerHTML = certs.map(s=>`<tr><td><strong>${s.name}</strong></td><td style="font-family:monospace;font-size:12px;">${s.certNo}</td><td>${s.course}</td><td>Level ${Math.floor(Math.random()*3)+1}</td><td>${s.certDate}</td><td>${s.certCollected?'<span class="badge badge-green"><span class="badge-dot"></span>Collected</span>':'<span class="badge badge-amber"><span class="badge-dot"></span>Pending</span>'}</td><td>${!s.certCollected?`<button class="btn btn-sm btn-success" onclick="markCollected(${students.indexOf(s)})">Mark Collected</button>`:'<span style="font-size:12px;color:var(--text-muted);">✓ Done</span>'}</td></tr>`).join('');
 }
 function filterCerts() { renderCerts(document.getElementById('certFilter')?.value,document.getElementById('certSearch')?.value?.toLowerCase()); }
-function markCollected(idx) { students[idx].certCollected=true;students[idx].stage='collected';students[idx].progress=100;filterCerts();updatePipelineCounts();renderCertStats();showToast(`Certificate collected: ${students[idx].name}`);saveState(); }
+function markCollected(idx) { students[idx].certCollected=true;students[idx].stage='collected';students[idx].progress=100;filterCerts();updatePipelineCounts();renderCertStats();showToast(`Certificate collected: ${students[idx].name}`);addNotification('Certificate collected: ' + students[idx].name + ' — ' + students[idx].course, 'cert');saveState(); }
 
 function renderPassRates() {
   const progs=[{name:'Welding',rate:82},{name:'Electrical',rate:76},{name:'Cosmetology',rate:88},{name:'Business Admin',rate:71},{name:'Auto Mechanics',rate:79},{name:'Hospitality',rate:90},{name:'IT',rate:72},{name:'Plumbing',rate:84}];
@@ -8086,6 +8154,7 @@ function updateAttendanceCell(sel) {
 function saveAttendance() {
   saveState();
   showToast('Attendance saved!');
+  addNotification('Attendance records updated', 'attendance');
   const courseFilter = document.getElementById('attendanceCourseFilter')?.value || 'all';
   let records = courseFilter==='all' ? attendanceRecords : attendanceRecords.filter(r=>r.course===courseFilter);
   renderAttendanceSummary(records);
@@ -8113,6 +8182,7 @@ function createAnnouncement() {
   renderAnnouncements();
   saveState();
   showToast('Announcement published!');
+  addNotification('New announcement: "' + title + '"' + (priority==='urgent' ? ' (URGENT)' : ''), priority==='urgent' ? 'warning' : 'announce');
 }
 
 function deleteAnnouncement(id) {
@@ -8261,6 +8331,7 @@ function promptAddEvent() {
   renderCalendar();
   saveState();
   showToast('Event added!');
+  addNotification('New ' + type + ' event: "' + title + '" on ' + date, 'calendar');
 }
 
 function openModal(id) { document.getElementById(id).classList.add('active'); }
@@ -8864,6 +8935,7 @@ function finalizeImportExam() {
   saveState();
 
   showToast('Exam "' + title + '" created with ' + importedQuestions.length + ' questions from import!');
+  addNotification('New exam imported: "' + title + '" — ' + importedQuestions.length + ' questions', 'exam');
 
   // Reset import state
   importedQuestions = [];
