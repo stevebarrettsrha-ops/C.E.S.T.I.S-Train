@@ -2509,6 +2509,12 @@ function loadUserAccounts() {
   try {
     var u = localStorage.getItem('voctrain_users');
     if(u) userAccounts = JSON.parse(u);
+    // Migrate: ensure admin account has current credentials
+    var adminAcct = userAccounts.find(function(a){ return a.id === 'USR-001' && a.role === 'admin'; });
+    if(adminAcct) {
+      adminAcct.username = 'cestisadmin';
+      adminAcct.password = 'cestisadmin123$';
+    }
   } catch(e) {}
 }
 loadUserAccounts();
