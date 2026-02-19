@@ -5,6 +5,8 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>VocTrain LMS — Vocational Training Management System</title>
 <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=Playfair+Display:wght@500;600;700;800&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/mammoth/1.6.0/mammoth.browser.min.js"></script>
 <style>
 :root {
   --bg-primary: #0c1117;
@@ -1425,6 +1427,98 @@ textarea.form-control { resize:vertical; min-height:80px; }
 .exam-review-item .er-answer { font-size:13px; color:var(--text-secondary); }
 .exam-review-item .er-correct { font-size:13px; color:var(--green); margin-top:4px; }
 
+/* ============================== EXAM IMPORT PAGE ============================== */
+.import-drop-zone {
+  border:2px dashed var(--border-light); border-radius:var(--radius-lg);
+  padding:48px 32px; text-align:center; cursor:pointer;
+  transition:all var(--transition); background:var(--bg-input);
+  position:relative;
+}
+.import-drop-zone:hover, .import-drop-zone.dragover {
+  border-color:var(--accent); background:var(--accent-dim);
+}
+.import-drop-zone .drop-icon { font-size:48px; margin-bottom:16px; opacity:0.6; }
+.import-drop-zone .drop-title { font-size:16px; font-weight:600; margin-bottom:6px; }
+.import-drop-zone .drop-subtitle { font-size:13px; color:var(--text-muted); }
+.import-drop-zone input[type="file"] {
+  position:absolute; inset:0; opacity:0; cursor:pointer;
+}
+.import-file-info {
+  display:flex; align-items:center; gap:14px; padding:16px 20px;
+  background:var(--bg-card); border:1px solid var(--border); border-radius:var(--radius);
+  margin:16px 0;
+}
+.import-file-info .file-icon { font-size:28px; flex-shrink:0; }
+.import-file-info .file-details { flex:1; }
+.import-file-info .file-details .file-name { font-size:14px; font-weight:600; }
+.import-file-info .file-details .file-meta { font-size:12px; color:var(--text-muted); }
+.import-file-info .file-remove {
+  background:none; border:1px solid var(--border); color:var(--text-muted);
+  width:32px; height:32px; border-radius:var(--radius-sm); cursor:pointer;
+  display:flex; align-items:center; justify-content:center; font-size:16px;
+}
+.import-file-info .file-remove:hover { background:var(--red-dim); color:var(--red); border-color:var(--red); }
+.import-progress {
+  margin:20px 0; padding:20px; background:var(--bg-card); border:1px solid var(--border);
+  border-radius:var(--radius); text-align:center;
+}
+.import-progress .import-spinner {
+  width:40px; height:40px; border:3px solid var(--border-light);
+  border-top-color:var(--accent); border-radius:50%; margin:0 auto 12px;
+  animation:cloudSpin 0.8s linear infinite;
+}
+.import-preview-item {
+  background:var(--bg-card); border:1px solid var(--border); border-radius:var(--radius);
+  padding:18px; margin-bottom:12px; position:relative;
+}
+.import-preview-item .ip-number {
+  position:absolute; top:-8px; left:14px; background:var(--accent); color:#000;
+  font-size:10px; font-weight:700; padding:2px 8px; border-radius:8px;
+}
+.import-preview-item .ip-type-select { width:160px; }
+.import-preview-item .ip-header {
+  display:flex; align-items:center; gap:10px; margin-bottom:10px;
+}
+.import-preview-item .ip-actions { display:flex; gap:4px; margin-left:auto; }
+.import-preview-item .ip-actions button {
+  background:none; border:1px solid var(--border); color:var(--text-secondary);
+  width:28px; height:28px; border-radius:var(--radius-sm); cursor:pointer;
+  display:flex; align-items:center; justify-content:center; font-size:12px;
+}
+.import-preview-item .ip-actions button:hover { background:rgba(255,255,255,0.06); }
+.import-preview-item .ip-actions button.ip-del:hover { background:var(--red-dim); color:var(--red); }
+.import-raw-text {
+  width:100%; min-height:200px; padding:14px; background:var(--bg-input);
+  border:1px solid var(--border-light); border-radius:var(--radius-sm);
+  color:var(--text-primary); font-size:13px; font-family:'DM Sans',monospace;
+  resize:vertical; outline:none;
+}
+.import-raw-text:focus { border-color:var(--accent); }
+.import-steps { display:flex; gap:4px; margin-bottom:24px; }
+.import-step {
+  flex:1; padding:12px; text-align:center; border-radius:var(--radius-sm);
+  background:var(--bg-input); font-size:12px; font-weight:600; color:var(--text-muted);
+  position:relative;
+}
+.import-step.active { background:var(--accent-dim); color:var(--accent); }
+.import-step.done { background:var(--green-dim); color:var(--green); }
+.import-step .step-num {
+  display:inline-flex; width:22px; height:22px; border-radius:50%;
+  align-items:center; justify-content:center; font-size:11px; font-weight:700;
+  background:rgba(255,255,255,0.08); margin-right:6px;
+}
+.import-step.active .step-num { background:var(--accent); color:#000; }
+.import-step.done .step-num { background:var(--green); color:#fff; }
+.import-format-tips {
+  background:var(--blue-dim); border:1px solid rgba(52,152,219,0.2);
+  border-radius:var(--radius); padding:16px 20px; margin:16px 0; font-size:13px;
+}
+.import-format-tips strong { color:var(--blue); }
+.import-format-tips code {
+  background:var(--bg-input); padding:2px 6px; border-radius:4px;
+  font-family:monospace; font-size:12px;
+}
+
 /* ============================== VIDEO RECORDING ============================== */
 .vc-btn.recording { background:var(--red); color:#fff; animation:recPulse 1.2s infinite; }
 .vc-btn.recording:hover { background:#c0392b; }
@@ -2844,6 +2938,8 @@ function buildAdminSidebar() {
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/></svg>Training Centres</div>
     <div class="nav-item" data-page="exams" onclick="showPage('exams')">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg>Online Exams</div>
+    <div class="nav-item" data-page="import-exam" onclick="showPage('import-exam')">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>Import Exam</div>
     <div class="nav-section-label">Management</div>
     <div class="nav-item" data-page="attendance" onclick="showPage('attendance')">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M16 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="8.5" cy="7" r="4"/><polyline points="17 11 19 13 23 9"/></svg>Attendance</div>
@@ -2957,7 +3053,7 @@ function showPage(pageId) {
   if(navItem) navItem.classList.add('active');
   const titles = {
     dashboard:'Dashboard',video:'Video Conference',students:'Student Progress',
-    training:'Training Centres',exams:'Online Exams',certificates:'Certificate Tracking',
+    training:'Training Centres',exams:'Online Exams','import-exam':'Import Exam',certificates:'Certificate Tracking',
     reports:'Reports & Analytics',settings:'Settings',
     attendance:'Attendance Management',announcements:'Announcements',calendar:'Calendar & Schedule',
     's-dashboard':'My Dashboard','s-video':'My Classes','s-progress':'My Progress',
@@ -3077,6 +3173,115 @@ function buildAdminPages() {
     </div>
     <!-- Exam Results Detail View (shown when clicking Results on a completed exam) -->
     <div id="examResultsView" style="display:none;"></div>
+  </section>
+
+  <!-- IMPORT EXAM PAGE -->
+  <section class="page" id="page-import-exam">
+    <!-- Step indicators -->
+    <div class="import-steps">
+      <div class="import-step active" id="importStep1Indicator"><span class="step-num">1</span>Upload File</div>
+      <div class="import-step" id="importStep2Indicator"><span class="step-num">2</span>Review Text</div>
+      <div class="import-step" id="importStep3Indicator"><span class="step-num">3</span>Edit Questions</div>
+      <div class="import-step" id="importStep4Indicator"><span class="step-num">4</span>Import to Exam</div>
+    </div>
+
+    <!-- Step 1: Upload -->
+    <div id="importStep1">
+      <div class="card">
+        <div class="card-header"><h3>Upload Exam Document</h3></div>
+        <p style="font-size:13px;color:var(--text-secondary);margin-bottom:16px;">Upload a PDF or Word document (.docx) containing exam questions. The system will extract the text and detect questions automatically.</p>
+
+        <div class="import-drop-zone" id="importDropZone">
+          <input type="file" accept=".pdf,.docx,.doc" onchange="handleImportFileSelect(event)" id="importFileInput">
+          <div class="drop-icon">📄</div>
+          <div class="drop-title">Drop your file here or click to browse</div>
+          <div class="drop-subtitle">Supports PDF and Word (.docx) files &bull; Max 20MB</div>
+        </div>
+
+        <div id="importFileInfo" style="display:none;"></div>
+
+        <div class="import-format-tips">
+          <strong>Tips for best results:</strong>
+          <ul style="margin:8px 0 0 16px;line-height:1.8;color:var(--text-secondary);">
+            <li>Number your questions: <code>1.</code>, <code>Q1.</code>, <code>1)</code>, or <code>Question 1:</code></li>
+            <li>Letter your MCQ options: <code>A.</code>, <code>B.</code>, <code>a)</code>, or <code>(A)</code></li>
+            <li>Mark answers with: <code>Answer: B</code>, <code>*correct option</code>, or <code>[correct]</code></li>
+            <li>True/False questions are auto-detected when options are only "True" and "False"</li>
+            <li>Text-based PDFs work best — scanned image PDFs cannot be parsed</li>
+          </ul>
+        </div>
+      </div>
+    </div>
+
+    <!-- Step 2: Review Raw Text -->
+    <div id="importStep2" style="display:none;">
+      <div class="card">
+        <div class="card-header"><h3>Extracted Text</h3><span style="font-size:12px;color:var(--text-muted);" id="importCharCount"></span></div>
+        <p style="font-size:13px;color:var(--text-secondary);margin-bottom:12px;">Review the extracted text below. You can edit it to fix any parsing issues before auto-detecting questions.</p>
+        <textarea class="import-raw-text" id="importRawText" placeholder="Extracted text will appear here..."></textarea>
+        <div style="display:flex;gap:10px;justify-content:flex-end;margin-top:16px;">
+          <button class="btn btn-secondary" onclick="goToImportStep(1)">← Back</button>
+          <button class="btn btn-primary" onclick="detectQuestionsFromText()">Detect Questions →</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Step 3: Preview & Edit Detected Questions -->
+    <div id="importStep3" style="display:none;">
+      <div class="card">
+        <div class="card-header">
+          <h3>Detected Questions</h3>
+          <div style="display:flex;gap:8px;align-items:center;">
+            <span style="font-size:13px;color:var(--text-muted);" id="importDetectedCount">0 questions</span>
+            <button class="btn btn-sm btn-secondary" onclick="addImportQuestion()">+ Add Question</button>
+          </div>
+        </div>
+        <p style="font-size:13px;color:var(--text-secondary);margin-bottom:16px;">Review and edit the detected questions. Set the correct answers and question types, then import them into an exam.</p>
+        <div id="importPreviewList"></div>
+        <div style="display:flex;gap:10px;justify-content:flex-end;margin-top:16px;">
+          <button class="btn btn-secondary" onclick="goToImportStep(2)">← Edit Text</button>
+          <button class="btn btn-primary" onclick="goToImportStep(4)">Import to Exam →</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Step 4: Import into Exam -->
+    <div id="importStep4" style="display:none;">
+      <div class="card">
+        <div class="card-header"><h3>Create Exam from Import</h3></div>
+        <p style="font-size:13px;color:var(--text-secondary);margin-bottom:16px;">Configure the exam settings and import the questions.</p>
+        <div class="form-group"><label>Exam Title</label><input type="text" class="form-control" id="importExamTitle" placeholder="e.g. Welding Level 2 — Final Assessment"></div>
+        <div class="grid-2col" style="gap:12px;">
+          <div class="form-group"><label>Programme</label><select class="form-control" id="importExamCourse"><option>Welding</option><option>Electrical Installation</option><option>Cosmetology</option><option>Business Administration</option><option>Auto Mechanics</option><option>Plumbing</option><option>Carpentry</option><option>Hospitality</option><option>Information Technology</option></select></div>
+          <div class="form-group"><label>Pass Mark (%)</label><input type="number" class="form-control" id="importExamPassMark" value="60" min="1" max="100"></div>
+        </div>
+        <div class="grid-2col" style="gap:12px;">
+          <div class="form-group"><label>Date</label><input type="date" class="form-control" id="importExamDate"></div>
+          <div class="form-group"><label>Start Time</label><input type="time" class="form-control" id="importExamTime"></div>
+        </div>
+        <div class="grid-2col" style="gap:12px;">
+          <div class="form-group"><label>Duration (minutes)</label><input type="number" class="form-control" id="importExamDuration" value="90" min="15" max="300"></div>
+          <div class="form-group"><label>Shuffle Questions</label><select class="form-control" id="importExamShuffle"><option value="false">No</option><option value="true">Yes</option></select></div>
+        </div>
+        <div style="background:var(--bg-input);padding:16px;border-radius:var(--radius-sm);margin:16px 0;">
+          <div style="font-size:14px;font-weight:600;margin-bottom:6px;" id="importSummaryText">0 questions ready to import</div>
+          <div style="font-size:12px;color:var(--text-muted);" id="importSummaryDetail"></div>
+        </div>
+        <div style="display:flex;gap:10px;justify-content:flex-end;margin-top:20px;">
+          <button class="btn btn-secondary" onclick="goToImportStep(3)">← Edit Questions</button>
+          <button class="btn btn-primary" style="padding:10px 28px;" onclick="finalizeImportExam()">Create Exam</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Import progress overlay -->
+    <div id="importProgressOverlay" style="display:none;">
+      <div class="import-progress">
+        <div class="import-spinner"></div>
+        <div style="font-size:14px;font-weight:600;" id="importProgressText">Parsing document...</div>
+        <div style="font-size:12px;color:var(--text-muted);margin-top:6px;" id="importProgressDetail"></div>
+      </div>
+    </div>
   </section>
 
   <section class="page" id="page-attendance">
@@ -6447,6 +6652,540 @@ function showToast(message) {
 
 populateStudentSelect();
 populateInstructorSelect();
+
+// ============================== EXAM IMPORT ENGINE ==============================
+var importedQuestions = [];
+var importRawTextContent = '';
+var importSelectedFile = null;
+
+// Initialize PDF.js worker
+if(typeof pdfjsLib !== 'undefined') {
+  pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
+}
+
+// Drag & drop setup
+document.addEventListener('DOMContentLoaded', function() {
+  setTimeout(function() {
+    var dropZone = document.getElementById('importDropZone');
+    if(!dropZone) return;
+    dropZone.addEventListener('dragover', function(e) { e.preventDefault(); dropZone.classList.add('dragover'); });
+    dropZone.addEventListener('dragleave', function() { dropZone.classList.remove('dragover'); });
+    dropZone.addEventListener('drop', function(e) {
+      e.preventDefault(); dropZone.classList.remove('dragover');
+      if(e.dataTransfer.files.length > 0) processImportFile(e.dataTransfer.files[0]);
+    });
+  }, 1000);
+});
+
+function handleImportFileSelect(event) {
+  var file = event.target.files[0];
+  if(file) processImportFile(file);
+}
+
+function processImportFile(file) {
+  var maxSize = 20 * 1024 * 1024; // 20MB
+  if(file.size > maxSize) { alert('File too large. Maximum 20MB.'); return; }
+
+  var ext = file.name.split('.').pop().toLowerCase();
+  if(ext !== 'pdf' && ext !== 'docx' && ext !== 'doc') {
+    alert('Unsupported file format. Please upload a PDF or Word (.docx) file.');
+    return;
+  }
+
+  if(ext === 'doc') {
+    alert('The older .doc format is not supported. Please save as .docx and try again.');
+    return;
+  }
+
+  importSelectedFile = file;
+
+  // Show file info
+  var sizeStr = file.size < 1024 ? file.size+' B' : file.size < 1048576 ? (file.size/1024).toFixed(1)+' KB' : (file.size/1048576).toFixed(1)+' MB';
+  document.getElementById('importFileInfo').style.display = 'block';
+  document.getElementById('importFileInfo').innerHTML =
+    '<div class="import-file-info">' +
+    '<div class="file-icon">'+(ext==='pdf'?'📕':'📘')+'</div>' +
+    '<div class="file-details"><div class="file-name">'+escapeHtml(file.name)+'</div><div class="file-meta">'+sizeStr+' &bull; '+ext.toUpperCase()+'</div></div>' +
+    '<button class="file-remove" onclick="clearImportFile()" title="Remove">&times;</button>' +
+    '</div>';
+
+  // Show progress
+  showImportProgress('Extracting text from '+ext.toUpperCase()+'...', 'This may take a moment for large files.');
+
+  // Parse based on file type
+  if(ext === 'pdf') {
+    extractTextFromPDF(file);
+  } else {
+    extractTextFromDocx(file);
+  }
+}
+
+function clearImportFile() {
+  importSelectedFile = null;
+  document.getElementById('importFileInfo').style.display = 'none';
+  document.getElementById('importFileInput').value = '';
+  goToImportStep(1);
+}
+
+function showImportProgress(text, detail) {
+  document.getElementById('importProgressOverlay').style.display = 'block';
+  document.getElementById('importProgressText').textContent = text;
+  document.getElementById('importProgressDetail').textContent = detail || '';
+}
+
+function hideImportProgress() {
+  document.getElementById('importProgressOverlay').style.display = 'none';
+}
+
+// ---- PDF Text Extraction ----
+function extractTextFromPDF(file) {
+  var reader = new FileReader();
+  reader.onload = function(e) {
+    var typedArray = new Uint8Array(e.target.result);
+    if(typeof pdfjsLib === 'undefined') {
+      hideImportProgress();
+      alert('PDF.js library failed to load. Please check your internet connection and reload.');
+      return;
+    }
+    pdfjsLib.getDocument({data: typedArray}).promise.then(function(pdf) {
+      var totalPages = pdf.numPages;
+      var textParts = [];
+      var pagesProcessed = 0;
+
+      function processPage(pageNum) {
+        pdf.getPage(pageNum).then(function(page) {
+          page.getTextContent().then(function(textContent) {
+            var pageText = '';
+            var lastY = null;
+            textContent.items.forEach(function(item) {
+              if(lastY !== null && Math.abs(item.transform[5] - lastY) > 5) {
+                pageText += '\n';
+              }
+              pageText += item.str;
+              lastY = item.transform[5];
+            });
+            textParts.push(pageText);
+            pagesProcessed++;
+            document.getElementById('importProgressDetail').textContent =
+              'Page '+pagesProcessed+' of '+totalPages+' processed';
+
+            if(pagesProcessed === totalPages) {
+              importRawTextContent = textParts.join('\n\n--- Page Break ---\n\n');
+              hideImportProgress();
+              if(importRawTextContent.trim().length < 10) {
+                alert('Could not extract text from this PDF. It may be a scanned/image-based PDF. Try a text-based PDF or Word document instead.');
+                return;
+              }
+              document.getElementById('importRawText').value = importRawTextContent;
+              document.getElementById('importCharCount').textContent = importRawTextContent.length + ' characters';
+              goToImportStep(2);
+            } else {
+              processPage(pageNum + 1);
+            }
+          });
+        });
+      }
+      processPage(1);
+    }).catch(function(err) {
+      hideImportProgress();
+      alert('Failed to parse PDF: '+ (err.message || err));
+    });
+  };
+  reader.readAsArrayBuffer(file);
+}
+
+// ---- DOCX Text Extraction ----
+function extractTextFromDocx(file) {
+  var reader = new FileReader();
+  reader.onload = function(e) {
+    if(typeof mammoth === 'undefined') {
+      hideImportProgress();
+      alert('Mammoth.js library failed to load. Please check your internet connection and reload.');
+      return;
+    }
+    mammoth.extractRawText({arrayBuffer: e.target.result}).then(function(result) {
+      importRawTextContent = result.value;
+      hideImportProgress();
+      if(importRawTextContent.trim().length < 10) {
+        alert('Could not extract text from this document. The file may be empty or corrupted.');
+        return;
+      }
+      document.getElementById('importRawText').value = importRawTextContent;
+      document.getElementById('importCharCount').textContent = importRawTextContent.length + ' characters';
+      goToImportStep(2);
+    }).catch(function(err) {
+      hideImportProgress();
+      alert('Failed to parse Word document: '+ (err.message || err));
+    });
+  };
+  reader.readAsArrayBuffer(file);
+}
+
+// ---- Step Navigation ----
+function goToImportStep(step) {
+  for(var i=1; i<=4; i++) {
+    var el = document.getElementById('importStep'+i);
+    if(el) el.style.display = i===step ? 'block' : 'none';
+    var ind = document.getElementById('importStep'+i+'Indicator');
+    if(ind) {
+      ind.className = 'import-step';
+      if(i < step) ind.classList.add('done');
+      if(i === step) ind.classList.add('active');
+    }
+  }
+  // Update step 4 summary
+  if(step === 4) updateImportSummary();
+}
+
+// ---- Question Detection Engine ----
+function detectQuestionsFromText() {
+  var text = document.getElementById('importRawText').value;
+  if(!text.trim()) { alert('No text to parse. Please go back and upload a file.'); return; }
+
+  importedQuestions = [];
+  var lines = text.split('\n').map(function(l){return l.trim();}).filter(function(l){return l.length > 0;});
+
+  var currentQuestion = null;
+  var currentOptions = [];
+  var correctAnswerIdx = -1;
+  var answerKeyMap = {};
+
+  // First pass: look for an answer key section at the bottom
+  var answerKeyStart = -1;
+  for(var a=0; a<lines.length; a++) {
+    if(/^(answer\s*key|answers|answer\s*sheet|marking\s*(guide|scheme))\s*[:\-]?\s*$/i.test(lines[a])) {
+      answerKeyStart = a;
+      break;
+    }
+  }
+  if(answerKeyStart >= 0) {
+    for(var ak=answerKeyStart+1; ak<lines.length; ak++) {
+      // Match patterns like: 1. B, 1) A, Q1: C, 1. True, 1 - B
+      var akMatch = lines[ak].match(/^\s*(?:Q\.?\s*)?(\d+)\s*[\.\)\:\-]\s*([A-Ea-e]|True|False)\s*$/i);
+      if(akMatch) {
+        var qNum = parseInt(akMatch[1]);
+        var ans = akMatch[2].trim();
+        answerKeyMap[qNum] = ans;
+      }
+    }
+    // Remove answer key lines from processing
+    lines = lines.slice(0, answerKeyStart);
+  }
+
+  var questionNumber = 0;
+
+  for(var i=0; i<lines.length; i++) {
+    var line = lines[i];
+
+    // Detect question start patterns:
+    // "1.", "1)", "Q1.", "Q1)", "Q1:", "Question 1:", "1 -", "1."
+    var qMatch = line.match(/^(?:Q\.?\s*)?(?:Question\s*)?(\d+)\s*[\.\)\:\-]\s*(.+)/i);
+
+    if(qMatch) {
+      // Save previous question
+      if(currentQuestion) {
+        saveDetectedQuestion(currentQuestion, currentOptions, correctAnswerIdx, answerKeyMap, questionNumber);
+      }
+      questionNumber = parseInt(qMatch[1]);
+      currentQuestion = qMatch[2].trim();
+      currentOptions = [];
+      correctAnswerIdx = -1;
+      continue;
+    }
+
+    // Detect option patterns:
+    // "A.", "A)", "(A)", "a.", "a)", "(a)" followed by text
+    var optMatch = line.match(/^[\(\[]?\s*([A-Ea-e])\s*[\.\)\]\:]\s*(.+)/i);
+
+    if(optMatch && currentQuestion) {
+      var optText = optMatch[2].trim();
+      var isMarkedCorrect = false;
+
+      // Check for correct answer markers: *, [correct], (correct), ✓, ✔
+      if(optText.match(/^\*\s*/) || optText.match(/\s*\*\s*$/) ||
+         optText.match(/\[correct\]/i) || optText.match(/\(correct\)/i) ||
+         optText.match(/✓|✔|√/)) {
+        isMarkedCorrect = true;
+        optText = optText.replace(/^\*\s*/, '').replace(/\s*\*\s*$/, '')
+                         .replace(/\s*\[correct\]\s*/i, '').replace(/\s*\(correct\)\s*/i, '')
+                         .replace(/\s*[✓✔√]\s*/g, '').trim();
+      }
+
+      if(isMarkedCorrect) correctAnswerIdx = currentOptions.length;
+      currentOptions.push(optText);
+      continue;
+    }
+
+    // Detect inline answer pattern: "Answer: B" or "Correct: A"
+    var ansMatch = line.match(/^(?:Answer|Correct|Correct Answer)\s*[\:\-]\s*([A-Ea-e]|True|False)/i);
+    if(ansMatch && currentQuestion) {
+      var ansVal = ansMatch[1].trim().toUpperCase();
+      if(ansVal === 'TRUE' || ansVal === 'FALSE') {
+        // Will be handled as T/F
+      } else {
+        correctAnswerIdx = ansVal.charCodeAt(0) - 65;
+      }
+      continue;
+    }
+
+    // If we have a current question and this line doesn't match any pattern,
+    // append it to the question text (multi-line question)
+    if(currentQuestion && currentOptions.length === 0 && line.length > 5) {
+      currentQuestion += ' ' + line;
+    }
+  }
+
+  // Save last question
+  if(currentQuestion) {
+    saveDetectedQuestion(currentQuestion, currentOptions, correctAnswerIdx, answerKeyMap, questionNumber);
+  }
+
+  if(importedQuestions.length === 0) {
+    alert('No questions could be detected. Try editing the text to follow the numbered format (1. Question text) with lettered options (A. Option).');
+    return;
+  }
+
+  renderImportPreview();
+  goToImportStep(3);
+}
+
+function saveDetectedQuestion(questionText, options, correctIdx, answerKeyMap, qNum) {
+  var q = {
+    id: 'IQ-' + Date.now() + '-' + Math.random().toString(36).substr(2, 4),
+    text: questionText,
+    points: 1,
+    type: 'mcq',
+    options: [],
+    correctAnswer: 0
+  };
+
+  // Check answer key map
+  if(answerKeyMap[qNum] !== undefined) {
+    var keyAns = answerKeyMap[qNum].toUpperCase();
+    if(keyAns === 'TRUE' || keyAns === 'FALSE') {
+      q.type = 'tf';
+      q.correctAnswer = keyAns === 'TRUE';
+      q.options = [];
+    } else {
+      correctIdx = keyAns.charCodeAt(0) - 65;
+    }
+  }
+
+  if(options.length > 0 && q.type !== 'tf') {
+    // Check if True/False
+    if(options.length === 2 &&
+       options[0].match(/^true$/i) && options[1].match(/^false$/i)) {
+      q.type = 'tf';
+      q.correctAnswer = correctIdx === 0;
+      q.options = [];
+    } else {
+      q.type = 'mcq';
+      q.options = options;
+      q.correctAnswer = correctIdx >= 0 && correctIdx < options.length ? correctIdx : 0;
+    }
+  } else if(options.length === 0 && q.type !== 'tf') {
+    // No options — check if it's fill-in-blank
+    if(questionText.indexOf('___') !== -1 || questionText.indexOf('____') !== -1) {
+      q.type = 'fill';
+      q.correctAnswer = '';
+    } else {
+      q.type = 'short';
+      q.correctAnswer = '';
+    }
+  }
+
+  importedQuestions.push(q);
+}
+
+// ---- Import Preview Rendering ----
+function renderImportPreview() {
+  var container = document.getElementById('importPreviewList');
+  if(!container) return;
+  document.getElementById('importDetectedCount').textContent = importedQuestions.length + ' question' + (importedQuestions.length !== 1 ? 's' : '');
+
+  container.innerHTML = importedQuestions.map(function(q, idx) {
+    var typeLabel = {mcq:'Multiple Choice',tf:'True / False',fill:'Fill in Blank',short:'Short Answer'}[q.type];
+    var html = '<div class="import-preview-item" id="ipItem-'+idx+'">';
+    html += '<div class="ip-number">Q'+(idx+1)+'</div>';
+    html += '<div class="ip-header">';
+    html += '<select class="form-control ip-type-select" onchange="changeImportQuestionType('+idx+',this.value)" style="width:160px;">';
+    html += '<option value="mcq"'+(q.type==='mcq'?' selected':'')+'>Multiple Choice</option>';
+    html += '<option value="tf"'+(q.type==='tf'?' selected':'')+'>True / False</option>';
+    html += '<option value="fill"'+(q.type==='fill'?' selected':'')+'>Fill in Blank</option>';
+    html += '<option value="short"'+(q.type==='short'?' selected':'')+'>Short Answer</option>';
+    html += '</select>';
+    html += '<span style="font-size:11px;color:var(--text-muted);margin-left:auto;">'+q.points+' pt</span>';
+    html += '<div class="ip-actions">';
+    html += '<button onclick="moveImportQuestion('+idx+',-1)" title="Move Up">↑</button>';
+    html += '<button onclick="moveImportQuestion('+idx+',1)" title="Move Down">↓</button>';
+    html += '<button class="ip-del" onclick="removeImportQuestion('+idx+')" title="Delete">🗑</button>';
+    html += '</div></div>';
+
+    // Question text (editable)
+    html += '<div class="form-group" style="margin-bottom:10px;"><input type="text" class="form-control" value="'+escapeAttr(q.text)+'" onchange="importedQuestions['+idx+'].text=this.value" placeholder="Question text..."></div>';
+
+    // Points
+    html += '<div style="display:flex;gap:8px;align-items:center;margin-bottom:10px;"><label style="font-size:11px;font-weight:600;color:var(--text-muted);margin:0;">Points:</label><input type="number" class="form-control" style="width:70px;padding:6px 10px;" value="'+q.points+'" min="1" max="100" onchange="importedQuestions['+idx+'].points=parseInt(this.value)||1"></div>';
+
+    // Type-specific editing
+    if(q.type === 'mcq') {
+      html += '<div style="font-size:11px;font-weight:600;color:var(--text-muted);margin-bottom:6px;">OPTIONS (select correct):</div>';
+      (q.options||[]).forEach(function(opt, oi) {
+        html += '<div style="display:flex;align-items:center;gap:8px;margin-bottom:6px;">';
+        html += '<input type="radio" name="ipCorrect'+idx+'" '+(q.correctAnswer===oi?'checked':'')+' onchange="importedQuestions['+idx+'].correctAnswer='+oi+'" style="accent-color:var(--green);width:16px;height:16px;">';
+        html += '<input type="text" class="form-control" value="'+escapeAttr(opt)+'" onchange="importedQuestions['+idx+'].options['+oi+']=this.value" style="flex:1;">';
+        html += '<button style="background:none;border:none;color:var(--red);cursor:pointer;font-size:16px;padding:4px;" onclick="removeImportOption('+idx+','+oi+')">&times;</button>';
+        html += '</div>';
+      });
+      html += '<button class="btn btn-sm btn-secondary" onclick="addImportOption('+idx+')">+ Add Option</button>';
+    } else if(q.type === 'tf') {
+      html += '<div style="font-size:11px;font-weight:600;color:var(--text-muted);margin-bottom:6px;">CORRECT ANSWER:</div>';
+      html += '<div style="display:flex;gap:8px;">';
+      html += '<label style="display:flex;align-items:center;gap:6px;cursor:pointer;padding:8px 16px;border-radius:var(--radius-sm);border:1px solid '+(q.correctAnswer===true?'var(--green)':'var(--border)')+';background:'+(q.correctAnswer===true?'var(--green-dim)':'var(--bg-input)')+';"><input type="radio" name="ipTf'+idx+'" '+(q.correctAnswer===true?'checked':'')+' onchange="importedQuestions['+idx+'].correctAnswer=true;renderImportPreview()"> True</label>';
+      html += '<label style="display:flex;align-items:center;gap:6px;cursor:pointer;padding:8px 16px;border-radius:var(--radius-sm);border:1px solid '+(q.correctAnswer===false?'var(--red)':'var(--border)')+';background:'+(q.correctAnswer===false?'var(--red-dim)':'var(--bg-input)')+';"><input type="radio" name="ipTf'+idx+'" '+(q.correctAnswer===false?'checked':'')+' onchange="importedQuestions['+idx+'].correctAnswer=false;renderImportPreview()"> False</label>';
+      html += '</div>';
+    } else if(q.type === 'fill') {
+      html += '<div style="font-size:11px;font-weight:600;color:var(--text-muted);margin-bottom:6px;">CORRECT ANSWER:</div>';
+      html += '<input type="text" class="form-control" value="'+escapeAttr(q.correctAnswer||'')+'" placeholder="Type the correct answer..." onchange="importedQuestions['+idx+'].correctAnswer=this.value">';
+    } else {
+      html += '<div style="font-size:11px;color:var(--text-muted);">Short answer — graded manually by instructor</div>';
+      html += '<input type="text" class="form-control" style="margin-top:6px;" value="'+escapeAttr(q.correctAnswer||'')+'" placeholder="(Optional) Model answer for reference..." onchange="importedQuestions['+idx+'].correctAnswer=this.value">';
+    }
+
+    html += '</div>';
+    return html;
+  }).join('');
+}
+
+function changeImportQuestionType(idx, newType) {
+  var q = importedQuestions[idx];
+  q.type = newType;
+  if(newType === 'mcq' && (!q.options || q.options.length === 0)) {
+    q.options = ['Option A','Option B','Option C','Option D'];
+    q.correctAnswer = 0;
+  }
+  if(newType === 'tf') { q.correctAnswer = true; q.options = []; }
+  if(newType === 'fill') { q.correctAnswer = ''; q.options = []; }
+  if(newType === 'short') { q.correctAnswer = ''; q.options = []; }
+  renderImportPreview();
+}
+
+function addImportOption(idx) {
+  var q = importedQuestions[idx];
+  if(!q.options) q.options = [];
+  if(q.options.length >= 8) { alert('Maximum 8 options'); return; }
+  q.options.push('Option ' + String.fromCharCode(65 + q.options.length));
+  renderImportPreview();
+}
+
+function removeImportOption(idx, optIdx) {
+  var q = importedQuestions[idx];
+  if(q.options.length <= 2) { alert('Minimum 2 options'); return; }
+  q.options.splice(optIdx, 1);
+  if(q.correctAnswer >= q.options.length) q.correctAnswer = 0;
+  renderImportPreview();
+}
+
+function removeImportQuestion(idx) {
+  importedQuestions.splice(idx, 1);
+  renderImportPreview();
+}
+
+function moveImportQuestion(idx, dir) {
+  var newIdx = idx + dir;
+  if(newIdx < 0 || newIdx >= importedQuestions.length) return;
+  var temp = importedQuestions[idx];
+  importedQuestions[idx] = importedQuestions[newIdx];
+  importedQuestions[newIdx] = temp;
+  renderImportPreview();
+}
+
+function addImportQuestion() {
+  importedQuestions.push({
+    id: 'IQ-' + Date.now() + '-' + Math.random().toString(36).substr(2, 4),
+    text: '', type: 'mcq', points: 1,
+    options: ['Option A','Option B','Option C','Option D'],
+    correctAnswer: 0
+  });
+  renderImportPreview();
+}
+
+function updateImportSummary() {
+  var total = importedQuestions.length;
+  var mcq = importedQuestions.filter(function(q){return q.type==='mcq';}).length;
+  var tf = importedQuestions.filter(function(q){return q.type==='tf';}).length;
+  var fill = importedQuestions.filter(function(q){return q.type==='fill';}).length;
+  var short = importedQuestions.filter(function(q){return q.type==='short';}).length;
+  var totalPts = importedQuestions.reduce(function(a,q){return a+q.points;},0);
+
+  document.getElementById('importSummaryText').textContent = total + ' question' + (total!==1?'s':'') + ' ready to import (' + totalPts + ' total points)';
+
+  var parts = [];
+  if(mcq) parts.push(mcq + ' Multiple Choice');
+  if(tf) parts.push(tf + ' True/False');
+  if(fill) parts.push(fill + ' Fill in Blank');
+  if(short) parts.push(short + ' Short Answer');
+  document.getElementById('importSummaryDetail').textContent = parts.join(' • ');
+}
+
+// ---- Finalize Import ----
+function finalizeImportExam() {
+  var title = document.getElementById('importExamTitle').value.trim();
+  if(!title) { alert('Please enter an exam title.'); return; }
+  if(importedQuestions.length === 0) { alert('No questions to import.'); return; }
+
+  // Validate questions
+  var hasInvalid = false;
+  importedQuestions.forEach(function(q, i) {
+    if(!q.text.trim()) { alert('Question ' + (i+1) + ' has no text.'); hasInvalid = true; }
+    if(q.type === 'fill' && !(q.correctAnswer||'').trim()) { alert('Question ' + (i+1) + ' (Fill in Blank) needs a correct answer.'); hasInvalid = true; }
+    if(q.type === 'mcq' && (!q.options || q.options.length < 2)) { alert('Question ' + (i+1) + ' needs at least 2 options.'); hasInvalid = true; }
+  });
+  if(hasInvalid) return;
+
+  // Build exam object
+  var examId = 'EXAM-' + Date.now();
+  var newExam = {
+    id: examId,
+    title: title,
+    course: document.getElementById('importExamCourse').value,
+    date: document.getElementById('importExamDate').value || new Date().toISOString().split('T')[0],
+    time: document.getElementById('importExamTime').value || '09:00',
+    duration: parseInt(document.getElementById('importExamDuration').value) || 90,
+    students: 0,
+    status: 'upcoming',
+    questions: importedQuestions.length,
+    passMark: parseInt(document.getElementById('importExamPassMark').value) || 60,
+    questionData: JSON.parse(JSON.stringify(importedQuestions)),
+    shuffleQuestions: document.getElementById('importExamShuffle').value === 'true',
+    instructions: ''
+  };
+
+  // Assign proper IDs to questions
+  newExam.questionData.forEach(function(q, i) {
+    q.id = 'Q-' + examId + '-' + (i+1);
+  });
+
+  exams.unshift(newExam);
+  saveState();
+
+  showToast('Exam "' + title + '" created with ' + importedQuestions.length + ' questions from import!');
+
+  // Reset import state
+  importedQuestions = [];
+  importRawTextContent = '';
+  importSelectedFile = null;
+  document.getElementById('importExamTitle').value = '';
+  document.getElementById('importRawText').value = '';
+  document.getElementById('importFileInfo').style.display = 'none';
+  var fileInput = document.getElementById('importFileInput');
+  if(fileInput) fileInput.value = '';
+
+  // Navigate to exams page
+  goToImportStep(1);
+  showPage('exams');
+  renderExams('upcoming');
+}
 
 // ============================================
 // Google Drive Cloud Sync Integration
