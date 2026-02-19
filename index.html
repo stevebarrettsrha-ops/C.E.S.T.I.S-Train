@@ -8795,7 +8795,7 @@ function finalizeImportExam() {
 // Google Drive Configuration
 const GOOGLE_DRIVE_CONFIG = {
   CLIENT_ID: '302497466088-0b619cqa9qno2c606k4rqp742lebc5o8.apps.googleusercontent.com',
-  FOLDER_ID: '18ACBw0kRi0BssLEoZLWoeXNa1EiANeBu',
+  FOLDER_ID: '1lNpI00Et1BN5c4eaV5WfQwuQVhCMBtv8',
   BACKUP_FILE_NAME: 'CESTIS_LMS_BACKUP.json',
   SCOPES: 'https://www.googleapis.com/auth/drive'
 };
@@ -8815,9 +8815,10 @@ let _isAutoSaving = false;
 let _autoSaveFileIds = {}; // { folderId: fileId } for tracking backup files per folder
 const AUTO_SAVE_INTERVAL_MS = 5000; // 5 seconds
 const ALL_DRIVE_FOLDERS = [
-  { id: '18ACBw0kRi0BssLEoZLWoeXNa1EiANeBu', label: 'Main Backup' },
-  { id: '1ashmmL0ZS7mW6XrwoxMuamf7yjtVWHyO', label: 'Chat' },
-  { id: '1Yp9aLXGGjhojF1J04QxoNG-9yEgaiS-A', label: 'VC Recordings' }
+  { id: '1lNpI00Et1BN5c4eaV5WfQwuQVhCMBtv8', label: 'Main Backup' },
+  { id: '18ACBw0kRi0BssLEoZLWoeXNa1EiANeBu', label: 'Online Exams' },
+  { id: '1ashmmL0ZS7mW6XrwoxMuamf7yjtVWHyO', label: 'LMS Chat' },
+  { id: '1Yp9aLXGGjhojF1J04QxoNG-9yEgaiS-A', label: 'Class Recording' }
 ];
 
 // Google Token Client for OAuth
