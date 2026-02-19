@@ -1982,6 +1982,20 @@ textarea.form-control { resize:vertical; min-height:80px; }
 .lms-chat-msg .msg-sender { font-size:11px; font-weight:700; color:var(--accent); margin-bottom:3px; }
 .lms-chat-msg .msg-text { font-size:13.5px; line-height:1.5; word-wrap:break-word; }
 .lms-chat-msg .msg-time { font-size:10px; color:rgba(255,255,255,0.45); text-align:right; margin-top:4px; }
+.lms-chat-msg .msg-edited { font-size:9px; color:rgba(255,255,255,0.35); font-style:italic; }
+.lms-chat-msg .msg-actions {
+  display:none; position:absolute; top:4px; gap:2px;
+}
+.lms-chat-msg.sent .msg-actions { left:-58px; }
+.lms-chat-msg.received .msg-actions { right:-58px; }
+.lms-chat-msg:hover .msg-actions { display:flex; }
+.lms-chat-msg .msg-actions button {
+  width:26px; height:26px; border:none; border-radius:50%; background:var(--bg-card);
+  color:var(--text-muted); cursor:pointer; font-size:12px; display:flex;
+  align-items:center; justify-content:center; transition:var(--transition);
+  border:1px solid var(--border);
+}
+.lms-chat-msg .msg-actions button:hover { background:var(--accent-dim); color:var(--accent); }
 .lms-chat-msg .msg-file {
   display:flex; align-items:center; gap:8px; padding:8px 12px; border-radius:var(--radius-sm);
   background:rgba(0,0,0,0.15); margin-top:6px; cursor:pointer; transition:var(--transition);
@@ -9853,11 +9867,24 @@ function lmsChatRenderMessages(prefix) {
     var senderName = senderUser ? senderUser.name : msg.senderName || 'Unknown';
     var roleLabel = senderUser ? (' (' + senderUser.role + ')') : '';
 
+    var isDeleted = msg.deleted;
     html += '<div class="lms-chat-msg '+(isSent?'sent':'received')+'">';
+
+    // Edit/Delete actions for sender's own text messages
+    if(isSent && !isDeleted && msg.type === 'text') {
+      html += '<div class="msg-actions">';
+      html += '<button onclick="lmsChatEditMessage(\''+msg.id+'\')" title="Edit">&#9998;</button>';
+      html += '<button onclick="lmsChatDeleteMessage(\''+msg.id+'\')" title="Delete">&#128465;</button>';
+      html += '</div>';
+    }
+
     if(!isSent) {
       html += '<div class="msg-sender">'+lmsChatEscapeHtml(senderName)+roleLabel+'</div>';
     }
-    if(msg.type === 'file') {
+
+    if(isDeleted) {
+      html += '<div class="msg-text" style="font-style:italic;opacity:0.5;">This message was deleted</div>';
+    } else if(msg.type === 'file') {
       var fileIcon = lmsChatGetFileIcon(msg.fileName);
       html += '<div class="msg-file" onclick="lmsChatDownloadFile(\''+lmsChatEscapeHtml(msg.fileUrl||'')+'\',\''+lmsChatEscapeHtml(msg.fileName)+'\')">';
       html += '<div class="msg-file-icon">'+fileIcon+'</div>';
@@ -9872,7 +9899,7 @@ function lmsChatRenderMessages(prefix) {
     } else {
       html += '<div class="msg-text">'+lmsChatLinkify(lmsChatEscapeHtml(msg.text))+'</div>';
     }
-    html += '<div class="msg-time">'+lmsChatFormatFullTime(msg.timestamp)+'</div>';
+    html += '<div class="msg-time">'+lmsChatFormatFullTime(msg.timestamp)+(msg.edited?' <span class="msg-edited">edited</span>':'')+'</div>';
     html += '</div>';
   });
 
@@ -9939,6 +9966,52 @@ function lmsChatInputKeydown(e, prefix) {
     el.style.height = 'auto';
     el.style.height = Math.min(el.scrollHeight, 120) + 'px';
   }, 0);
+}
+
+// Edit a message
+function lmsChatEditMessage(msgId) {
+  if(!lmsChatActiveRoom) return;
+  var msgs = lmsChatMessages[lmsChatActiveRoom] || [];
+  var msg = msgs.find(function(m){ return m.id === msgId; });
+  if(!msg) return;
+  var user = lmsChatGetCurrentUser();
+  if(msg.senderId !== user.id) return;
+
+  var newText = prompt('Edit message:', msg.text);
+  if(newText === null) return; // cancelled
+  newText = newText.trim();
+  if(!newText) return;
+  if(newText === msg.text) return;
+
+  msg.text = newText;
+  msg.edited = true;
+  msg.editedAt = new Date().toISOString();
+  saveLmsChatData();
+
+  var prefix = lmsChatGetRolePrefix();
+  lmsChatRenderMessages(prefix);
+  lmsChatRenderRoomList(prefix);
+}
+
+// Delete a message
+function lmsChatDeleteMessage(msgId) {
+  if(!lmsChatActiveRoom) return;
+  var msgs = lmsChatMessages[lmsChatActiveRoom] || [];
+  var msg = msgs.find(function(m){ return m.id === msgId; });
+  if(!msg) return;
+  var user = lmsChatGetCurrentUser();
+  if(msg.senderId !== user.id) return;
+
+  if(!confirm('Delete this message?')) return;
+
+  msg.deleted = true;
+  msg.text = '';
+  msg.deletedAt = new Date().toISOString();
+  saveLmsChatData();
+
+  var prefix = lmsChatGetRolePrefix();
+  lmsChatRenderMessages(prefix);
+  lmsChatRenderRoomList(prefix);
 }
 
 // File attachment handling
@@ -10036,7 +10109,6 @@ async function lmsChatUploadFileToDrive(file, msgId) {
         });
       });
       saveLmsChatData();
-      showToast('File uploaded to Google Drive');
     }
   } catch(err) {
     console.error('Chat file upload to Drive failed:', err);
