@@ -2828,7 +2828,6 @@ function loadState() {
   } catch(e) { /* parse error, use generated data */ }
 }
 loadState();
-initLmsChatData();
 
 // ============================== USER ACCOUNTS MANAGEMENT ==============================
 let userAccounts = [
@@ -2861,6 +2860,7 @@ function loadUserAccounts() {
   } catch(e) {}
 }
 loadUserAccounts();
+initLmsChatData();
 
 function getNextUserId() {
   var maxNum = 0;
