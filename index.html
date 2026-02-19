@@ -237,6 +237,54 @@ h1,h2,h3,h4 { font-family:'Playfair Display',serif; }
 }
 .landing-footer a { color:var(--accent); text-decoration:none; }
 
+/* Pre-login cloud sync bar */
+.login-sync-bar {
+  position:relative; z-index:2;
+  display:flex; align-items:center; justify-content:center; gap:12px;
+  background:rgba(26,35,50,0.85);
+  backdrop-filter:blur(16px);
+  border:1px solid var(--border-light);
+  border-radius:var(--radius-lg);
+  padding:14px 24px;
+  margin-bottom:28px;
+  max-width:600px;
+  animation:fadeSlideDown 0.6s ease 0.15s both;
+}
+.login-sync-bar .sync-icon {
+  font-size:22px; flex-shrink:0;
+}
+.login-sync-bar .sync-text {
+  font-size:13px; color:var(--text-secondary); line-height:1.4; text-align:left;
+}
+.login-sync-bar .sync-text strong {
+  color:var(--text-primary); display:block; font-size:13.5px; margin-bottom:2px;
+}
+.login-sync-btn {
+  flex-shrink:0;
+  padding:9px 20px;
+  border-radius:var(--radius-sm);
+  background:linear-gradient(135deg, var(--accent), #d4900a);
+  color:#000;
+  font-size:12.5px;
+  font-weight:700;
+  font-family:'DM Sans',sans-serif;
+  border:none;
+  cursor:pointer;
+  transition:all var(--transition);
+  white-space:nowrap;
+}
+.login-sync-btn:hover { transform:translateY(-1px); box-shadow:0 4px 16px rgba(240,165,0,0.3); }
+.login-sync-btn:disabled {
+  opacity:0.7; cursor:not-allowed; transform:none !important; box-shadow:none !important;
+}
+.login-sync-btn .spinning { display:inline-block; animation:spin 1s linear infinite; }
+@keyframes spin { from{transform:rotate(0deg);} to{transform:rotate(360deg);} }
+.login-sync-status {
+  font-size:11.5px; color:var(--text-muted); margin-top:4px;
+}
+.login-sync-status.success { color:var(--green); }
+.login-sync-status.error { color:var(--red); }
+
 /* LOGIN FORM ON ROLE CARD */
 .role-login {
   display:none;
@@ -2223,6 +2271,17 @@ textarea.form-control { resize:vertical; min-height:80px; }
     <p class="landing-subtitle">
       Empowering vocational excellence through integrated learning, assessment, and certification tracking — from enrolment to career readiness.
     </p>
+
+    <!-- Pre-login Cloud Sync Bar -->
+    <div class="login-sync-bar" id="loginSyncBar">
+      <span class="sync-icon">☁️</span>
+      <div class="sync-text">
+        <strong>Sync from Cloud before logging in</strong>
+        Pull the latest user accounts and data from Google Drive so all credentials are up to date.
+        <div class="login-sync-status" id="loginSyncStatus"></div>
+      </div>
+      <button class="login-sync-btn" id="loginSyncBtn" onclick="loginPageSync()">Sync Now</button>
+    </div>
 
     <div class="role-cards">
       <!-- ADMIN CARD -->
@@ -10141,6 +10200,178 @@ function getTimeAgo(date) {
 // Initialize cloud sync on page load
 initializeCloudSync();
 setTimeout(() => { initGoogleAuth(); }, 500);
+
+// ============================================
+// PRE-LOGIN CLOUD SYNC (Landing Page)
+// ============================================
+
+// Update the landing page sync bar status display
+function updateLoginSyncStatus(message, type) {
+  var statusEl = document.getElementById('loginSyncStatus');
+  if (statusEl) {
+    statusEl.textContent = message;
+    statusEl.className = 'login-sync-status' + (type ? ' ' + type : '');
+  }
+}
+
+// Set the login sync button state
+function setLoginSyncBtnState(syncing) {
+  var btn = document.getElementById('loginSyncBtn');
+  if (!btn) return;
+  if (syncing) {
+    btn.disabled = true;
+    btn.innerHTML = '<span class="spinning">&#x21BB;</span> Syncing...';
+  } else {
+    btn.disabled = false;
+    btn.textContent = 'Sync Now';
+  }
+}
+
+// Pre-login sync: pull data from all Google Drive folders before user logs in
+async function loginPageSync() {
+  isLoginPageSync = true;
+  setLoginSyncBtnState(true);
+  updateLoginSyncStatus('Connecting to Google Drive...', '');
+
+  // Step 1: Ensure we have a Google access token
+  if (!isCloudConnected || !googleAccessToken) {
+    // Check if token is in localStorage and still valid
+    var savedToken = localStorage.getItem('schoolDashboardGoogleAccessToken');
+    var savedExpiry = localStorage.getItem('schoolDashboardGoogleTokenExpiry');
+    if (savedToken && savedExpiry && new Date(savedExpiry) > new Date()) {
+      googleAccessToken = savedToken;
+      isCloudConnected = true;
+    } else {
+      // Need to authenticate — use Google OAuth popup
+      try {
+        var token = await loginPageGoogleAuth();
+        if (!token) {
+          updateLoginSyncStatus('Google sign-in was cancelled or failed.', 'error');
+          setLoginSyncBtnState(false);
+          isLoginPageSync = false;
+          return;
+        }
+        googleAccessToken = token;
+        isCloudConnected = true;
+      } catch (err) {
+        updateLoginSyncStatus('Failed to connect: ' + err.message, 'error');
+        setLoginSyncBtnState(false);
+        isLoginPageSync = false;
+        return;
+      }
+    }
+  }
+
+  updateLoginSyncStatus('Connected. Syncing data from all Drive folders...', '');
+
+  try {
+    var totalMerged = 0;
+    var foldersSynced = 0;
+
+    // Step 2: Sync main backup data from ALL 4 folders
+    for (var i = 0; i < ALL_DRIVE_FOLDERS.length; i++) {
+      var folder = ALL_DRIVE_FOLDERS[i];
+      try {
+        updateLoginSyncStatus('Syncing from ' + folder.label + ' (' + (i + 1) + '/' + ALL_DRIVE_FOLDERS.length + ')...', '');
+        var fileId = await findBackupFileInFolder(folder.id);
+        if (fileId) {
+          var changed = await silentMergeFromBackup(fileId);
+          if (changed) totalMerged++;
+          foldersSynced++;
+        }
+      } catch (e) {
+        console.warn('[LoginSync] Error syncing from ' + folder.label + ':', e);
+      }
+    }
+
+    // Step 3: Also sync chat-specific data from chat folder
+    try {
+      updateLoginSyncStatus('Syncing chat data...', '');
+      await lmsChatSyncFromDrive();
+    } catch (e) {
+      console.warn('[LoginSync] Chat sync error:', e);
+    }
+
+    // Step 4: Ensure main cloudFileId is set
+    if (!cloudFileId) {
+      await findExistingBackupFile();
+    }
+
+    // Step 5: Update sync timestamp
+    lastSyncTime = new Date();
+    localStorage.setItem('schoolDashboardLastSyncTime', lastSyncTime.toISOString());
+
+    // Step 6: Show success status
+    var accountCount = userAccounts.length;
+    var statusMsg = 'Sync complete! ' + foldersSynced + ' folder(s) synced. ' + accountCount + ' user account(s) available.';
+    if (totalMerged > 0) {
+      statusMsg += ' New data was merged.';
+    }
+    updateLoginSyncStatus(statusMsg, 'success');
+
+    console.log('[LoginSync] Pre-login sync complete. Folders synced: ' + foldersSynced + ', Data changed in: ' + totalMerged);
+  } catch (err) {
+    console.error('[LoginSync] Sync failed:', err);
+    if (err.message && (err.message.includes('invalid_token') || err.message.includes('Invalid Credentials'))) {
+      updateLoginSyncStatus('Session expired. Please try again.', 'error');
+      googleAccessToken = null;
+      isCloudConnected = false;
+      localStorage.removeItem('schoolDashboardGoogleAccessToken');
+      localStorage.removeItem('schoolDashboardGoogleTokenExpiry');
+    } else {
+      updateLoginSyncStatus('Sync failed: ' + err.message, 'error');
+    }
+  } finally {
+    setLoginSyncBtnState(false);
+    isLoginPageSync = false;
+  }
+}
+
+// Google OAuth for the login page (returns access token or null)
+function loginPageGoogleAuth() {
+  return new Promise(function(resolve, reject) {
+    // Try Google Identity Services first
+    if (typeof google !== 'undefined' && google.accounts && google.accounts.oauth2) {
+      var client = google.accounts.oauth2.initTokenClient({
+        client_id: GOOGLE_DRIVE_CONFIG.CLIENT_ID,
+        scope: GOOGLE_DRIVE_CONFIG.SCOPES,
+        callback: function(tokenResponse) {
+          if (tokenResponse.error) {
+            resolve(null);
+            return;
+          }
+          // Save token
+          var expiry = new Date();
+          expiry.setSeconds(expiry.getSeconds() + (tokenResponse.expires_in || 3600));
+          localStorage.setItem('schoolDashboardGoogleAccessToken', tokenResponse.access_token);
+          localStorage.setItem('schoolDashboardGoogleTokenExpiry', expiry.toISOString());
+          resolve(tokenResponse.access_token);
+        },
+        error_callback: function(err) {
+          if (err.type === 'popup_closed') {
+            resolve(null);
+          } else {
+            reject(new Error(err.message || 'Google auth failed'));
+          }
+        }
+      });
+      client.requestAccessToken();
+    } else {
+      // Google Identity Services not loaded — show manual token modal
+      showGoogleAuthModal();
+      resolve(null);
+    }
+  });
+}
+
+// Auto-sync on page load if already connected (refresh the landing page data)
+(function() {
+  setTimeout(function() {
+    if (isCloudConnected && googleAccessToken) {
+      updateLoginSyncStatus('Previously connected. Click Sync Now to pull latest data.', '');
+    }
+  }, 600);
+})();
 
 // ============================================
 // C.E.S.T.I.S LMS CHAT - FULL IMPLEMENTATION
