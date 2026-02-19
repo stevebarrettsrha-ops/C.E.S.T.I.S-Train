@@ -2831,9 +2831,36 @@ function initLmsChatData() {
 function saveLmsChatData() {
   try {
     localStorage.setItem('voctrain_chatRooms', JSON.stringify(lmsChatRooms));
-    localStorage.setItem('voctrain_chatMessages', JSON.stringify(lmsChatMessages));
-    localStorage.setItem('voctrain_chatProfiles', JSON.stringify(lmsChatProfiles));
-  } catch(e) { console.warn('saveLmsChatData: storage error'); }
+    // Strip large base64 data before saving to localStorage to avoid quota issues
+    var msgCopy = {};
+    Object.keys(lmsChatMessages).forEach(function(roomId) {
+      msgCopy[roomId] = lmsChatMessages[roomId].map(function(m) {
+        var clone = Object.assign({}, m);
+        delete clone.imageData;
+        delete clone.fileData;
+        return clone;
+      });
+    });
+    localStorage.setItem('voctrain_chatMessages', JSON.stringify(msgCopy));
+    // Strip profile pics from localStorage (keep in memory + Drive)
+    var profCopy = {};
+    Object.keys(lmsChatProfiles).forEach(function(uid) {
+      profCopy[uid] = Object.assign({}, lmsChatProfiles[uid]);
+      delete profCopy[uid].profilePic;
+    });
+    localStorage.setItem('voctrain_chatProfiles', JSON.stringify(profCopy));
+  } catch(e) { console.warn('saveLmsChatData: storage error', e); }
+  // Auto-save to Google Drive (debounced)
+  lmsChatScheduleDriveSync();
+}
+
+var _lmsChatDriveSyncTimer = null;
+function lmsChatScheduleDriveSync() {
+  if(_lmsChatDriveSyncTimer) clearTimeout(_lmsChatDriveSyncTimer);
+  _lmsChatDriveSyncTimer = setTimeout(function() {
+    _lmsChatDriveSyncTimer = null;
+    lmsChatSyncToDrive();
+  }, 3000);
 }
 
 function saveState() {
@@ -10618,7 +10645,18 @@ function lmsChatOnPageShow(prefix) {
   var user = lmsChatGetCurrentUser();
   if(!lmsChatProfiles[user.id]) lmsChatProfiles[user.id] = {};
   lmsChatProfiles[user.id].status = 'online';
-  saveLmsChatData();
+
+  // Auto-fetch latest chat data from Google Drive
+  if(isCloudConnected && googleAccessToken) {
+    lmsChatSyncFromDrive().then(function() {
+      lmsChatRenderRoomList(prefix);
+    });
+  }
+
+  // Save status (but skip the Drive sync timer — we just fetched)
+  try {
+    localStorage.setItem('voctrain_chatProfiles', JSON.stringify(lmsChatProfiles));
+  } catch(e) {}
 }
 
 // ============================================
@@ -10635,11 +10673,25 @@ var _origSaveToCloud = typeof saveToCloud === 'function' ? saveToCloud : null;
 })();
 
 // Sync chat data to/from Google Drive via the shared folder
+var _lmsChatDriveFileId = null;
+
+async function lmsChatFindDriveFile() {
+  if(_lmsChatDriveFileId) return _lmsChatDriveFileId;
+  try {
+    var query = encodeURIComponent("name='CESTIS_LMS_CHAT.json' and '"+LMS_CHAT_DRIVE_FOLDER+"' in parents and trashed=false");
+    var searchResp = await fetch('https://www.googleapis.com/drive/v3/files?q='+query+'&fields=files(id)', {
+      headers: {'Authorization': 'Bearer '+googleAccessToken}
+    });
+    var searchData = await searchResp.json();
+    if(searchData.files && searchData.files.length) {
+      _lmsChatDriveFileId = searchData.files[0].id;
+    }
+  } catch(e) {}
+  return _lmsChatDriveFileId;
+}
+
 async function lmsChatSyncToDrive() {
-  if(!isCloudConnected || !googleAccessToken) {
-    showToast('Connect to Google Drive first');
-    return;
-  }
+  if(!isCloudConnected || !googleAccessToken) return;
   try {
     var chatData = {
       version: '1.0',
@@ -10650,20 +10702,13 @@ async function lmsChatSyncToDrive() {
       chatProfiles: lmsChatProfiles
     };
 
-    var jsonContent = JSON.stringify(chatData, null, 2);
+    var jsonContent = JSON.stringify(chatData);
     var blob = new Blob([jsonContent], {type:'application/json'});
 
-    // Check for existing chat backup file
-    var query = encodeURIComponent("name='CESTIS_LMS_CHAT.json' and '"+LMS_CHAT_DRIVE_FOLDER+"' in parents and trashed=false");
-    var searchResp = await fetch('https://www.googleapis.com/drive/v3/files?q='+query+'&fields=files(id)', {
-      headers: {'Authorization': 'Bearer '+googleAccessToken}
-    });
-    var searchData = await searchResp.json();
-    var existingFile = searchData.files && searchData.files.length ? searchData.files[0] : null;
-
+    var fileId = await lmsChatFindDriveFile();
     var resp;
-    if(existingFile) {
-      resp = await fetch('https://www.googleapis.com/upload/drive/v3/files/'+existingFile.id+'?uploadType=media', {
+    if(fileId) {
+      resp = await fetch('https://www.googleapis.com/upload/drive/v3/files/'+fileId+'?uploadType=media', {
         method:'PATCH', headers:{'Authorization':'Bearer '+googleAccessToken,'Content-Type':'application/json'}, body:blob
       });
     } else {
@@ -10674,65 +10719,84 @@ async function lmsChatSyncToDrive() {
       resp = await fetch('https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart&fields=id,name', {
         method:'POST', headers:{'Authorization':'Bearer '+googleAccessToken}, body:formData
       });
+      if(resp.ok) {
+        var result = await resp.json();
+        _lmsChatDriveFileId = result.id;
+      }
     }
-
-    if(resp.ok) showToast('Chat data saved to Google Drive!');
-    else throw new Error('Upload failed');
+    if(!resp.ok) throw new Error('Upload failed');
+    console.log('Chat data auto-saved to Google Drive');
   } catch(err) {
-    console.error('Chat sync to Drive error:', err);
-    showToast('Failed to sync chat to Drive');
+    console.error('Chat auto-sync to Drive error:', err);
   }
 }
 
 async function lmsChatSyncFromDrive() {
-  if(!isCloudConnected || !googleAccessToken) {
-    showToast('Connect to Google Drive first');
-    return;
-  }
+  if(!isCloudConnected || !googleAccessToken) return;
   try {
-    var query = encodeURIComponent("name='CESTIS_LMS_CHAT.json' and '"+LMS_CHAT_DRIVE_FOLDER+"' in parents and trashed=false");
-    var searchResp = await fetch('https://www.googleapis.com/drive/v3/files?q='+query+'&fields=files(id)', {
-      headers:{'Authorization':'Bearer '+googleAccessToken}
-    });
-    var searchData = await searchResp.json();
-    if(!searchData.files || !searchData.files.length) {
-      showToast('No chat backup found on Drive');
+    var fileId = await lmsChatFindDriveFile();
+    if(!fileId) {
+      console.log('No chat backup found on Drive — will create on first save');
       return;
     }
-    var fileId = searchData.files[0].id;
     var resp = await fetch('https://www.googleapis.com/drive/v3/files/'+fileId+'?alt=media', {
       headers:{'Authorization':'Bearer '+googleAccessToken}
     });
     if(!resp.ok) throw new Error('Download failed');
     var data = await resp.json();
 
+    // Replace rooms with cloud version (single source of truth)
     if(data.chatRooms) lmsChatRooms = data.chatRooms;
+
+    // Merge messages — cloud messages take priority, add any local-only messages
     if(data.chatMessages) {
-      // Merge messages
+      var merged = {};
+      // Start with cloud messages
       Object.keys(data.chatMessages).forEach(function(roomId) {
-        if(!lmsChatMessages[roomId]) lmsChatMessages[roomId] = [];
-        var existingIds = lmsChatMessages[roomId].map(function(m){ return m.id; });
-        data.chatMessages[roomId].forEach(function(m) {
-          if(existingIds.indexOf(m.id) === -1) lmsChatMessages[roomId].push(m);
-        });
-        lmsChatMessages[roomId].sort(function(a,b){ return new Date(a.timestamp) - new Date(b.timestamp); });
+        merged[roomId] = data.chatMessages[roomId].slice();
       });
+      // Add any local messages not in cloud
+      Object.keys(lmsChatMessages).forEach(function(roomId) {
+        if(!merged[roomId]) merged[roomId] = [];
+        var cloudIds = merged[roomId].map(function(m){ return m.id; });
+        lmsChatMessages[roomId].forEach(function(m) {
+          if(cloudIds.indexOf(m.id) === -1) merged[roomId].push(m);
+        });
+        merged[roomId].sort(function(a,b){ return new Date(a.timestamp) - new Date(b.timestamp); });
+      });
+      lmsChatMessages = merged;
     }
+
+    // Merge profiles — cloud profiles take priority
     if(data.chatProfiles) {
       Object.keys(data.chatProfiles).forEach(function(uid) {
-        if(!lmsChatProfiles[uid]) lmsChatProfiles[uid] = {};
-        Object.assign(lmsChatProfiles[uid], data.chatProfiles[uid]);
+        lmsChatProfiles[uid] = data.chatProfiles[uid];
       });
     }
-    saveLmsChatData();
-    showToast('Chat data synced from Google Drive!');
+
+    // Save merged data to localStorage (stripped version)
+    try {
+      var msgCopy = {};
+      Object.keys(lmsChatMessages).forEach(function(roomId) {
+        msgCopy[roomId] = lmsChatMessages[roomId].map(function(m) {
+          var clone = Object.assign({}, m);
+          delete clone.imageData;
+          delete clone.fileData;
+          return clone;
+        });
+      });
+      localStorage.setItem('voctrain_chatRooms', JSON.stringify(lmsChatRooms));
+      localStorage.setItem('voctrain_chatMessages', JSON.stringify(msgCopy));
+      localStorage.setItem('voctrain_chatProfiles', JSON.stringify(lmsChatProfiles));
+    } catch(e) {}
+
+    console.log('Chat data loaded from Google Drive');
 
     var prefix = lmsChatGetRolePrefix();
     lmsChatRenderRoomList(prefix);
     if(lmsChatActiveRoom) lmsChatRenderMessages(prefix);
   } catch(err) {
-    console.error('Chat sync from Drive error:', err);
-    showToast('Failed to sync chat from Drive');
+    console.error('Chat fetch from Drive error:', err);
   }
 }
 
