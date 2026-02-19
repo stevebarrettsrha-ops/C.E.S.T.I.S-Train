@@ -421,6 +421,22 @@ h1,h2,h3,h4 { font-family:'Playfair Display',serif; }
   font-size:9px; font-weight:700; color:#fff; display:flex; align-items:center; justify-content:center;
   line-height:1; box-sizing:border-box;
 }
+@keyframes bellShake {
+  0% { transform:rotate(0); }
+  15% { transform:rotate(14deg); }
+  30% { transform:rotate(-12deg); }
+  45% { transform:rotate(10deg); }
+  60% { transform:rotate(-8deg); }
+  75% { transform:rotate(4deg); }
+  90% { transform:rotate(-2deg); }
+  100% { transform:rotate(0); }
+}
+@keyframes bellGlow {
+  0%,100% { box-shadow:0 0 4px rgba(240,165,0,0.3); }
+  50% { box-shadow:0 0 14px rgba(240,165,0,0.7), 0 0 28px rgba(240,165,0,0.3); }
+}
+.topbar-btn.notif-active { animation:bellGlow 2s ease-in-out infinite; border-radius:var(--radius-sm); }
+.topbar-btn.notif-shake svg { animation:bellShake 0.6s ease-in-out; transform-origin:top center; }
 .logout-btn {
   display:flex; align-items:center; gap:6px;
   background:rgba(231,76,60,0.1);
@@ -2764,6 +2780,34 @@ let announcements = [
 
 let notifications = [];
 
+function playNotificationSound() {
+  try {
+    var ctx = new (window.AudioContext || window.webkitAudioContext)();
+    var osc = ctx.createOscillator();
+    var gain = ctx.createGain();
+    osc.connect(gain);
+    gain.connect(ctx.destination);
+    osc.type = 'sine';
+    osc.frequency.setValueAtTime(880, ctx.currentTime);
+    osc.frequency.setValueAtTime(1047, ctx.currentTime + 0.08);
+    osc.frequency.setValueAtTime(1319, ctx.currentTime + 0.16);
+    gain.gain.setValueAtTime(0.15, ctx.currentTime);
+    gain.gain.exponentialRampToValueAtTime(0.01, ctx.currentTime + 0.35);
+    osc.start(ctx.currentTime);
+    osc.stop(ctx.currentTime + 0.35);
+    setTimeout(function(){ ctx.close(); }, 500);
+  } catch(e) {}
+}
+
+function shakeNotificationBell() {
+  var btn = document.querySelector('.topbar-btn[title="Notifications"]');
+  if(!btn) return;
+  btn.classList.remove('notif-shake');
+  void btn.offsetWidth;
+  btn.classList.add('notif-shake');
+  setTimeout(function(){ btn.classList.remove('notif-shake'); }, 700);
+}
+
 function addNotification(text, type, icon) {
   type = type || 'info';
   var icons = {success:'\u2705',warning:'\u26A0\uFE0F',info:'\uD83D\uDD14',exam:'\uD83D\uDCDD',student:'\uD83D\uDC64',cert:'\uD83C\uDF93',announce:'\uD83D\uDCE2',calendar:'\uD83D\uDCC5',attendance:'\uD83D\uDCCB',resource:'\uD83D\uDCC1',grade:'\uD83C\uDF1F'};
@@ -2778,6 +2822,8 @@ function addNotification(text, type, icon) {
   });
   if(notifications.length > 50) notifications = notifications.slice(0, 50);
   updateNotificationDot();
+  shakeNotificationBell();
+  playNotificationSound();
   saveNotifications();
 }
 
@@ -3410,11 +3456,13 @@ function clearAllNotifications() {
 }
 
 function updateNotificationDot() {
-  const dot = document.querySelector('.topbar-btn[title="Notifications"] .dot');
+  const btn = document.querySelector('.topbar-btn[title="Notifications"]');
+  const dot = btn ? btn.querySelector('.dot') : null;
   if(!dot) return;
   const unread = notifications.filter(n=>!n.read).length;
   dot.style.display = unread > 0 ? 'flex' : 'none';
   dot.textContent = unread > 99 ? '99+' : unread;
+  if(btn) { if(unread > 0) btn.classList.add('notif-active'); else btn.classList.remove('notif-active'); }
 }
 
 function exportCSV(data, headers, filename) {
