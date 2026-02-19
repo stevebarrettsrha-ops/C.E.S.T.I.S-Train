@@ -1261,6 +1261,170 @@ textarea.form-control { resize:vertical; min-height:80px; }
 }
 .google-auth-modal .close-btn:hover { color:var(--text-primary); }
 
+/* ============================== EXAM BUILDER & TEST TAKING ============================== */
+.exam-builder { background:var(--bg-card); border:1px solid var(--border); border-radius:var(--radius); padding:22px; margin-bottom:18px; }
+.exam-builder-header { display:flex; align-items:center; justify-content:space-between; margin-bottom:20px; }
+.question-list { list-style:none; counter-reset:question; }
+.question-item {
+  background:var(--bg-secondary); border:1px solid var(--border-light); border-radius:var(--radius);
+  padding:20px; margin-bottom:14px; position:relative; transition:all var(--transition);
+}
+.question-item:hover { border-color:var(--accent); }
+.question-item .q-number {
+  position:absolute; top:-10px; left:16px; background:var(--accent); color:#000;
+  font-size:11px; font-weight:700; padding:2px 10px; border-radius:10px;
+}
+.question-item .q-header { display:flex; align-items:center; gap:12px; margin-bottom:14px; }
+.question-item .q-type-badge {
+  display:inline-flex; padding:3px 10px; border-radius:12px; font-size:11px; font-weight:600;
+}
+.q-type-mcq { background:var(--blue-dim); color:var(--blue); }
+.q-type-tf { background:var(--purple-dim); color:var(--purple); }
+.q-type-fill { background:var(--teal-dim); color:var(--teal); }
+.q-type-short { background:var(--accent-dim); color:var(--accent); }
+.question-item .q-text { font-size:14px; font-weight:600; margin-bottom:12px; color:var(--text-primary); }
+.question-item .q-options { list-style:none; }
+.question-item .q-options li {
+  display:flex; align-items:center; gap:10px; padding:8px 12px; margin-bottom:4px;
+  border-radius:var(--radius-sm); font-size:13px; color:var(--text-secondary);
+  background:var(--bg-input); border:1px solid var(--border);
+}
+.question-item .q-options li.correct { border-color:var(--green); background:var(--green-dim); color:var(--green); }
+.question-item .q-actions { display:flex; gap:6px; margin-top:12px; }
+.question-item .q-actions button {
+  background:none; border:1px solid var(--border); color:var(--text-secondary);
+  width:30px; height:30px; border-radius:var(--radius-sm); cursor:pointer;
+  display:flex; align-items:center; justify-content:center; font-size:14px;
+  transition:all var(--transition);
+}
+.question-item .q-actions button:hover { background:rgba(255,255,255,0.06); color:var(--text-primary); }
+.question-item .q-actions button.q-del:hover { background:var(--red-dim); color:var(--red); border-color:var(--red); }
+.question-item .q-points { font-size:11px; color:var(--text-muted); margin-left:auto; }
+.add-question-bar {
+  display:flex; gap:8px; flex-wrap:wrap; padding:16px; background:var(--bg-input);
+  border:2px dashed var(--border-light); border-radius:var(--radius); margin-top:14px;
+  justify-content:center;
+}
+.add-q-btn {
+  display:flex; align-items:center; gap:6px; padding:8px 16px; border-radius:var(--radius-sm);
+  font-size:12px; font-weight:600; cursor:pointer; border:1px solid var(--border-light);
+  background:var(--bg-card); color:var(--text-primary); transition:all var(--transition);
+  font-family:'DM Sans',sans-serif;
+}
+.add-q-btn:hover { border-color:var(--accent); background:var(--accent-dim); color:var(--accent); }
+.q-edit-form { margin-top:12px; padding:14px; background:var(--bg-input); border-radius:var(--radius-sm); border:1px solid var(--border-light); }
+.q-edit-form .q-option-row { display:flex; align-items:center; gap:8px; margin-bottom:8px; }
+.q-edit-form .q-option-row input[type="text"] { flex:1; }
+.q-edit-form .q-option-row input[type="radio"], .q-edit-form .q-option-row input[type="checkbox"] { accent-color:var(--green); width:16px; height:16px; cursor:pointer; }
+.q-edit-form .q-option-row .q-remove-opt {
+  background:none; border:none; color:var(--red); cursor:pointer; font-size:16px; padding:4px;
+}
+
+/* Exam taking interface */
+.exam-taking { max-width:800px; margin:0 auto; }
+.exam-timer-bar {
+  position:sticky; top:0; z-index:50; background:var(--bg-secondary); border:1px solid var(--border);
+  border-radius:var(--radius); padding:14px 22px; margin-bottom:20px; display:flex;
+  align-items:center; justify-content:space-between; backdrop-filter:blur(10px);
+}
+.exam-timer { display:flex; align-items:center; gap:10px; }
+.exam-timer .timer-icon { font-size:20px; }
+.exam-timer .timer-value { font-size:22px; font-weight:700; font-family:'Playfair Display',serif; }
+.exam-timer .timer-value.warning { color:var(--accent); }
+.exam-timer .timer-value.danger { color:var(--red); animation:pulse 1s infinite; }
+.exam-progress-info { display:flex; align-items:center; gap:16px; font-size:13px; color:var(--text-secondary); }
+.exam-question-card {
+  background:var(--bg-card); border:1px solid var(--border); border-radius:var(--radius);
+  padding:24px; margin-bottom:16px; transition:all var(--transition);
+}
+.exam-question-card.answered { border-left:4px solid var(--green); }
+.exam-question-card.flagged { border-left:4px solid var(--accent); }
+.exam-question-card .eq-header { display:flex; align-items:center; gap:12px; margin-bottom:16px; }
+.exam-question-card .eq-number { font-size:13px; font-weight:700; color:var(--accent); }
+.exam-question-card .eq-text { font-size:15px; font-weight:600; color:var(--text-primary); flex:1; }
+.exam-question-card .eq-flag {
+  background:none; border:1px solid var(--border); color:var(--text-muted); width:32px; height:32px;
+  border-radius:var(--radius-sm); cursor:pointer; display:flex; align-items:center;
+  justify-content:center; font-size:16px; transition:all var(--transition);
+}
+.exam-question-card .eq-flag:hover { background:var(--accent-dim); color:var(--accent); border-color:var(--accent); }
+.exam-question-card .eq-flag.flagged { background:var(--accent-dim); color:var(--accent); border-color:var(--accent); }
+.exam-option-list { list-style:none; }
+.exam-option-list li {
+  display:flex; align-items:center; gap:12px; padding:12px 16px; margin-bottom:6px;
+  border-radius:var(--radius-sm); cursor:pointer; border:1px solid var(--border);
+  background:var(--bg-input); transition:all var(--transition); font-size:14px; color:var(--text-secondary);
+}
+.exam-option-list li:hover { border-color:var(--blue); background:rgba(52,152,219,0.05); }
+.exam-option-list li.selected { border-color:var(--blue); background:var(--blue-dim); color:var(--blue); font-weight:600; }
+.exam-option-list li .opt-letter {
+  width:28px; height:28px; border-radius:50%; display:flex; align-items:center; justify-content:center;
+  font-size:12px; font-weight:700; background:rgba(255,255,255,0.06); flex-shrink:0;
+}
+.exam-option-list li.selected .opt-letter { background:var(--blue); color:#fff; }
+.exam-tf-options { display:flex; gap:12px; }
+.exam-tf-options .tf-btn {
+  flex:1; padding:14px; text-align:center; border-radius:var(--radius-sm); cursor:pointer;
+  border:1px solid var(--border); background:var(--bg-input); font-size:15px; font-weight:600;
+  color:var(--text-secondary); transition:all var(--transition); font-family:'DM Sans',sans-serif;
+}
+.exam-tf-options .tf-btn:hover { border-color:var(--blue); }
+.exam-tf-options .tf-btn.selected-true { border-color:var(--green); background:var(--green-dim); color:var(--green); }
+.exam-tf-options .tf-btn.selected-false { border-color:var(--red); background:var(--red-dim); color:var(--red); }
+.exam-fill-input {
+  width:100%; padding:12px 16px; background:var(--bg-input); border:2px solid var(--border-light);
+  border-radius:var(--radius-sm); color:var(--text-primary); font-size:15px; font-family:'DM Sans',sans-serif;
+  outline:none; transition:border-color var(--transition);
+}
+.exam-fill-input:focus { border-color:var(--blue); }
+.exam-short-textarea {
+  width:100%; min-height:120px; padding:12px 16px; background:var(--bg-input);
+  border:2px solid var(--border-light); border-radius:var(--radius-sm); color:var(--text-primary);
+  font-size:14px; font-family:'DM Sans',sans-serif; outline:none; resize:vertical;
+  transition:border-color var(--transition);
+}
+.exam-short-textarea:focus { border-color:var(--blue); }
+.exam-nav-footer {
+  display:flex; gap:8px; justify-content:space-between; padding:16px 0;
+}
+.exam-submit-area { text-align:center; padding:24px; }
+.exam-question-nav {
+  display:flex; flex-wrap:wrap; gap:6px; padding:16px; background:var(--bg-card);
+  border:1px solid var(--border); border-radius:var(--radius); margin-bottom:16px;
+}
+.eq-nav-btn {
+  width:36px; height:36px; border-radius:var(--radius-sm); display:flex; align-items:center;
+  justify-content:center; font-size:12px; font-weight:700; cursor:pointer; border:1px solid var(--border);
+  background:var(--bg-input); color:var(--text-secondary); transition:all var(--transition);
+  font-family:'DM Sans',sans-serif;
+}
+.eq-nav-btn:hover { border-color:var(--blue); }
+.eq-nav-btn.answered { background:var(--green-dim); border-color:var(--green); color:var(--green); }
+.eq-nav-btn.flagged { background:var(--accent-dim); border-color:var(--accent); color:var(--accent); }
+.eq-nav-btn.current { background:var(--blue); color:#fff; border-color:var(--blue); }
+
+/* Exam results display */
+.exam-result-card {
+  background:var(--bg-card); border:1px solid var(--border); border-radius:var(--radius-lg);
+  padding:32px; text-align:center; margin-bottom:24px;
+}
+.exam-result-card .result-icon { font-size:64px; margin-bottom:16px; }
+.exam-result-card .result-score { font-size:48px; font-weight:800; font-family:'Playfair Display',serif; }
+.exam-result-card .result-label { font-size:14px; color:var(--text-secondary); margin-top:4px; }
+.exam-result-card .result-status { font-size:20px; font-weight:700; margin-top:12px; }
+.exam-result-card .result-status.passed { color:var(--green); }
+.exam-result-card .result-status.failed { color:var(--red); }
+.exam-review-item {
+  background:var(--bg-card); border:1px solid var(--border); border-radius:var(--radius);
+  padding:20px; margin-bottom:12px;
+}
+.exam-review-item.correct { border-left:4px solid var(--green); }
+.exam-review-item.incorrect { border-left:4px solid var(--red); }
+.exam-review-item.pending { border-left:4px solid var(--accent); }
+.exam-review-item .er-question { font-size:14px; font-weight:600; margin-bottom:8px; }
+.exam-review-item .er-answer { font-size:13px; color:var(--text-secondary); }
+.exam-review-item .er-correct { font-size:13px; color:var(--green); margin-top:4px; }
+
 /* ============================== VIDEO RECORDING ============================== */
 .vc-btn.recording { background:var(--red); color:#fff; animation:recPulse 1.2s infinite; }
 .vc-btn.recording:hover { background:#c0392b; }
@@ -1680,16 +1844,46 @@ textarea.form-control { resize:vertical; min-height:80px; }
   </div>
 </div>
 <div class="modal-overlay" id="createExamModal">
-  <div class="modal">
-    <div class="modal-header"><h3>Create New Exam</h3><button class="modal-close" onclick="closeModal('createExamModal')">✕</button></div>
-    <div class="form-group"><label>Exam Title</label><input type="text" class="form-control" id="examTitle" placeholder="e.g. Welding Level 2 — Final Assessment"></div>
-    <div class="form-group"><label>Programme</label><select class="form-control" id="examCourse"><option>Welding</option><option>Electrical Installation</option><option>Cosmetology</option><option>Business Administration</option><option>Auto Mechanics</option><option>Plumbing</option><option>Carpentry</option><option>Hospitality</option><option>Information Technology</option></select></div>
-    <div class="grid-2col" style="gap:12px;"><div class="form-group"><label>Date</label><input type="date" class="form-control" id="examDate"></div><div class="form-group"><label>Start Time</label><input type="time" class="form-control" id="examTime"></div></div>
-    <div class="form-group"><label>Duration (minutes)</label><input type="number" class="form-control" id="examDuration" value="90" min="15" max="300"></div>
-    <div class="form-group"><label>Number of Questions</label><input type="number" class="form-control" id="examQuestions" value="50" min="5" max="200"></div>
-    <div class="form-group"><label>Pass Mark (%)</label><input type="number" class="form-control" id="examPassMark" value="60" min="1" max="100"></div>
-    <div class="form-group"><label>Instructions</label><textarea class="form-control" id="examInstructions" placeholder="Special instructions for students..."></textarea></div>
-    <div style="display:flex;gap:10px;justify-content:flex-end;margin-top:20px;"><button class="btn btn-secondary" onclick="closeModal('createExamModal')">Cancel</button><button class="btn btn-primary" onclick="createExam()">Schedule Exam</button></div>
+  <div class="modal" style="max-width:780px;">
+    <div class="modal-header"><h3>Create Online Exam</h3><button class="modal-close" onclick="closeModal('createExamModal');examBuilderQuestions=[];">✕</button></div>
+
+    <!-- Step 1: Exam Details -->
+    <div id="examStep1">
+      <div class="form-group"><label>Exam Title</label><input type="text" class="form-control" id="examTitle" placeholder="e.g. Welding Level 2 — Final Assessment"></div>
+      <div class="form-group"><label>Programme</label><select class="form-control" id="examCourse"><option>Welding</option><option>Electrical Installation</option><option>Cosmetology</option><option>Business Administration</option><option>Auto Mechanics</option><option>Plumbing</option><option>Carpentry</option><option>Hospitality</option><option>Information Technology</option></select></div>
+      <div class="grid-2col" style="gap:12px;"><div class="form-group"><label>Date</label><input type="date" class="form-control" id="examDate"></div><div class="form-group"><label>Start Time</label><input type="time" class="form-control" id="examTime"></div></div>
+      <div class="grid-2col" style="gap:12px;"><div class="form-group"><label>Duration (minutes)</label><input type="number" class="form-control" id="examDuration" value="90" min="15" max="300"></div><div class="form-group"><label>Pass Mark (%)</label><input type="number" class="form-control" id="examPassMark" value="60" min="1" max="100"></div></div>
+      <div class="form-group"><label>Shuffle Questions</label><select class="form-control" id="examShuffle"><option value="false">No — Keep original order</option><option value="true">Yes — Randomise order for each student</option></select></div>
+      <div class="form-group"><label>Instructions</label><textarea class="form-control" id="examInstructions" placeholder="Special instructions for students..."></textarea></div>
+      <div style="display:flex;gap:10px;justify-content:flex-end;margin-top:20px;">
+        <button class="btn btn-secondary" onclick="closeModal('createExamModal');examBuilderQuestions=[];">Cancel</button>
+        <button class="btn btn-primary" onclick="goToExamStep2()">Next: Add Questions →</button>
+      </div>
+    </div>
+
+    <!-- Step 2: Question Builder -->
+    <div id="examStep2" style="display:none;">
+      <div style="display:flex;align-items:center;gap:12px;margin-bottom:16px;">
+        <button class="btn btn-sm btn-secondary" onclick="goToExamStep1()">← Back</button>
+        <h4 style="flex:1;">Add Questions</h4>
+        <span style="font-size:13px;color:var(--text-muted);" id="examQCount">0 questions</span>
+        <span style="font-size:13px;color:var(--accent);" id="examTotalPoints">0 pts</span>
+      </div>
+
+      <div id="examQuestionsList" class="question-list"></div>
+
+      <div class="add-question-bar">
+        <button class="add-q-btn" onclick="addExamQuestion('mcq')">+ Multiple Choice</button>
+        <button class="add-q-btn" onclick="addExamQuestion('tf')">+ True / False</button>
+        <button class="add-q-btn" onclick="addExamQuestion('fill')">+ Fill in Blank</button>
+        <button class="add-q-btn" onclick="addExamQuestion('short')">+ Short Answer</button>
+      </div>
+
+      <div style="display:flex;gap:10px;justify-content:flex-end;margin-top:20px;">
+        <button class="btn btn-secondary" onclick="goToExamStep1()">← Back to Details</button>
+        <button class="btn btn-primary" onclick="createExam()">Publish Exam</button>
+      </div>
+    </div>
   </div>
 </div>
 <div class="modal-overlay" id="updateStageModal">
@@ -1912,18 +2106,18 @@ function generateStudents() {
 generateStudents();
 
 let exams = [
-  {title:"Welding Level 2 \u2014 Final Theory",course:"Welding",date:"2026-02-18",time:"09:00",duration:90,students:24,status:"upcoming",questions:50,passMark:60},
-  {title:"Electrical Installation L3 \u2014 Safety",course:"Electrical Installation",date:"2026-02-20",time:"10:00",duration:60,students:18,status:"upcoming",questions:40,passMark:70},
-  {title:"Business Admin L1 \u2014 Midterm",course:"Business Administration",date:"2026-02-22",time:"14:00",duration:120,students:32,status:"upcoming",questions:80,passMark:55},
-  {title:"Cosmetology L1 \u2014 Practical Theory",course:"Cosmetology",date:"2026-02-25",time:"09:30",duration:75,students:22,status:"upcoming",questions:45,passMark:60},
-  {title:"Auto Mechanics \u2014 Diagnostics",course:"Auto Mechanics",date:"2026-02-15",time:"08:00",duration:90,students:19,status:"active",questions:50,passMark:65},
-  {title:"Welding L1 \u2014 Safety Fundamentals",course:"Welding",date:"2026-02-10",time:"09:00",duration:60,students:26,status:"completed",questions:35,passMark:60,passRate:"84%"},
-  {title:"Hospitality \u2014 Food Safety",course:"Hospitality",date:"2026-02-08",time:"11:00",duration:45,students:30,status:"completed",questions:30,passMark:70,passRate:"90%"},
-  {title:"IT Fundamentals \u2014 Networking",course:"Information Technology",date:"2026-02-05",time:"14:00",duration:90,students:25,status:"completed",questions:60,passMark:60,passRate:"72%"},
-  {title:"Plumbing L2 \u2014 Pipe Systems",course:"Plumbing",date:"2026-03-01",time:"10:00",duration:75,students:15,status:"upcoming",questions:40,passMark:60},
-  {title:"Carpentry \u2014 Joints & Framing",course:"Carpentry",date:"2026-03-04",time:"09:00",duration:90,students:20,status:"upcoming",questions:55,passMark:60},
-  {title:"Beauty Therapy \u2014 Skin Analysis",course:"Cosmetology",date:"2026-03-06",time:"13:00",duration:60,students:28,status:"upcoming",questions:35,passMark:65},
-  {title:"Data Operations \u2014 Spreadsheets",course:"Information Technology",date:"2026-03-10",time:"10:00",duration:60,students:22,status:"upcoming",questions:40,passMark:60},
+  {id:"EXAM-001",title:"Welding Level 2 \u2014 Final Theory",course:"Welding",date:"2026-02-18",time:"09:00",duration:90,students:24,status:"upcoming",questions:50,passMark:60,questionData:[],shuffleQuestions:false},
+  {id:"EXAM-002",title:"Electrical Installation L3 \u2014 Safety",course:"Electrical Installation",date:"2026-02-20",time:"10:00",duration:60,students:18,status:"upcoming",questions:40,passMark:70,questionData:[],shuffleQuestions:false},
+  {id:"EXAM-003",title:"Business Admin L1 \u2014 Midterm",course:"Business Administration",date:"2026-02-22",time:"14:00",duration:120,students:32,status:"upcoming",questions:80,passMark:55,questionData:[],shuffleQuestions:false},
+  {id:"EXAM-004",title:"Cosmetology L1 \u2014 Practical Theory",course:"Cosmetology",date:"2026-02-25",time:"09:30",duration:75,students:22,status:"upcoming",questions:45,passMark:60,questionData:[],shuffleQuestions:false},
+  {id:"EXAM-005",title:"Auto Mechanics \u2014 Diagnostics",course:"Auto Mechanics",date:"2026-02-15",time:"08:00",duration:90,students:19,status:"active",questions:50,passMark:65,questionData:[],shuffleQuestions:false},
+  {id:"EXAM-006",title:"Welding L1 \u2014 Safety Fundamentals",course:"Welding",date:"2026-02-10",time:"09:00",duration:60,students:26,status:"completed",questions:35,passMark:60,passRate:"84%",questionData:[],shuffleQuestions:false},
+  {id:"EXAM-007",title:"Hospitality \u2014 Food Safety",course:"Hospitality",date:"2026-02-08",time:"11:00",duration:45,students:30,status:"completed",questions:30,passMark:70,passRate:"90%",questionData:[],shuffleQuestions:false},
+  {id:"EXAM-008",title:"IT Fundamentals \u2014 Networking",course:"Information Technology",date:"2026-02-05",time:"14:00",duration:90,students:25,status:"completed",questions:60,passMark:60,passRate:"72%",questionData:[],shuffleQuestions:false},
+  {id:"EXAM-009",title:"Plumbing L2 \u2014 Pipe Systems",course:"Plumbing",date:"2026-03-01",time:"10:00",duration:75,students:15,status:"upcoming",questions:40,passMark:60,questionData:[],shuffleQuestions:false},
+  {id:"EXAM-010",title:"Carpentry \u2014 Joints & Framing",course:"Carpentry",date:"2026-03-04",time:"09:00",duration:90,students:20,status:"upcoming",questions:55,passMark:60,questionData:[],shuffleQuestions:false},
+  {id:"EXAM-011",title:"Beauty Therapy \u2014 Skin Analysis",course:"Cosmetology",date:"2026-03-06",time:"13:00",duration:60,students:28,status:"upcoming",questions:35,passMark:65,questionData:[],shuffleQuestions:false},
+  {id:"EXAM-012",title:"Data Operations \u2014 Spreadsheets",course:"Information Technology",date:"2026-03-10",time:"10:00",duration:60,students:22,status:"upcoming",questions:40,passMark:60,questionData:[],shuffleQuestions:false},
 ];
 
 let announcements = [
@@ -1945,6 +2139,8 @@ let notifications = [
   {id:7,text:"New student enrolled: Crystal Nelson - Hospitality",time:"6 hrs ago",read:false,icon:"\uD83D\uDC64",type:"info"},
   {id:8,text:"Exam results published for Welding L1 Safety",time:"1 day ago",read:false,icon:"\uD83D\uDCCB",type:"success"}
 ];
+
+let examResults = [];
 
 let calendarEvents = [
   {title:"Welding L2 Final Theory",date:"2026-02-18",time:"09:00 AM",type:"exam",color:"var(--red)"},
@@ -2033,6 +2229,7 @@ function saveState() {
     localStorage.setItem('voctrain_resources', JSON.stringify(instructorResources));
     localStorage.setItem('voctrain_studentProfiles', JSON.stringify(studentProfiles));
     localStorage.setItem('voctrain_systemSettings', JSON.stringify(systemSettings));
+    localStorage.setItem('voctrain_examResults', JSON.stringify(examResults));
   } catch(e) { /* quota exceeded or private browsing */ }
 }
 
@@ -2047,6 +2244,7 @@ function loadState() {
     const ir = localStorage.getItem('voctrain_resources');
     const sp = localStorage.getItem('voctrain_studentProfiles');
     const ss = localStorage.getItem('voctrain_systemSettings');
+    const er = localStorage.getItem('voctrain_examResults');
     if(s) students = JSON.parse(s);
     if(e) exams = JSON.parse(e);
     if(a) announcements = JSON.parse(a);
@@ -2056,6 +2254,7 @@ function loadState() {
     if(ir) instructorResources = JSON.parse(ir);
     if(sp) studentProfiles = JSON.parse(sp);
     if(ss) systemSettings = JSON.parse(ss);
+    if(er) examResults = JSON.parse(er);
   } catch(e) { /* parse error, use generated data */ }
 }
 loadState();
@@ -2870,9 +3069,14 @@ function buildAdminPages() {
 
   <!-- EXAMS -->
   <section class="page" id="page-exams">
-    <div style="display:flex;gap:12px;margin-bottom:20px;"><button class="btn btn-primary" onclick="openModal('createExamModal')">+ Create Exam</button><button class="btn btn-secondary" onclick="exportExamResults()">Export Results</button></div>
-    <div class="tabs"><div class="tab active" onclick="switchExamTab(this,'upcoming')">Upcoming</div><div class="tab" onclick="switchExamTab(this,'active')">Active Now</div><div class="tab" onclick="switchExamTab(this,'completed')">Completed</div></div>
-    <div class="card"><div class="card-header"><h3>Scheduled Examinations</h3></div><div class="table-wrapper"><table><thead><tr><th>Exam Title</th><th>Course</th><th>Date & Time</th><th>Duration</th><th>Students</th><th>Status</th><th>Actions</th></tr></thead><tbody id="examTableBody"></tbody></table></div></div>
+    <div id="examListView">
+      <div class="stats-grid" id="examStatsGrid"></div>
+      <div style="display:flex;gap:12px;margin-bottom:20px;"><button class="btn btn-primary" onclick="openModal('createExamModal')">+ Create Exam</button><button class="btn btn-secondary" onclick="exportExamResults()">Export Results</button></div>
+      <div class="tabs"><div class="tab active" onclick="switchExamTab(this,'upcoming')">Upcoming</div><div class="tab" onclick="switchExamTab(this,'active')">Active Now</div><div class="tab" onclick="switchExamTab(this,'completed')">Completed</div></div>
+      <div class="card"><div class="card-header"><h3>Scheduled Examinations</h3></div><div class="table-wrapper"><table><thead><tr><th>Exam Title</th><th>Course</th><th>Date & Time</th><th>Duration</th><th>Questions</th><th>Status</th><th>Actions</th></tr></thead><tbody id="examTableBody"></tbody></table></div></div>
+    </div>
+    <!-- Exam Results Detail View (shown when clicking Results on a completed exam) -->
+    <div id="examResultsView" style="display:none;"></div>
   </section>
 
   <section class="page" id="page-attendance">
@@ -3248,26 +3452,53 @@ function buildStudentPages() {
 
   <!-- STUDENT EXAMS -->
   <section class="page" id="page-s-exams">
-    <div class="card">
-      <div class="card-header"><h3>My Upcoming Exams</h3></div>
-      ${exams.filter(e => e.course === s.course && e.status === 'upcoming').map(e => `
-        <div class="class-schedule-card" style="border-left:3px solid var(--accent);">
-          <div class="class-time-block"><div class="time" style="font-size:13px;">${e.date.split('-').slice(1).join('/')}</div><div class="period">${e.time}</div></div>
-          <div style="flex:1;"><div style="font-size:14px;font-weight:600;">${e.title}</div><div style="font-size:12px;color:var(--text-muted);">${e.duration} minutes &nbsp;•&nbsp; ${e.questions} questions &nbsp;•&nbsp; Pass: ${e.passMark}%</div></div>
-          <span class="badge badge-amber">Upcoming</span>
+    <div id="studentExamListView">
+      <div class="card">
+        <div class="card-header"><h3>My Upcoming Exams</h3></div>
+        ${exams.filter(e => e.course === s.course && (e.status === 'upcoming' || e.status === 'active')).map((e,idx) => {
+          const examIdx = exams.indexOf(e);
+          const hasQuestions = e.questionData && e.questionData.length > 0;
+          const alreadyTaken = (examResults||[]).some(r => r.examId === e.id && r.studentId === s.id);
+          return '<div class="class-schedule-card" style="border-left:3px solid '+(e.status==='active'?'var(--green)':'var(--accent)')+';">' +
+            '<div class="class-time-block"><div class="time" style="font-size:13px;">'+e.date.split('-').slice(1).join('/')+'</div><div class="period">'+e.time+'</div></div>' +
+            '<div style="flex:1;"><div style="font-size:14px;font-weight:600;">'+e.title+'</div><div style="font-size:12px;color:var(--text-muted);">'+e.duration+' minutes &nbsp;•&nbsp; '+(e.questionData?e.questionData.length:e.questions)+' questions &nbsp;•&nbsp; Pass: '+e.passMark+'%</div></div>' +
+            (e.status==='active' && hasQuestions && !alreadyTaken
+              ? '<button class="btn btn-sm btn-primary" onclick="startStudentExam('+examIdx+')">Take Exam</button>'
+              : alreadyTaken
+                ? '<span class="badge badge-green"><span class="badge-dot"></span>Completed</span>'
+                : '<span class="badge badge-amber">'+(e.status==='active'?'No Questions':'Upcoming')+'</span>') +
+            '</div>';
+        }).join('') || '<p style="color:var(--text-muted);padding:16px;">No upcoming exams for your programme.</p>'}
+      </div>
+      <div class="card">
+        <div class="card-header"><h3>Past Exam Results</h3></div>
+        <div id="studentPastExamResults">
+        ${(function(){
+          const myResults = (examResults||[]).filter(r => r.studentId === s.id);
+          if(myResults.length === 0) {
+            return exams.filter(e => e.course === s.course && e.status === 'completed').map(e =>
+              '<div class="class-schedule-card" style="border-left:3px solid var(--green);">' +
+              '<div class="class-time-block" style="background:var(--green-dim);"><div class="time" style="font-size:13px;">'+e.date.split('-').slice(1).join('/')+'</div><div class="period">'+e.time+'</div></div>' +
+              '<div style="flex:1;"><div style="font-size:14px;font-weight:600;">'+e.title+'</div><div style="font-size:12px;color:var(--text-muted);">Score: <strong style="color:var(--green);">'+(s.score||'82%')+'</strong> &nbsp;•&nbsp; Class Average: '+(e.passRate||'—')+'</div></div>' +
+              '<span class="badge badge-green"><span class="badge-dot"></span>Passed</span></div>'
+            ).join('') || '<p style="color:var(--text-muted);padding:16px;">No past exams yet.</p>';
+          }
+          return myResults.map(r => {
+            const ex = exams.find(e => e.id === r.examId) || {};
+            return '<div class="class-schedule-card" style="border-left:3px solid '+(r.passed?'var(--green)':'var(--red)')+';">' +
+              '<div class="class-time-block" style="background:'+(r.passed?'var(--green-dim)':'var(--red-dim)') +';"><div class="time" style="font-size:13px;">'+(r.submittedAt?r.submittedAt.split('T')[0].split('-').slice(1).join('/'):'—')+'</div><div class="period">'+(ex.time||'')+'</div></div>' +
+              '<div style="flex:1;"><div style="font-size:14px;font-weight:600;">'+(ex.title||'Exam')+'</div><div style="font-size:12px;color:var(--text-muted);">Score: <strong style="color:'+(r.passed?'var(--green)':'var(--red)')+';">'+r.score+'%</strong> &nbsp;•&nbsp; '+r.correctCount+'/'+r.totalQuestions+' correct</div></div>' +
+              '<span class="badge '+(r.passed?'badge-green':'badge-red')+'"><span class="badge-dot"></span>'+(r.passed?'Passed':'Failed')+'</span>' +
+              '<button class="btn btn-sm btn-secondary" onclick="viewExamResultDetail(\''+r.examId+'\',\''+r.studentId+'\')">Review</button></div>';
+          }).join('');
+        })()}
         </div>
-      `).join('') || '<p style="color:var(--text-muted);padding:16px;">No upcoming exams for your programme.</p>'}
+      </div>
     </div>
-    <div class="card">
-      <div class="card-header"><h3>Past Exam Results</h3></div>
-      ${exams.filter(e => e.course === s.course && e.status === 'completed').map(e => `
-        <div class="class-schedule-card" style="border-left:3px solid var(--green);">
-          <div class="class-time-block" style="background:var(--green-dim);"><div class="time" style="font-size:13px;">${e.date.split('-').slice(1).join('/')}</div><div class="period">${e.time}</div></div>
-          <div style="flex:1;"><div style="font-size:14px;font-weight:600;">${e.title}</div><div style="font-size:12px;color:var(--text-muted);">Score: <strong style="color:var(--green);">${s.score||'82%'}</strong> &nbsp;•&nbsp; Class Average: ${e.passRate}</div></div>
-          <span class="badge badge-green"><span class="badge-dot"></span>Passed</span>
-        </div>
-      `).join('') || '<p style="color:var(--text-muted);padding:16px;">No past exams yet.</p>'}
-    </div>
+    <!-- Exam taking interface (shown when student clicks Take Exam) -->
+    <div id="studentExamTakingView" style="display:none;"></div>
+    <!-- Exam result review (shown after submission or when reviewing past results) -->
+    <div id="studentExamResultView" style="display:none;"></div>
   </section>
 
   <!-- STUDENT CERTIFICATE -->
@@ -5124,11 +5355,21 @@ function saveSystemSettings() {
 
 // ============================== EXPORT FUNCTIONS ==============================
 function exportExamResults() {
-  if(exams.length === 0) { showToast('No exam data to export'); return; }
-  var csv = 'Exam Title,Course,Date,Time,Duration (min),Questions,Pass Mark (%),Status,Students,Pass Rate\n';
+  if(exams.length === 0 && examResults.length === 0) { showToast('No exam data to export'); return; }
+  var csv = 'Exam Title,Course,Date,Time,Duration (min),Questions,Pass Mark (%),Status,Submissions,Pass Rate\n';
   exams.forEach(function(e) {
-    csv += '"' + (e.title||'') + '","' + (e.course||'') + '","' + (e.date||'') + '","' + (e.time||'') + '",' + (e.duration||'') + ',' + (e.questions||'') + ',' + (e.passMark||'') + ',"' + (e.status||'') + '",' + (e.students||'') + ',"' + (e.passRate||'') + '"\n';
+    var results = examResults.filter(function(r){return r.examId===e.id;});
+    var passRate = results.length > 0 ? Math.round(results.filter(function(r){return r.passed;}).length/results.length*100)+'%' : (e.passRate||'—');
+    csv += '"' + (e.title||'') + '","' + (e.course||'') + '","' + (e.date||'') + '","' + (e.time||'') + '",' + (e.duration||'') + ',' + ((e.questionData?e.questionData.length:e.questions)||'') + ',' + (e.passMark||'') + ',"' + (e.status||'') + '",' + results.length + ',"' + passRate + '"\n';
   });
+  // Also export individual student results
+  if(examResults.length > 0) {
+    csv += '\n\nStudent Results Detail\nExam,Student,Score (%),Correct,Total Questions,Status,Submitted At\n';
+    examResults.forEach(function(r){
+      var exam = exams.find(function(e){return e.id===r.examId;});
+      csv += '"'+(exam?exam.title:r.examId)+'","'+(r.studentName||r.studentId)+'",'+r.score+','+r.correctCount+','+r.totalQuestions+',"'+(r.passed?'Passed':'Failed')+'","'+r.submittedAt+'"\n';
+    });
+  }
   var blob = new Blob([csv], {type:'text/csv'});
   var a = document.createElement('a');
   a.href = URL.createObjectURL(blob);
@@ -5219,15 +5460,616 @@ function renderExams(filter) {
   const filtered = exams.filter(e=>e.status===(filter||'upcoming'));
   const tbody = document.getElementById('examTableBody');
   if(!tbody) return;
-  tbody.innerHTML = filtered.map(e=>`<tr><td><strong>${e.title}</strong></td><td>${e.course}</td><td>${e.date} @ ${e.time}</td><td>${e.duration} min</td><td>${e.students}</td><td><span class="badge ${e.status==='upcoming'?'badge-blue':e.status==='active'?'badge-red':'badge-green'}"><span class="badge-dot"></span>${e.status==='active'?'In Progress':e.status==='completed'?'Completed ✓':'Scheduled'}</span>${e.passRate?'<br><span style="font-size:11px;color:var(--text-muted);">Pass: '+e.passRate+'</span>':''}</td><td>${e.status==='upcoming'?'<button class="btn btn-sm btn-secondary">Edit</button>':e.status==='active'?'<button class="btn btn-sm btn-primary">Monitor</button>':'<button class="btn btn-sm btn-secondary">Results</button>'}</td></tr>`).join('');
+  // Render exam stats
+  const statsEl = document.getElementById('examStatsGrid');
+  if(statsEl) {
+    const totalExams = exams.length;
+    const activeExams = exams.filter(e=>e.status==='active').length;
+    const completedExams = exams.filter(e=>e.status==='completed').length;
+    const totalResults = examResults.length;
+    const avgScore = totalResults > 0 ? Math.round(examResults.reduce((a,r)=>a+r.score,0)/totalResults) : 0;
+    statsEl.innerHTML = `
+      <div class="stat-card"><div class="stat-icon" style="background:var(--blue-dim);color:var(--blue);">📝</div><div class="stat-value">${totalExams}</div><div class="stat-label">Total Exams</div></div>
+      <div class="stat-card"><div class="stat-icon" style="background:var(--red-dim);color:var(--red);">🔴</div><div class="stat-value">${activeExams}</div><div class="stat-label">Active Now</div></div>
+      <div class="stat-card"><div class="stat-icon" style="background:var(--green-dim);color:var(--green);">✅</div><div class="stat-value">${completedExams}</div><div class="stat-label">Completed</div></div>
+      <div class="stat-card"><div class="stat-icon" style="background:var(--accent-dim);color:var(--accent);">📊</div><div class="stat-value">${avgScore}%</div><div class="stat-label">Avg Score</div></div>
+    `;
+  }
+  tbody.innerHTML = filtered.map(function(e) {
+    var idx = exams.indexOf(e);
+    var qCount = (e.questionData && e.questionData.length > 0) ? e.questionData.length : e.questions;
+    var hasQuestions = e.questionData && e.questionData.length > 0;
+    var resultsForExam = examResults.filter(function(r){return r.examId===e.id;});
+    var actionBtns = '';
+    if(e.status==='upcoming') {
+      actionBtns = '<button class="btn btn-sm btn-secondary" onclick="editExamQuestions('+idx+')">'+(!hasQuestions?'Add Questions':'Edit')+'</button>' +
+        '<button class="btn btn-sm btn-primary" style="margin-left:4px;" onclick="activateExam('+idx+')">Activate</button>';
+    } else if(e.status==='active') {
+      actionBtns = '<button class="btn btn-sm btn-primary" onclick="viewExamResults('+idx+')">Monitor ('+resultsForExam.length+')</button>' +
+        '<button class="btn btn-sm btn-secondary" style="margin-left:4px;" onclick="completeExam('+idx+')">Complete</button>';
+    } else {
+      actionBtns = '<button class="btn btn-sm btn-secondary" onclick="viewExamResults('+idx+')">Results ('+resultsForExam.length+')</button>';
+    }
+    return '<tr><td><strong>'+e.title+'</strong>'+(hasQuestions?'<br><span style="font-size:11px;color:var(--green);">✓ Questions added</span>':'')+'</td><td>'+e.course+'</td><td>'+e.date+' @ '+e.time+'</td><td>'+e.duration+' min</td><td>'+qCount+'</td><td><span class="badge '+(e.status==='upcoming'?'badge-blue':e.status==='active'?'badge-red':'badge-green')+'"><span class="badge-dot"></span>'+(e.status==='active'?'In Progress':e.status==='completed'?'Completed ✓':'Scheduled')+'</span>'+(e.passRate?'<br><span style="font-size:11px;color:var(--text-muted);">Pass: '+e.passRate+'</span>':'')+'</td><td>'+actionBtns+'</td></tr>';
+  }).join('');
 }
 function switchExamTab(el,tab) { document.querySelectorAll('#page-exams .tab').forEach(t=>t.classList.remove('active')); el.classList.add('active'); renderExams(tab); }
+
+// ============================== EXAM BUILDER ==============================
+var examBuilderQuestions = [];
+var editingExamIdx = -1;
+
+function goToExamStep1() {
+  document.getElementById('examStep1').style.display='block';
+  document.getElementById('examStep2').style.display='none';
+}
+function goToExamStep2() {
+  var title = document.getElementById('examTitle').value.trim();
+  if(!title){alert('Please enter an exam title');return;}
+  document.getElementById('examStep1').style.display='none';
+  document.getElementById('examStep2').style.display='block';
+  renderExamBuilderQuestions();
+}
+
+function addExamQuestion(type) {
+  var q = { id:'Q-'+Date.now()+'-'+Math.random().toString(36).substr(2,4), type:type, text:'', points:1 };
+  if(type==='mcq') { q.options=['Option A','Option B','Option C','Option D']; q.correctAnswer=0; }
+  else if(type==='tf') { q.correctAnswer=true; }
+  else if(type==='fill') { q.correctAnswer=''; }
+  else if(type==='short') { q.correctAnswer=''; q.autoGrade=false; }
+  examBuilderQuestions.push(q);
+  renderExamBuilderQuestions();
+  // Scroll to new question
+  setTimeout(function(){ var el=document.getElementById('qItem-'+(examBuilderQuestions.length-1)); if(el)el.scrollIntoView({behavior:'smooth',block:'center'}); },100);
+}
+
+function removeExamQuestion(idx) {
+  examBuilderQuestions.splice(idx,1);
+  renderExamBuilderQuestions();
+}
+
+function moveExamQuestion(idx,dir) {
+  var newIdx = idx+dir;
+  if(newIdx<0||newIdx>=examBuilderQuestions.length) return;
+  var temp = examBuilderQuestions[idx];
+  examBuilderQuestions[idx] = examBuilderQuestions[newIdx];
+  examBuilderQuestions[newIdx] = temp;
+  renderExamBuilderQuestions();
+}
+
+function renderExamBuilderQuestions() {
+  var container = document.getElementById('examQuestionsList');
+  if(!container) return;
+  var totalPts = examBuilderQuestions.reduce(function(a,q){return a+q.points;},0);
+  document.getElementById('examQCount').textContent = examBuilderQuestions.length+' question'+(examBuilderQuestions.length!==1?'s':'');
+  document.getElementById('examTotalPoints').textContent = totalPts+' pts';
+
+  container.innerHTML = examBuilderQuestions.map(function(q,idx) {
+    var typeLabel = {mcq:'Multiple Choice',tf:'True / False',fill:'Fill in Blank',short:'Short Answer'}[q.type];
+    var typeCls = 'q-type-'+q.type;
+    var html = '<div class="question-item" id="qItem-'+idx+'">';
+    html += '<div class="q-number">Q'+(idx+1)+'</div>';
+    html += '<div class="q-header"><span class="q-type-badge '+typeCls+'">'+typeLabel+'</span><span class="q-points">'+q.points+' pt'+(q.points!==1?'s':'')+'</span></div>';
+
+    // Question text input
+    html += '<div class="form-group" style="margin-bottom:12px;"><input type="text" class="form-control" value="'+escapeAttr(q.text)+'" placeholder="Enter your question here..." onchange="examBuilderQuestions['+idx+'].text=this.value"></div>';
+
+    // Points input
+    html += '<div style="display:flex;gap:8px;align-items:center;margin-bottom:12px;"><label style="font-size:11px;font-weight:600;color:var(--text-muted);margin:0;">Points:</label><input type="number" class="form-control" style="width:70px;padding:6px 10px;" value="'+q.points+'" min="1" max="100" onchange="examBuilderQuestions['+idx+'].points=parseInt(this.value)||1;renderExamBuilderQuestions()"></div>';
+
+    // Type-specific editing
+    if(q.type==='mcq') {
+      html += '<div class="q-edit-form"><div style="font-size:11px;font-weight:600;color:var(--text-muted);margin-bottom:8px;">OPTIONS (select the correct answer):</div>';
+      q.options.forEach(function(opt,oi){
+        html += '<div class="q-option-row"><input type="radio" name="qCorrect'+idx+'" '+(q.correctAnswer===oi?'checked':'')+' onchange="examBuilderQuestions['+idx+'].correctAnswer='+oi+'"><input type="text" class="form-control" value="'+escapeAttr(opt)+'" onchange="examBuilderQuestions['+idx+'].options['+oi+']=this.value"><button class="q-remove-opt" onclick="removeExamOption('+idx+','+oi+')" title="Remove">&times;</button></div>';
+      });
+      html += '<button class="btn btn-sm btn-secondary" style="margin-top:6px;" onclick="addExamOption('+idx+')">+ Add Option</button></div>';
+    } else if(q.type==='tf') {
+      html += '<div class="q-edit-form"><div style="font-size:11px;font-weight:600;color:var(--text-muted);margin-bottom:8px;">CORRECT ANSWER:</div>';
+      html += '<div style="display:flex;gap:8px;"><label style="display:flex;align-items:center;gap:6px;cursor:pointer;padding:8px 16px;border-radius:var(--radius-sm);border:1px solid '+(q.correctAnswer===true?'var(--green)':'var(--border)')+';background:'+(q.correctAnswer===true?'var(--green-dim)':'var(--bg-input)')+';"><input type="radio" name="tfCorrect'+idx+'" '+(q.correctAnswer===true?'checked':'')+' onchange="examBuilderQuestions['+idx+'].correctAnswer=true;renderExamBuilderQuestions()"> True</label>';
+      html += '<label style="display:flex;align-items:center;gap:6px;cursor:pointer;padding:8px 16px;border-radius:var(--radius-sm);border:1px solid '+(q.correctAnswer===false?'var(--red)':'var(--border)')+';background:'+(q.correctAnswer===false?'var(--red-dim)':'var(--bg-input)')+';"><input type="radio" name="tfCorrect'+idx+'" '+(q.correctAnswer===false?'checked':'')+' onchange="examBuilderQuestions['+idx+'].correctAnswer=false;renderExamBuilderQuestions()"> False</label></div></div>';
+    } else if(q.type==='fill') {
+      html += '<div class="q-edit-form"><div style="font-size:11px;font-weight:600;color:var(--text-muted);margin-bottom:8px;">CORRECT ANSWER (case-insensitive match):</div>';
+      html += '<input type="text" class="form-control" value="'+escapeAttr(q.correctAnswer)+'" placeholder="Type the correct answer..." onchange="examBuilderQuestions['+idx+'].correctAnswer=this.value"></div>';
+    } else if(q.type==='short') {
+      html += '<div class="q-edit-form"><div style="font-size:11px;font-weight:600;color:var(--text-muted);margin-bottom:8px;">SHORT ANSWER — graded manually by instructor</div>';
+      html += '<input type="text" class="form-control" value="'+escapeAttr(q.correctAnswer)+'" placeholder="(Optional) Model answer for reference..." onchange="examBuilderQuestions['+idx+'].correctAnswer=this.value"></div>';
+    }
+
+    // Action buttons
+    html += '<div class="q-actions">';
+    html += '<button onclick="moveExamQuestion('+idx+',-1)" title="Move Up">↑</button>';
+    html += '<button onclick="moveExamQuestion('+idx+',1)" title="Move Down">↓</button>';
+    html += '<button class="q-del" onclick="removeExamQuestion('+idx+')" title="Delete">🗑</button>';
+    html += '</div></div>';
+    return html;
+  }).join('');
+}
+
+function escapeAttr(s) { return (s||'').replace(/&/g,'&amp;').replace(/"/g,'&quot;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
+
+function addExamOption(qIdx) {
+  var q = examBuilderQuestions[qIdx];
+  if(q.options.length >= 8) { alert('Maximum 8 options'); return; }
+  q.options.push('Option '+ String.fromCharCode(65+q.options.length));
+  renderExamBuilderQuestions();
+}
+function removeExamOption(qIdx,optIdx) {
+  var q = examBuilderQuestions[qIdx];
+  if(q.options.length <= 2) { alert('Minimum 2 options required'); return; }
+  q.options.splice(optIdx,1);
+  if(q.correctAnswer >= q.options.length) q.correctAnswer = 0;
+  renderExamBuilderQuestions();
+}
+
 function createExam() {
-  const title = document.getElementById('examTitle').value.trim();
+  var title = document.getElementById('examTitle').value.trim();
   if(!title){alert('Please enter exam title');return;}
-  exams.unshift({title,course:document.getElementById('examCourse').value,date:document.getElementById('examDate').value||'2026-03-15',time:document.getElementById('examTime').value||'09:00',duration:parseInt(document.getElementById('examDuration').value)||90,students:0,status:'upcoming',questions:parseInt(document.getElementById('examQuestions').value)||50,passMark:parseInt(document.getElementById('examPassMark').value)||60});
-  closeModal('createExamModal');renderExams('upcoming');showToast(`Exam "${title}" scheduled!`);document.getElementById('examTitle').value='';
+  // Validate questions
+  var hasInvalid = false;
+  examBuilderQuestions.forEach(function(q,i){
+    if(!q.text.trim()) { alert('Question '+(i+1)+' has no text'); hasInvalid=true; }
+    if(q.type==='fill' && !q.correctAnswer.trim()) { alert('Question '+(i+1)+' needs a correct answer'); hasInvalid=true; }
+  });
+  if(hasInvalid) return;
+
+  var examId = 'EXAM-'+Date.now();
+  var newExam = {
+    id: examId,
+    title: title,
+    course: document.getElementById('examCourse').value,
+    date: document.getElementById('examDate').value||'2026-03-15',
+    time: document.getElementById('examTime').value||'09:00',
+    duration: parseInt(document.getElementById('examDuration').value)||90,
+    students: 0,
+    status: 'upcoming',
+    questions: examBuilderQuestions.length || 0,
+    passMark: parseInt(document.getElementById('examPassMark').value)||60,
+    questionData: JSON.parse(JSON.stringify(examBuilderQuestions)),
+    shuffleQuestions: document.getElementById('examShuffle').value === 'true',
+    instructions: document.getElementById('examInstructions').value
+  };
+
+  if(editingExamIdx >= 0) {
+    // Updating existing exam questions
+    exams[editingExamIdx].questionData = newExam.questionData;
+    exams[editingExamIdx].questions = newExam.questionData.length;
+    exams[editingExamIdx].shuffleQuestions = newExam.shuffleQuestions;
+    if(newExam.title) exams[editingExamIdx].title = newExam.title;
+    exams[editingExamIdx].instructions = newExam.instructions;
+    showToast('Exam updated with '+newExam.questionData.length+' questions!');
+  } else {
+    exams.unshift(newExam);
+    showToast('Exam "'+title+'" created with '+newExam.questionData.length+' questions!');
+  }
+
+  editingExamIdx = -1;
+  examBuilderQuestions = [];
+  closeModal('createExamModal');
+  renderExams('upcoming');
+  document.getElementById('examTitle').value='';
+  document.getElementById('examStep1').style.display='block';
+  document.getElementById('examStep2').style.display='none';
   saveState();
+}
+
+function editExamQuestions(idx) {
+  var e = exams[idx];
+  editingExamIdx = idx;
+  examBuilderQuestions = e.questionData ? JSON.parse(JSON.stringify(e.questionData)) : [];
+  document.getElementById('examTitle').value = e.title;
+  document.getElementById('examCourse').value = e.course;
+  document.getElementById('examDate').value = e.date;
+  document.getElementById('examTime').value = e.time;
+  document.getElementById('examDuration').value = e.duration;
+  document.getElementById('examPassMark').value = e.passMark;
+  document.getElementById('examShuffle').value = e.shuffleQuestions ? 'true' : 'false';
+  document.getElementById('examInstructions').value = e.instructions || '';
+  openModal('createExamModal');
+  goToExamStep2();
+}
+
+function activateExam(idx) {
+  var e = exams[idx];
+  if(!e.questionData || e.questionData.length === 0) {
+    alert('Please add questions to this exam before activating it.');
+    return;
+  }
+  if(!confirm('Activate "'+e.title+'"? Students will be able to take this exam immediately.')) return;
+  exams[idx].status = 'active';
+  renderExams('upcoming');
+  showToast('Exam "'+e.title+'" is now ACTIVE!');
+  saveState();
+}
+
+function completeExam(idx) {
+  if(!confirm('Mark this exam as completed? Students will no longer be able to take it.')) return;
+  var e = exams[idx];
+  exams[idx].status = 'completed';
+  // Calculate pass rate
+  var results = examResults.filter(function(r){return r.examId===e.id;});
+  if(results.length > 0) {
+    var passed = results.filter(function(r){return r.passed;}).length;
+    exams[idx].passRate = Math.round(passed/results.length*100)+'%';
+  }
+  renderExams('active');
+  showToast('Exam "'+e.title+'" marked as completed');
+  saveState();
+}
+
+function viewExamResults(idx) {
+  var e = exams[idx];
+  var results = examResults.filter(function(r){return r.examId===e.id;});
+  var view = document.getElementById('examResultsView');
+  var listView = document.getElementById('examListView');
+  listView.style.display='none';
+  view.style.display='block';
+
+  var avgScore = results.length>0 ? Math.round(results.reduce(function(a,r){return a+r.score;},0)/results.length) : 0;
+  var passCount = results.filter(function(r){return r.passed;}).length;
+  var passRate = results.length>0 ? Math.round(passCount/results.length*100) : 0;
+  var highScore = results.length>0 ? Math.max.apply(null,results.map(function(r){return r.score;})) : 0;
+  var lowScore = results.length>0 ? Math.min.apply(null,results.map(function(r){return r.score;})) : 0;
+
+  view.innerHTML = '<div style="display:flex;align-items:center;gap:12px;margin-bottom:20px;"><button class="btn btn-secondary" onclick="backToExamList()">← Back to Exams</button><h3 style="flex:1;">'+e.title+' — Results</h3></div>' +
+    '<div class="stats-grid">' +
+    '<div class="stat-card"><div class="stat-icon" style="background:var(--blue-dim);color:var(--blue);">👥</div><div class="stat-value">'+results.length+'</div><div class="stat-label">Submissions</div></div>' +
+    '<div class="stat-card"><div class="stat-icon" style="background:var(--accent-dim);color:var(--accent);">📊</div><div class="stat-value">'+avgScore+'%</div><div class="stat-label">Average Score</div></div>' +
+    '<div class="stat-card"><div class="stat-icon" style="background:var(--green-dim);color:var(--green);">✅</div><div class="stat-value">'+passRate+'%</div><div class="stat-label">Pass Rate ('+passCount+'/'+results.length+')</div></div>' +
+    '<div class="stat-card"><div class="stat-icon" style="background:var(--purple-dim);color:var(--purple);">🏆</div><div class="stat-value">'+highScore+'%</div><div class="stat-label">Highest Score</div></div>' +
+    '</div>' +
+    '<div class="card"><div class="card-header"><h3>Student Results</h3><span style="font-size:12px;color:var(--text-muted);">Pass Mark: '+e.passMark+'%</span></div>' +
+    '<div class="table-wrapper"><table><thead><tr><th>Student</th><th>Score</th><th>Correct</th><th>Status</th><th>Submitted</th></tr></thead><tbody>' +
+    (results.length === 0 ? '<tr><td colspan="5" style="text-align:center;color:var(--text-muted);padding:24px;">No submissions yet</td></tr>' :
+    results.map(function(r){
+      var student = students.find(function(st){return st.id===r.studentId;});
+      return '<tr><td><strong>'+(student?student.name:r.studentId)+'</strong></td>' +
+        '<td style="font-weight:700;color:'+(r.passed?'var(--green)':'var(--red)')+';">'+r.score+'%</td>' +
+        '<td>'+r.correctCount+'/'+r.totalQuestions+'</td>' +
+        '<td><span class="badge '+(r.passed?'badge-green':'badge-red')+'"><span class="badge-dot"></span>'+(r.passed?'Passed':'Failed')+'</span></td>' +
+        '<td style="font-size:12px;color:var(--text-muted);">'+new Date(r.submittedAt).toLocaleString()+'</td></tr>';
+    }).join('')) +
+    '</tbody></table></div></div>';
+}
+
+function backToExamList() {
+  document.getElementById('examResultsView').style.display='none';
+  document.getElementById('examListView').style.display='block';
+}
+
+// ============================== STUDENT EXAM TAKING ==============================
+var currentExamSession = null;
+var examTimerInterval = null;
+
+function startStudentExam(examIdx) {
+  var e = exams[examIdx];
+  if(!e.questionData || e.questionData.length === 0) { alert('This exam has no questions yet.'); return; }
+  // Check if already taken
+  var alreadyTaken = examResults.some(function(r){return r.examId===e.id && r.studentId===currentStudent.id;});
+  if(alreadyTaken) { alert('You have already taken this exam.'); return; }
+
+  if(!confirm('Start "'+e.title+'"?\n\nDuration: '+e.duration+' minutes\nQuestions: '+e.questionData.length+'\nPass Mark: '+e.passMark+'%\n\nThe timer will start immediately. Are you ready?')) return;
+
+  // Build session
+  var questions = JSON.parse(JSON.stringify(e.questionData));
+  if(e.shuffleQuestions) {
+    for(var i=questions.length-1;i>0;i--) { var j=Math.floor(Math.random()*(i+1));var t=questions[i];questions[i]=questions[j];questions[j]=t; }
+  }
+
+  currentExamSession = {
+    examId: e.id,
+    examIdx: examIdx,
+    title: e.title,
+    duration: e.duration,
+    passMark: e.passMark,
+    questions: questions,
+    answers: new Array(questions.length).fill(null),
+    flagged: new Array(questions.length).fill(false),
+    startTime: Date.now(),
+    timeRemaining: e.duration * 60
+  };
+
+  document.getElementById('studentExamListView').style.display='none';
+  document.getElementById('studentExamResultView').style.display='none';
+  var takingView = document.getElementById('studentExamTakingView');
+  takingView.style.display='block';
+  renderExamTaking();
+  startExamTimer();
+}
+
+function startExamTimer() {
+  if(examTimerInterval) clearInterval(examTimerInterval);
+  examTimerInterval = setInterval(function() {
+    if(!currentExamSession) { clearInterval(examTimerInterval); return; }
+    var elapsed = Math.floor((Date.now() - currentExamSession.startTime)/1000);
+    currentExamSession.timeRemaining = Math.max(0, currentExamSession.duration*60 - elapsed);
+    updateExamTimerDisplay();
+    // Auto-save every 30 seconds
+    if(elapsed % 30 === 0) autoSaveExamProgress();
+    // Time's up
+    if(currentExamSession.timeRemaining <= 0) {
+      clearInterval(examTimerInterval);
+      alert('Time is up! Your exam will be submitted automatically.');
+      submitExam();
+    }
+  }, 1000);
+}
+
+function updateExamTimerDisplay() {
+  var el = document.getElementById('examTimerValue');
+  if(!el || !currentExamSession) return;
+  var t = currentExamSession.timeRemaining;
+  var hrs = Math.floor(t/3600);
+  var mins = Math.floor((t%3600)/60);
+  var secs = t%60;
+  var display = (hrs>0?hrs+':':'') + String(mins).padStart(2,'0')+':'+String(secs).padStart(2,'0');
+  el.textContent = display;
+  el.className = 'timer-value' + (t<=300?' danger':t<=600?' warning':'');
+}
+
+function renderExamTaking() {
+  var s = currentExamSession;
+  if(!s) return;
+  var takingView = document.getElementById('studentExamTakingView');
+  var answered = s.answers.filter(function(a){return a!==null;}).length;
+
+  var html = '<div class="exam-taking">';
+  // Timer bar
+  html += '<div class="exam-timer-bar"><div style="flex:1;"><h3 style="font-size:16px;margin-bottom:2px;">'+s.title+'</h3><div style="font-size:12px;color:var(--text-muted);">'+s.questions.length+' Questions &bull; Pass Mark: '+s.passMark+'%</div></div>';
+  html += '<div class="exam-timer"><span class="timer-icon">⏱</span><span class="timer-value" id="examTimerValue">--:--</span></div></div>';
+
+  // Progress bar
+  html += '<div style="margin-bottom:16px;"><div style="display:flex;justify-content:space-between;font-size:12px;color:var(--text-muted);margin-bottom:6px;"><span>'+answered+' of '+s.questions.length+' answered</span><span>'+Math.round(answered/s.questions.length*100)+'%</span></div>';
+  html += '<div class="progress-bar progress-bar-lg"><div class="fill" style="width:'+Math.round(answered/s.questions.length*100)+'%;background:var(--green);"></div></div></div>';
+
+  // Question navigator
+  html += '<div class="exam-question-nav">';
+  s.questions.forEach(function(_,i){
+    var cls = 'eq-nav-btn';
+    if(s.answers[i]!==null) cls+=' answered';
+    if(s.flagged[i]) cls+=' flagged';
+    html += '<button class="'+cls+'" onclick="scrollToExamQuestion('+i+')">'+(i+1)+'</button>';
+  });
+  html += '</div>';
+
+  // Questions
+  s.questions.forEach(function(q,i){
+    var isAnswered = s.answers[i] !== null;
+    var isFlagged = s.flagged[i];
+    var typeLabel = {mcq:'Multiple Choice',tf:'True / False',fill:'Fill in Blank',short:'Short Answer'}[q.type];
+    html += '<div class="exam-question-card'+(isAnswered?' answered':'')+(isFlagged?' flagged':'')+'" id="examQ-'+i+'">';
+    html += '<div class="eq-header"><span class="eq-number">Q'+(i+1)+'</span><span class="q-type-badge q-type-'+q.type+'">'+typeLabel+'</span><span style="font-size:11px;color:var(--text-muted);margin-left:auto;">'+q.points+' pt'+(q.points!==1?'s':'')+'</span>';
+    html += '<button class="eq-flag'+(isFlagged?' flagged':'')+'" onclick="toggleExamFlag('+i+')" title="Flag for review">'+(isFlagged?'🚩':'⚑')+'</button></div>';
+    html += '<div class="eq-text">'+escapeHtml(q.text)+'</div>';
+
+    // Answer area
+    if(q.type==='mcq') {
+      html += '<ul class="exam-option-list">';
+      q.options.forEach(function(opt,oi){
+        var selected = s.answers[i]===oi;
+        html += '<li class="'+(selected?'selected':'')+'" onclick="selectExamAnswer('+i+','+oi+')"><span class="opt-letter">'+String.fromCharCode(65+oi)+'</span><span>'+escapeHtml(opt)+'</span></li>';
+      });
+      html += '</ul>';
+    } else if(q.type==='tf') {
+      html += '<div class="exam-tf-options">';
+      html += '<button class="tf-btn'+(s.answers[i]===true?' selected-true':'')+'" onclick="selectExamAnswer('+i+',true)">True</button>';
+      html += '<button class="tf-btn'+(s.answers[i]===false?' selected-false':'')+'" onclick="selectExamAnswer('+i+',false)">False</button>';
+      html += '</div>';
+    } else if(q.type==='fill') {
+      html += '<input type="text" class="exam-fill-input" value="'+escapeAttr(s.answers[i]||'')+'" placeholder="Type your answer..." oninput="selectExamAnswer('+i+',this.value)">';
+    } else if(q.type==='short') {
+      html += '<textarea class="exam-short-textarea" placeholder="Write your answer here..." oninput="selectExamAnswer('+i+',this.value)">'+escapeHtml(s.answers[i]||'')+'</textarea>';
+    }
+    html += '</div>';
+  });
+
+  // Submit area
+  html += '<div class="exam-submit-area"><p style="font-size:13px;color:var(--text-muted);margin-bottom:16px;">'+answered+' of '+s.questions.length+' questions answered'+((s.questions.length-answered)>0?' &mdash; <strong style="color:var(--accent);">'+(s.questions.length-answered)+' unanswered</strong>':'')+'</p>';
+  html += '<button class="btn btn-primary" style="padding:12px 40px;font-size:15px;" onclick="confirmSubmitExam()">Submit Exam</button></div>';
+  html += '</div>';
+
+  takingView.innerHTML = html;
+  updateExamTimerDisplay();
+}
+
+function escapeHtml(s) { return (s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
+
+function selectExamAnswer(qIdx,answer) {
+  if(!currentExamSession) return;
+  currentExamSession.answers[qIdx] = answer;
+  // Only do a lightweight nav update instead of full re-render for text inputs
+  var navBtns = document.querySelectorAll('.eq-nav-btn');
+  if(navBtns[qIdx]) {
+    if(answer!==null && answer!=='') navBtns[qIdx].classList.add('answered');
+    else navBtns[qIdx].classList.remove('answered');
+  }
+  // For MCQ/TF, re-render to show selection visually
+  if(currentExamSession.questions[qIdx].type==='mcq' || currentExamSession.questions[qIdx].type==='tf') {
+    renderExamTaking();
+  }
+}
+
+function toggleExamFlag(qIdx) {
+  if(!currentExamSession) return;
+  currentExamSession.flagged[qIdx] = !currentExamSession.flagged[qIdx];
+  renderExamTaking();
+}
+
+function scrollToExamQuestion(qIdx) {
+  var el = document.getElementById('examQ-'+qIdx);
+  if(el) el.scrollIntoView({behavior:'smooth',block:'center'});
+}
+
+function autoSaveExamProgress() {
+  // Auto-save in localStorage in case of browser crash
+  if(!currentExamSession) return;
+  try {
+    localStorage.setItem('voctrain_examInProgress', JSON.stringify(currentExamSession));
+  } catch(e) {}
+}
+
+function confirmSubmitExam() {
+  if(!currentExamSession) return;
+  var unanswered = currentExamSession.answers.filter(function(a){return a===null||a==='';}).length;
+  var msg = 'Submit your exam?';
+  if(unanswered > 0) msg = 'You have '+unanswered+' unanswered question'+(unanswered!==1?'s':'')+'. Submit anyway?';
+  if(!confirm(msg)) return;
+  submitExam();
+}
+
+function submitExam() {
+  if(!currentExamSession) return;
+  if(examTimerInterval) clearInterval(examTimerInterval);
+
+  var s = currentExamSession;
+  var totalPoints = 0;
+  var earnedPoints = 0;
+  var correctCount = 0;
+  var gradedResults = [];
+
+  s.questions.forEach(function(q,i) {
+    totalPoints += q.points;
+    var studentAnswer = s.answers[i];
+    var isCorrect = false;
+    var needsManualGrade = false;
+
+    if(q.type === 'mcq') {
+      isCorrect = studentAnswer === q.correctAnswer;
+    } else if(q.type === 'tf') {
+      isCorrect = studentAnswer === q.correctAnswer;
+    } else if(q.type === 'fill') {
+      isCorrect = (studentAnswer||'').trim().toLowerCase() === (q.correctAnswer||'').trim().toLowerCase();
+    } else if(q.type === 'short') {
+      needsManualGrade = true;
+    }
+
+    if(isCorrect) {
+      earnedPoints += q.points;
+      correctCount++;
+    }
+
+    gradedResults.push({
+      questionId: q.id,
+      questionText: q.text,
+      type: q.type,
+      studentAnswer: studentAnswer,
+      correctAnswer: q.correctAnswer,
+      isCorrect: isCorrect,
+      needsManualGrade: needsManualGrade,
+      points: q.points,
+      earnedPoints: isCorrect ? q.points : 0
+    });
+  });
+
+  var score = totalPoints > 0 ? Math.round(earnedPoints/totalPoints*100) : 0;
+  var passed = score >= s.passMark;
+  var exam = exams[s.examIdx];
+
+  var result = {
+    id: 'RES-'+Date.now(),
+    examId: s.examId,
+    studentId: currentStudent.id,
+    studentName: currentStudent.name,
+    answers: gradedResults,
+    score: score,
+    correctCount: correctCount,
+    totalQuestions: s.questions.length,
+    totalPoints: totalPoints,
+    earnedPoints: earnedPoints,
+    passed: passed,
+    submittedAt: new Date().toISOString(),
+    timeTaken: Math.floor((Date.now()-s.startTime)/1000)
+  };
+
+  examResults.push(result);
+
+  // Update student score
+  currentStudent.score = score + '%';
+  var studentIdx = students.findIndex(function(st){return st.id===currentStudent.id;});
+  if(studentIdx>=0) students[studentIdx].score = score + '%';
+
+  // Update exam student count
+  if(exam) {
+    var resultsForExam = examResults.filter(function(r){return r.examId===s.examId;});
+    exam.students = resultsForExam.length;
+  }
+
+  localStorage.removeItem('voctrain_examInProgress');
+  currentExamSession = null;
+  saveState();
+
+  // Show results
+  showExamResult(result, exam);
+}
+
+function showExamResult(result, exam) {
+  var takingView = document.getElementById('studentExamTakingView');
+  takingView.style.display='none';
+  var resultView = document.getElementById('studentExamResultView');
+  resultView.style.display='block';
+
+  var timeMins = Math.floor(result.timeTaken/60);
+  var timeSecs = result.timeTaken%60;
+
+  var html = '<div style="max-width:700px;margin:0 auto;">';
+  html += '<div class="exam-result-card">';
+  html += '<div class="result-icon">'+(result.passed?'🎉':'😔')+'</div>';
+  html += '<div class="result-score" style="color:'+(result.passed?'var(--green)':'var(--red)')+';">'+result.score+'%</div>';
+  html += '<div class="result-label">'+result.earnedPoints+' / '+result.totalPoints+' points &bull; '+result.correctCount+' / '+result.totalQuestions+' correct</div>';
+  html += '<div class="result-status '+(result.passed?'passed':'failed')+'">'+(result.passed?'PASSED ✓':'NOT PASSED')+'</div>';
+  html += '<div style="font-size:13px;color:var(--text-muted);margin-top:8px;">Time taken: '+timeMins+'m '+timeSecs+'s &bull; Pass mark: '+(exam?exam.passMark:60)+'%</div>';
+  html += '</div>';
+
+  // Review each question
+  html += '<h3 style="margin-bottom:16px;">Review Your Answers</h3>';
+  result.answers.forEach(function(a,i){
+    var cls = a.needsManualGrade ? 'pending' : (a.isCorrect ? 'correct' : 'incorrect');
+    html += '<div class="exam-review-item '+cls+'">';
+    html += '<div class="er-question"><span style="color:var(--accent);">Q'+(i+1)+'</span> <span class="q-type-badge q-type-'+a.type+'" style="font-size:10px;margin-left:4px;">'+a.type.toUpperCase()+'</span> '+escapeHtml(a.questionText)+'</div>';
+
+    // Show student's answer
+    var ansDisplay = '';
+    if(a.type==='mcq') {
+      ansDisplay = a.studentAnswer!==null && a.studentAnswer!==undefined ? String.fromCharCode(65+a.studentAnswer)+'. (selected)' : 'Not answered';
+    } else if(a.type==='tf') {
+      ansDisplay = a.studentAnswer!==null ? (a.studentAnswer?'True':'False') : 'Not answered';
+    } else {
+      ansDisplay = a.studentAnswer || 'Not answered';
+    }
+    html += '<div class="er-answer">Your answer: <strong>'+escapeHtml(ansDisplay)+'</strong> '+(a.isCorrect?'<span style="color:var(--green);">✓ Correct</span>':a.needsManualGrade?'<span style="color:var(--accent);">⏳ Pending Review</span>':'<span style="color:var(--red);">✗ Incorrect</span>')+'</div>';
+
+    // Show correct answer if wrong
+    if(!a.isCorrect && !a.needsManualGrade) {
+      var correctDisplay = '';
+      if(a.type==='mcq') correctDisplay = String.fromCharCode(65+a.correctAnswer);
+      else if(a.type==='tf') correctDisplay = a.correctAnswer?'True':'False';
+      else correctDisplay = a.correctAnswer;
+      html += '<div class="er-correct">Correct answer: '+escapeHtml(correctDisplay)+'</div>';
+    }
+    html += '<div style="font-size:11px;color:var(--text-muted);margin-top:4px;">'+a.earnedPoints+' / '+a.points+' points</div>';
+    html += '</div>';
+  });
+
+  html += '<div style="text-align:center;padding:24px;"><button class="btn btn-primary" onclick="backToStudentExamList()">Back to Exams</button></div>';
+  html += '</div>';
+
+  resultView.innerHTML = html;
+}
+
+function viewExamResultDetail(examId, studentId) {
+  var result = examResults.find(function(r){return r.examId===examId && r.studentId===studentId;});
+  if(!result) { alert('Result not found'); return; }
+  var exam = exams.find(function(e){return e.id===examId;});
+  showExamResult(result, exam);
+}
+
+function backToStudentExamList() {
+  document.getElementById('studentExamResultView').style.display='none';
+  document.getElementById('studentExamTakingView').style.display='none';
+  document.getElementById('studentExamListView').style.display='block';
+  // Rebuild student pages to refresh exam list
+  buildStudentPages();
+  showPage('s-exams');
 }
 
 function renderCerts(filter,search) {
@@ -5613,7 +6455,7 @@ populateInstructorSelect();
 // Google Drive Configuration
 const GOOGLE_DRIVE_CONFIG = {
   CLIENT_ID: '302497466088-0b619cqa9qno2c606k4rqp742lebc5o8.apps.googleusercontent.com',
-  FOLDER_ID: '11vWe_Nc40TtJ1Hi7PoE7EZ3JrpR-K0Vj',
+  FOLDER_ID: '18ACBw0kRi0BssLEoZLWoeXNa1EiANeBu',
   BACKUP_FILE_NAME: 'CESTIS_LMS_BACKUP.json',
   SCOPES: 'https://www.googleapis.com/auth/drive'
 };
@@ -6074,7 +6916,8 @@ async function saveToCloud() {
         exams: exams,
         announcements: announcements,
         attendanceRecords: attendanceRecords,
-        calendarEvents: calendarEvents
+        calendarEvents: calendarEvents,
+        examResults: examResults
       }
     };
 
@@ -6220,6 +7063,10 @@ async function syncFromCloud() {
 
     if (backupData.data.calendarEvents) {
       calendarEvents = backupData.data.calendarEvents;
+    }
+
+    if (backupData.data.examResults) {
+      examResults = backupData.data.examResults;
     }
 
     // Persist all restored data to localStorage
@@ -6372,6 +7219,18 @@ async function mergeFromCloud() {
       });
     }
 
+    // Merge exam results — add cloud results that don't exist locally
+    if (backupData.data.examResults) {
+      const localResultKeys = examResults.map(r => r.examId + '|' + r.studentId);
+      backupData.data.examResults.forEach(cloudResult => {
+        const key = cloudResult.examId + '|' + cloudResult.studentId;
+        if (!localResultKeys.includes(key)) {
+          examResults.push(cloudResult);
+          mergeStats.examResultsAdded = (mergeStats.examResultsAdded||0) + 1;
+        }
+      });
+    }
+
     // Persist all merged data
     saveState();
 
@@ -6394,8 +7253,9 @@ async function mergeFromCloud() {
     summary += `• Exams added: ${mergeStats.examsAdded}\n`;
     summary += `• Announcements added: ${mergeStats.announcementsAdded}\n`;
     summary += `• Calendar events added: ${mergeStats.eventsAdded}\n`;
+    summary += `• Exam results added: ${mergeStats.examResultsAdded||0}\n`;
 
-    const totalAdded = mergeStats.usersAdded + mergeStats.studentsAdded + mergeStats.examsAdded + mergeStats.announcementsAdded + mergeStats.eventsAdded;
+    const totalAdded = mergeStats.usersAdded + mergeStats.studentsAdded + mergeStats.examsAdded + mergeStats.announcementsAdded + mergeStats.eventsAdded + (mergeStats.examResultsAdded||0);
     if (totalAdded === 0) {
       summary += '\n💡 No new data found — your local data already contains everything from the cloud.';
     } else {
