@@ -1857,6 +1857,286 @@ textarea.form-control { resize:vertical; min-height:80px; }
   .class-schedule-card { flex-direction:column; align-items:flex-start; }
   .class-time-block { min-width:auto; width:100%; }
 }
+
+/* ============================== C.E.S.T.I.S LMS CHAT ============================== */
+.lms-chat-container {
+  display:flex; height:calc(100vh - var(--topbar-h) - 40px); border-radius:var(--radius-lg); overflow:hidden;
+  background:var(--bg-card); border:1px solid var(--border);
+}
+.lms-chat-sidebar {
+  width:340px; min-width:340px; background:var(--bg-secondary); border-right:1px solid var(--border);
+  display:flex; flex-direction:column; overflow:hidden;
+}
+.lms-chat-sidebar-header {
+  padding:16px 20px; display:flex; align-items:center; justify-content:space-between;
+  border-bottom:1px solid var(--border); background:var(--bg-card);
+}
+.lms-chat-sidebar-header h3 { font-size:18px; font-weight:700; color:var(--accent); }
+.lms-chat-sidebar-actions { display:flex; gap:8px; }
+.lms-chat-sidebar-actions button {
+  width:36px; height:36px; border:none; border-radius:50%; background:var(--bg-input);
+  color:var(--text-secondary); cursor:pointer; display:flex; align-items:center; justify-content:center;
+  font-size:16px; transition:var(--transition);
+}
+.lms-chat-sidebar-actions button:hover { background:var(--accent-dim); color:var(--accent); }
+.lms-chat-search {
+  padding:10px 16px; border-bottom:1px solid var(--border);
+}
+.lms-chat-search input {
+  width:100%; padding:10px 14px 10px 36px; border:1px solid var(--border-light);
+  border-radius:20px; background:var(--bg-input); color:var(--text-primary);
+  font-size:13px; outline:none; transition:var(--transition);
+}
+.lms-chat-search input:focus { border-color:var(--accent); }
+.lms-chat-search-wrap { position:relative; }
+.lms-chat-search-wrap::before {
+  content:'\1F50D'; position:absolute; left:12px; top:50%; transform:translateY(-50%);
+  font-size:14px; pointer-events:none;
+}
+.lms-chat-list { flex:1; overflow-y:auto; }
+.lms-chat-item {
+  display:flex; align-items:center; gap:12px; padding:12px 16px; cursor:pointer;
+  transition:var(--transition); border-bottom:1px solid var(--border);
+}
+.lms-chat-item:hover { background:var(--bg-card-hover); }
+.lms-chat-item.active { background:var(--accent-dim); border-left:3px solid var(--accent); }
+.lms-chat-avatar {
+  width:48px; height:48px; min-width:48px; border-radius:50%; background:var(--bg-input);
+  display:flex; align-items:center; justify-content:center; font-size:20px;
+  font-weight:700; color:var(--accent); position:relative; overflow:hidden;
+}
+.lms-chat-avatar img { width:100%; height:100%; object-fit:cover; border-radius:50%; }
+.lms-chat-avatar .status-dot {
+  position:absolute; bottom:2px; right:2px; width:12px; height:12px; border-radius:50%;
+  border:2px solid var(--bg-secondary);
+}
+.lms-chat-avatar .status-dot.online { background:var(--green); }
+.lms-chat-avatar .status-dot.offline { background:var(--text-muted); }
+.lms-chat-avatar .status-dot.away { background:var(--orange); }
+.lms-chat-info { flex:1; min-width:0; }
+.lms-chat-name { font-size:14px; font-weight:600; color:var(--text-primary); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+.lms-chat-last-msg { font-size:12px; color:var(--text-muted); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; margin-top:2px; }
+.lms-chat-meta { display:flex; flex-direction:column; align-items:flex-end; gap:4px; min-width:50px; }
+.lms-chat-time { font-size:11px; color:var(--text-muted); }
+.lms-chat-unread {
+  width:20px; height:20px; border-radius:50%; background:var(--accent); color:#000;
+  font-size:11px; font-weight:700; display:flex; align-items:center; justify-content:center;
+}
+
+/* Chat main area */
+.lms-chat-main { flex:1; display:flex; flex-direction:column; background:var(--bg-primary); }
+.lms-chat-main-empty {
+  flex:1; display:flex; flex-direction:column; align-items:center; justify-content:center;
+  color:var(--text-muted); gap:12px;
+}
+.lms-chat-main-empty .empty-icon { font-size:64px; opacity:0.3; }
+.lms-chat-main-header {
+  padding:12px 20px; display:flex; align-items:center; justify-content:space-between;
+  border-bottom:1px solid var(--border); background:var(--bg-card);
+}
+.lms-chat-main-header-left { display:flex; align-items:center; gap:12px; }
+.lms-chat-main-header-left .back-btn {
+  display:none; width:32px; height:32px; border:none; border-radius:50%;
+  background:var(--bg-input); color:var(--text-secondary); cursor:pointer;
+  align-items:center; justify-content:center; font-size:16px;
+}
+.lms-chat-header-info h4 { font-size:15px; font-weight:600; }
+.lms-chat-header-info span { font-size:12px; color:var(--text-muted); }
+.lms-chat-header-actions { display:flex; gap:6px; }
+.lms-chat-header-actions button {
+  width:38px; height:38px; border:none; border-radius:50%; background:var(--bg-input);
+  color:var(--text-secondary); cursor:pointer; display:flex; align-items:center; justify-content:center;
+  font-size:16px; transition:var(--transition);
+}
+.lms-chat-header-actions button:hover { background:var(--accent-dim); color:var(--accent); }
+.lms-chat-header-actions button.active-call { background:var(--green-dim); color:var(--green); animation:pulse 1.5s infinite; }
+
+/* Messages area */
+.lms-chat-messages {
+  flex:1; overflow-y:auto; padding:20px; display:flex; flex-direction:column; gap:4px;
+}
+.lms-chat-date-divider {
+  text-align:center; margin:12px 0; font-size:11px; color:var(--text-muted);
+  position:relative;
+}
+.lms-chat-date-divider span {
+  background:var(--bg-primary); padding:0 12px; position:relative; z-index:1;
+}
+.lms-chat-date-divider::before {
+  content:''; position:absolute; left:0; right:0; top:50%;
+  border-top:1px solid var(--border); z-index:0;
+}
+.lms-chat-msg {
+  max-width:65%; padding:10px 14px; border-radius:12px; position:relative;
+  margin-bottom:2px; animation:msgIn 0.2s ease;
+}
+@keyframes msgIn { from { opacity:0; transform:translateY(8px); } to { opacity:1; transform:translateY(0); } }
+.lms-chat-msg.sent {
+  align-self:flex-end; background:linear-gradient(135deg, #1a5c2e, #145224);
+  border-bottom-right-radius:4px; color:var(--text-primary);
+}
+.lms-chat-msg.received {
+  align-self:flex-start; background:var(--bg-card);
+  border-bottom-left-radius:4px; color:var(--text-primary);
+}
+.lms-chat-msg .msg-sender { font-size:11px; font-weight:700; color:var(--accent); margin-bottom:3px; }
+.lms-chat-msg .msg-text { font-size:13.5px; line-height:1.5; word-wrap:break-word; }
+.lms-chat-msg .msg-time { font-size:10px; color:rgba(255,255,255,0.45); text-align:right; margin-top:4px; }
+.lms-chat-msg .msg-file {
+  display:flex; align-items:center; gap:8px; padding:8px 12px; border-radius:var(--radius-sm);
+  background:rgba(0,0,0,0.15); margin-top:6px; cursor:pointer; transition:var(--transition);
+}
+.lms-chat-msg .msg-file:hover { background:rgba(0,0,0,0.25); }
+.lms-chat-msg .msg-file-icon { font-size:24px; }
+.lms-chat-msg .msg-file-info { flex:1; min-width:0; }
+.lms-chat-msg .msg-file-name { font-size:12px; font-weight:600; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+.lms-chat-msg .msg-file-size { font-size:10px; color:rgba(255,255,255,0.5); }
+.lms-chat-msg .msg-img { max-width:280px; border-radius:var(--radius-sm); margin-top:6px; cursor:pointer; }
+
+/* Chat input area */
+.lms-chat-input-area {
+  padding:12px 16px; border-top:1px solid var(--border); background:var(--bg-card);
+  display:flex; align-items:flex-end; gap:8px;
+}
+.lms-chat-input-area .attach-btn, .lms-chat-input-area .send-btn {
+  width:40px; height:40px; min-width:40px; border:none; border-radius:50%;
+  cursor:pointer; display:flex; align-items:center; justify-content:center;
+  font-size:18px; transition:var(--transition);
+}
+.lms-chat-input-area .attach-btn { background:var(--bg-input); color:var(--text-secondary); }
+.lms-chat-input-area .attach-btn:hover { background:var(--accent-dim); color:var(--accent); }
+.lms-chat-input-area .send-btn { background:var(--accent); color:#000; }
+.lms-chat-input-area .send-btn:hover { background:#d4900a; }
+.lms-chat-input-area .msg-input {
+  flex:1; padding:10px 16px; border:1px solid var(--border-light); border-radius:20px;
+  background:var(--bg-input); color:var(--text-primary); font-size:14px;
+  font-family:'DM Sans',sans-serif; outline:none; resize:none; max-height:120px;
+  min-height:40px; line-height:1.4; transition:var(--transition);
+}
+.lms-chat-input-area .msg-input:focus { border-color:var(--accent); }
+
+/* Chat info panel (right side drawer) */
+.lms-chat-info-panel {
+  width:0; overflow:hidden; background:var(--bg-secondary); border-left:1px solid var(--border);
+  transition:width 0.3s ease; display:flex; flex-direction:column;
+}
+.lms-chat-info-panel.open { width:320px; min-width:320px; }
+.lms-chat-info-panel-header {
+  padding:16px 20px; display:flex; align-items:center; justify-content:space-between;
+  border-bottom:1px solid var(--border);
+}
+.lms-chat-info-panel-header h4 { font-size:15px; font-weight:600; }
+.lms-chat-info-panel-header button {
+  width:32px; height:32px; border:none; border-radius:50%; background:var(--bg-input);
+  color:var(--text-secondary); cursor:pointer; font-size:14px;
+}
+.lms-chat-info-body { flex:1; overflow-y:auto; padding:16px; }
+.lms-chat-info-body .info-section { margin-bottom:20px; }
+.lms-chat-info-body .info-section h5 { font-size:12px; color:var(--text-muted); text-transform:uppercase; margin-bottom:10px; letter-spacing:0.5px; }
+.lms-chat-info-body .member-item {
+  display:flex; align-items:center; gap:10px; padding:8px 0;
+  border-bottom:1px solid var(--border);
+}
+.lms-chat-info-body .member-avatar {
+  width:36px; height:36px; border-radius:50%; background:var(--bg-input);
+  display:flex; align-items:center; justify-content:center; font-size:14px;
+  font-weight:600; color:var(--accent); overflow:hidden;
+}
+.lms-chat-info-body .member-avatar img { width:100%; height:100%; object-fit:cover; }
+.lms-chat-info-body .member-name { font-size:13px; font-weight:500; }
+.lms-chat-info-body .member-role { font-size:11px; color:var(--text-muted); }
+.lms-chat-info-body .member-remove {
+  margin-left:auto; width:24px; height:24px; border:none; border-radius:50%;
+  background:var(--red-dim); color:var(--red); cursor:pointer; font-size:12px;
+  display:flex; align-items:center; justify-content:center;
+}
+
+/* Voice/Video call overlay */
+.lms-call-overlay {
+  position:fixed; inset:0; z-index:9999; background:rgba(0,0,0,0.92);
+  display:none; flex-direction:column; align-items:center; justify-content:center; gap:24px;
+}
+.lms-call-overlay.active { display:flex; }
+.lms-call-overlay .call-avatar { width:120px; height:120px; border-radius:50%; background:var(--bg-card); display:flex; align-items:center; justify-content:center; font-size:48px; }
+.lms-call-overlay .call-name { font-size:24px; font-weight:700; }
+.lms-call-overlay .call-status { font-size:14px; color:var(--text-muted); }
+.lms-call-overlay .call-timer { font-size:18px; color:var(--accent); font-family:monospace; }
+.lms-call-overlay .call-controls { display:flex; gap:16px; margin-top:24px; }
+.lms-call-overlay .call-btn {
+  width:56px; height:56px; border:none; border-radius:50%; cursor:pointer;
+  display:flex; align-items:center; justify-content:center; font-size:22px;
+  transition:var(--transition);
+}
+.lms-call-overlay .call-btn.end-call { background:var(--red); color:#fff; }
+.lms-call-overlay .call-btn.mute-call { background:var(--bg-card); color:var(--text-primary); }
+.lms-call-overlay .call-btn.mute-call.muted { background:var(--red-dim); color:var(--red); }
+
+/* Video call grid */
+.lms-video-call-grid {
+  display:grid; grid-template-columns:repeat(auto-fit, minmax(280px, 1fr)); gap:12px;
+  width:90%; max-width:1200px; max-height:70vh;
+}
+.lms-video-call-grid video {
+  width:100%; border-radius:var(--radius); background:#000; aspect-ratio:16/9;
+}
+.lms-video-call-grid .video-tile {
+  position:relative; border-radius:var(--radius); overflow:hidden; background:#111;
+}
+.lms-video-call-grid .video-tile .tile-name {
+  position:absolute; bottom:8px; left:8px; font-size:12px; background:rgba(0,0,0,0.7);
+  padding:4px 10px; border-radius:12px; color:#fff;
+}
+
+/* Profile pic upload modal */
+.lms-chat-profile-modal {
+  position:fixed; inset:0; z-index:10000; background:rgba(0,0,0,0.7);
+  display:none; align-items:center; justify-content:center;
+}
+.lms-chat-profile-modal.active { display:flex; }
+.lms-chat-profile-modal .profile-modal-content {
+  background:var(--bg-card); border-radius:var(--radius-lg); padding:32px;
+  width:400px; max-width:90vw; text-align:center;
+}
+.lms-chat-profile-modal .profile-preview {
+  width:120px; height:120px; border-radius:50%; margin:16px auto;
+  background:var(--bg-input); display:flex; align-items:center; justify-content:center;
+  font-size:48px; color:var(--accent); overflow:hidden; border:3px solid var(--accent);
+}
+.lms-chat-profile-modal .profile-preview img { width:100%; height:100%; object-fit:cover; }
+.lms-chat-profile-modal .profile-status-select {
+  width:100%; padding:10px; border:1px solid var(--border-light); border-radius:var(--radius-sm);
+  background:var(--bg-input); color:var(--text-primary); margin:12px 0; font-size:13px;
+}
+
+/* Admin manage members modal */
+.lms-manage-modal {
+  position:fixed; inset:0; z-index:10000; background:rgba(0,0,0,0.7);
+  display:none; align-items:center; justify-content:center;
+}
+.lms-manage-modal.active { display:flex; }
+.lms-manage-modal .manage-modal-content {
+  background:var(--bg-card); border-radius:var(--radius-lg); padding:24px;
+  width:520px; max-width:90vw; max-height:80vh; overflow-y:auto;
+}
+.lms-manage-modal .manage-modal-content h3 { margin-bottom:16px; }
+.lms-manage-user-item {
+  display:flex; align-items:center; gap:10px; padding:10px 0;
+  border-bottom:1px solid var(--border);
+}
+.lms-manage-user-item label { display:flex; align-items:center; gap:10px; flex:1; cursor:pointer; font-size:13px; }
+.lms-manage-user-item input[type="checkbox"] { accent-color:var(--accent); width:18px; height:18px; }
+
+/* Responsive */
+@media(max-width:768px) {
+  .lms-chat-container { flex-direction:column; height:calc(100vh - var(--topbar-h)); border-radius:0; }
+  .lms-chat-sidebar { width:100%; min-width:100%; }
+  .lms-chat-sidebar.chat-open { display:none; }
+  .lms-chat-main { display:none; }
+  .lms-chat-main.chat-open { display:flex; }
+  .lms-chat-main-header-left .back-btn { display:flex; }
+  .lms-chat-info-panel.open { width:100%; min-width:100%; }
+  .lms-chat-msg { max-width:85%; }
+}
 </style>
 <script src="https://unpkg.com/peerjs@1.5.4/dist/peerjs.min.js"></script>
 <!-- Google Identity Services for OAuth -->
@@ -2442,6 +2722,67 @@ let instructorResources = [];
 let studentProfiles = {};
 let systemSettings = { institutionName: 'C.E.S.T.I.S LMS - Community Training Intervention', adminEmail: 'admin@heartlms.edu.jm', academicYear: '2025/2026', vcProvider: 'Built-in (WebRTC)' };
 
+// ============================== LMS CHAT DATA MODEL ==============================
+let lmsChatRooms = [];
+let lmsChatMessages = {};
+let lmsChatProfiles = {};
+let lmsChatActiveRoom = null;
+let lmsChatCallState = null;
+let lmsChatCallTimer = null;
+let lmsChatCallSeconds = 0;
+let lmsChatLocalStream = null;
+let lmsChatPeer = null;
+
+// Google Drive folder for chat file uploads
+const LMS_CHAT_DRIVE_FOLDER = '1ashmmL0ZS7mW6XrwoxMuamf7yjtVWHyO';
+
+function initLmsChatData() {
+  try {
+    var cr = localStorage.getItem('voctrain_chatRooms');
+    var cm = localStorage.getItem('voctrain_chatMessages');
+    var cp = localStorage.getItem('voctrain_chatProfiles');
+    if(cr) lmsChatRooms = JSON.parse(cr);
+    if(cm) lmsChatMessages = JSON.parse(cm);
+    if(cp) lmsChatProfiles = JSON.parse(cp);
+  } catch(e) { console.warn('initLmsChatData parse error'); }
+
+  if(!lmsChatRooms.length) {
+    // Create default chat rooms: one per skill area + admin general chat
+    lmsChatRooms = [
+      { id:'chat-admin', name:'Admin General', icon:'\uD83D\uDCBC', type:'admin', members:[], color:'#f0a500', createdBy:'admin' }
+    ];
+    // Create a chat room for each programme/skill area
+    skillAreas.forEach(function(sk) {
+      lmsChatRooms.push({
+        id:'chat-class-'+sk.id, name:sk.name, icon:sk.icon, type:'class',
+        members:[], color:sk.color, createdBy:'admin', skillAreaId:sk.id
+      });
+    });
+    // Auto-populate members based on student/instructor programmes
+    lmsChatRooms.forEach(function(room) {
+      if(room.type === 'admin') {
+        // Admin room has all admins
+        room.members = userAccounts.filter(function(u){ return u.role==='admin'; }).map(function(u){ return u.id; });
+      } else if(room.type === 'class') {
+        // Class rooms have admin + instructor for that programme + students in that programme
+        var admins = userAccounts.filter(function(u){ return u.role==='admin'; }).map(function(u){ return u.id; });
+        var instructors = userAccounts.filter(function(u){ return u.role==='instructor' && room.name.toLowerCase().indexOf(u.programme.toLowerCase().split(' ')[0]) !== -1; }).map(function(u){ return u.id; });
+        var studs = userAccounts.filter(function(u){ return u.role==='student' && room.name.toLowerCase().indexOf(u.programme.toLowerCase().split(' ')[0]) !== -1; }).map(function(u){ return u.id; });
+        room.members = admins.concat(instructors).concat(studs);
+      }
+    });
+    saveLmsChatData();
+  }
+}
+
+function saveLmsChatData() {
+  try {
+    localStorage.setItem('voctrain_chatRooms', JSON.stringify(lmsChatRooms));
+    localStorage.setItem('voctrain_chatMessages', JSON.stringify(lmsChatMessages));
+    localStorage.setItem('voctrain_chatProfiles', JSON.stringify(lmsChatProfiles));
+  } catch(e) { console.warn('saveLmsChatData: storage error'); }
+}
+
 function saveState() {
   try {
     localStorage.setItem('voctrain_students', JSON.stringify(students));
@@ -2456,6 +2797,7 @@ function saveState() {
     localStorage.setItem('voctrain_systemSettings', JSON.stringify(systemSettings));
     localStorage.setItem('voctrain_examResults', JSON.stringify(examResults));
     localStorage.setItem('voctrain_calendarEvents', JSON.stringify(calendarEvents));
+    saveLmsChatData();
   } catch(e) { console.warn('saveState: storage quota exceeded or unavailable'); }
 }
 
@@ -2486,6 +2828,7 @@ function loadState() {
   } catch(e) { /* parse error, use generated data */ }
 }
 loadState();
+initLmsChatData();
 
 // ============================== USER ACCOUNTS MANAGEMENT ==============================
 let userAccounts = [
@@ -3415,6 +3758,8 @@ function buildAdminSidebar() {
     <div class="nav-section-label">Main</div>
     <div class="nav-item active" data-page="dashboard" onclick="showPage('dashboard')">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/></svg>Dashboard</div>
+    <div class="nav-item" data-page="lms-chat" onclick="showPage('lms-chat')">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>LMS Chat<span class="nav-badge" style="background:var(--green);">NEW</span></div>
     <div class="nav-item" data-page="video" onclick="showPage('video')">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="23 7 16 12 23 17 23 7"/><rect x="1" y="5" width="15" height="14" rx="2"/></svg>Video Conference<span class="nav-badge">LIVE</span></div>
     <div class="nav-item" data-page="students" onclick="showPage('students')">
@@ -3450,6 +3795,8 @@ function buildStudentSidebar() {
     <div class="nav-section-label">My Portal</div>
     <div class="nav-item active" data-page="s-dashboard" onclick="showPage('s-dashboard')">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/></svg>My Dashboard</div>
+    <div class="nav-item" data-page="s-lms-chat" onclick="showPage('s-lms-chat')">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>LMS Chat<span class="nav-badge" style="background:var(--green);">NEW</span></div>
     <div class="nav-item" data-page="s-video" onclick="showPage('s-video')">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="23 7 16 12 23 17 23 7"/><rect x="1" y="5" width="15" height="14" rx="2"/></svg>My Classes<span class="nav-badge">LIVE</span></div>
     <div class="nav-item" data-page="s-progress" onclick="showPage('s-progress')">
@@ -3474,6 +3821,8 @@ function buildInstructorSidebar() {
     <div class="nav-section-label">Overview</div>
     <div class="nav-item active" data-page="i-dashboard" onclick="showPage('i-dashboard')">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/></svg>Dashboard</div>
+    <div class="nav-item" data-page="i-lms-chat" onclick="showPage('i-lms-chat')">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>LMS Chat<span class="nav-badge" style="background:var(--green);">NEW</span></div>
     <div class="nav-item" data-page="i-classes" onclick="showPage('i-classes')">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="23 7 16 12 23 17 23 7"/><rect x="1" y="5" width="15" height="14" rx="2"/></svg>My Classes<span class="nav-badge">LIVE</span></div>
     <div class="nav-item" data-page="i-students" onclick="showPage('i-students')">
@@ -3549,10 +3898,14 @@ function showPage(pageId) {
     's-profile':'My Profile','s-calendar':'My Calendar',
     'i-dashboard':'Instructor Dashboard','i-classes':'My Classes','i-students':'My Students',
     'i-attendance':'Class Attendance','i-gradebook':'Gradebook','i-resources':'Course Resources',
-    'i-announcements':'Announcements','i-calendar':'Calendar','i-profile':'My Profile'
+    'i-announcements':'Announcements','i-calendar':'Calendar','i-profile':'My Profile',
+    'lms-chat':'C.E.S.T.I.S LMS Chat','s-lms-chat':'C.E.S.T.I.S LMS Chat','i-lms-chat':'C.E.S.T.I.S LMS Chat'
   };
   document.getElementById('topbarTitle').textContent = titles[pageId]||pageId;
   if(pageId === 'verify-users') renderVerifyUsersPage();
+  if(pageId === 'lms-chat') lmsChatOnPageShow('admin');
+  if(pageId === 's-lms-chat') lmsChatOnPageShow('student');
+  if(pageId === 'i-lms-chat') lmsChatOnPageShow('instructor');
   setTimeout(animateAllCounters, 50);
 }
 
@@ -3938,6 +4291,67 @@ function buildAdminPages() {
       </div>
     </div>
   </section>
+
+  <!-- C.E.S.T.I.S LMS CHAT PAGE (ADMIN) -->
+  <section class="page" id="page-lms-chat">
+    <div class="lms-chat-container" id="adminChatContainer">
+      <div class="lms-chat-sidebar" id="adminChatSidebar">
+        <div class="lms-chat-sidebar-header">
+          <h3>C.E.S.T.I.S Chat</h3>
+          <div class="lms-chat-sidebar-actions">
+            <button onclick="lmsChatOpenProfileModal()" title="My Profile">&#128100;</button>
+            <button onclick="lmsChatCreateRoom()" title="New Chat">&#10133;</button>
+          </div>
+        </div>
+        <div class="lms-chat-search">
+          <div class="lms-chat-search-wrap">
+            <input type="text" placeholder="Search chats..." oninput="lmsChatFilterRooms(this.value,'admin')">
+          </div>
+        </div>
+        <div class="lms-chat-list" id="adminChatList"></div>
+      </div>
+      <div class="lms-chat-main" id="adminChatMain">
+        <div class="lms-chat-main-empty" id="adminChatEmpty">
+          <div class="empty-icon">&#128172;</div>
+          <h3>C.E.S.T.I.S LMS Chat</h3>
+          <p>Select a class chat or create a new conversation</p>
+        </div>
+        <div id="adminChatActive" style="display:none;flex:1;flex-direction:column;">
+          <div class="lms-chat-main-header">
+            <div class="lms-chat-main-header-left">
+              <button class="back-btn" onclick="lmsChatBack('admin')">&#8592;</button>
+              <div class="lms-chat-avatar" id="adminChatHeaderAvatar"></div>
+              <div class="lms-chat-header-info">
+                <h4 id="adminChatHeaderName"></h4>
+                <span id="adminChatHeaderStatus"></span>
+              </div>
+            </div>
+            <div class="lms-chat-header-actions">
+              <button onclick="lmsChatStartVoiceCall()" title="Voice Call">&#128222;</button>
+              <button onclick="lmsChatStartVideoCall()" title="Video Call">&#128249;</button>
+              <button onclick="lmsChatManageMembers()" title="Manage Members">&#128101;</button>
+              <button onclick="lmsChatToggleInfoPanel('admin')" title="Chat Info">&#9432;</button>
+            </div>
+          </div>
+          <div class="lms-chat-messages" id="adminChatMessages"></div>
+          <div class="lms-chat-input-area">
+            <button class="attach-btn" onclick="lmsChatAttachFile()" title="Attach File">&#128206;</button>
+            <textarea class="msg-input" id="adminChatInput" placeholder="Type a message..." rows="1" onkeydown="lmsChatInputKeydown(event,'admin')"></textarea>
+            <button class="send-btn" onclick="lmsChatSendMessage('admin')" title="Send">&#10148;</button>
+          </div>
+        </div>
+      </div>
+      <div class="lms-chat-info-panel" id="adminChatInfoPanel">
+        <div class="lms-chat-info-panel-header">
+          <h4>Chat Info</h4>
+          <button onclick="lmsChatToggleInfoPanel('admin')">&#10005;</button>
+        </div>
+        <div class="lms-chat-info-body" id="adminChatInfoBody"></div>
+      </div>
+    </div>
+    <input type="file" id="lmsChatFileInput" style="display:none" onchange="lmsChatHandleFileUpload(event)" accept="*/*">
+    <input type="file" id="lmsChatProfilePicInput" style="display:none" onchange="lmsChatHandleProfilePic(event)" accept="image/*">
+  </section>
   `;
 
   renderStudents(students);
@@ -4319,6 +4733,63 @@ function buildStudentPages() {
       </div>
     </div>
   </section>
+
+  <!-- C.E.S.T.I.S LMS CHAT PAGE (STUDENT) -->
+  <section class="page" id="page-s-lms-chat">
+    <div class="lms-chat-container" id="studentChatContainer">
+      <div class="lms-chat-sidebar" id="studentChatSidebar">
+        <div class="lms-chat-sidebar-header">
+          <h3>C.E.S.T.I.S Chat</h3>
+          <div class="lms-chat-sidebar-actions">
+            <button onclick="lmsChatOpenProfileModal()" title="My Profile">&#128100;</button>
+          </div>
+        </div>
+        <div class="lms-chat-search">
+          <div class="lms-chat-search-wrap">
+            <input type="text" placeholder="Search chats..." oninput="lmsChatFilterRooms(this.value,'student')">
+          </div>
+        </div>
+        <div class="lms-chat-list" id="studentChatList"></div>
+      </div>
+      <div class="lms-chat-main" id="studentChatMain">
+        <div class="lms-chat-main-empty" id="studentChatEmpty">
+          <div class="empty-icon">&#128172;</div>
+          <h3>C.E.S.T.I.S LMS Chat</h3>
+          <p>Select a class chat to start messaging</p>
+        </div>
+        <div id="studentChatActive" style="display:none;flex:1;flex-direction:column;">
+          <div class="lms-chat-main-header">
+            <div class="lms-chat-main-header-left">
+              <button class="back-btn" onclick="lmsChatBack('student')">&#8592;</button>
+              <div class="lms-chat-avatar" id="studentChatHeaderAvatar"></div>
+              <div class="lms-chat-header-info">
+                <h4 id="studentChatHeaderName"></h4>
+                <span id="studentChatHeaderStatus"></span>
+              </div>
+            </div>
+            <div class="lms-chat-header-actions">
+              <button onclick="lmsChatStartVoiceCall()" title="Voice Call">&#128222;</button>
+              <button onclick="lmsChatStartVideoCall()" title="Video Call">&#128249;</button>
+              <button onclick="lmsChatToggleInfoPanel('student')" title="Chat Info">&#9432;</button>
+            </div>
+          </div>
+          <div class="lms-chat-messages" id="studentChatMessages"></div>
+          <div class="lms-chat-input-area">
+            <button class="attach-btn" onclick="lmsChatAttachFile()" title="Attach File">&#128206;</button>
+            <textarea class="msg-input" id="studentChatInput" placeholder="Type a message..." rows="1" onkeydown="lmsChatInputKeydown(event,'student')"></textarea>
+            <button class="send-btn" onclick="lmsChatSendMessage('student')" title="Send">&#10148;</button>
+          </div>
+        </div>
+      </div>
+      <div class="lms-chat-info-panel" id="studentChatInfoPanel">
+        <div class="lms-chat-info-panel-header">
+          <h4>Chat Info</h4>
+          <button onclick="lmsChatToggleInfoPanel('student')">&#10005;</button>
+        </div>
+        <div class="lms-chat-info-body" id="studentChatInfoBody"></div>
+      </div>
+    </div>
+  </section>
   `;
   } catch(err) {
     console.error('buildStudentPages error:', err);
@@ -4644,6 +5115,63 @@ function buildInstructorPages() {
         <div class="info-row"><span class="info-label">Specialization</span><span class="info-value">${ins.specialization}</span></div>
         <div class="info-row"><span class="info-label">Experience</span><span class="info-value">${ins.yearsExp} years</span></div>
         <div class="info-row"><span class="info-label">Joined</span><span class="info-value">${2026 - ins.yearsExp}</span></div>
+      </div>
+    </div>
+  </section>
+
+  <!-- C.E.S.T.I.S LMS CHAT PAGE (INSTRUCTOR) -->
+  <section class="page" id="page-i-lms-chat">
+    <div class="lms-chat-container" id="instructorChatContainer">
+      <div class="lms-chat-sidebar" id="instructorChatSidebar">
+        <div class="lms-chat-sidebar-header">
+          <h3>C.E.S.T.I.S Chat</h3>
+          <div class="lms-chat-sidebar-actions">
+            <button onclick="lmsChatOpenProfileModal()" title="My Profile">&#128100;</button>
+          </div>
+        </div>
+        <div class="lms-chat-search">
+          <div class="lms-chat-search-wrap">
+            <input type="text" placeholder="Search chats..." oninput="lmsChatFilterRooms(this.value,'instructor')">
+          </div>
+        </div>
+        <div class="lms-chat-list" id="instructorChatList"></div>
+      </div>
+      <div class="lms-chat-main" id="instructorChatMain">
+        <div class="lms-chat-main-empty" id="instructorChatEmpty">
+          <div class="empty-icon">&#128172;</div>
+          <h3>C.E.S.T.I.S LMS Chat</h3>
+          <p>Select a class chat to start messaging</p>
+        </div>
+        <div id="instructorChatActive" style="display:none;flex:1;flex-direction:column;">
+          <div class="lms-chat-main-header">
+            <div class="lms-chat-main-header-left">
+              <button class="back-btn" onclick="lmsChatBack('instructor')">&#8592;</button>
+              <div class="lms-chat-avatar" id="instructorChatHeaderAvatar"></div>
+              <div class="lms-chat-header-info">
+                <h4 id="instructorChatHeaderName"></h4>
+                <span id="instructorChatHeaderStatus"></span>
+              </div>
+            </div>
+            <div class="lms-chat-header-actions">
+              <button onclick="lmsChatStartVoiceCall()" title="Voice Call">&#128222;</button>
+              <button onclick="lmsChatStartVideoCall()" title="Video Call">&#128249;</button>
+              <button onclick="lmsChatToggleInfoPanel('instructor')" title="Chat Info">&#9432;</button>
+            </div>
+          </div>
+          <div class="lms-chat-messages" id="instructorChatMessages"></div>
+          <div class="lms-chat-input-area">
+            <button class="attach-btn" onclick="lmsChatAttachFile()" title="Attach File">&#128206;</button>
+            <textarea class="msg-input" id="instructorChatInput" placeholder="Type a message..." rows="1" onkeydown="lmsChatInputKeydown(event,'instructor')"></textarea>
+            <button class="send-btn" onclick="lmsChatSendMessage('instructor')" title="Send">&#10148;</button>
+          </div>
+        </div>
+      </div>
+      <div class="lms-chat-info-panel" id="instructorChatInfoPanel">
+        <div class="lms-chat-info-panel-header">
+          <h4>Chat Info</h4>
+          <button onclick="lmsChatToggleInfoPanel('instructor')">&#10005;</button>
+        </div>
+        <div class="lms-chat-info-body" id="instructorChatInfoBody"></div>
       </div>
     </div>
   </section>
@@ -8639,7 +9167,10 @@ async function saveToCloud() {
         announcements: announcements,
         attendanceRecords: attendanceRecords,
         calendarEvents: calendarEvents,
-        examResults: examResults
+        examResults: examResults,
+        chatRooms: lmsChatRooms,
+        chatMessages: lmsChatMessages,
+        chatProfiles: lmsChatProfiles
       }
     };
 
@@ -8953,6 +9484,34 @@ async function mergeFromCloud() {
       });
     }
 
+    // Merge chat data from cloud backup
+    if (backupData.data.chatRooms) {
+      var localRoomIds = lmsChatRooms.map(function(r){ return r.id; });
+      backupData.data.chatRooms.forEach(function(cloudRoom) {
+        if (localRoomIds.indexOf(cloudRoom.id) === -1) {
+          lmsChatRooms.push(cloudRoom);
+        }
+      });
+    }
+    if (backupData.data.chatMessages) {
+      Object.keys(backupData.data.chatMessages).forEach(function(roomId) {
+        if (!lmsChatMessages[roomId]) lmsChatMessages[roomId] = [];
+        var existingIds = lmsChatMessages[roomId].map(function(m){ return m.id; });
+        backupData.data.chatMessages[roomId].forEach(function(m) {
+          if (existingIds.indexOf(m.id) === -1) {
+            lmsChatMessages[roomId].push(m);
+          }
+        });
+        lmsChatMessages[roomId].sort(function(a,b){ return new Date(a.timestamp) - new Date(b.timestamp); });
+      });
+    }
+    if (backupData.data.chatProfiles) {
+      Object.keys(backupData.data.chatProfiles).forEach(function(uid) {
+        if (!lmsChatProfiles[uid]) lmsChatProfiles[uid] = {};
+        Object.assign(lmsChatProfiles[uid], backupData.data.chatProfiles[uid]);
+      });
+    }
+
     // Persist all merged data
     saveState();
 
@@ -9057,6 +9616,1011 @@ function getTimeAgo(date) {
 // Initialize cloud sync on page load
 initializeCloudSync();
 setTimeout(() => { initGoogleAuth(); }, 500);
+
+// ============================================
+// C.E.S.T.I.S LMS CHAT - FULL IMPLEMENTATION
+// ============================================
+
+function lmsChatGetCurrentUser() {
+  if(currentRole === 'admin') {
+    var adm = userAccounts.find(function(u){ return u.role==='admin'; });
+    return adm || {id:'USR-001',name:'Administrator',role:'admin',programme:''};
+  }
+  if(currentRole === 'instructor' && currentInstructor) {
+    var ins = userAccounts.find(function(u){ return u.name === currentInstructor.name && u.role==='instructor'; });
+    return ins || {id:'unknown',name:currentInstructor.name,role:'instructor',programme:currentInstructor.course};
+  }
+  if(currentRole === 'student' && currentStudent) {
+    var stu = userAccounts.find(function(u){ return u.name === currentStudent.name && u.role==='student'; });
+    return stu || {id:'unknown',name:currentStudent.name,role:'student',programme:currentStudent.course};
+  }
+  return {id:'unknown',name:'Unknown',role:'unknown',programme:''};
+}
+
+function lmsChatGetRolePrefix() {
+  if(currentRole === 'admin') return 'admin';
+  if(currentRole === 'instructor') return 'instructor';
+  return 'student';
+}
+
+function lmsChatGetUserRooms() {
+  var user = lmsChatGetCurrentUser();
+  return lmsChatRooms.filter(function(room) {
+    if(currentRole === 'admin') return true; // Admin sees all rooms
+    return room.members.indexOf(user.id) !== -1;
+  });
+}
+
+function lmsChatGetProfile(userId) {
+  return lmsChatProfiles[userId] || {};
+}
+
+function lmsChatGetUserInitials(name) {
+  if(!name) return '?';
+  var parts = name.split(' ');
+  if(parts.length >= 2) return (parts[0][0] + parts[parts.length-1][0]).toUpperCase();
+  return name.substring(0,2).toUpperCase();
+}
+
+function lmsChatGetAvatarHTML(userId, name, size) {
+  var profile = lmsChatGetProfile(userId);
+  var sz = size || 48;
+  var status = profile.status || 'offline';
+  if(profile.profilePic) {
+    return '<div class="lms-chat-avatar" style="width:'+sz+'px;height:'+sz+'px;min-width:'+sz+'px;"><img src="'+profile.profilePic+'" alt=""><div class="status-dot '+status+'"></div></div>';
+  }
+  return '<div class="lms-chat-avatar" style="width:'+sz+'px;height:'+sz+'px;min-width:'+sz+'px;font-size:'+(sz*0.4)+'px;">'+lmsChatGetUserInitials(name)+'<div class="status-dot '+status+'"></div></div>';
+}
+
+function lmsChatRenderRoomList(prefix) {
+  var rooms = lmsChatGetUserRooms();
+  var listEl = document.getElementById(prefix+'ChatList');
+  if(!listEl) return;
+
+  if(rooms.length === 0) {
+    listEl.innerHTML = '<div style="padding:40px;text-align:center;color:var(--text-muted);font-size:13px;">No chats available</div>';
+    return;
+  }
+
+  var html = '';
+  rooms.forEach(function(room) {
+    var msgs = lmsChatMessages[room.id] || [];
+    var lastMsg = msgs.length ? msgs[msgs.length-1] : null;
+    var lastText = lastMsg ? (lastMsg.type === 'file' ? '\uD83D\uDCCE '+lastMsg.fileName : lastMsg.text) : 'No messages yet';
+    var lastTime = lastMsg ? lmsChatFormatTime(lastMsg.timestamp) : '';
+    var unread = lmsChatCountUnread(room.id);
+    var isActive = lmsChatActiveRoom === room.id ? ' active' : '';
+    var memberCount = room.members.length;
+
+    html += '<div class="lms-chat-item'+isActive+'" onclick="lmsChatOpenRoom(\''+room.id+'\',\''+prefix+'\')" data-room-id="'+room.id+'">';
+    html += '<div class="lms-chat-avatar" style="background:'+room.color+'22;color:'+room.color+';font-size:22px;">'+room.icon+'</div>';
+    html += '<div class="lms-chat-info"><div class="lms-chat-name">'+room.name+'</div>';
+    html += '<div class="lms-chat-last-msg">'+lmsChatEscapeHtml(lastText.substring(0,50))+'</div></div>';
+    html += '<div class="lms-chat-meta"><div class="lms-chat-time">'+lastTime+'</div>';
+    if(unread > 0) html += '<div class="lms-chat-unread">'+unread+'</div>';
+    html += '</div></div>';
+  });
+  listEl.innerHTML = html;
+}
+
+function lmsChatCountUnread(roomId) {
+  var msgs = lmsChatMessages[roomId] || [];
+  var user = lmsChatGetCurrentUser();
+  var count = 0;
+  for(var i = msgs.length - 1; i >= 0; i--) {
+    if(msgs[i].senderId === user.id) break;
+    if(!msgs[i].readBy || msgs[i].readBy.indexOf(user.id) === -1) count++;
+  }
+  return count;
+}
+
+function lmsChatFormatTime(ts) {
+  var d = new Date(ts);
+  var now = new Date();
+  var diff = now - d;
+  if(diff < 86400000 && d.getDate() === now.getDate()) {
+    return d.toLocaleTimeString([],{hour:'2-digit',minute:'2-digit'});
+  }
+  if(diff < 172800000) return 'Yesterday';
+  return d.toLocaleDateString([],{month:'short',day:'numeric'});
+}
+
+function lmsChatFormatFullTime(ts) {
+  var d = new Date(ts);
+  return d.toLocaleTimeString([],{hour:'2-digit',minute:'2-digit'});
+}
+
+function lmsChatFormatDate(ts) {
+  var d = new Date(ts);
+  var now = new Date();
+  if(d.toDateString() === now.toDateString()) return 'Today';
+  var yesterday = new Date(now);
+  yesterday.setDate(yesterday.getDate()-1);
+  if(d.toDateString() === yesterday.toDateString()) return 'Yesterday';
+  return d.toLocaleDateString([],{weekday:'long',month:'long',day:'numeric',year:'numeric'});
+}
+
+function lmsChatEscapeHtml(str) {
+  var div = document.createElement('div');
+  div.textContent = str;
+  return div.innerHTML;
+}
+
+function lmsChatOpenRoom(roomId, prefix) {
+  lmsChatActiveRoom = roomId;
+  var room = lmsChatRooms.find(function(r){ return r.id === roomId; });
+  if(!room) return;
+
+  // Mark messages as read
+  var user = lmsChatGetCurrentUser();
+  var msgs = lmsChatMessages[roomId] || [];
+  msgs.forEach(function(m) {
+    if(!m.readBy) m.readBy = [];
+    if(m.readBy.indexOf(user.id) === -1) m.readBy.push(user.id);
+  });
+  saveLmsChatData();
+
+  // Show active chat view
+  var emptyEl = document.getElementById(prefix+'ChatEmpty');
+  var activeEl = document.getElementById(prefix+'ChatActive');
+  if(emptyEl) emptyEl.style.display = 'none';
+  if(activeEl) { activeEl.style.display = 'flex'; activeEl.style.flexDirection = 'column'; }
+
+  // Mobile: toggle sidebar/main
+  var sidebar = document.getElementById(prefix+'ChatSidebar');
+  var main = document.getElementById(prefix+'ChatMain');
+  if(window.innerWidth <= 768) {
+    if(sidebar) sidebar.classList.add('chat-open');
+    if(main) main.classList.add('chat-open');
+  }
+
+  // Update header
+  document.getElementById(prefix+'ChatHeaderAvatar').innerHTML = room.icon;
+  document.getElementById(prefix+'ChatHeaderAvatar').style.cssText = 'width:42px;height:42px;min-width:42px;background:'+room.color+'22;color:'+room.color+';font-size:20px;display:flex;align-items:center;justify-content:center;border-radius:50%;';
+  document.getElementById(prefix+'ChatHeaderName').textContent = room.name;
+  document.getElementById(prefix+'ChatHeaderStatus').textContent = room.members.length + ' members';
+
+  lmsChatRenderMessages(prefix);
+  lmsChatRenderRoomList(prefix);
+
+  // Scroll to bottom
+  var msgContainer = document.getElementById(prefix+'ChatMessages');
+  if(msgContainer) setTimeout(function(){ msgContainer.scrollTop = msgContainer.scrollHeight; }, 50);
+}
+
+function lmsChatRenderMessages(prefix) {
+  var roomId = lmsChatActiveRoom;
+  if(!roomId) return;
+  var msgs = lmsChatMessages[roomId] || [];
+  var container = document.getElementById(prefix+'ChatMessages');
+  if(!container) return;
+  var user = lmsChatGetCurrentUser();
+
+  var html = '';
+  var lastDate = '';
+
+  msgs.forEach(function(msg) {
+    var msgDate = lmsChatFormatDate(msg.timestamp);
+    if(msgDate !== lastDate) {
+      html += '<div class="lms-chat-date-divider"><span>'+msgDate+'</span></div>';
+      lastDate = msgDate;
+    }
+
+    var isSent = msg.senderId === user.id;
+    var senderUser = userAccounts.find(function(u){ return u.id === msg.senderId; });
+    var senderName = senderUser ? senderUser.name : msg.senderName || 'Unknown';
+    var roleLabel = senderUser ? (' (' + senderUser.role + ')') : '';
+
+    html += '<div class="lms-chat-msg '+(isSent?'sent':'received')+'">';
+    if(!isSent) {
+      html += '<div class="msg-sender">'+lmsChatEscapeHtml(senderName)+roleLabel+'</div>';
+    }
+    if(msg.type === 'file') {
+      var fileIcon = lmsChatGetFileIcon(msg.fileName);
+      html += '<div class="msg-file" onclick="lmsChatDownloadFile(\''+lmsChatEscapeHtml(msg.fileUrl||'')+'\',\''+lmsChatEscapeHtml(msg.fileName)+'\')">';
+      html += '<div class="msg-file-icon">'+fileIcon+'</div>';
+      html += '<div class="msg-file-info"><div class="msg-file-name">'+lmsChatEscapeHtml(msg.fileName)+'</div>';
+      html += '<div class="msg-file-size">'+lmsChatFormatFileSize(msg.fileSize||0)+'</div></div></div>';
+      if(msg.text) html += '<div class="msg-text">'+lmsChatEscapeHtml(msg.text)+'</div>';
+    } else if(msg.type === 'image') {
+      html += '<img class="msg-img" src="'+msg.imageData+'" onclick="window.open(this.src)" alt="shared image">';
+      if(msg.text) html += '<div class="msg-text">'+lmsChatEscapeHtml(msg.text)+'</div>';
+    } else if(msg.type === 'call') {
+      html += '<div class="msg-text" style="font-style:italic;opacity:0.8;">'+lmsChatEscapeHtml(msg.text)+'</div>';
+    } else {
+      html += '<div class="msg-text">'+lmsChatLinkify(lmsChatEscapeHtml(msg.text))+'</div>';
+    }
+    html += '<div class="msg-time">'+lmsChatFormatFullTime(msg.timestamp)+'</div>';
+    html += '</div>';
+  });
+
+  container.innerHTML = html;
+}
+
+function lmsChatLinkify(text) {
+  return text.replace(/(https?:\/\/[^\s<]+)/g, '<a href="$1" target="_blank" style="color:var(--accent);text-decoration:underline;">$1</a>');
+}
+
+function lmsChatGetFileIcon(fileName) {
+  if(!fileName) return '\uD83D\uDCC4';
+  var ext = fileName.split('.').pop().toLowerCase();
+  var icons = {pdf:'\uD83D\uDCC4',doc:'\uD83D\uDCC3',docx:'\uD83D\uDCC3',xls:'\uD83D\uDCCA',xlsx:'\uD83D\uDCCA',ppt:'\uD83D\uDCCA',pptx:'\uD83D\uDCCA',zip:'\uD83D\uDCC1',rar:'\uD83D\uDCC1',mp4:'\uD83C\uDFA5',avi:'\uD83C\uDFA5',mov:'\uD83C\uDFA5',mp3:'\uD83C\uDFA7',wav:'\uD83C\uDFA7',jpg:'\uD83D\uDDBC\uFE0F',jpeg:'\uD83D\uDDBC\uFE0F',png:'\uD83D\uDDBC\uFE0F',gif:'\uD83D\uDDBC\uFE0F'};
+  return icons[ext] || '\uD83D\uDCC4';
+}
+
+function lmsChatFormatFileSize(bytes) {
+  if(bytes < 1024) return bytes + ' B';
+  if(bytes < 1048576) return (bytes/1024).toFixed(1) + ' KB';
+  return (bytes/1048576).toFixed(1) + ' MB';
+}
+
+function lmsChatSendMessage(prefix) {
+  var input = document.getElementById(prefix+'ChatInput');
+  if(!input) return;
+  var text = input.value.trim();
+  if(!text && !lmsChatPendingFile) return;
+  if(!lmsChatActiveRoom) return;
+
+  var user = lmsChatGetCurrentUser();
+  var msg = {
+    id: 'msg-'+Date.now()+'-'+Math.random().toString(36).substr(2,6),
+    roomId: lmsChatActiveRoom,
+    senderId: user.id,
+    senderName: user.name,
+    text: text,
+    type: 'text',
+    timestamp: new Date().toISOString(),
+    readBy: [user.id]
+  };
+
+  if(!lmsChatMessages[lmsChatActiveRoom]) lmsChatMessages[lmsChatActiveRoom] = [];
+  lmsChatMessages[lmsChatActiveRoom].push(msg);
+  saveLmsChatData();
+
+  input.value = '';
+  input.style.height = 'auto';
+  lmsChatRenderMessages(prefix);
+  lmsChatRenderRoomList(prefix);
+
+  var msgContainer = document.getElementById(prefix+'ChatMessages');
+  if(msgContainer) setTimeout(function(){ msgContainer.scrollTop = msgContainer.scrollHeight; }, 50);
+}
+
+function lmsChatInputKeydown(e, prefix) {
+  if(e.key === 'Enter' && !e.shiftKey) {
+    e.preventDefault();
+    lmsChatSendMessage(prefix);
+  }
+  // Auto-resize textarea
+  var el = e.target;
+  setTimeout(function() {
+    el.style.height = 'auto';
+    el.style.height = Math.min(el.scrollHeight, 120) + 'px';
+  }, 0);
+}
+
+// File attachment handling
+var lmsChatPendingFile = null;
+
+function lmsChatAttachFile() {
+  var input = document.getElementById('lmsChatFileInput');
+  if(!input) {
+    // Create it dynamically if not in admin page
+    input = document.createElement('input');
+    input.type = 'file';
+    input.id = 'lmsChatFileInput';
+    input.style.display = 'none';
+    input.accept = '*/*';
+    input.onchange = function(e){ lmsChatHandleFileUpload(e); };
+    document.body.appendChild(input);
+  }
+  input.click();
+}
+
+function lmsChatHandleFileUpload(event) {
+  var file = event.target.files[0];
+  if(!file) return;
+  var prefix = lmsChatGetRolePrefix();
+  var user = lmsChatGetCurrentUser();
+  if(!lmsChatActiveRoom) { alert('Please select a chat first.'); return; }
+
+  var reader = new FileReader();
+  reader.onload = function(e) {
+    var isImage = file.type.startsWith('image/');
+    var msg = {
+      id: 'msg-'+Date.now()+'-'+Math.random().toString(36).substr(2,6),
+      roomId: lmsChatActiveRoom,
+      senderId: user.id,
+      senderName: user.name,
+      text: '',
+      type: isImage ? 'image' : 'file',
+      timestamp: new Date().toISOString(),
+      readBy: [user.id]
+    };
+
+    if(isImage) {
+      msg.imageData = e.target.result;
+    } else {
+      msg.fileName = file.name;
+      msg.fileSize = file.size;
+      msg.fileData = e.target.result;
+    }
+
+    if(!lmsChatMessages[lmsChatActiveRoom]) lmsChatMessages[lmsChatActiveRoom] = [];
+    lmsChatMessages[lmsChatActiveRoom].push(msg);
+    saveLmsChatData();
+
+    lmsChatRenderMessages(prefix);
+    lmsChatRenderRoomList(prefix);
+
+    // Upload to Google Drive if connected
+    if(isCloudConnected && googleAccessToken) {
+      lmsChatUploadFileToDrive(file, msg.id);
+    }
+
+    var msgContainer = document.getElementById(prefix+'ChatMessages');
+    if(msgContainer) setTimeout(function(){ msgContainer.scrollTop = msgContainer.scrollHeight; }, 50);
+  };
+  reader.readAsDataURL(file);
+  event.target.value = '';
+}
+
+async function lmsChatUploadFileToDrive(file, msgId) {
+  try {
+    var metadata = {
+      name: 'lms_chat_' + Date.now() + '_' + file.name,
+      parents: [LMS_CHAT_DRIVE_FOLDER],
+      mimeType: file.type
+    };
+    var formData = new FormData();
+    formData.append('metadata', new Blob([JSON.stringify(metadata)], {type:'application/json'}));
+    formData.append('file', file);
+
+    var resp = await fetch('https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart&fields=id,name,webViewLink', {
+      method: 'POST',
+      headers: { 'Authorization': 'Bearer ' + googleAccessToken },
+      body: formData
+    });
+
+    if(resp.ok) {
+      var result = await resp.json();
+      // Update message with Drive link
+      Object.keys(lmsChatMessages).forEach(function(roomId) {
+        lmsChatMessages[roomId].forEach(function(m) {
+          if(m.id === msgId) {
+            m.fileUrl = result.webViewLink || ('https://drive.google.com/file/d/' + result.id + '/view');
+            m.driveFileId = result.id;
+          }
+        });
+      });
+      saveLmsChatData();
+      showToast('File uploaded to Google Drive');
+    }
+  } catch(err) {
+    console.error('Chat file upload to Drive failed:', err);
+  }
+}
+
+function lmsChatDownloadFile(url, name) {
+  if(url && url.startsWith('http')) {
+    window.open(url, '_blank');
+  } else {
+    // File is stored locally as base64
+    var msgs = lmsChatMessages[lmsChatActiveRoom] || [];
+    var fileMsg = msgs.find(function(m){ return m.fileName === name && m.fileData; });
+    if(fileMsg && fileMsg.fileData) {
+      var link = document.createElement('a');
+      link.href = fileMsg.fileData;
+      link.download = name;
+      link.click();
+    }
+  }
+}
+
+// Profile picture and status
+function lmsChatOpenProfileModal() {
+  var user = lmsChatGetCurrentUser();
+  var profile = lmsChatGetProfile(user.id);
+
+  var modal = document.getElementById('lmsChatProfileModal');
+  if(!modal) {
+    modal = document.createElement('div');
+    modal.id = 'lmsChatProfileModal';
+    modal.className = 'lms-chat-profile-modal';
+    document.body.appendChild(modal);
+  }
+
+  modal.innerHTML = '<div class="profile-modal-content">' +
+    '<h3 style="margin-bottom:8px;">My Chat Profile</h3>' +
+    '<p style="color:var(--text-muted);font-size:13px;margin-bottom:16px;">'+lmsChatEscapeHtml(user.name)+' ('+user.role+')</p>' +
+    '<div class="profile-preview" id="lmsChatProfilePreview">' +
+      (profile.profilePic ? '<img src="'+profile.profilePic+'">' : lmsChatGetUserInitials(user.name)) +
+    '</div>' +
+    '<button class="btn btn-secondary btn-sm" onclick="document.getElementById(\'lmsChatProfilePicInputGlobal\')?(document.getElementById(\'lmsChatProfilePicInputGlobal\').click()):lmsChatCreatePicInput()" style="margin-bottom:16px;">Change Photo</button>' +
+    '<div style="text-align:left;margin-bottom:12px;">' +
+      '<label style="font-size:12px;color:var(--text-muted);display:block;margin-bottom:6px;">Status</label>' +
+      '<select class="profile-status-select" id="lmsChatStatusSelect">' +
+        '<option value="online"'+(profile.status==='online'?' selected':'')+'>Online</option>' +
+        '<option value="away"'+(profile.status==='away'?' selected':'')+'>Away</option>' +
+        '<option value="offline"'+(!profile.status||profile.status==='offline'?' selected':'')+'>Offline</option>' +
+      '</select>' +
+    '</div>' +
+    '<div style="text-align:left;margin-bottom:16px;">' +
+      '<label style="font-size:12px;color:var(--text-muted);display:block;margin-bottom:6px;">Status Message</label>' +
+      '<input type="text" class="form-control" id="lmsChatStatusMsg" value="'+lmsChatEscapeHtml(profile.statusMsg||'')+'" placeholder="What\'s on your mind?" style="font-size:13px;">' +
+    '</div>' +
+    '<div style="display:flex;gap:10px;justify-content:flex-end;">' +
+      '<button class="btn btn-secondary" onclick="lmsChatCloseProfileModal()">Cancel</button>' +
+      '<button class="btn btn-primary" onclick="lmsChatSaveProfile()">Save</button>' +
+    '</div>' +
+  '</div>';
+
+  modal.classList.add('active');
+
+  // Ensure pic input exists
+  if(!document.getElementById('lmsChatProfilePicInputGlobal')) {
+    var inp = document.createElement('input');
+    inp.type = 'file';
+    inp.id = 'lmsChatProfilePicInputGlobal';
+    inp.accept = 'image/*';
+    inp.style.display = 'none';
+    inp.onchange = function(e) { lmsChatHandleProfilePic(e); };
+    document.body.appendChild(inp);
+  }
+}
+
+function lmsChatCreatePicInput() {
+  var inp = document.createElement('input');
+  inp.type = 'file';
+  inp.id = 'lmsChatProfilePicInputGlobal';
+  inp.accept = 'image/*';
+  inp.style.display = 'none';
+  inp.onchange = function(e) { lmsChatHandleProfilePic(e); };
+  document.body.appendChild(inp);
+  inp.click();
+}
+
+function lmsChatHandleProfilePic(event) {
+  var file = event.target.files[0];
+  if(!file) return;
+  var reader = new FileReader();
+  reader.onload = function(e) {
+    var preview = document.getElementById('lmsChatProfilePreview');
+    if(preview) preview.innerHTML = '<img src="'+e.target.result+'">';
+    lmsChatPendingProfilePic = e.target.result;
+  };
+  reader.readAsDataURL(file);
+  event.target.value = '';
+}
+
+var lmsChatPendingProfilePic = null;
+
+function lmsChatSaveProfile() {
+  var user = lmsChatGetCurrentUser();
+  if(!lmsChatProfiles[user.id]) lmsChatProfiles[user.id] = {};
+  var profile = lmsChatProfiles[user.id];
+
+  var statusSel = document.getElementById('lmsChatStatusSelect');
+  var statusMsg = document.getElementById('lmsChatStatusMsg');
+  if(statusSel) profile.status = statusSel.value;
+  if(statusMsg) profile.statusMsg = statusMsg.value.trim();
+  if(lmsChatPendingProfilePic) {
+    profile.profilePic = lmsChatPendingProfilePic;
+    lmsChatPendingProfilePic = null;
+  }
+
+  saveLmsChatData();
+  lmsChatCloseProfileModal();
+  showToast('Profile updated!');
+
+  // Re-render chat lists
+  var prefix = lmsChatGetRolePrefix();
+  lmsChatRenderRoomList(prefix);
+}
+
+function lmsChatCloseProfileModal() {
+  var modal = document.getElementById('lmsChatProfileModal');
+  if(modal) modal.classList.remove('active');
+  lmsChatPendingProfilePic = null;
+}
+
+// Chat info panel
+function lmsChatToggleInfoPanel(prefix) {
+  var panel = document.getElementById(prefix+'ChatInfoPanel');
+  if(!panel) return;
+  panel.classList.toggle('open');
+  if(panel.classList.contains('open')) lmsChatRenderInfoPanel(prefix);
+}
+
+function lmsChatRenderInfoPanel(prefix) {
+  var room = lmsChatRooms.find(function(r){ return r.id === lmsChatActiveRoom; });
+  if(!room) return;
+  var body = document.getElementById(prefix+'ChatInfoBody');
+  if(!body) return;
+
+  var html = '<div class="info-section"><div style="text-align:center;padding:16px 0;">';
+  html += '<div style="width:80px;height:80px;border-radius:50%;background:'+room.color+'22;color:'+room.color+';font-size:36px;display:flex;align-items:center;justify-content:center;margin:0 auto;">'+room.icon+'</div>';
+  html += '<h4 style="margin-top:12px;">'+room.name+'</h4>';
+  html += '<p style="font-size:12px;color:var(--text-muted);">'+room.type+' chat &bull; '+room.members.length+' members</p>';
+  html += '</div></div>';
+
+  // Files shared
+  var msgs = lmsChatMessages[room.id] || [];
+  var fileMsgs = msgs.filter(function(m){ return m.type==='file'||m.type==='image'; });
+  if(fileMsgs.length) {
+    html += '<div class="info-section"><h5>Shared Files ('+fileMsgs.length+')</h5>';
+    fileMsgs.slice(-5).reverse().forEach(function(m) {
+      html += '<div style="display:flex;align-items:center;gap:8px;padding:6px 0;font-size:12px;cursor:pointer;" onclick="lmsChatDownloadFile(\''+lmsChatEscapeHtml(m.fileUrl||'')+'\',\''+lmsChatEscapeHtml(m.fileName||'image')+'\')">';
+      html += '<span>'+lmsChatGetFileIcon(m.fileName||'image.png')+'</span>';
+      html += '<span style="flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">'+(m.fileName||'Image')+'</span>';
+      html += '</div>';
+    });
+    html += '</div>';
+  }
+
+  // Members list
+  html += '<div class="info-section"><h5>Members ('+room.members.length+')</h5>';
+  room.members.forEach(function(memberId) {
+    var member = userAccounts.find(function(u){ return u.id === memberId; });
+    if(!member) return;
+    var prof = lmsChatGetProfile(memberId);
+    html += '<div class="member-item">';
+    if(prof.profilePic) {
+      html += '<div class="member-avatar"><img src="'+prof.profilePic+'"></div>';
+    } else {
+      html += '<div class="member-avatar">'+lmsChatGetUserInitials(member.name)+'</div>';
+    }
+    html += '<div style="flex:1;"><div class="member-name">'+lmsChatEscapeHtml(member.name)+'</div>';
+    html += '<div class="member-role">'+member.role+(member.programme?' - '+member.programme:'')+'</div></div>';
+    if(currentRole === 'admin' && member.role !== 'admin') {
+      html += '<button class="member-remove" onclick="lmsChatRemoveMember(\''+room.id+'\',\''+memberId+'\',\''+prefix+'\')" title="Remove">&#10005;</button>';
+    }
+    html += '</div>';
+  });
+  html += '</div>';
+
+  body.innerHTML = html;
+}
+
+// Admin: Manage members
+function lmsChatManageMembers() {
+  if(currentRole !== 'admin') {
+    alert('Only admins can manage chat members.');
+    return;
+  }
+  var room = lmsChatRooms.find(function(r){ return r.id === lmsChatActiveRoom; });
+  if(!room) return;
+
+  var modal = document.getElementById('lmsChatManageModal');
+  if(!modal) {
+    modal = document.createElement('div');
+    modal.id = 'lmsChatManageModal';
+    modal.className = 'lms-manage-modal';
+    document.body.appendChild(modal);
+  }
+
+  var allUsers = userAccounts.filter(function(u){ return u.status === 'active'; });
+  var html = '<div class="manage-modal-content">';
+  html += '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px;"><h3>Manage Members: '+room.name+'</h3>';
+  html += '<button class="btn btn-secondary btn-sm" onclick="lmsChatCloseManageModal()" style="font-size:18px;background:none;border:none;color:var(--text-secondary);cursor:pointer;">&#10005;</button></div>';
+  html += '<p style="font-size:12px;color:var(--text-muted);margin-bottom:16px;">Add or remove students, teachers, and admins from this chat based on skill area.</p>';
+  html += '<input type="text" class="form-control" placeholder="Search users..." oninput="lmsChatFilterManageUsers(this.value)" style="margin-bottom:12px;font-size:13px;">';
+
+  html += '<div id="lmsChatManageUserList">';
+  allUsers.forEach(function(u) {
+    var isMember = room.members.indexOf(u.id) !== -1;
+    var roleBadge = u.role === 'admin' ? 'background:var(--accent-dim);color:var(--accent);' : u.role==='instructor' ? 'background:var(--green-dim);color:var(--green);' : 'background:var(--blue-dim);color:var(--blue);';
+    html += '<div class="lms-manage-user-item" data-name="'+u.name.toLowerCase()+'">';
+    html += '<label><input type="checkbox" value="'+u.id+'" '+(isMember?'checked':'')+' onchange="lmsChatToggleMember(\''+room.id+'\',\''+u.id+'\',this.checked)">';
+    html += '<span>'+lmsChatEscapeHtml(u.name)+'</span></label>';
+    html += '<span style="font-size:10px;padding:2px 8px;border-radius:12px;'+roleBadge+'">'+u.role+'</span>';
+    if(u.programme) html += '<span style="font-size:10px;color:var(--text-muted);margin-left:4px;">'+u.programme+'</span>';
+    html += '</div>';
+  });
+  html += '</div>';
+
+  html += '<div style="display:flex;gap:10px;justify-content:flex-end;margin-top:16px;">';
+  html += '<button class="btn btn-secondary" onclick="lmsChatCloseManageModal()">Close</button>';
+  html += '</div></div>';
+
+  modal.innerHTML = html;
+  modal.classList.add('active');
+}
+
+function lmsChatFilterManageUsers(query) {
+  var items = document.querySelectorAll('#lmsChatManageUserList .lms-manage-user-item');
+  var q = query.toLowerCase();
+  items.forEach(function(item) {
+    item.style.display = item.getAttribute('data-name').indexOf(q) !== -1 ? '' : 'none';
+  });
+}
+
+function lmsChatToggleMember(roomId, userId, add) {
+  var room = lmsChatRooms.find(function(r){ return r.id === roomId; });
+  if(!room) return;
+  if(add && room.members.indexOf(userId) === -1) {
+    room.members.push(userId);
+  } else if(!add) {
+    room.members = room.members.filter(function(id){ return id !== userId; });
+  }
+  saveLmsChatData();
+}
+
+function lmsChatRemoveMember(roomId, userId, prefix) {
+  if(!confirm('Remove this member from the chat?')) return;
+  lmsChatToggleMember(roomId, userId, false);
+  lmsChatRenderInfoPanel(prefix);
+  showToast('Member removed');
+}
+
+function lmsChatCloseManageModal() {
+  var modal = document.getElementById('lmsChatManageModal');
+  if(modal) modal.classList.remove('active');
+  var prefix = lmsChatGetRolePrefix();
+  lmsChatRenderRoomList(prefix);
+  if(lmsChatActiveRoom) lmsChatRenderInfoPanel(prefix);
+}
+
+// Admin: Create new chat room
+function lmsChatCreateRoom() {
+  if(currentRole !== 'admin') return;
+  var name = prompt('Enter chat room name:');
+  if(!name || !name.trim()) return;
+  var room = {
+    id: 'chat-custom-'+Date.now(),
+    name: name.trim(),
+    icon: '\uD83D\uDCAC',
+    type: 'custom',
+    members: [lmsChatGetCurrentUser().id],
+    color: '#' + Math.floor(Math.random()*16777215).toString(16).padStart(6,'0'),
+    createdBy: 'admin'
+  };
+  lmsChatRooms.push(room);
+  saveLmsChatData();
+  lmsChatRenderRoomList('admin');
+  showToast('Chat room created! Click it to manage members.');
+}
+
+// Search/filter rooms
+function lmsChatFilterRooms(query, prefix) {
+  var q = query.toLowerCase();
+  var items = document.querySelectorAll('#'+prefix+'ChatList .lms-chat-item');
+  items.forEach(function(item) {
+    var name = item.querySelector('.lms-chat-name');
+    if(name && name.textContent.toLowerCase().indexOf(q) !== -1) {
+      item.style.display = '';
+    } else {
+      item.style.display = 'none';
+    }
+  });
+}
+
+// Back button (mobile)
+function lmsChatBack(prefix) {
+  lmsChatActiveRoom = null;
+  var sidebar = document.getElementById(prefix+'ChatSidebar');
+  var main = document.getElementById(prefix+'ChatMain');
+  if(sidebar) sidebar.classList.remove('chat-open');
+  if(main) main.classList.remove('chat-open');
+
+  var emptyEl = document.getElementById(prefix+'ChatEmpty');
+  var activeEl = document.getElementById(prefix+'ChatActive');
+  if(emptyEl) emptyEl.style.display = '';
+  if(activeEl) activeEl.style.display = 'none';
+
+  // Close info panel
+  var panel = document.getElementById(prefix+'ChatInfoPanel');
+  if(panel) panel.classList.remove('open');
+}
+
+// ============================================
+// VOICE CALLS
+// ============================================
+function lmsChatStartVoiceCall() {
+  if(!lmsChatActiveRoom) return;
+  var room = lmsChatRooms.find(function(r){ return r.id === lmsChatActiveRoom; });
+  if(!room) return;
+
+  // Create call overlay
+  var overlay = document.getElementById('lmsChatCallOverlay');
+  if(!overlay) {
+    overlay = document.createElement('div');
+    overlay.id = 'lmsChatCallOverlay';
+    overlay.className = 'lms-call-overlay';
+    document.body.appendChild(overlay);
+  }
+
+  lmsChatCallSeconds = 0;
+  lmsChatCallState = 'voice';
+
+  overlay.innerHTML =
+    '<div class="call-avatar" style="background:'+room.color+'22;color:'+room.color+';">'+room.icon+'</div>' +
+    '<div class="call-name">'+room.name+'</div>' +
+    '<div class="call-status" id="lmsCallStatus">LMS Voice Call - Connecting...</div>' +
+    '<div class="call-timer" id="lmsCallTimer">00:00</div>' +
+    '<div class="call-controls">' +
+      '<button class="call-btn mute-call" id="lmsCallMuteBtn" onclick="lmsChatToggleMute()">&#128263;</button>' +
+      '<button class="call-btn end-call" onclick="lmsChatEndCall()">&#128244;</button>' +
+    '</div>';
+
+  overlay.classList.add('active');
+
+  // Start local audio
+  navigator.mediaDevices.getUserMedia({audio:true}).then(function(stream) {
+    lmsChatLocalStream = stream;
+    document.getElementById('lmsCallStatus').textContent = 'LMS Voice Call - Connected';
+    lmsChatCallTimer = setInterval(function() {
+      lmsChatCallSeconds++;
+      var m = Math.floor(lmsChatCallSeconds/60).toString().padStart(2,'0');
+      var s = (lmsChatCallSeconds%60).toString().padStart(2,'0');
+      var el = document.getElementById('lmsCallTimer');
+      if(el) el.textContent = m+':'+s;
+    }, 1000);
+
+    // Log call message
+    var user = lmsChatGetCurrentUser();
+    var msg = {
+      id:'msg-'+Date.now(), roomId:lmsChatActiveRoom, senderId:user.id, senderName:user.name,
+      text:user.name+' started a voice call', type:'call', timestamp:new Date().toISOString(), readBy:[user.id]
+    };
+    if(!lmsChatMessages[lmsChatActiveRoom]) lmsChatMessages[lmsChatActiveRoom] = [];
+    lmsChatMessages[lmsChatActiveRoom].push(msg);
+    saveLmsChatData();
+    var prefix = lmsChatGetRolePrefix();
+    lmsChatRenderMessages(prefix);
+    lmsChatRenderRoomList(prefix);
+  }).catch(function(err) {
+    document.getElementById('lmsCallStatus').textContent = 'Microphone access denied';
+    console.error('Voice call error:', err);
+  });
+}
+
+function lmsChatToggleMute() {
+  if(!lmsChatLocalStream) return;
+  var audioTrack = lmsChatLocalStream.getAudioTracks()[0];
+  if(audioTrack) {
+    audioTrack.enabled = !audioTrack.enabled;
+    var btn = document.getElementById('lmsCallMuteBtn');
+    if(btn) {
+      btn.classList.toggle('muted');
+      btn.innerHTML = audioTrack.enabled ? '&#128263;' : '&#128264;';
+    }
+  }
+}
+
+function lmsChatEndCall() {
+  if(lmsChatCallTimer) { clearInterval(lmsChatCallTimer); lmsChatCallTimer = null; }
+  if(lmsChatLocalStream) { lmsChatLocalStream.getTracks().forEach(function(t){t.stop();}); lmsChatLocalStream = null; }
+
+  // Log end call
+  if(lmsChatActiveRoom && lmsChatCallSeconds > 0) {
+    var user = lmsChatGetCurrentUser();
+    var duration = Math.floor(lmsChatCallSeconds/60)+'m '+lmsChatCallSeconds%60+'s';
+    var msg = {
+      id:'msg-'+Date.now(), roomId:lmsChatActiveRoom, senderId:user.id, senderName:user.name,
+      text:'Call ended ('+duration+')', type:'call', timestamp:new Date().toISOString(), readBy:[user.id]
+    };
+    if(!lmsChatMessages[lmsChatActiveRoom]) lmsChatMessages[lmsChatActiveRoom] = [];
+    lmsChatMessages[lmsChatActiveRoom].push(msg);
+    saveLmsChatData();
+    var prefix = lmsChatGetRolePrefix();
+    lmsChatRenderMessages(prefix);
+    lmsChatRenderRoomList(prefix);
+  }
+
+  lmsChatCallState = null;
+  lmsChatCallSeconds = 0;
+  var overlay = document.getElementById('lmsChatCallOverlay');
+  if(overlay) overlay.classList.remove('active');
+}
+
+// ============================================
+// VIDEO CALLS
+// ============================================
+function lmsChatStartVideoCall() {
+  if(!lmsChatActiveRoom) return;
+  var room = lmsChatRooms.find(function(r){ return r.id === lmsChatActiveRoom; });
+  if(!room) return;
+
+  var overlay = document.getElementById('lmsChatCallOverlay');
+  if(!overlay) {
+    overlay = document.createElement('div');
+    overlay.id = 'lmsChatCallOverlay';
+    overlay.className = 'lms-call-overlay';
+    document.body.appendChild(overlay);
+  }
+
+  lmsChatCallSeconds = 0;
+  lmsChatCallState = 'video';
+
+  overlay.innerHTML =
+    '<div class="lms-video-call-grid" id="lmsVideoGrid">' +
+      '<div class="video-tile"><video id="lmsLocalVideo" autoplay muted playsinline></video><div class="tile-name">You</div></div>' +
+    '</div>' +
+    '<div class="call-name" style="margin-top:16px;">'+room.name+' - LMS Class Video Call</div>' +
+    '<div class="call-status" id="lmsCallStatus">Connecting camera...</div>' +
+    '<div class="call-timer" id="lmsCallTimer">00:00</div>' +
+    '<div class="call-controls">' +
+      '<button class="call-btn mute-call" id="lmsCallMuteBtn" onclick="lmsChatToggleMute()">&#128263;</button>' +
+      '<button class="call-btn mute-call" id="lmsCallVideoBtn" onclick="lmsChatToggleVideo()">&#128249;</button>' +
+      '<button class="call-btn end-call" onclick="lmsChatEndCall()">&#128244;</button>' +
+    '</div>';
+
+  overlay.classList.add('active');
+
+  navigator.mediaDevices.getUserMedia({audio:true, video:true}).then(function(stream) {
+    lmsChatLocalStream = stream;
+    var vid = document.getElementById('lmsLocalVideo');
+    if(vid) vid.srcObject = stream;
+    document.getElementById('lmsCallStatus').textContent = 'LMS Class Video Call - Connected';
+
+    lmsChatCallTimer = setInterval(function() {
+      lmsChatCallSeconds++;
+      var m = Math.floor(lmsChatCallSeconds/60).toString().padStart(2,'0');
+      var s = (lmsChatCallSeconds%60).toString().padStart(2,'0');
+      var el = document.getElementById('lmsCallTimer');
+      if(el) el.textContent = m+':'+s;
+    }, 1000);
+
+    var user = lmsChatGetCurrentUser();
+    var msg = {
+      id:'msg-'+Date.now(), roomId:lmsChatActiveRoom, senderId:user.id, senderName:user.name,
+      text:user.name+' started a video call', type:'call', timestamp:new Date().toISOString(), readBy:[user.id]
+    };
+    if(!lmsChatMessages[lmsChatActiveRoom]) lmsChatMessages[lmsChatActiveRoom] = [];
+    lmsChatMessages[lmsChatActiveRoom].push(msg);
+    saveLmsChatData();
+    var prefix = lmsChatGetRolePrefix();
+    lmsChatRenderMessages(prefix);
+    lmsChatRenderRoomList(prefix);
+  }).catch(function(err) {
+    document.getElementById('lmsCallStatus').textContent = 'Camera/microphone access denied';
+    console.error('Video call error:', err);
+  });
+}
+
+function lmsChatToggleVideo() {
+  if(!lmsChatLocalStream) return;
+  var videoTrack = lmsChatLocalStream.getVideoTracks()[0];
+  if(videoTrack) {
+    videoTrack.enabled = !videoTrack.enabled;
+    var btn = document.getElementById('lmsCallVideoBtn');
+    if(btn) {
+      btn.classList.toggle('muted');
+      btn.innerHTML = videoTrack.enabled ? '&#128249;' : '&#128683;';
+    }
+  }
+}
+
+// ============================================
+// INITIALIZE CHAT ON PAGE SHOW
+// ============================================
+function lmsChatOnPageShow(prefix) {
+  initLmsChatData();
+  lmsChatActiveRoom = null;
+  lmsChatRenderRoomList(prefix);
+
+  // Set my status to online
+  var user = lmsChatGetCurrentUser();
+  if(!lmsChatProfiles[user.id]) lmsChatProfiles[user.id] = {};
+  lmsChatProfiles[user.id].status = 'online';
+  saveLmsChatData();
+}
+
+// ============================================
+// GOOGLE DRIVE: Include chat data in backup
+// ============================================
+var _origSaveToCloud = typeof saveToCloud === 'function' ? saveToCloud : null;
+
+// Override backup data to include chat
+(function() {
+  var origPrepare = null;
+  // We'll hook into the saveToCloud by ensuring chat data is in the backup
+  // The backup already collects data from the global variables, but chat data
+  // is stored separately. We add it to the saveState which is called before backup.
+})();
+
+// Sync chat data to/from Google Drive via the shared folder
+async function lmsChatSyncToDrive() {
+  if(!isCloudConnected || !googleAccessToken) {
+    showToast('Connect to Google Drive first');
+    return;
+  }
+  try {
+    var chatData = {
+      version: '1.0',
+      timestamp: new Date().toISOString(),
+      savedBy: lmsChatGetCurrentUser().name,
+      chatRooms: lmsChatRooms,
+      chatMessages: lmsChatMessages,
+      chatProfiles: lmsChatProfiles
+    };
+
+    var jsonContent = JSON.stringify(chatData, null, 2);
+    var blob = new Blob([jsonContent], {type:'application/json'});
+
+    // Check for existing chat backup file
+    var query = encodeURIComponent("name='CESTIS_LMS_CHAT.json' and '"+LMS_CHAT_DRIVE_FOLDER+"' in parents and trashed=false");
+    var searchResp = await fetch('https://www.googleapis.com/drive/v3/files?q='+query+'&fields=files(id)', {
+      headers: {'Authorization': 'Bearer '+googleAccessToken}
+    });
+    var searchData = await searchResp.json();
+    var existingFile = searchData.files && searchData.files.length ? searchData.files[0] : null;
+
+    var resp;
+    if(existingFile) {
+      resp = await fetch('https://www.googleapis.com/upload/drive/v3/files/'+existingFile.id+'?uploadType=media', {
+        method:'PATCH', headers:{'Authorization':'Bearer '+googleAccessToken,'Content-Type':'application/json'}, body:blob
+      });
+    } else {
+      var metadata = {name:'CESTIS_LMS_CHAT.json', parents:[LMS_CHAT_DRIVE_FOLDER], mimeType:'application/json'};
+      var formData = new FormData();
+      formData.append('metadata', new Blob([JSON.stringify(metadata)],{type:'application/json'}));
+      formData.append('file', blob);
+      resp = await fetch('https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart&fields=id,name', {
+        method:'POST', headers:{'Authorization':'Bearer '+googleAccessToken}, body:formData
+      });
+    }
+
+    if(resp.ok) showToast('Chat data saved to Google Drive!');
+    else throw new Error('Upload failed');
+  } catch(err) {
+    console.error('Chat sync to Drive error:', err);
+    showToast('Failed to sync chat to Drive');
+  }
+}
+
+async function lmsChatSyncFromDrive() {
+  if(!isCloudConnected || !googleAccessToken) {
+    showToast('Connect to Google Drive first');
+    return;
+  }
+  try {
+    var query = encodeURIComponent("name='CESTIS_LMS_CHAT.json' and '"+LMS_CHAT_DRIVE_FOLDER+"' in parents and trashed=false");
+    var searchResp = await fetch('https://www.googleapis.com/drive/v3/files?q='+query+'&fields=files(id)', {
+      headers:{'Authorization':'Bearer '+googleAccessToken}
+    });
+    var searchData = await searchResp.json();
+    if(!searchData.files || !searchData.files.length) {
+      showToast('No chat backup found on Drive');
+      return;
+    }
+    var fileId = searchData.files[0].id;
+    var resp = await fetch('https://www.googleapis.com/drive/v3/files/'+fileId+'?alt=media', {
+      headers:{'Authorization':'Bearer '+googleAccessToken}
+    });
+    if(!resp.ok) throw new Error('Download failed');
+    var data = await resp.json();
+
+    if(data.chatRooms) lmsChatRooms = data.chatRooms;
+    if(data.chatMessages) {
+      // Merge messages
+      Object.keys(data.chatMessages).forEach(function(roomId) {
+        if(!lmsChatMessages[roomId]) lmsChatMessages[roomId] = [];
+        var existingIds = lmsChatMessages[roomId].map(function(m){ return m.id; });
+        data.chatMessages[roomId].forEach(function(m) {
+          if(existingIds.indexOf(m.id) === -1) lmsChatMessages[roomId].push(m);
+        });
+        lmsChatMessages[roomId].sort(function(a,b){ return new Date(a.timestamp) - new Date(b.timestamp); });
+      });
+    }
+    if(data.chatProfiles) {
+      Object.keys(data.chatProfiles).forEach(function(uid) {
+        if(!lmsChatProfiles[uid]) lmsChatProfiles[uid] = {};
+        Object.assign(lmsChatProfiles[uid], data.chatProfiles[uid]);
+      });
+    }
+    saveLmsChatData();
+    showToast('Chat data synced from Google Drive!');
+
+    var prefix = lmsChatGetRolePrefix();
+    lmsChatRenderRoomList(prefix);
+    if(lmsChatActiveRoom) lmsChatRenderMessages(prefix);
+  } catch(err) {
+    console.error('Chat sync from Drive error:', err);
+    showToast('Failed to sync chat from Drive');
+  }
+}
 
 </script>
 </body>
