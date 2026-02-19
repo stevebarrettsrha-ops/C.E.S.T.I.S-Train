@@ -225,7 +225,19 @@ h1,h2,h3,h4 { font-family:'Playfair Display',serif; }
   background:linear-gradient(135deg, var(--green), #27ae60);
   color:#fff;
 }
-.role-enter-btn:hover { transform:translateY(-1px); box-shadow:0 4px 16px rgba(0,0,0,0.3); }
+.role-enter-btn:hover:not(:disabled) { transform:translateY(-1px); box-shadow:0 4px 16px rgba(0,0,0,0.3); }
+.role-enter-btn:disabled {
+  opacity:0.45; cursor:not-allowed; transform:none !important; box-shadow:none !important;
+  filter:grayscale(0.5);
+}
+.gmail-btn:disabled {
+  opacity:0.45; cursor:not-allowed; transform:none !important; box-shadow:none !important;
+  filter:grayscale(0.5);
+}
+.sync-required-hint {
+  font-size:11px; color:var(--accent); margin-top:6px; text-align:center;
+  animation:fadeSlideDown 0.3s ease both;
+}
 
 .landing-footer {
   position:relative; z-index:1;
@@ -3403,6 +3415,22 @@ function switchSettingsTab(tab, which) {
 }
 
 let adminLoginShown = false, studentLoginShown = false, instructorLoginShown = false;
+function requireLoginSync() {
+  if(loginSyncCompleted) return false;
+  alert('Please sync from Cloud first before signing in.\n\nClick the "Sync Now" button at the top of the page to pull the latest data.');
+  var bar = document.getElementById('loginSyncBar');
+  if(bar) { bar.style.animation = 'none'; bar.offsetHeight; bar.style.animation = 'fadeSlideDown 0.4s ease'; }
+  return true;
+}
+function enableLoginButtons() {
+  document.querySelectorAll('.role-enter-btn').forEach(function(btn){ btn.disabled = false; });
+  document.querySelectorAll('.role-card .gmail-btn').forEach(function(btn){ btn.disabled = false; });
+  document.querySelectorAll('.sync-required-hint').forEach(function(el){ el.remove(); });
+}
+function disableLoginButtons() {
+  document.querySelectorAll('.role-enter-btn').forEach(function(btn){ btn.disabled = true; });
+  document.querySelectorAll('.role-card .gmail-btn').forEach(function(btn){ btn.disabled = true; });
+}
 function handleAdminClick() {
   try {
     if(!adminLoginShown) {
@@ -3411,6 +3439,7 @@ function handleAdminClick() {
       document.getElementById('adminUser').focus();
       return;
     }
+    if(requireLoginSync()) return;
     var uname = document.getElementById('adminUser').value.trim();
     var pw = document.getElementById('adminPass').value;
     var adminUser = userAccounts.find(function(u){ return u.role==='admin' && (u.username===uname || u.email===uname) && u.password===pw; });
@@ -3432,6 +3461,7 @@ function handleStudentClick() {
       document.getElementById('studentUser').focus();
       return;
     }
+    if(requireLoginSync()) return;
     var uname = (document.getElementById('studentUser').value || '').trim();
     var pw = document.getElementById('studentPass').value;
     if(!uname || !pw) { alert('Please enter your email/username and password.'); return; }
@@ -3466,6 +3496,7 @@ function handleInstructorClick() {
       document.getElementById('instructorUser').focus();
       return;
     }
+    if(requireLoginSync()) return;
     var uname = (document.getElementById('instructorUser').value || '').trim();
     var pw = document.getElementById('instructorPass').value;
     if(!uname || !pw) { alert('Please enter your email/username and password.'); return; }
@@ -3554,6 +3585,7 @@ var currentLoggedInUser = null;
 
 // ----- Gmail Sign-In via Google Identity Services -----
 function gmailSignIn(role) {
+  if(requireLoginSync()) return;
   if(typeof google === 'undefined' || !google.accounts || !google.accounts.oauth2) {
     alert('Google Sign-In is not available. Please check your internet connection and reload the page.');
     return;
@@ -8869,6 +8901,7 @@ let cloudFileId = null;
 let lastSavedBy = null;
 let cloudFileTimestamp = null;
 let isLoginPageSync = false;
+let loginSyncCompleted = false;
 
 // Auto-sync & auto-save state
 let _autoSaveIntervalId = null;
@@ -10203,6 +10236,9 @@ function getTimeAgo(date) {
 initializeCloudSync();
 setTimeout(() => { initGoogleAuth(); }, 500);
 
+// Disable login buttons until pre-login sync completes
+setTimeout(function() { if(!loginSyncCompleted) disableLoginButtons(); }, 100);
+
 // ============================================
 // PRE-LOGIN CLOUD SYNC (Landing Page)
 // ============================================
@@ -10321,6 +10357,10 @@ async function loginPageSync() {
     } else {
       updateLoginSyncStatus('Sync complete! You may now log in.', 'success');
     }
+
+    // Unlock login — sync completed successfully
+    loginSyncCompleted = true;
+    enableLoginButtons();
 
     console.log('[LoginSync] Pre-login sync complete. Folders synced: ' + foldersSynced + ', Data changed in: ' + totalMerged);
   } catch (err) {
