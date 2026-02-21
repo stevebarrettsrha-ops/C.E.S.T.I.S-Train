@@ -2046,7 +2046,7 @@ textarea.form-control { resize:vertical; min-height:80px; }
 }
 .lms-chat-msg {
   max-width:65%; padding:10px 14px; border-radius:12px; position:relative;
-  margin-bottom:2px; animation:msgIn 0.2s ease;
+  margin-bottom:2px; animation:msgIn 0.2s ease; overflow:hidden;
 }
 @keyframes msgIn { from { opacity:0; transform:translateY(8px); } to { opacity:1; transform:translateY(0); } }
 .lms-chat-msg.sent {
@@ -2083,7 +2083,7 @@ textarea.form-control { resize:vertical; min-height:80px; }
 .lms-chat-msg .msg-file-info { flex:1; min-width:0; }
 .lms-chat-msg .msg-file-name { font-size:12px; font-weight:600; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
 .lms-chat-msg .msg-file-size { font-size:10px; color:rgba(255,255,255,0.5); }
-.lms-chat-msg .msg-img { max-width:280px; width:auto; height:auto; border-radius:var(--radius-sm); margin-top:6px; cursor:pointer; display:block; }
+.lms-chat-msg .msg-img { max-width:100%; width:auto; height:auto; border-radius:var(--radius-sm); margin-top:6px; cursor:pointer; display:block; }
 .lms-chat-msg .msg-img-error { display:flex; align-items:center; gap:8px; padding:12px 16px; border-radius:var(--radius-sm); background:rgba(0,0,0,0.15); margin-top:6px; color:var(--text-muted); font-size:12px; font-style:italic; }
 
 /* Chat input area */
@@ -10826,7 +10826,7 @@ function lmsChatRenderMessages(prefix) {
     } else if(msg.type === 'image') {
       var imgSrc = msg.imageData || msg.imageUrl || (msg.driveFileId ? 'https://drive.google.com/thumbnail?id='+msg.driveFileId+'&sz=w800' : '') || msg.fileUrl || '';
       if(imgSrc) {
-        html += '<img class="msg-img" src="'+imgSrc+'" onclick="window.open(this.src)" alt="shared image" onerror="this.onerror=null;this.style.display=\'none\';this.nextElementSibling&&this.nextElementSibling.classList.contains(\'msg-img-error\')&&(this.nextElementSibling.style.display=\'flex\');">';
+        html += '<img class="msg-img" src="'+imgSrc+'" onclick="lmsChatOpenImage(\''+msg.id+'\')" alt="shared image" onerror="this.onerror=null;this.style.display=\'none\';this.nextElementSibling&&this.nextElementSibling.classList.contains(\'msg-img-error\')&&(this.nextElementSibling.style.display=\'flex\');">';
         html += '<div class="msg-img-error" style="display:none;">&#128444;&#65039; Image could not be loaded</div>';
       } else {
         html += '<div class="msg-img-error">&#128444;&#65039; Image not available</div>';
@@ -11083,6 +11083,29 @@ function lmsChatDownloadFile(url, name) {
       link.download = name;
       link.click();
     }
+  }
+}
+
+function lmsChatOpenImage(msgId) {
+  // Find message across all rooms
+  var msg = null;
+  var rooms = Object.keys(lmsChatMessages);
+  for(var i = 0; i < rooms.length; i++) {
+    var msgs = lmsChatMessages[rooms[i]] || [];
+    msg = msgs.find(function(m){ return m.id === msgId; });
+    if(msg) break;
+  }
+  if(!msg) return;
+
+  // Try best viewable URL: base64 in-memory > Drive viewer > fileUrl > current img src
+  if(msg.imageData) {
+    window.open(msg.imageData, '_blank');
+  } else if(msg.driveFileId) {
+    window.open('https://drive.google.com/file/d/' + msg.driveFileId + '/view', '_blank');
+  } else if(msg.imageUrl && msg.imageUrl.startsWith('http')) {
+    window.open(msg.imageUrl, '_blank');
+  } else if(msg.fileUrl && msg.fileUrl.startsWith('http')) {
+    window.open(msg.fileUrl, '_blank');
   }
 }
 
