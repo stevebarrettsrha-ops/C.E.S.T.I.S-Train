@@ -3569,6 +3569,16 @@ function loadUserAccounts() {
       adminAcct.username = 'cestisadmin';
       adminAcct.password = 'cestisadmin123$';
     }
+    // Migrate: ensure default admin staff accounts exist
+    var defaultAdminStaff = [
+      {id:'USR-011',name:'Ms. T. Clarke',role:'adminstaff',username:'t.clarke',password:'staff123',email:'t.clarke@heartlms.edu.jm',programme:'',status:'active',createdAt:'2026-01-15'},
+      {id:'USR-012',name:'Mr. D. Brown',role:'adminstaff',username:'d.brown',password:'staff123',email:'d.brown@heartlms.edu.jm',programme:'',status:'active',createdAt:'2026-01-15'}
+    ];
+    defaultAdminStaff.forEach(function(def) {
+      if(!userAccounts.find(function(u){ return u.id === def.id; })) {
+        userAccounts.push(def);
+      }
+    });
   } catch(e) {}
 }
 loadUserAccounts();
