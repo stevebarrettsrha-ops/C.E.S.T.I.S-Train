@@ -3140,6 +3140,8 @@ function saveState() {
     localStorage.setItem('voctrain_calendarEvents', JSON.stringify(calendarEvents));
     saveLmsChatData();
   } catch(e) { console.warn('saveState: storage quota exceeded or unavailable'); }
+  // Push changes to Google Drive immediately (debounced)
+  scheduleDebouncedCloudSave();
 }
 
 function loadState() {
@@ -3189,6 +3191,8 @@ let umSelectedIds = [];
 
 function saveUserAccounts() {
   try { localStorage.setItem('voctrain_users', JSON.stringify(userAccounts)); } catch(e) {}
+  // Push changes to Google Drive immediately (debounced)
+  scheduleDebouncedCloudSave();
 }
 function loadUserAccounts() {
   try {
@@ -3247,6 +3251,11 @@ function createUserAccount() {
   renderUserAccountsTable();
   showToast('User account created successfully!');
   addNotification('New user account created: ' + name + ' (' + role + ')', 'student');
+
+  // Auto-merge from cloud to pick up accounts created on other devices
+  if (isCloudConnected && googleAccessToken) {
+    autoSyncOnLogin();
+  }
 }
 
 function openEditUser(userId) {
@@ -3282,6 +3291,11 @@ function saveUserEdit() {
   closeModal('editUserModal');
   renderUserAccountsTable();
   showToast('User updated successfully!');
+
+  // Auto-merge from cloud to pick up changes from other devices
+  if (isCloudConnected && googleAccessToken) {
+    autoSyncOnLogin();
+  }
 }
 
 function openResetPassword(userId) {
@@ -3916,6 +3930,11 @@ function submitRegistration() {
 
   userAccounts.push(newUser);
   saveState();
+
+  // Auto-merge from cloud to pick up accounts from other devices, then push new registration
+  if (isCloudConnected && googleAccessToken) {
+    autoSyncOnLogin();
+  }
 
   closeRegistrationModal();
   showPendingApprovalScreen(newUser);
@@ -7571,6 +7590,11 @@ function addStudent() {
   closeModal('addStudentModal');filterStudents();updatePipelineCounts();showToast(`${name} added!`);document.getElementById('newStudentName').value='';
   addNotification('New student enrolled: ' + name + ' — ' + document.getElementById('newStudentCourse').value, 'student');
   saveState();
+
+  // Auto-merge from cloud to pick up students added on other devices
+  if (isCloudConnected && googleAccessToken) {
+    autoSyncOnLogin();
+  }
 }
 
 function renderSkills() {
@@ -9587,6 +9611,18 @@ let _autoSaveIntervalId = null;
 let _isAutoSaving = false;
 let _autoSaveFileIds = {}; // { folderId: fileId } for tracking backup files per folder
 const AUTO_SAVE_INTERVAL_MS = 5000; // 5 seconds
+var _debouncedCloudSaveTimer = null;
+
+// Debounced immediate cloud push — called by saveState() and saveUserAccounts()
+// so ANY dashboard data change triggers a cloud save within 2 seconds
+function scheduleDebouncedCloudSave() {
+  if (!isCloudConnected || !googleAccessToken) return;
+  if (_debouncedCloudSaveTimer) clearTimeout(_debouncedCloudSaveTimer);
+  _debouncedCloudSaveTimer = setTimeout(function() {
+    _debouncedCloudSaveTimer = null;
+    autoSaveToAllFolders();
+  }, 2000);
+}
 const ALL_DRIVE_FOLDERS = [
   { id: '1lNpI00Et1BN5c4eaV5WfQwuQVhCMBtv8', label: 'Main Backup' },
   { id: '18ACBw0kRi0BssLEoZLWoeXNa1EiANeBu', label: 'Online Exams' },
