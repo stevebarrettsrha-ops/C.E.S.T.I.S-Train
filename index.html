@@ -225,7 +225,19 @@ h1,h2,h3,h4 { font-family:'Playfair Display',serif; }
   background:linear-gradient(135deg, var(--green), #27ae60);
   color:#fff;
 }
-.role-enter-btn:hover { transform:translateY(-1px); box-shadow:0 4px 16px rgba(0,0,0,0.3); }
+.role-enter-btn:hover:not(:disabled) { transform:translateY(-1px); box-shadow:0 4px 16px rgba(0,0,0,0.3); }
+.role-enter-btn:disabled {
+  opacity:0.45; cursor:not-allowed; transform:none !important; box-shadow:none !important;
+  filter:grayscale(0.5);
+}
+.gmail-btn:disabled {
+  opacity:0.45; cursor:not-allowed; transform:none !important; box-shadow:none !important;
+  filter:grayscale(0.5);
+}
+.sync-required-hint {
+  font-size:11px; color:var(--accent); margin-top:6px; text-align:center;
+  animation:fadeSlideDown 0.3s ease both;
+}
 
 .landing-footer {
   position:relative; z-index:1;
@@ -404,9 +416,27 @@ h1,h2,h3,h4 { font-family:'Playfair Display',serif; }
 }
 .topbar-btn:hover { background:rgba(255,255,255,0.06); color:var(--text-primary); }
 .topbar-btn .dot {
-  position:absolute; top:6px; right:6px; width:8px; height:8px;
-  background:var(--red); border-radius:50%; border:2px solid var(--bg-primary);
+  position:absolute; top:2px; right:2px; min-width:16px; height:16px; padding:0 4px;
+  background:var(--red); border-radius:8px; border:2px solid var(--bg-primary);
+  font-size:9px; font-weight:700; color:#fff; display:flex; align-items:center; justify-content:center;
+  line-height:1; box-sizing:border-box;
 }
+@keyframes bellShake {
+  0% { transform:rotate(0); }
+  15% { transform:rotate(14deg); }
+  30% { transform:rotate(-12deg); }
+  45% { transform:rotate(10deg); }
+  60% { transform:rotate(-8deg); }
+  75% { transform:rotate(4deg); }
+  90% { transform:rotate(-2deg); }
+  100% { transform:rotate(0); }
+}
+@keyframes bellGlow {
+  0%,100% { box-shadow:0 0 4px rgba(240,165,0,0.3); }
+  50% { box-shadow:0 0 14px rgba(240,165,0,0.7), 0 0 28px rgba(240,165,0,0.3); }
+}
+.topbar-btn.notif-active { animation:bellGlow 2s ease-in-out infinite; border-radius:var(--radius-sm); }
+.topbar-btn.notif-shake svg { animation:bellShake 0.6s ease-in-out; transform-origin:top center; }
 .logout-btn {
   display:flex; align-items:center; gap:6px;
   background:rgba(231,76,60,0.1);
@@ -1641,6 +1671,55 @@ textarea.form-control { resize:vertical; min-height:80px; }
   max-width:480px; width:90%; padding:24px; box-shadow:0 20px 60px rgba(0,0,0,0.5);
 }
 
+/* ============================== HOST CONTROLS & PARTICIPANT MANAGEMENT ============================== */
+.vc-host-controls {
+  display:flex; align-items:center; gap:8px; margin-left:auto;
+}
+.vc-host-btn {
+  padding:6px 12px; border-radius:var(--radius-sm); font-size:11px; font-weight:600;
+  border:1px solid var(--border-light); background:rgba(255,255,255,0.06);
+  color:var(--text-secondary); cursor:pointer; transition:all var(--transition);
+  display:flex; align-items:center; gap:5px; white-space:nowrap;
+}
+.vc-host-btn:hover { background:rgba(255,255,255,0.12); color:var(--text-primary); }
+.vc-host-btn.danger { border-color:rgba(231,76,60,0.3); color:var(--red); }
+.vc-host-btn.danger:hover { background:rgba(231,76,60,0.15); }
+.vc-host-btn.warning { border-color:rgba(240,165,0,0.3); color:var(--accent); }
+.vc-host-btn.warning:hover { background:rgba(240,165,0,0.15); }
+.vc-participant-item {
+  display:flex; align-items:center; gap:8px; padding:8px 10px;
+  border:1px solid var(--border); border-radius:var(--radius-sm);
+  margin-bottom:6px; transition:all var(--transition);
+}
+.vc-participant-item:hover { background:rgba(255,255,255,0.03); }
+.vc-participant-item .p-name { flex:1; font-size:12px; font-weight:600; }
+.vc-participant-item .p-role { font-size:10px; color:var(--text-muted); }
+.vc-participant-item .p-actions { display:flex; gap:4px; }
+.vc-participant-item .p-action-btn {
+  width:26px; height:26px; border-radius:50%; border:1px solid var(--border);
+  background:transparent; color:var(--text-muted); cursor:pointer;
+  display:flex; align-items:center; justify-content:center; font-size:12px;
+  transition:all var(--transition);
+}
+.vc-participant-item .p-action-btn:hover { background:rgba(255,255,255,0.1); color:var(--text-primary); }
+.vc-participant-item .p-action-btn.muted { background:rgba(231,76,60,0.15); color:var(--red); border-color:rgba(231,76,60,0.3); }
+.vc-participant-item .p-action-btn.is-host { background:rgba(240,165,0,0.15); color:var(--accent); border-color:rgba(240,165,0,0.3); }
+.vc-host-badge {
+  font-size:9px; padding:2px 6px; border-radius:4px;
+  background:rgba(240,165,0,0.15); color:var(--accent); font-weight:700;
+}
+.vc-screenshot-modal {
+  position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.7);
+  display:flex; align-items:center; justify-content:center; z-index:10000;
+}
+.vc-screenshot-modal .modal-content {
+  background:var(--bg-card); border-radius:var(--radius-lg); border:1px solid var(--border-light);
+  max-width:800px; width:90%; padding:24px; box-shadow:0 20px 60px rgba(0,0,0,0.5);
+}
+.vc-screenshot-modal canvas, .vc-screenshot-modal img {
+  max-width:100%; border-radius:var(--radius); border:1px solid var(--border);
+}
+
 /* ============================== GMAIL REGISTRATION & VERIFY USERS ============================== */
 .gmail-divider {
   display:flex; align-items:center; gap:12px; margin:12px 0 8px;
@@ -1909,7 +1988,7 @@ textarea.form-control { resize:vertical; min-height:80px; }
 /* ============================== C.E.S.T.I.S LMS CHAT ============================== */
 .lms-chat-container {
   display:flex; height:calc(100vh - var(--topbar-h) - 40px); border-radius:var(--radius-lg); overflow:hidden;
-  background:var(--bg-card); border:1px solid var(--border);
+  background:var(--bg-card); border:1px solid var(--border); max-width:100%;
 }
 .lms-chat-sidebar {
   width:340px; min-width:340px; background:var(--bg-secondary); border-right:1px solid var(--border);
@@ -1972,7 +2051,7 @@ textarea.form-control { resize:vertical; min-height:80px; }
 }
 
 /* Chat main area */
-.lms-chat-main { flex:1; display:flex; flex-direction:column; background:var(--bg-primary); }
+.lms-chat-main { flex:1; display:flex; flex-direction:column; background:var(--bg-primary); min-width:0; overflow:hidden; }
 .lms-chat-main-empty {
   flex:1; display:flex; flex-direction:column; align-items:center; justify-content:center;
   color:var(--text-muted); gap:12px;
@@ -2001,7 +2080,7 @@ textarea.form-control { resize:vertical; min-height:80px; }
 
 /* Messages area */
 .lms-chat-messages {
-  flex:1; overflow-y:auto; padding:20px; display:flex; flex-direction:column; gap:4px;
+  flex:1; overflow-y:auto; padding:20px; display:flex; flex-direction:column; gap:4px; min-height:0;
 }
 .lms-chat-date-divider {
   text-align:center; margin:12px 0; font-size:11px; color:var(--text-muted);
@@ -2016,7 +2095,7 @@ textarea.form-control { resize:vertical; min-height:80px; }
 }
 .lms-chat-msg {
   max-width:65%; padding:10px 14px; border-radius:12px; position:relative;
-  margin-bottom:2px; animation:msgIn 0.2s ease;
+  margin-bottom:2px; animation:msgIn 0.2s ease; overflow:hidden;
 }
 @keyframes msgIn { from { opacity:0; transform:translateY(8px); } to { opacity:1; transform:translateY(0); } }
 .lms-chat-msg.sent {
@@ -2028,7 +2107,7 @@ textarea.form-control { resize:vertical; min-height:80px; }
   border-bottom-left-radius:4px; color:var(--text-primary);
 }
 .lms-chat-msg .msg-sender { font-size:11px; font-weight:700; color:var(--accent); margin-bottom:3px; }
-.lms-chat-msg .msg-text { font-size:13.5px; line-height:1.5; word-wrap:break-word; }
+.lms-chat-msg .msg-text { font-size:13.5px; line-height:1.5; word-wrap:break-word; overflow-wrap:break-word; word-break:break-word; }
 .lms-chat-msg .msg-time { font-size:10px; color:rgba(255,255,255,0.45); text-align:right; margin-top:4px; }
 .lms-chat-msg .msg-edited { font-size:9px; color:rgba(255,255,255,0.35); font-style:italic; }
 .lms-chat-msg .msg-actions {
@@ -2053,31 +2132,87 @@ textarea.form-control { resize:vertical; min-height:80px; }
 .lms-chat-msg .msg-file-info { flex:1; min-width:0; }
 .lms-chat-msg .msg-file-name { font-size:12px; font-weight:600; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
 .lms-chat-msg .msg-file-size { font-size:10px; color:rgba(255,255,255,0.5); }
-.lms-chat-msg .msg-img { max-width:280px; border-radius:var(--radius-sm); margin-top:6px; cursor:pointer; }
+.lms-chat-msg .msg-img { max-width:100%; width:auto; height:auto; border-radius:var(--radius-sm); margin-top:6px; cursor:pointer; display:block; }
+.lms-chat-msg .msg-img-error { display:flex; align-items:center; gap:8px; padding:12px 16px; border-radius:var(--radius-sm); background:rgba(0,0,0,0.15); margin-top:6px; color:var(--text-muted); font-size:12px; font-style:italic; }
 
 /* Chat input area */
 .lms-chat-input-area {
   padding:12px 16px; border-top:1px solid var(--border); background:var(--bg-card);
-  display:flex; align-items:flex-end; gap:8px;
+  display:flex; align-items:flex-end; gap:8px; flex-shrink:0; min-height:64px; max-height:180px; overflow:visible;
 }
-.lms-chat-input-area .attach-btn, .lms-chat-input-area .send-btn, .lms-chat-input-area .emoji-btn {
+.lms-chat-input-area .attach-btn, .lms-chat-input-area .send-btn, .lms-chat-input-area .emoji-btn, .lms-chat-input-area .poll-btn {
   width:40px; height:40px; min-width:40px; border:none; border-radius:50%;
   cursor:pointer; display:flex; align-items:center; justify-content:center;
-  font-size:18px; transition:var(--transition);
+  font-size:18px; transition:var(--transition); flex-shrink:0;
 }
 .lms-chat-input-area .attach-btn { background:var(--bg-input); color:var(--text-secondary); }
 .lms-chat-input-area .attach-btn:hover { background:var(--accent-dim); color:var(--accent); }
+.lms-chat-input-area .poll-btn { background:var(--bg-input); color:var(--text-secondary); }
+.lms-chat-input-area .poll-btn:hover { background:var(--accent-dim); color:var(--accent); }
 .lms-chat-input-area .emoji-btn { background:var(--bg-input); color:var(--text-secondary); position:relative; }
 .lms-chat-input-area .emoji-btn:hover { background:var(--accent-dim); color:var(--accent); }
 .lms-chat-input-area .send-btn { background:var(--accent); color:#000; }
 .lms-chat-input-area .send-btn:hover { background:#d4900a; }
 .lms-chat-input-area .msg-input {
-  flex:1; padding:10px 16px; border:1px solid var(--border-light); border-radius:20px;
+  flex:1; min-width:0; padding:10px 16px; border:1px solid var(--border-light); border-radius:20px;
   background:var(--bg-input); color:var(--text-primary); font-size:14px;
   font-family:'DM Sans',sans-serif; outline:none; resize:none; max-height:120px;
-  min-height:40px; line-height:1.4; transition:var(--transition);
+  min-height:40px; line-height:1.4; transition:var(--transition); overflow-y:auto;
+  word-wrap:break-word; overflow-wrap:break-word;
 }
 .lms-chat-input-area .msg-input:focus { border-color:var(--accent); }
+
+/* Poll styles */
+.lms-chat-poll { background:rgba(0,0,0,0.15); border-radius:var(--radius); padding:14px; margin-top:4px; }
+.lms-chat-poll-question { font-size:14px; font-weight:600; margin-bottom:10px; line-height:1.4; }
+.lms-chat-poll-icon { font-size:16px; margin-right:6px; vertical-align:middle; }
+.lms-chat-poll-option {
+  display:flex; align-items:center; gap:10px; padding:10px 12px; margin-bottom:6px;
+  border-radius:var(--radius-sm); border:1px solid var(--border-light); cursor:pointer;
+  transition:var(--transition); position:relative; overflow:hidden;
+}
+.lms-chat-poll-option:hover { border-color:var(--accent); background:rgba(240,165,0,0.05); }
+.lms-chat-poll-option.voted { border-color:var(--accent); }
+.lms-chat-poll-option.my-vote { border-color:var(--accent); background:var(--accent-dim); }
+.lms-chat-poll-bar {
+  position:absolute; left:0; top:0; bottom:0; background:var(--accent-dim);
+  border-radius:var(--radius-sm); transition:width 0.4s ease; z-index:0;
+}
+.lms-chat-poll-option-text { flex:1; font-size:13px; position:relative; z-index:1; }
+.lms-chat-poll-option-check { font-size:14px; color:var(--accent); position:relative; z-index:1; }
+.lms-chat-poll-option-pct { font-size:12px; font-weight:600; color:var(--text-muted); min-width:36px; text-align:right; position:relative; z-index:1; }
+.lms-chat-poll-footer { display:flex; justify-content:space-between; align-items:center; margin-top:8px; font-size:11px; color:var(--text-muted); }
+
+/* Poll creation modal */
+.lms-poll-modal { position:fixed; inset:0; z-index:9999; background:rgba(0,0,0,0.6); display:none; align-items:center; justify-content:center; }
+.lms-poll-modal.active { display:flex; }
+.lms-poll-modal-content {
+  background:var(--bg-card); border:1px solid var(--border-light); border-radius:var(--radius-lg);
+  padding:24px; width:420px; max-width:90vw; max-height:80vh; overflow-y:auto;
+  box-shadow:0 20px 60px rgba(0,0,0,0.5);
+}
+.lms-poll-modal-content h3 { font-size:18px; margin-bottom:16px; color:var(--accent); }
+.lms-poll-modal-content label { font-size:12px; color:var(--text-muted); display:block; margin-bottom:6px; text-transform:uppercase; letter-spacing:0.5px; }
+.lms-poll-modal-content input[type="text"] {
+  width:100%; padding:10px 14px; border:1px solid var(--border-light); border-radius:var(--radius-sm);
+  background:var(--bg-input); color:var(--text-primary); font-size:14px; outline:none; margin-bottom:12px;
+}
+.lms-poll-modal-content input[type="text"]:focus { border-color:var(--accent); }
+.lms-poll-options-list { margin-bottom:12px; }
+.lms-poll-option-row { display:flex; gap:8px; align-items:center; margin-bottom:8px; }
+.lms-poll-option-row input { flex:1; margin-bottom:0; }
+.lms-poll-option-row button {
+  width:32px; height:32px; min-width:32px; border:none; border-radius:50%; background:var(--red-dim);
+  color:var(--red); cursor:pointer; font-size:14px; display:flex; align-items:center; justify-content:center;
+}
+.lms-poll-option-row button:hover { background:var(--red); color:#fff; }
+.lms-poll-add-option {
+  padding:8px 14px; border:1px dashed var(--border-light); border-radius:var(--radius-sm);
+  background:none; color:var(--text-muted); cursor:pointer; font-size:13px; width:100%;
+  transition:var(--transition); margin-bottom:16px;
+}
+.lms-poll-add-option:hover { border-color:var(--accent); color:var(--accent); }
+.lms-poll-modal-actions { display:flex; gap:10px; justify-content:flex-end; }
 
 /* Emoji Picker */
 .lms-emoji-picker {
@@ -2089,6 +2224,7 @@ textarea.form-control { resize:vertical; min-height:80px; }
 .lms-emoji-picker.open { display:flex; }
 .lms-emoji-picker-header {
   display:flex; gap:2px; padding:8px 8px 0; overflow-x:auto; border-bottom:1px solid var(--border);
+  flex-shrink:0;
 }
 .lms-emoji-picker-header button {
   padding:6px 10px; border:none; background:none; cursor:pointer; font-size:16px;
@@ -2099,6 +2235,7 @@ textarea.form-control { resize:vertical; min-height:80px; }
 .lms-emoji-picker-header button.active { background:var(--accent-dim); color:var(--accent); }
 .lms-emoji-picker-search {
   padding:8px; border-bottom:1px solid var(--border);
+  flex-shrink:0;
 }
 .lms-emoji-picker-search input {
   width:100%; padding:7px 10px; border:1px solid var(--border-light); border-radius:var(--radius-sm);
@@ -2746,16 +2883,78 @@ let announcements = [
   {id:6,title:"Guest Lecture: Industry Trends",body:"A guest lecture on emerging industry trends will be held on March 1 in the main auditorium. All programmes welcome. Attendance counts toward professional development hours.",priority:"general",date:"2026-02-12",author:"Mrs. P. Morgan",forRoles:['admin','student','instructor']}
 ];
 
-let notifications = [
-  {id:1,text:"Keisha Brown scored 87% on Welding L2 exam",time:"15 min ago",read:false,icon:"\uD83C\uDF1F",type:"success"},
-  {id:2,text:"3 students below 70% attendance threshold",time:"1 hr ago",read:false,icon:"\u26A0\uFE0F",type:"warning"},
-  {id:3,text:"New exam scheduled: Electrical Installation L3",time:"2 hrs ago",read:false,icon:"\uD83D\uDCDD",type:"info"},
-  {id:4,text:"Certificate collected: Marlon Davis - Auto Mechanics",time:"3 hrs ago",read:false,icon:"\u2705",type:"success"},
-  {id:5,text:"5 students marked incomplete in Cosmetology L1",time:"4 hrs ago",read:false,icon:"\uD83D\uDED1",type:"warning"},
-  {id:6,text:"System backup completed successfully",time:"5 hrs ago",read:false,icon:"\uD83D\uDCBE",type:"info"},
-  {id:7,text:"New student enrolled: Crystal Nelson - Hospitality",time:"6 hrs ago",read:false,icon:"\uD83D\uDC64",type:"info"},
-  {id:8,text:"Exam results published for Welding L1 Safety",time:"1 day ago",read:false,icon:"\uD83D\uDCCB",type:"success"}
-];
+let notifications = [];
+
+function playNotificationSound() {
+  try {
+    var ctx = new (window.AudioContext || window.webkitAudioContext)();
+    var osc = ctx.createOscillator();
+    var gain = ctx.createGain();
+    osc.connect(gain);
+    gain.connect(ctx.destination);
+    osc.type = 'sine';
+    osc.frequency.setValueAtTime(880, ctx.currentTime);
+    osc.frequency.setValueAtTime(1047, ctx.currentTime + 0.08);
+    osc.frequency.setValueAtTime(1319, ctx.currentTime + 0.16);
+    gain.gain.setValueAtTime(0.15, ctx.currentTime);
+    gain.gain.exponentialRampToValueAtTime(0.01, ctx.currentTime + 0.35);
+    osc.start(ctx.currentTime);
+    osc.stop(ctx.currentTime + 0.35);
+    setTimeout(function(){ ctx.close(); }, 500);
+  } catch(e) {}
+}
+
+function shakeNotificationBell() {
+  var btn = document.querySelector('.topbar-btn[title="Notifications"]');
+  if(!btn) return;
+  btn.classList.remove('notif-shake');
+  void btn.offsetWidth;
+  btn.classList.add('notif-shake');
+  setTimeout(function(){ btn.classList.remove('notif-shake'); }, 700);
+}
+
+function addNotification(text, type, icon) {
+  type = type || 'info';
+  var icons = {success:'\u2705',warning:'\u26A0\uFE0F',info:'\uD83D\uDD14',exam:'\uD83D\uDCDD',student:'\uD83D\uDC64',cert:'\uD83C\uDF93',announce:'\uD83D\uDCE2',calendar:'\uD83D\uDCC5',attendance:'\uD83D\uDCCB',resource:'\uD83D\uDCC1',grade:'\uD83C\uDF1F'};
+  notifications.unshift({
+    id: Date.now() + Math.random(),
+    text: text,
+    timestamp: Date.now(),
+    time: 'Just now',
+    read: false,
+    icon: icon || icons[type] || icons.info,
+    type: type === 'warning' ? 'warning' : type === 'success' || type === 'grade' || type === 'cert' ? 'success' : 'info'
+  });
+  if(notifications.length > 50) notifications = notifications.slice(0, 50);
+  updateNotificationDot();
+  shakeNotificationBell();
+  playNotificationSound();
+  saveNotifications();
+}
+
+function getRelativeTime(ts) {
+  var diff = Math.floor((Date.now() - ts) / 1000);
+  if(diff < 60) return 'Just now';
+  if(diff < 3600) return Math.floor(diff/60) + ' min ago';
+  if(diff < 86400) return Math.floor(diff/3600) + ' hr' + (Math.floor(diff/3600)>1?'s':'') + ' ago';
+  if(diff < 604800) return Math.floor(diff/86400) + ' day' + (Math.floor(diff/86400)>1?'s':'') + ' ago';
+  return new Date(ts).toLocaleDateString();
+}
+
+function refreshNotificationTimes() {
+  notifications.forEach(function(n) { if(n.timestamp) n.time = getRelativeTime(n.timestamp); });
+}
+
+function saveNotifications() {
+  try { localStorage.setItem('voctrain_notifications', JSON.stringify(notifications)); } catch(e) {}
+}
+
+function loadNotifications() {
+  try {
+    var saved = localStorage.getItem('voctrain_notifications');
+    if(saved) { notifications = JSON.parse(saved); refreshNotificationTimes(); }
+  } catch(e) {}
+}
 
 let examResults = [];
 
@@ -2821,6 +3020,9 @@ let vcCurrentRole = '';
 let vcCurrentUserName = '';
 let activeHostRoom = null; // {code, title, role} - persists when host leaves so they can rejoin
 let vcHostReconnectInterval = null; // interval for participants to reconnect to host
+let peerRoles = {}; // track roles: {peerId: 'student'|'instructor'|'admin'}
+let mutedPeers = {}; // track muted peers: {peerId: true}
+let vcCoHosts = {}; // track co-hosts: {peerId: true}
 let calendarMonth = 1;
 let calendarYear = 2026;
 let selectedCalendarDay = null;
@@ -2938,6 +3140,8 @@ function saveState() {
     localStorage.setItem('voctrain_calendarEvents', JSON.stringify(calendarEvents));
     saveLmsChatData();
   } catch(e) { console.warn('saveState: storage quota exceeded or unavailable'); }
+  // Push changes to Google Drive immediately (debounced)
+  scheduleDebouncedCloudSave();
 }
 
 function loadState() {
@@ -2967,6 +3171,8 @@ function loadState() {
   } catch(e) { /* parse error, use generated data */ }
 }
 loadState();
+loadNotifications();
+updateNotificationDot();
 
 // ============================== USER ACCOUNTS MANAGEMENT ==============================
 let userAccounts = [
@@ -2985,6 +3191,8 @@ let umSelectedIds = [];
 
 function saveUserAccounts() {
   try { localStorage.setItem('voctrain_users', JSON.stringify(userAccounts)); } catch(e) {}
+  // Push changes to Google Drive immediately (debounced)
+  scheduleDebouncedCloudSave();
 }
 function loadUserAccounts() {
   try {
@@ -3042,12 +3250,11 @@ function createUserAccount() {
   document.getElementById('newUserProgramme').value='';
   renderUserAccountsTable();
   showToast('User account created successfully!');
+  addNotification('New user account created: ' + name + ' (' + role + ')', 'student');
 
-  // Auto-merge from cloud then push the new account to all Drive folders
+  // Auto-merge from cloud to pick up accounts created on other devices
   if (isCloudConnected && googleAccessToken) {
-    autoSyncOnLogin().then(function() {
-      autoSaveToAllFolders();
-    });
+    autoSyncOnLogin();
   }
 }
 
@@ -3085,11 +3292,9 @@ function saveUserEdit() {
   renderUserAccountsTable();
   showToast('User updated successfully!');
 
-  // Auto-merge from cloud then push updated account to all Drive folders
+  // Auto-merge from cloud to pick up changes from other devices
   if (isCloudConnected && googleAccessToken) {
-    autoSyncOnLogin().then(function() {
-      autoSaveToAllFolders();
-    });
+    autoSyncOnLogin();
   }
 }
 
@@ -3329,10 +3534,11 @@ function toggleNotifications() {
     btn.appendChild(dropdown);
   }
   if(dropdown.classList.contains('active')) { dropdown.classList.remove('active'); return; }
+  refreshNotificationTimes();
   const unreadCount = notifications.filter(n=>!n.read).length;
   dropdown.innerHTML = `
-    <div class="notif-header"><span>Notifications ${unreadCount>0?'('+unreadCount+')':''}</span><button class="mark-read" onclick="event.stopPropagation();markAllNotificationsRead()">Mark all read</button></div>
-    ${notifications.length === 0 ? '<div class="notif-empty">No notifications</div>' :
+    <div class="notif-header"><span>Notifications ${unreadCount>0?'('+unreadCount+')':''}</span><div style="display:flex;gap:8px;"><button class="mark-read" onclick="event.stopPropagation();markAllNotificationsRead()">Mark all read</button>${notifications.length>0?'<button class="mark-read" style="color:var(--red);" onclick="event.stopPropagation();clearAllNotifications()">Clear all</button>':''}</div></div>
+    ${notifications.length === 0 ? '<div class="notif-empty">No notifications yet.<br><span style="font-size:11px;color:var(--text-muted);margin-top:4px;display:block;">Notifications will appear here as you use the system.</span></div>' :
       notifications.map((n,i) => `
         <div class="notif-item ${n.read?'':'unread'}" onclick="event.stopPropagation();markNotificationRead(${i})">
           <div class="notif-icon" style="background:${n.type==='success'?'var(--green-dim)':n.type==='warning'?'var(--accent-dim)':'var(--blue-dim)'};">${n.icon}</div>
@@ -3350,6 +3556,7 @@ function toggleNotifications() {
 function markNotificationRead(idx) {
   notifications[idx].read = true;
   updateNotificationDot();
+  saveNotifications();
   toggleNotifications();
   toggleNotifications();
 }
@@ -3357,15 +3564,27 @@ function markNotificationRead(idx) {
 function markAllNotificationsRead() {
   notifications.forEach(n => n.read = true);
   updateNotificationDot();
+  saveNotifications();
+  toggleNotifications();
+  toggleNotifications();
+}
+
+function clearAllNotifications() {
+  notifications = [];
+  updateNotificationDot();
+  saveNotifications();
   toggleNotifications();
   toggleNotifications();
 }
 
 function updateNotificationDot() {
-  const dot = document.querySelector('.topbar-btn[title="Notifications"] .dot');
+  const btn = document.querySelector('.topbar-btn[title="Notifications"]');
+  const dot = btn ? btn.querySelector('.dot') : null;
   if(!dot) return;
   const unread = notifications.filter(n=>!n.read).length;
-  dot.style.display = unread > 0 ? '' : 'none';
+  dot.style.display = unread > 0 ? 'flex' : 'none';
+  dot.textContent = unread > 99 ? '99+' : unread;
+  if(btn) { if(unread > 0) btn.classList.add('notif-active'); else btn.classList.remove('notif-active'); }
 }
 
 function exportCSV(data, headers, filename) {
@@ -3415,6 +3634,22 @@ function switchSettingsTab(tab, which) {
 }
 
 let adminLoginShown = false, studentLoginShown = false, instructorLoginShown = false;
+function requireLoginSync() {
+  if(loginSyncCompleted) return false;
+  alert('Please sync from Cloud first before signing in.\n\nClick the "Sync Now" button at the top of the page to pull the latest data.');
+  var bar = document.getElementById('loginSyncBar');
+  if(bar) { bar.style.animation = 'none'; bar.offsetHeight; bar.style.animation = 'fadeSlideDown 0.4s ease'; }
+  return true;
+}
+function enableLoginButtons() {
+  document.querySelectorAll('.role-enter-btn').forEach(function(btn){ btn.disabled = false; });
+  document.querySelectorAll('.role-card .gmail-btn').forEach(function(btn){ btn.disabled = false; });
+  document.querySelectorAll('.sync-required-hint').forEach(function(el){ el.remove(); });
+}
+function disableLoginButtons() {
+  document.querySelectorAll('.role-enter-btn').forEach(function(btn){ btn.disabled = true; });
+  document.querySelectorAll('.role-card .gmail-btn').forEach(function(btn){ btn.disabled = true; });
+}
 function handleAdminClick() {
   try {
     if(!adminLoginShown) {
@@ -3423,6 +3658,7 @@ function handleAdminClick() {
       document.getElementById('adminUser').focus();
       return;
     }
+    if(requireLoginSync()) return;
     var uname = document.getElementById('adminUser').value.trim();
     var pw = document.getElementById('adminPass').value;
     var adminUser = userAccounts.find(function(u){ return u.role==='admin' && (u.username===uname || u.email===uname) && u.password===pw; });
@@ -3444,6 +3680,7 @@ function handleStudentClick() {
       document.getElementById('studentUser').focus();
       return;
     }
+    if(requireLoginSync()) return;
     var uname = (document.getElementById('studentUser').value || '').trim();
     var pw = document.getElementById('studentPass').value;
     if(!uname || !pw) { alert('Please enter your email/username and password.'); return; }
@@ -3478,6 +3715,7 @@ function handleInstructorClick() {
       document.getElementById('instructorUser').focus();
       return;
     }
+    if(requireLoginSync()) return;
     var uname = (document.getElementById('instructorUser').value || '').trim();
     var pw = document.getElementById('instructorPass').value;
     if(!uname || !pw) { alert('Please enter your email/username and password.'); return; }
@@ -3566,6 +3804,7 @@ var currentLoggedInUser = null;
 
 // ----- Gmail Sign-In via Google Identity Services -----
 function gmailSignIn(role) {
+  if(requireLoginSync()) return;
   if(typeof google === 'undefined' || !google.accounts || !google.accounts.oauth2) {
     alert('Google Sign-In is not available. Please check your internet connection and reload the page.');
     return;
@@ -3691,6 +3930,11 @@ function submitRegistration() {
 
   userAccounts.push(newUser);
   saveState();
+
+  // Auto-merge from cloud to pick up accounts from other devices, then push new registration
+  if (isCloudConnected && googleAccessToken) {
+    autoSyncOnLogin();
+  }
 
   closeRegistrationModal();
   showPendingApprovalScreen(newUser);
@@ -3842,6 +4086,7 @@ function approveUser(userId) {
   saveState();
   renderVerifyUsersPage();
   showToast('Account approved: ' + user.name + ' (' + user.role + ')');
+  addNotification('Account approved: ' + user.name + ' (' + user.role + ')', 'success');
 }
 
 function rejectUser(userId) {
@@ -3854,6 +4099,7 @@ function rejectUser(userId) {
   saveState();
   renderVerifyUsersPage();
   showToast('Account rejected: ' + user.name);
+  addNotification('Account rejected: ' + user.name, 'warning');
 }
 
 function approveAllPending() {
@@ -3869,6 +4115,7 @@ function approveAllPending() {
   saveState();
   renderVerifyUsersPage();
   showToast(pending.length + ' account(s) approved!');
+  addNotification(pending.length + ' user account(s) approved', 'success');
 }
 
 function rejectAllPending() {
@@ -3884,6 +4131,7 @@ function rejectAllPending() {
   saveState();
   renderVerifyUsersPage();
   showToast(pending.length + ' account(s) rejected.');
+  addNotification(pending.length + ' user account(s) rejected', 'warning');
 }
 
 /* ============================== MOBILE SIDEBAR TOGGLE ============================== */
@@ -4022,6 +4270,7 @@ function vcCleanupMediaIfNeeded() {
     if(peerConnections[pid].data) peerConnections[pid].data.close();
   });
   peerConnections = {}; dataConnections = {}; peerNames = {};
+  peerRoles = {}; mutedPeers = {}; vcCoHosts = {};
   if(rtcPeer) { rtcPeer.destroy(); rtcPeer = null; }
   if(vcRecordingAudioCtx) { try { vcRecordingAudioCtx.close(); } catch(e){} vcRecordingAudioCtx = null; }
   if(vcIsRecording && vcMediaRecorder && vcMediaRecorder.state !== 'inactive') { vcMediaRecorder.stop(); }
@@ -4480,7 +4729,7 @@ function buildAdminPages() {
           <h3>C.E.S.T.I.S LMS Chat</h3>
           <p>Select a class chat or create a new conversation</p>
         </div>
-        <div id="adminChatActive" style="display:none;flex:1;flex-direction:column;">
+        <div id="adminChatActive" style="display:none;flex:1;flex-direction:column;min-height:0;overflow:hidden;">
           <div class="lms-chat-main-header">
             <div class="lms-chat-main-header-left">
               <button class="back-btn" onclick="lmsChatBack('admin')">&#8592;</button>
@@ -4501,6 +4750,7 @@ function buildAdminPages() {
           <div class="lms-chat-input-area">
             <button class="emoji-btn" onclick="lmsChatToggleEmojiPicker('admin')" title="Emoji">&#128522;</button>
             <button class="attach-btn" onclick="lmsChatAttachFile()" title="Attach File">&#128206;</button>
+            <button class="poll-btn" onclick="lmsChatOpenPollModal('admin')" title="Create Poll">&#128202;</button>
             <textarea class="msg-input" id="adminChatInput" placeholder="Type a message..." rows="1" onkeydown="lmsChatInputKeydown(event,'admin')"></textarea>
             <button class="send-btn" onclick="lmsChatSendMessage('admin')" title="Send">&#10148;</button>
           </div>
@@ -4922,7 +5172,7 @@ function buildStudentPages() {
           <h3>C.E.S.T.I.S LMS Chat</h3>
           <p>Select a class chat to start messaging</p>
         </div>
-        <div id="studentChatActive" style="display:none;flex:1;flex-direction:column;">
+        <div id="studentChatActive" style="display:none;flex:1;flex-direction:column;min-height:0;overflow:hidden;">
           <div class="lms-chat-main-header">
             <div class="lms-chat-main-header-left">
               <button class="back-btn" onclick="lmsChatBack('student')">&#8592;</button>
@@ -4942,6 +5192,7 @@ function buildStudentPages() {
           <div class="lms-chat-input-area">
             <button class="emoji-btn" onclick="lmsChatToggleEmojiPicker('student')" title="Emoji">&#128522;</button>
             <button class="attach-btn" onclick="lmsChatAttachFile()" title="Attach File">&#128206;</button>
+            <button class="poll-btn" onclick="lmsChatOpenPollModal('student')" title="Create Poll">&#128202;</button>
             <textarea class="msg-input" id="studentChatInput" placeholder="Type a message..." rows="1" onkeydown="lmsChatInputKeydown(event,'student')"></textarea>
             <button class="send-btn" onclick="lmsChatSendMessage('student')" title="Send">&#10148;</button>
           </div>
@@ -5308,7 +5559,7 @@ function buildInstructorPages() {
           <h3>C.E.S.T.I.S LMS Chat</h3>
           <p>Select a class chat to start messaging</p>
         </div>
-        <div id="instructorChatActive" style="display:none;flex:1;flex-direction:column;">
+        <div id="instructorChatActive" style="display:none;flex:1;flex-direction:column;min-height:0;overflow:hidden;">
           <div class="lms-chat-main-header">
             <div class="lms-chat-main-header-left">
               <button class="back-btn" onclick="lmsChatBack('instructor')">&#8592;</button>
@@ -5328,6 +5579,7 @@ function buildInstructorPages() {
           <div class="lms-chat-input-area">
             <button class="emoji-btn" onclick="lmsChatToggleEmojiPicker('instructor')" title="Emoji">&#128522;</button>
             <button class="attach-btn" onclick="lmsChatAttachFile()" title="Attach File">&#128206;</button>
+            <button class="poll-btn" onclick="lmsChatOpenPollModal('instructor')" title="Create Poll">&#128202;</button>
             <textarea class="msg-input" id="instructorChatInput" placeholder="Type a message..." rows="1" onkeydown="lmsChatInputKeydown(event,'instructor')"></textarea>
             <button class="send-btn" onclick="lmsChatSendMessage('instructor')" title="Send">&#10148;</button>
           </div>
@@ -5453,6 +5705,7 @@ function renderInstructorWeeklyChart(records) {
 function saveInstructorAttendance() {
   saveState();
   showToast('Attendance saved!');
+  addNotification('Attendance records updated', 'attendance');
   renderInstructorAttendance();
 }
 
@@ -5477,6 +5730,7 @@ function createInstructorAnnouncement() {
   renderInstructorAnnouncements();
   saveState();
   showToast('Announcement published!');
+  addNotification('New announcement: "' + title + '"' + (priority==='urgent' ? ' (URGENT)' : ''), priority==='urgent' ? 'warning' : 'announce');
 }
 
 function renderInstructorAnnouncements() {
@@ -5856,7 +6110,7 @@ function vcHandleDataConn(conn) {
 
     conn.on('data', function(data) { vcOnData(data, pid); });
     conn.on('close', function() {
-      vcRemoveVideo(pid); delete peerConnections[pid]; delete dataConnections[pid]; delete peerNames[pid];
+      vcRemoveVideo(pid); delete peerConnections[pid]; delete dataConnections[pid]; delete peerNames[pid]; delete peerRoles[pid]; delete mutedPeers[pid]; delete vcCoHosts[pid];
       vcUpdateParticipants();
       if(isRoomHost) {
         Object.keys(dataConnections).forEach(function(id) {
@@ -5874,6 +6128,7 @@ function vcOnData(raw, fromId) {
   switch(msg.type) {
     case 'name':
       peerNames[fromId] = msg.name;
+      peerRoles[fromId] = msg.role || 'student';
       vcUpdateVideoLabel(fromId, msg.name + (msg.role==='instructor'?' (Instructor)':msg.role==='admin'?' (Admin)':''));
       vcUpdateParticipants();
       if(isRoomHost) {
@@ -5885,6 +6140,7 @@ function vcOnData(raw, fromId) {
       break;
     case 'peer-name':
       peerNames[msg.peerId] = msg.name;
+      peerRoles[msg.peerId] = msg.role || 'student';
       vcUpdateVideoLabel(msg.peerId, msg.name + (msg.role==='instructor'?' (Instructor)':msg.role==='admin'?' (Admin)':''));
       vcUpdateParticipants();
       break;
@@ -5895,7 +6151,7 @@ function vcOnData(raw, fromId) {
       vcConnectToPeer(msg.peerId, msg.name);
       break;
     case 'peer-left':
-      vcRemoveVideo(msg.peerId); delete peerConnections[msg.peerId]; delete dataConnections[msg.peerId]; delete peerNames[msg.peerId];
+      vcRemoveVideo(msg.peerId); delete peerConnections[msg.peerId]; delete dataConnections[msg.peerId]; delete peerNames[msg.peerId]; delete peerRoles[msg.peerId]; delete mutedPeers[msg.peerId]; delete vcCoHosts[msg.peerId];
       vcUpdateParticipants();
       break;
     case 'chat':
@@ -5908,6 +6164,92 @@ function vcOnData(raw, fromId) {
       vcStopHostReconnect();
       alert('The meeting has been ended by the host.');
       exitVideoRoom(vcCurrentRole);
+      break;
+    // ── Host Control Messages ──
+    case 'kick':
+      // Participant receives this when they are kicked
+      vcStopHostReconnect();
+      alert('You have been removed from the meeting by the host.');
+      exitVideoRoom(vcCurrentRole);
+      break;
+    case 'force-mute':
+      // Host tells a participant to mute their mic
+      if(localStream) {
+        localStream.getAudioTracks().forEach(function(t){ t.enabled = false; });
+        var micBtn = document.getElementById('vc-mic-btn');
+        if(micBtn) micBtn.classList.remove('active');
+      }
+      showToast('Your microphone has been muted by the host');
+      break;
+    case 'force-unmute':
+      // Host tells a participant they are unmuted (enables the track)
+      if(localStream) {
+        localStream.getAudioTracks().forEach(function(t){ t.enabled = true; });
+        var micBtn2 = document.getElementById('vc-mic-btn');
+        if(micBtn2) micBtn2.classList.add('active');
+      }
+      showToast('Your microphone has been unmuted by the host');
+      break;
+    case 'mute-all':
+      // Host tells all participants to mute their mics
+      if(localStream) {
+        localStream.getAudioTracks().forEach(function(t){ t.enabled = false; });
+        var micBtn3 = document.getElementById('vc-mic-btn');
+        if(micBtn3) micBtn3.classList.remove('active');
+      }
+      showToast('All participants have been muted by the host');
+      break;
+    case 'force-cam-off':
+      // Host tells a participant to turn off their camera
+      if(localStream) {
+        localStream.getVideoTracks().forEach(function(t){ t.enabled = false; });
+        var camBtn = document.getElementById('vc-cam-btn');
+        if(camBtn) camBtn.classList.remove('active');
+        var lv = document.getElementById('vc-local-video');
+        if(lv) lv.style.opacity = '0.15';
+      }
+      showToast('Your camera has been turned off by the host');
+      break;
+    case 'promote-host':
+      // This participant is promoted to co-host
+      isRoomHost = true;
+      showToast('You have been given host privileges by ' + (msg.by || 'the host'));
+      vcUpdateParticipants();
+      vcRefreshHostControls();
+      break;
+    case 'demote-host':
+      // This participant is demoted from co-host
+      isRoomHost = false;
+      showToast('Your host privileges have been removed');
+      vcUpdateParticipants();
+      vcRefreshHostControls();
+      break;
+    case 'peer-kicked':
+      // Host notifies everyone that a peer was kicked
+      vcRemoveVideo(msg.peerId); delete peerConnections[msg.peerId]; delete dataConnections[msg.peerId]; delete peerNames[msg.peerId]; delete peerRoles[msg.peerId]; delete mutedPeers[msg.peerId];
+      vcUpdateParticipants();
+      showToast((msg.name || 'A participant') + ' was removed by the host');
+      break;
+    case 'peer-muted':
+      // Notification that a peer was muted (for UI update)
+      mutedPeers[msg.peerId] = true;
+      vcUpdateParticipants();
+      break;
+    case 'peer-unmuted':
+      // Notification that a peer was unmuted (for UI update)
+      delete mutedPeers[msg.peerId];
+      vcUpdateParticipants();
+      break;
+    case 'screen-share-started':
+      // A peer started sharing their screen — highlight their video tile
+      var shareTile = document.getElementById('vc-tile-'+sanitizePeerId(msg.peerId));
+      if(shareTile) { shareTile.classList.add('screen-share'); }
+      showToast((msg.name || 'A participant') + ' is sharing their screen');
+      break;
+    case 'screen-share-stopped':
+      // A peer stopped sharing their screen
+      var unshareTile = document.getElementById('vc-tile-'+sanitizePeerId(msg.peerId));
+      if(unshareTile) { unshareTile.classList.remove('screen-share'); }
       break;
   }
 }
@@ -5924,19 +6266,46 @@ function vcConnectToPeer(peerId, name) {
     dataConnections[peerId] = conn;
     conn.send(JSON.stringify({type:'name', name:vcCurrentUserName, role:vcCurrentRole}));
     conn.on('data', function(data) { vcOnData(data, peerId); });
-    conn.on('close', function() { vcRemoveVideo(peerId); delete peerConnections[peerId]; delete dataConnections[peerId]; vcUpdateParticipants(); });
+    conn.on('close', function() { vcRemoveVideo(peerId); delete peerConnections[peerId]; delete dataConnections[peerId]; delete peerRoles[peerId]; vcUpdateParticipants(); });
+  });
+  conn.on('error', function(err) {
+    console.warn('Data connection to', peerId, 'failed:', err);
   });
 
-  if(localStream) {
-    var call = rtcPeer.call(peerId, localStream);
-    call.on('stream', function(rs) {
-      if(!peerConnections[peerId]) peerConnections[peerId] = {};
-      peerConnections[peerId].media = call;
-      peerConnections[peerId].stream = rs;
-      vcAddVideo(peerId, rs, name);
-    });
-    call.on('close', function() { vcRemoveVideo(peerId); });
+  // Establish media connection with retry logic
+  vcCallPeerWithRetry(peerId, name, 0);
+}
+
+function vcCallPeerWithRetry(peerId, name, attempt) {
+  if(!localStream || !rtcPeer || rtcPeer.destroyed) return;
+  if(attempt > 2) return; // max 3 attempts
+
+  var call = rtcPeer.call(peerId, localStream);
+  if(!call) {
+    setTimeout(function() { vcCallPeerWithRetry(peerId, name, attempt + 1); }, 2000 * (attempt + 1));
+    return;
   }
+  var streamReceived = false;
+  call.on('stream', function(rs) {
+    streamReceived = true;
+    if(!peerConnections[peerId]) peerConnections[peerId] = {};
+    peerConnections[peerId].media = call;
+    peerConnections[peerId].stream = rs;
+    vcAddVideo(peerId, rs, name);
+  });
+  call.on('close', function() { vcRemoveVideo(peerId); });
+  call.on('error', function(err) {
+    console.warn('Media call to', peerId, 'failed:', err);
+    if(!streamReceived && attempt < 2) {
+      setTimeout(function() { vcCallPeerWithRetry(peerId, name, attempt + 1); }, 2000 * (attempt + 1));
+    }
+  });
+  // If no stream received after 5s, retry
+  setTimeout(function() {
+    if(!streamReceived && attempt < 2) {
+      vcCallPeerWithRetry(peerId, name, attempt + 1);
+    }
+  }, 5000 * (attempt + 1));
 }
 
 // ── Show Conference View ──
@@ -5944,9 +6313,10 @@ function vcShowConference(title, role) {
   var containerId = role==='admin' ? 'videoRoom' : role==='instructor' ? 'iVideoRoom' : 'sVideoRoom';
   var room = document.getElementById(containerId);
   var userName = vcCurrentUserName;
+  var showHostControls = isRoomHost && (role==='instructor' || role==='admin');
 
   room.innerHTML = `
-    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px;">
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px;flex-wrap:wrap;gap:8px;">
       <div style="display:flex;align-items:center;gap:12px;">
         <button class="btn btn-secondary btn-sm" onclick="exitVideoRoom('${role}')">&#8592; Leave</button>
         <h3 style="font-family:'Playfair Display',serif;">${title}</h3>
@@ -5958,12 +6328,19 @@ function vcShowConference(title, role) {
         <div style="font-size:13px;color:var(--text-muted);" id="vTimer-${role}">00:00:00</div>
       </div>
     </div>
+    ${showHostControls ? `
+    <div id="vc-host-bar" style="display:flex;align-items:center;gap:8px;margin-bottom:12px;flex-wrap:wrap;padding:10px;background:rgba(240,165,0,0.06);border:1px solid rgba(240,165,0,0.15);border-radius:var(--radius-sm);">
+      <span style="font-size:11px;font-weight:700;color:var(--accent);margin-right:4px;">HOST CONTROLS:</span>
+      <button class="vc-host-btn warning" onclick="vcMuteAll()" title="Mute all participants">&#x1F507; Mute All</button>
+      <button class="vc-host-btn" onclick="vcTakeScreenshot()" title="Take meeting screenshot">&#x1F4F8; Screenshot</button>
+    </div>
+    ` : ''}
     <div class="grid-sidebar">
       <div>
         <div class="video-grid" id="vc-video-grid">
           <div class="video-tile local" id="vc-tile-local" style="border:2px solid var(--accent);">
             <video id="vc-local-video" autoplay muted playsinline></video>
-            <div class="participant-info">${userName} (You)</div>
+            <div class="participant-info">${userName} (You)${isRoomHost ? ' <span class="vc-host-badge">HOST</span>' : ''}</div>
           </div>
         </div>
         <div class="video-controls" style="margin-top:12px;">
@@ -5974,8 +6351,8 @@ function vcShowConference(title, role) {
             ? `<button class="vc-btn" id="vc-hand-btn" onclick="vcToggleHand()" title="Raise Hand">&#x270B;</button>`
             : `<button class="vc-btn" id="vc-rec-btn" onclick="vcToggleRecord()" title="Record Session">&#x23FA;&#xFE0F;</button>`}
           <button class="vc-btn danger" onclick="exitVideoRoom('${role}')" title="Leave Call">&#x1F4DE;</button>
-          ${(role==='instructor' || role==='admin') && isRoomHost
-            ? `<button class="vc-btn danger" onclick="vcEndMeetingForAll()" title="End Meeting for All" style="font-size:11px;width:auto;border-radius:8px;padding:8px 14px;">End All</button>`
+          ${showHostControls
+            ? `<button class="vc-btn danger vc-end-all-btn" onclick="vcEndMeetingForAll()" title="End Meeting for All" style="font-size:11px;width:auto;border-radius:8px;padding:8px 14px;">End All</button>`
             : ''}
         </div>
       </div>
@@ -5992,9 +6369,7 @@ function vcShowConference(title, role) {
         </div>
         <div class="card" style="margin-top:12px;padding:14px;">
           <h4 style="font-size:13px;margin-bottom:10px;" id="vc-part-title">Participants (1)</h4>
-          <div style="display:flex;flex-wrap:wrap;gap:6px;" id="vc-part-list">
-            <span class="badge badge-green" style="font-size:10px;">${userName} (You)</span>
-          </div>
+          <div id="vc-part-list"></div>
         </div>
       </div>
     </div>
@@ -6002,6 +6377,9 @@ function vcShowConference(title, role) {
 
   var lv = document.getElementById('vc-local-video');
   if(lv && localStream) lv.srcObject = localStream;
+
+  // Initialize participant list
+  vcUpdateParticipants();
 
   videoSeconds = 0;
   if(videoTimerInterval) clearInterval(videoTimerInterval);
@@ -6017,7 +6395,11 @@ function vcShowConference(title, role) {
 function vcAddVideo(peerId, stream, name) {
   var safeId = sanitizePeerId(peerId);
   var existing = document.getElementById('vc-vid-'+safeId);
-  if(existing) { existing.srcObject = stream; return; }
+  if(existing) {
+    existing.srcObject = stream;
+    existing.play().catch(function(){});
+    return;
+  }
 
   var grid = document.getElementById('vc-video-grid');
   if(!grid) return;
@@ -6030,8 +6412,23 @@ function vcAddVideo(peerId, stream, name) {
   video.id = 'vc-vid-'+safeId;
   video.autoplay = true;
   video.playsInline = true;
+  video.setAttribute('playsinline', '');
   video.srcObject = stream;
   video.style.cssText = 'width:100%;height:100%;object-fit:cover;border-radius:var(--radius);';
+
+  // Ensure playback starts even if autoplay is restricted
+  video.play().catch(function() {
+    // Autoplay was prevented — add click-to-play handler
+    video.muted = true;
+    video.play().catch(function(){});
+    setTimeout(function() { video.muted = false; video.play().catch(function(){}); }, 1000);
+  });
+
+  // Listen for new tracks being added to the stream
+  stream.onaddtrack = function() {
+    video.srcObject = stream;
+    video.play().catch(function(){});
+  };
 
   var info = document.createElement('div');
   info.className = 'participant-info';
@@ -6063,10 +6460,56 @@ function vcUpdateParticipants() {
   if(!list) return;
   var count = Object.keys(peerNames).length + 1;
   if(title) title.textContent = 'Participants (' + count + ')';
-  var html = '<span class="badge badge-green" style="font-size:10px;">' + vcCurrentUserName + ' (You)</span>';
+
+  var canControl = isRoomHost || vcCoHosts[rtcPeer ? rtcPeer.id : ''];
+
+  // Build self entry
+  var html = '<div class="vc-participant-item" style="border-color:var(--accent);">' +
+    '<span class="p-name" style="color:var(--accent);">' + vcCurrentUserName + ' (You)' +
+    (isRoomHost ? ' <span class="vc-host-badge">HOST</span>' : '') +
+    '</span>' +
+    '<span class="p-role" style="color:var(--text-muted);">' + vcCurrentRole + '</span>' +
+    '</div>';
+
+  // Build entries for each remote peer
   Object.keys(peerNames).forEach(function(pid) {
-    html += '<span class="badge badge-blue" style="font-size:10px;">' + peerNames[pid] + '</span>';
+    var safeName = peerNames[pid].replace(/</g,'&lt;').replace(/>/g,'&gt;');
+    var role = peerRoles[pid] || 'student';
+    var isMuted = mutedPeers[pid];
+    var isCoHost = vcCoHosts[pid];
+    var safePid = pid.replace(/'/g, "\\'");
+
+    html += '<div class="vc-participant-item">';
+    html += '<span class="p-name">' + safeName;
+    if(isCoHost) html += ' <span class="vc-host-badge">CO-HOST</span>';
+    html += '</span>';
+    html += '<span class="p-role">' + role + (isMuted ? ' &bull; muted' : '') + '</span>';
+
+    // Show action buttons only if current user can control
+    if(canControl) {
+      html += '<span class="p-actions">';
+      // Mute / Unmute mic
+      if(isMuted) {
+        html += '<button class="p-action-btn muted" onclick="vcUnmuteParticipant(\'' + safePid + '\')" title="Unmute mic">&#x1F507;</button>';
+      } else {
+        html += '<button class="p-action-btn" onclick="vcMuteParticipant(\'' + safePid + '\')" title="Mute mic">&#x1F3A4;</button>';
+      }
+      // Turn off camera
+      html += '<button class="p-action-btn" onclick="vcTurnOffParticipantCam(\'' + safePid + '\')" title="Turn off camera">&#x1F4F7;</button>';
+      // Promote / Demote co-host
+      if(isCoHost) {
+        html += '<button class="p-action-btn is-host" onclick="vcDemoteHost(\'' + safePid + '\')" title="Remove host privileges">&#x1F451;</button>';
+      } else {
+        html += '<button class="p-action-btn" onclick="vcPromoteToHost(\'' + safePid + '\')" title="Give host privileges">&#x1F451;</button>';
+      }
+      // Kick
+      html += '<button class="p-action-btn" onclick="vcKickParticipant(\'' + safePid + '\')" title="Remove from meeting" style="color:var(--red);">&#x274C;</button>';
+      html += '</span>';
+    }
+
+    html += '</div>';
   });
+
   list.innerHTML = html;
 }
 
@@ -6096,33 +6539,52 @@ async function vcToggleScreen() {
     btn.classList.remove('active');
     if(localStream && localStream.getVideoTracks()[0]) {
       var camTrack = localStream.getVideoTracks()[0];
-      Object.keys(peerConnections).forEach(function(pid) {
-        var mc = peerConnections[pid].media;
-        if(mc && mc.peerConnection) {
-          var sender = mc.peerConnection.getSenders().find(function(s){return s.track && s.track.kind==='video';});
-          if(sender) sender.replaceTrack(camTrack);
-        }
-      });
+      vcReplaceVideoTrackForAll(camTrack);
     }
     var lv = document.getElementById('vc-local-video');
     if(lv && localStream) { lv.srcObject = localStream; lv.parentElement.classList.add('local'); }
+    // Notify peers that screen share stopped
+    vcBroadcastData({type:'screen-share-stopped', peerId: rtcPeer ? rtcPeer.id : ''});
     return;
   }
   try {
-    screenStream = await navigator.mediaDevices.getDisplayMedia({video:true});
+    screenStream = await navigator.mediaDevices.getDisplayMedia({video:true, audio:false});
     btn.classList.add('active');
     var sTrack = screenStream.getVideoTracks()[0];
-    Object.keys(peerConnections).forEach(function(pid) {
-      var mc = peerConnections[pid].media;
-      if(mc && mc.peerConnection) {
-        var sender = mc.peerConnection.getSenders().find(function(s){return s.track && s.track.kind==='video';});
-        if(sender) sender.replaceTrack(sTrack);
-      }
-    });
+    vcReplaceVideoTrackForAll(sTrack);
     var lv = document.getElementById('vc-local-video');
     if(lv) { lv.srcObject = screenStream; lv.parentElement.classList.remove('local'); }
+    // Notify peers that screen is being shared
+    vcBroadcastData({type:'screen-share-started', peerId: rtcPeer ? rtcPeer.id : '', name: vcCurrentUserName});
     sTrack.onended = function() { vcToggleScreen(); };
   } catch(err) { /* user cancelled */ }
+}
+
+// Helper: Replace video track in all peer media connections
+function vcReplaceVideoTrackForAll(newTrack) {
+  Object.keys(peerConnections).forEach(function(pid) {
+    var mc = peerConnections[pid].media;
+    if(!mc) return;
+    // PeerJS exposes the underlying RTCPeerConnection
+    var pc = mc.peerConnection || (mc._pc) || null;
+    if(pc && pc.getSenders) {
+      var sender = pc.getSenders().find(function(s){return s.track && s.track.kind==='video';});
+      if(sender) {
+        sender.replaceTrack(newTrack).catch(function(err) {
+          console.warn('Failed to replace track for', pid, err);
+        });
+      }
+    }
+  });
+}
+
+// Helper: Broadcast data message to all connected peers
+function vcBroadcastData(msgObj) {
+  var raw = JSON.stringify(msgObj);
+  Object.keys(dataConnections).forEach(function(pid) {
+    if(dataConnections[pid] && dataConnections[pid].open)
+      dataConnections[pid].send(raw);
+  });
 }
 
 function vcToggleHand() {
@@ -6400,6 +6862,244 @@ function sendChatMsg(role, sender) {
   input.value = '';
 }
 
+// ── Host Control: Remove Participant (Kick) ──
+function vcKickParticipant(peerId) {
+  var name = peerNames[peerId] || 'Participant';
+  if(!confirm('Remove ' + name + ' from the meeting?')) return;
+  // Send kick message to the target
+  if(dataConnections[peerId] && dataConnections[peerId].open) {
+    dataConnections[peerId].send(JSON.stringify({type:'kick'}));
+  }
+  // Notify all other peers
+  Object.keys(dataConnections).forEach(function(id) {
+    if(id !== peerId && dataConnections[id] && dataConnections[id].open)
+      dataConnections[id].send(JSON.stringify({type:'peer-kicked', peerId:peerId, name:name}));
+  });
+  // Close the connection locally
+  if(peerConnections[peerId]) {
+    if(peerConnections[peerId].media) peerConnections[peerId].media.close();
+    if(peerConnections[peerId].data) peerConnections[peerId].data.close();
+  }
+  vcRemoveVideo(peerId);
+  delete peerConnections[peerId]; delete dataConnections[peerId]; delete peerNames[peerId]; delete peerRoles[peerId]; delete mutedPeers[peerId]; delete vcCoHosts[peerId];
+  vcUpdateParticipants();
+  showToast(name + ' has been removed from the meeting');
+}
+
+// ── Host Control: Mute Individual Participant ──
+function vcMuteParticipant(peerId) {
+  if(dataConnections[peerId] && dataConnections[peerId].open) {
+    dataConnections[peerId].send(JSON.stringify({type:'force-mute'}));
+  }
+  mutedPeers[peerId] = true;
+  // Notify other peers about the mute
+  Object.keys(dataConnections).forEach(function(id) {
+    if(id !== peerId && dataConnections[id] && dataConnections[id].open)
+      dataConnections[id].send(JSON.stringify({type:'peer-muted', peerId:peerId}));
+  });
+  vcUpdateParticipants();
+  showToast((peerNames[peerId] || 'Participant') + ' has been muted');
+}
+
+// ── Host Control: Unmute Individual Participant ──
+function vcUnmuteParticipant(peerId) {
+  if(dataConnections[peerId] && dataConnections[peerId].open) {
+    dataConnections[peerId].send(JSON.stringify({type:'force-unmute'}));
+  }
+  delete mutedPeers[peerId];
+  // Notify other peers about the unmute
+  Object.keys(dataConnections).forEach(function(id) {
+    if(id !== peerId && dataConnections[id] && dataConnections[id].open)
+      dataConnections[id].send(JSON.stringify({type:'peer-unmuted', peerId:peerId}));
+  });
+  vcUpdateParticipants();
+  showToast((peerNames[peerId] || 'Participant') + ' has been unmuted');
+}
+
+// ── Host Control: Mute All Participants ──
+function vcMuteAll() {
+  Object.keys(dataConnections).forEach(function(pid) {
+    if(dataConnections[pid] && dataConnections[pid].open) {
+      dataConnections[pid].send(JSON.stringify({type:'mute-all'}));
+      mutedPeers[pid] = true;
+    }
+  });
+  vcUpdateParticipants();
+  showToast('All participants have been muted');
+}
+
+// ── Host Control: Turn Off Participant's Camera ──
+function vcTurnOffParticipantCam(peerId) {
+  if(dataConnections[peerId] && dataConnections[peerId].open) {
+    dataConnections[peerId].send(JSON.stringify({type:'force-cam-off'}));
+  }
+  showToast((peerNames[peerId] || 'Participant') + '\'s camera has been turned off');
+}
+
+// ── Host Control: Promote Participant to Co-Host ──
+function vcPromoteToHost(peerId) {
+  var name = peerNames[peerId] || 'Participant';
+  if(!confirm('Give host privileges to ' + name + '?')) return;
+  vcCoHosts[peerId] = true;
+  if(dataConnections[peerId] && dataConnections[peerId].open) {
+    dataConnections[peerId].send(JSON.stringify({type:'promote-host', by:vcCurrentUserName}));
+  }
+  vcUpdateParticipants();
+  showToast(name + ' now has host privileges');
+}
+
+// ── Host Control: Demote Co-Host ──
+function vcDemoteHost(peerId) {
+  var name = peerNames[peerId] || 'Participant';
+  delete vcCoHosts[peerId];
+  if(dataConnections[peerId] && dataConnections[peerId].open) {
+    dataConnections[peerId].send(JSON.stringify({type:'demote-host'}));
+  }
+  vcUpdateParticipants();
+  showToast(name + '\'s host privileges have been removed');
+}
+
+// ── Host Control: Refresh host control buttons after promotion/demotion ──
+function vcRefreshHostControls() {
+  var controls = document.querySelector('.video-controls');
+  if(!controls) return;
+  // Add or remove host-only buttons dynamically
+  var existingEndAll = controls.querySelector('.vc-end-all-btn');
+  var existingHostBar = document.getElementById('vc-host-bar');
+  if(isRoomHost) {
+    if(!existingEndAll) {
+      var endAllBtn = document.createElement('button');
+      endAllBtn.className = 'vc-btn danger vc-end-all-btn';
+      endAllBtn.onclick = vcEndMeetingForAll;
+      endAllBtn.title = 'End Meeting for All';
+      endAllBtn.style.cssText = 'font-size:11px;width:auto;border-radius:8px;padding:8px 14px;';
+      endAllBtn.textContent = 'End All';
+      controls.appendChild(endAllBtn);
+    }
+    if(!existingHostBar) vcInsertHostBar();
+  } else {
+    if(existingEndAll) existingEndAll.remove();
+    if(existingHostBar) existingHostBar.remove();
+  }
+}
+
+// ── Host Control: Insert host toolbar ──
+function vcInsertHostBar() {
+  var grid = document.getElementById('vc-video-grid');
+  if(!grid) return;
+  var existing = document.getElementById('vc-host-bar');
+  if(existing) return;
+  var bar = document.createElement('div');
+  bar.id = 'vc-host-bar';
+  bar.style.cssText = 'display:flex;align-items:center;gap:8px;margin-bottom:12px;flex-wrap:wrap;';
+  bar.innerHTML =
+    '<button class="vc-host-btn warning" onclick="vcMuteAll()" title="Mute all participants">&#x1F507; Mute All</button>' +
+    '<button class="vc-host-btn" onclick="vcTakeScreenshot()" title="Take meeting screenshot">&#x1F4F8; Screenshot</button>';
+  grid.parentElement.insertBefore(bar, grid);
+}
+
+// ── Screenshot: Capture meeting view ──
+function vcTakeScreenshot() {
+  var grid = document.getElementById('vc-video-grid');
+  if(!grid) { showToast('No video grid found'); return; }
+
+  var videos = grid.querySelectorAll('video');
+  if(videos.length === 0) { showToast('No video streams to capture'); return; }
+
+  // Create a canvas to composite all video tiles
+  var cols = Math.min(videos.length, 3);
+  var rows = Math.ceil(videos.length / cols);
+  var tileW = 480, tileH = 270;
+  var canvas = document.createElement('canvas');
+  canvas.width = cols * tileW;
+  canvas.height = rows * tileH;
+  var ctx = canvas.getContext('2d');
+  ctx.fillStyle = '#0c1117';
+  ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+  videos.forEach(function(video, i) {
+    var col = i % cols;
+    var row = Math.floor(i / cols);
+    var x = col * tileW;
+    var y = row * tileH;
+    try {
+      ctx.drawImage(video, x, y, tileW, tileH);
+    } catch(e) {
+      // Video may be from a different origin or not ready
+      ctx.fillStyle = '#1a2332';
+      ctx.fillRect(x, y, tileW, tileH);
+      ctx.fillStyle = '#556677';
+      ctx.font = '16px DM Sans, sans-serif';
+      ctx.textAlign = 'center';
+      ctx.fillText('Video unavailable', x + tileW/2, y + tileH/2);
+    }
+    // Draw participant name label
+    var tile = video.closest('.video-tile');
+    var label = tile ? tile.querySelector('.participant-info') : null;
+    var name = label ? label.textContent : 'Participant ' + (i+1);
+    ctx.fillStyle = 'rgba(0,0,0,0.6)';
+    ctx.fillRect(x, y + tileH - 30, tileW, 30);
+    ctx.fillStyle = '#e8edf3';
+    ctx.font = '13px DM Sans, sans-serif';
+    ctx.textAlign = 'left';
+    ctx.fillText(name, x + 10, y + tileH - 10);
+  });
+
+  // Add timestamp header
+  ctx.fillStyle = 'rgba(0,0,0,0.7)';
+  ctx.fillRect(0, 0, canvas.width, 36);
+  ctx.fillStyle = '#f0a500';
+  ctx.font = 'bold 14px DM Sans, sans-serif';
+  ctx.textAlign = 'left';
+  ctx.fillText('CESTIS Meeting — Room: ' + currentRoomCode + ' — ' + new Date().toLocaleString(), 12, 24);
+
+  // Show modal with screenshot
+  var dataUrl = canvas.toDataURL('image/png');
+  var modalHTML = '<div id="vcScreenshotModal" class="vc-screenshot-modal">' +
+    '<div class="modal-content">' +
+    '<h3 style="font-family:Playfair Display,serif;margin-bottom:16px;">Meeting Screenshot</h3>' +
+    '<img src="' + dataUrl + '" alt="Meeting Screenshot" style="width:100%;margin-bottom:16px;">' +
+    '<div style="display:flex;gap:8px;">' +
+    '<button class="btn btn-primary" onclick="vcDownloadScreenshot()" style="flex:1;">&#x1F4BE; Download</button>' +
+    '<button class="btn btn-secondary" onclick="vcCopyScreenshot()" style="flex:1;">&#x1F4CB; Copy to Clipboard</button>' +
+    '<button class="btn btn-secondary" onclick="document.getElementById(\'vcScreenshotModal\').remove()" style="flex:1;">Close</button>' +
+    '</div></div></div>';
+
+  window._vcScreenshotData = dataUrl;
+  document.body.insertAdjacentHTML('beforeend', modalHTML);
+  showToast('Screenshot captured');
+}
+
+function vcDownloadScreenshot() {
+  var dataUrl = window._vcScreenshotData;
+  if(!dataUrl) return;
+  var dateStr = new Date().toISOString().replace(/[:.]/g, '-').substring(0, 19);
+  var a = document.createElement('a');
+  a.href = dataUrl;
+  a.download = 'CESTIS_Meeting_' + (currentRoomCode || 'screenshot') + '_' + dateStr + '.png';
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  showToast('Screenshot downloaded');
+  var modal = document.getElementById('vcScreenshotModal');
+  if(modal) modal.remove();
+}
+
+function vcCopyScreenshot() {
+  var dataUrl = window._vcScreenshotData;
+  if(!dataUrl) return;
+  // Convert data URL to blob for clipboard
+  fetch(dataUrl).then(function(res){ return res.blob(); }).then(function(blob) {
+    if(navigator.clipboard && navigator.clipboard.write) {
+      navigator.clipboard.write([new ClipboardItem({'image/png': blob})]).then(function() {
+        showToast('Screenshot copied to clipboard');
+      }).catch(function() { showToast('Could not copy — download instead'); });
+    } else {
+      showToast('Clipboard not supported — download instead');
+    }
+  });
+}
+
 // ── End Meeting for All Participants (Host only) ──
 function vcEndMeetingForAll() {
   if(!confirm('Are you sure you want to end the meeting for all participants?')) return;
@@ -6438,6 +7138,7 @@ function exitVideoRoom(role) {
     if(peerConnections[pid].data) peerConnections[pid].data.close();
   });
   peerConnections = {}; dataConnections = {}; peerNames = {};
+  peerRoles = {}; mutedPeers = {}; vcCoHosts = {};
 
   if(rtcPeer) { rtcPeer.destroy(); rtcPeer = null; }
   // Note: activeHostRoom is intentionally preserved here so instructors can rejoin.
@@ -6488,6 +7189,7 @@ function createClassSession() {
   saveState();
   closeModal('createClassSessionModal');
   showToast('Class session "' + name + '" created successfully');
+  addNotification('New class session: "' + name + '"', 'calendar');
 
   // Reset form fields
   document.getElementById('csSessionName').value = '';
@@ -6582,6 +7284,7 @@ function createAssignment() {
   saveState();
   closeModal('createAssignmentModal');
   showToast('Assignment "' + title + '" created successfully');
+  addNotification('New assignment created: "' + title + '"', 'exam');
 
   // Reset form
   document.getElementById('assignTitle').value = '';
@@ -6646,6 +7349,7 @@ function uploadResource() {
   saveState();
   closeModal('uploadResourceModal');
   showToast('Resource "' + name + '" uploaded successfully');
+  addNotification('New resource uploaded: "' + name + '"', 'resource');
 
   // Reset form
   document.getElementById('resName').value = '';
@@ -6868,6 +7572,9 @@ function updateStudentStage(idx) {
   if(newStage==='incomplete')students[idx].progress=Math.min(students[idx].progress,40);
   closeModal('updateStageModal');filterStudents();updatePipelineCounts();
   showToast(`${students[idx].name} moved to ${stageLabels[newStage]}`);
+  if(newStage==='certified') addNotification('Certificate issued: ' + students[idx].name + ' — ' + students[idx].course, 'cert');
+  else if(newStage==='collected') addNotification('Certificate collected: ' + students[idx].name, 'cert');
+  else addNotification(students[idx].name + ' moved to ' + stageLabels[newStage], 'student');
   saveState();
 }
 function updatePipelineCounts() {
@@ -6881,13 +7588,12 @@ function addStudent() {
   if(!name){alert('Please enter a name');return;}
   students.unshift({id:'STU-'+String(2026000+students.length),name,stage:document.getElementById('newStudentStage').value,course:document.getElementById('newStudentCourse').value,score:'',progress:10,certNo:null,certDate:null,certCollected:false,attendance:0,assignments:0,assignmentsTotal:8,gpa:'0.0',instructor:'Mr. R. Campbell'});
   closeModal('addStudentModal');filterStudents();updatePipelineCounts();showToast(`${name} added!`);document.getElementById('newStudentName').value='';
+  addNotification('New student enrolled: ' + name + ' — ' + document.getElementById('newStudentCourse').value, 'student');
   saveState();
 
-  // Auto-merge from cloud then push the new student to all Drive folders
+  // Auto-merge from cloud to pick up students added on other devices
   if (isCloudConnected && googleAccessToken) {
-    autoSyncOnLogin().then(function() {
-      autoSaveToAllFolders();
-    });
+    autoSyncOnLogin();
   }
 }
 
@@ -7153,9 +7859,11 @@ function createExam() {
     if(newExam.title) exams[editingExamIdx].title = newExam.title;
     exams[editingExamIdx].instructions = newExam.instructions;
     showToast('Exam updated with '+newExam.questionData.length+' questions!');
+    addNotification('Exam updated: "' + exams[editingExamIdx].title + '" — ' + newExam.questionData.length + ' questions', 'exam');
   } else {
     exams.unshift(newExam);
     showToast('Exam "'+title+'" created with '+newExam.questionData.length+' questions!');
+    addNotification('New exam created: "' + title + '" — ' + newExam.questionData.length + ' questions', 'exam');
   }
 
   editingExamIdx = -1;
@@ -7194,6 +7902,7 @@ function activateExam(idx) {
   exams[idx].status = 'active';
   renderExams('upcoming');
   showToast('Exam "'+e.title+'" is now ACTIVE!');
+  addNotification('Exam activated: "' + e.title + '" — students can now take this exam', 'exam');
   saveState();
 }
 
@@ -7209,6 +7918,7 @@ function completeExam(idx) {
   }
   renderExams('active');
   showToast('Exam "'+e.title+'" marked as completed');
+  addNotification('Exam completed: "' + e.title + '"' + (exams[idx].passRate ? ' — pass rate: ' + exams[idx].passRate : ''), 'exam');
   saveState();
 }
 
@@ -7507,6 +8217,7 @@ function submitGrading() {
 
   closeGradingPanel();
   showToast('Grades saved! Final score: ' + result.score + '% — ' + (result.passed ? 'PASSED' : 'NOT PASSED'));
+  addNotification('Grading completed: ' + result.studentName + ' scored ' + result.score + '% — ' + (result.passed ? 'PASSED' : 'NOT PASSED'), result.passed ? 'grade' : 'warning');
 
   // Refresh the results view if visible
   var examIdx = exams.indexOf(exam);
@@ -7785,6 +8496,7 @@ function submitExam() {
 
   localStorage.removeItem('voctrain_examInProgress');
   currentExamSession = null;
+  addNotification(result.studentName + ' scored ' + result.score + '% on ' + (exam ? exam.title : 'exam') + (result.passed ? ' — PASSED' : result.needsReview ? ' — pending review' : ' — NOT PASSED'), result.passed ? 'grade' : result.needsReview ? 'info' : 'warning');
   saveState();
 
   // Show results
@@ -7895,7 +8607,7 @@ function renderCerts(filter,search) {
   tbody.innerHTML = certs.map(s=>`<tr><td><strong>${s.name}</strong></td><td style="font-family:monospace;font-size:12px;">${s.certNo}</td><td>${s.course}</td><td>Level ${Math.floor(Math.random()*3)+1}</td><td>${s.certDate}</td><td>${s.certCollected?'<span class="badge badge-green"><span class="badge-dot"></span>Collected</span>':'<span class="badge badge-amber"><span class="badge-dot"></span>Pending</span>'}</td><td>${!s.certCollected?`<button class="btn btn-sm btn-success" onclick="markCollected(${students.indexOf(s)})">Mark Collected</button>`:'<span style="font-size:12px;color:var(--text-muted);">✓ Done</span>'}</td></tr>`).join('');
 }
 function filterCerts() { renderCerts(document.getElementById('certFilter')?.value,document.getElementById('certSearch')?.value?.toLowerCase()); }
-function markCollected(idx) { students[idx].certCollected=true;students[idx].stage='collected';students[idx].progress=100;filterCerts();updatePipelineCounts();renderCertStats();showToast(`Certificate collected: ${students[idx].name}`);saveState(); }
+function markCollected(idx) { students[idx].certCollected=true;students[idx].stage='collected';students[idx].progress=100;filterCerts();updatePipelineCounts();renderCertStats();showToast(`Certificate collected: ${students[idx].name}`);addNotification('Certificate collected: ' + students[idx].name + ' — ' + students[idx].course, 'cert');saveState(); }
 
 function renderPassRates() {
   const progs=[{name:'Welding',rate:82},{name:'Electrical',rate:76},{name:'Cosmetology',rate:88},{name:'Business Admin',rate:71},{name:'Auto Mechanics',rate:79},{name:'Hospitality',rate:90},{name:'IT',rate:72},{name:'Plumbing',rate:84}];
@@ -8073,6 +8785,7 @@ function updateAttendanceCell(sel) {
 function saveAttendance() {
   saveState();
   showToast('Attendance saved!');
+  addNotification('Attendance records updated', 'attendance');
   const courseFilter = document.getElementById('attendanceCourseFilter')?.value || 'all';
   let records = courseFilter==='all' ? attendanceRecords : attendanceRecords.filter(r=>r.course===courseFilter);
   renderAttendanceSummary(records);
@@ -8100,6 +8813,7 @@ function createAnnouncement() {
   renderAnnouncements();
   saveState();
   showToast('Announcement published!');
+  addNotification('New announcement: "' + title + '"' + (priority==='urgent' ? ' (URGENT)' : ''), priority==='urgent' ? 'warning' : 'announce');
 }
 
 function deleteAnnouncement(id) {
@@ -8248,6 +8962,7 @@ function promptAddEvent() {
   renderCalendar();
   saveState();
   showToast('Event added!');
+  addNotification('New ' + type + ' event: "' + title + '" on ' + date, 'calendar');
 }
 
 function openModal(id) { document.getElementById(id).classList.add('active'); }
@@ -8851,6 +9566,7 @@ function finalizeImportExam() {
   saveState();
 
   showToast('Exam "' + title + '" created with ' + importedQuestions.length + ' questions from import!');
+  addNotification('New exam imported: "' + title + '" — ' + importedQuestions.length + ' questions', 'exam');
 
   // Reset import state
   importedQuestions = [];
@@ -8888,12 +9604,25 @@ let cloudFileId = null;
 let lastSavedBy = null;
 let cloudFileTimestamp = null;
 let isLoginPageSync = false;
+let loginSyncCompleted = false;
 
 // Auto-sync & auto-save state
 let _autoSaveIntervalId = null;
 let _isAutoSaving = false;
 let _autoSaveFileIds = {}; // { folderId: fileId } for tracking backup files per folder
 const AUTO_SAVE_INTERVAL_MS = 5000; // 5 seconds
+var _debouncedCloudSaveTimer = null;
+
+// Debounced immediate cloud push — called by saveState() and saveUserAccounts()
+// so ANY dashboard data change triggers a cloud save within 2 seconds
+function scheduleDebouncedCloudSave() {
+  if (!isCloudConnected || !googleAccessToken) return;
+  if (_debouncedCloudSaveTimer) clearTimeout(_debouncedCloudSaveTimer);
+  _debouncedCloudSaveTimer = setTimeout(function() {
+    _debouncedCloudSaveTimer = null;
+    autoSaveToAllFolders();
+  }, 2000);
+}
 const ALL_DRIVE_FOLDERS = [
   { id: '1lNpI00Et1BN5c4eaV5WfQwuQVhCMBtv8', label: 'Main Backup' },
   { id: '18ACBw0kRi0BssLEoZLWoeXNa1EiANeBu', label: 'Online Exams' },
@@ -10222,6 +10951,9 @@ function getTimeAgo(date) {
 initializeCloudSync();
 setTimeout(() => { initGoogleAuth(); }, 500);
 
+// Disable login buttons until pre-login sync completes
+setTimeout(function() { if(!loginSyncCompleted) disableLoginButtons(); }, 100);
+
 // ============================================
 // PRE-LOGIN CLOUD SYNC (Landing Page)
 // ============================================
@@ -10340,6 +11072,10 @@ async function loginPageSync() {
     } else {
       updateLoginSyncStatus('Sync complete! You may now log in.', 'success');
     }
+
+    // Unlock login — sync completed successfully
+    loginSyncCompleted = true;
+    enableLoginButtons();
 
     console.log('[LoginSync] Pre-login sync complete. Folders synced: ' + foldersSynced + ', Data changed in: ' + totalMerged);
   } catch (err) {
@@ -10474,7 +11210,7 @@ function lmsChatRenderRoomList(prefix) {
   rooms.forEach(function(room) {
     var msgs = lmsChatMessages[room.id] || [];
     var lastMsg = msgs.length ? msgs[msgs.length-1] : null;
-    var lastText = lastMsg ? (lastMsg.type === 'file' ? '\uD83D\uDCCE '+lastMsg.fileName : lastMsg.text) : 'No messages yet';
+    var lastText = lastMsg ? (lastMsg.type === 'file' ? '\uD83D\uDCCE '+lastMsg.fileName : lastMsg.type === 'image' ? '\uD83D\uDDBC\uFE0F Photo' : lastMsg.type === 'poll' ? '\uD83D\uDCCA Poll: '+lastMsg.pollQuestion : lastMsg.text) : 'No messages yet';
     var lastTime = lastMsg ? lmsChatFormatTime(lastMsg.timestamp) : '';
     var unread = lmsChatCountUnread(room.id);
     var isActive = lmsChatActiveRoom === room.id ? ' active' : '';
@@ -10624,8 +11360,16 @@ function lmsChatRenderMessages(prefix) {
       html += '<div class="msg-file-size">'+lmsChatFormatFileSize(msg.fileSize||0)+'</div></div></div>';
       if(msg.text) html += '<div class="msg-text">'+lmsChatEscapeHtml(msg.text)+'</div>';
     } else if(msg.type === 'image') {
-      html += '<img class="msg-img" src="'+msg.imageData+'" onclick="window.open(this.src)" alt="shared image">';
+      var imgSrc = msg.imageData || msg.imageUrl || (msg.driveFileId ? 'https://drive.google.com/thumbnail?id='+msg.driveFileId+'&sz=w800' : '') || msg.fileUrl || '';
+      if(imgSrc) {
+        html += '<img class="msg-img" src="'+imgSrc+'" onclick="lmsChatOpenImage(\''+msg.id+'\')" alt="shared image" onerror="this.onerror=null;this.style.display=\'none\';this.nextElementSibling&&this.nextElementSibling.classList.contains(\'msg-img-error\')&&(this.nextElementSibling.style.display=\'flex\');">';
+        html += '<div class="msg-img-error" style="display:none;">&#128444;&#65039; Image could not be loaded</div>';
+      } else {
+        html += '<div class="msg-img-error">&#128444;&#65039; Image not available</div>';
+      }
       if(msg.text) html += '<div class="msg-text">'+lmsChatEscapeHtml(msg.text)+'</div>';
+    } else if(msg.type === 'poll') {
+      html += lmsChatRenderPoll(msg, user);
     } else if(msg.type === 'call') {
       html += '<div class="msg-text" style="font-style:italic;opacity:0.8;">'+lmsChatEscapeHtml(msg.text)+'</div>';
     } else {
@@ -10823,7 +11567,7 @@ async function lmsChatUploadFileToDrive(file, msgId) {
     formData.append('metadata', new Blob([JSON.stringify(metadata)], {type:'application/json'}));
     formData.append('file', file);
 
-    var resp = await fetch('https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart&fields=id,name,webViewLink', {
+    var resp = await fetch('https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart&fields=id,name,webViewLink,webContentLink', {
       method: 'POST',
       headers: { 'Authorization': 'Bearer ' + googleAccessToken },
       body: formData
@@ -10831,16 +11575,31 @@ async function lmsChatUploadFileToDrive(file, msgId) {
 
     if(resp.ok) {
       var result = await resp.json();
-      // Update message with Drive link
+      // Make file publicly accessible so images can be displayed inline
+      try {
+        await fetch('https://www.googleapis.com/drive/v3/files/' + result.id + '/permissions', {
+          method: 'POST',
+          headers: { 'Authorization': 'Bearer ' + googleAccessToken, 'Content-Type': 'application/json' },
+          body: JSON.stringify({ role: 'reader', type: 'anyone' })
+        });
+      } catch(permErr) { console.warn('Could not set public permission on Drive file:', permErr); }
+      // Update message with Drive link and direct image URL
+      var isImage = file.type.startsWith('image/');
       Object.keys(lmsChatMessages).forEach(function(roomId) {
         lmsChatMessages[roomId].forEach(function(m) {
           if(m.id === msgId) {
             m.fileUrl = result.webViewLink || ('https://drive.google.com/file/d/' + result.id + '/view');
             m.driveFileId = result.id;
+            if(isImage) {
+              m.imageUrl = 'https://drive.google.com/thumbnail?id=' + result.id + '&sz=w800';
+            }
           }
         });
       });
       saveLmsChatData();
+      // Re-render so Drive URL appears for images
+      var prefix = lmsChatGetRolePrefix();
+      if(prefix) lmsChatRenderMessages(prefix);
     }
   } catch(err) {
     console.error('Chat file upload to Drive failed:', err);
@@ -10861,6 +11620,215 @@ function lmsChatDownloadFile(url, name) {
       link.click();
     }
   }
+}
+
+function lmsChatOpenImage(msgId) {
+  // Find message across all rooms
+  var msg = null;
+  var rooms = Object.keys(lmsChatMessages);
+  for(var i = 0; i < rooms.length; i++) {
+    var msgs = lmsChatMessages[rooms[i]] || [];
+    msg = msgs.find(function(m){ return m.id === msgId; });
+    if(msg) break;
+  }
+  if(!msg) return;
+
+  // Try best viewable URL: base64 in-memory > Drive viewer > fileUrl > current img src
+  if(msg.imageData) {
+    window.open(msg.imageData, '_blank');
+  } else if(msg.driveFileId) {
+    window.open('https://drive.google.com/file/d/' + msg.driveFileId + '/view', '_blank');
+  } else if(msg.imageUrl && msg.imageUrl.startsWith('http')) {
+    window.open(msg.imageUrl, '_blank');
+  } else if(msg.fileUrl && msg.fileUrl.startsWith('http')) {
+    window.open(msg.fileUrl, '_blank');
+  }
+}
+
+// ============================== CHAT POLLS ==============================
+
+var _lmsChatPollPrefix = null;
+
+function lmsChatOpenPollModal(prefix) {
+  _lmsChatPollPrefix = prefix;
+  if(!lmsChatActiveRoom) { alert('Please select a chat first.'); return; }
+
+  var modal = document.getElementById('lmsChatPollModal');
+  if(!modal) {
+    modal = document.createElement('div');
+    modal.id = 'lmsChatPollModal';
+    modal.className = 'lms-poll-modal';
+    document.body.appendChild(modal);
+  }
+
+  modal.innerHTML = '<div class="lms-poll-modal-content">' +
+    '<h3>&#128202; Create Poll</h3>' +
+    '<label>Question</label>' +
+    '<input type="text" id="lmsPollQuestion" placeholder="Ask a question...">' +
+    '<label>Options</label>' +
+    '<div class="lms-poll-options-list" id="lmsPollOptionsList">' +
+      '<div class="lms-poll-option-row"><input type="text" placeholder="Option 1" class="poll-opt-input"><button onclick="lmsChatRemovePollOption(this)" title="Remove">&times;</button></div>' +
+      '<div class="lms-poll-option-row"><input type="text" placeholder="Option 2" class="poll-opt-input"><button onclick="lmsChatRemovePollOption(this)" title="Remove">&times;</button></div>' +
+    '</div>' +
+    '<button class="lms-poll-add-option" onclick="lmsChatAddPollOption()">+ Add Option</button>' +
+    '<div style="margin-bottom:16px;">' +
+      '<label style="display:flex;align-items:center;gap:8px;cursor:pointer;text-transform:none;letter-spacing:0;font-size:13px;color:var(--text-secondary);">' +
+        '<input type="checkbox" id="lmsPollMultiSelect" style="accent-color:var(--accent);width:16px;height:16px;">' +
+        'Allow multiple selections' +
+      '</label>' +
+    '</div>' +
+    '<div class="lms-poll-modal-actions">' +
+      '<button class="btn btn-secondary" onclick="lmsChatClosePollModal()">Cancel</button>' +
+      '<button class="btn btn-primary" onclick="lmsChatSendPoll()">Send Poll</button>' +
+    '</div>' +
+  '</div>';
+
+  modal.classList.add('active');
+  setTimeout(function() { document.getElementById('lmsPollQuestion').focus(); }, 100);
+}
+
+function lmsChatClosePollModal() {
+  var modal = document.getElementById('lmsChatPollModal');
+  if(modal) modal.classList.remove('active');
+}
+
+function lmsChatAddPollOption() {
+  var list = document.getElementById('lmsPollOptionsList');
+  if(!list) return;
+  var count = list.querySelectorAll('.lms-poll-option-row').length;
+  if(count >= 10) { alert('Maximum 10 options allowed.'); return; }
+  var row = document.createElement('div');
+  row.className = 'lms-poll-option-row';
+  row.innerHTML = '<input type="text" placeholder="Option '+(count+1)+'" class="poll-opt-input"><button onclick="lmsChatRemovePollOption(this)" title="Remove">&times;</button>';
+  list.appendChild(row);
+  row.querySelector('input').focus();
+}
+
+function lmsChatRemovePollOption(btn) {
+  var list = document.getElementById('lmsPollOptionsList');
+  if(!list) return;
+  if(list.querySelectorAll('.lms-poll-option-row').length <= 2) {
+    alert('A poll must have at least 2 options.');
+    return;
+  }
+  btn.parentElement.remove();
+}
+
+function lmsChatSendPoll() {
+  var question = document.getElementById('lmsPollQuestion').value.trim();
+  if(!question) { alert('Please enter a question.'); return; }
+
+  var inputs = document.querySelectorAll('#lmsPollOptionsList .poll-opt-input');
+  var options = [];
+  inputs.forEach(function(inp) {
+    var val = inp.value.trim();
+    if(val) options.push(val);
+  });
+
+  if(options.length < 2) { alert('Please provide at least 2 options.'); return; }
+
+  var multiSelect = document.getElementById('lmsPollMultiSelect').checked;
+  var user = lmsChatGetCurrentUser();
+
+  var pollOptions = options.map(function(text) {
+    return { text: text, votes: [] };
+  });
+
+  var msg = {
+    id: 'msg-' + Date.now() + '-' + Math.random().toString(36).substr(2,6),
+    roomId: lmsChatActiveRoom,
+    senderId: user.id,
+    senderName: user.name,
+    text: '',
+    type: 'poll',
+    timestamp: new Date().toISOString(),
+    readBy: [user.id],
+    pollQuestion: question,
+    pollOptions: pollOptions,
+    pollMultiSelect: multiSelect
+  };
+
+  if(!lmsChatMessages[lmsChatActiveRoom]) lmsChatMessages[lmsChatActiveRoom] = [];
+  lmsChatMessages[lmsChatActiveRoom].push(msg);
+  saveLmsChatData();
+
+  lmsChatClosePollModal();
+  var prefix = _lmsChatPollPrefix || lmsChatGetRolePrefix();
+  lmsChatRenderMessages(prefix);
+  lmsChatRenderRoomList(prefix);
+
+  var msgContainer = document.getElementById(prefix+'ChatMessages');
+  if(msgContainer) setTimeout(function(){ msgContainer.scrollTop = msgContainer.scrollHeight; }, 50);
+}
+
+function lmsChatVotePoll(msgId, optionIdx) {
+  if(!lmsChatActiveRoom) return;
+  var msgs = lmsChatMessages[lmsChatActiveRoom] || [];
+  var msg = msgs.find(function(m){ return m.id === msgId; });
+  if(!msg || msg.type !== 'poll') return;
+
+  var user = lmsChatGetCurrentUser();
+  var opt = msg.pollOptions[optionIdx];
+  if(!opt) return;
+
+  var alreadyVoted = opt.votes.indexOf(user.id) !== -1;
+
+  if(alreadyVoted) {
+    // Remove vote (toggle off)
+    opt.votes = opt.votes.filter(function(v){ return v !== user.id; });
+  } else {
+    if(!msg.pollMultiSelect) {
+      // Single select: remove vote from all other options first
+      msg.pollOptions.forEach(function(o) {
+        o.votes = o.votes.filter(function(v){ return v !== user.id; });
+      });
+    }
+    opt.votes.push(user.id);
+  }
+
+  saveLmsChatData();
+  var prefix = lmsChatGetRolePrefix();
+  lmsChatRenderMessages(prefix);
+}
+
+function lmsChatRenderPoll(msg, currentUser) {
+  var totalVoters = [];
+  msg.pollOptions.forEach(function(opt) {
+    opt.votes.forEach(function(v) {
+      if(totalVoters.indexOf(v) === -1) totalVoters.push(v);
+    });
+  });
+  var totalVotes = totalVoters.length;
+  var userHasVoted = totalVoters.indexOf(currentUser.id) !== -1;
+
+  var html = '<div class="lms-chat-poll">';
+  html += '<div class="lms-chat-poll-question"><span class="lms-chat-poll-icon">&#128202;</span>' + lmsChatEscapeHtml(msg.pollQuestion) + '</div>';
+
+  msg.pollOptions.forEach(function(opt, idx) {
+    var voteCount = opt.votes.length;
+    var pct = totalVotes > 0 ? Math.round((voteCount / totalVotes) * 100) : 0;
+    var isMyVote = opt.votes.indexOf(currentUser.id) !== -1;
+
+    html += '<div class="lms-chat-poll-option' + (isMyVote ? ' my-vote' : (userHasVoted ? ' voted' : '')) + '" onclick="lmsChatVotePoll(\'' + msg.id + '\',' + idx + ')">';
+    if(userHasVoted) {
+      html += '<div class="lms-chat-poll-bar" style="width:' + pct + '%"></div>';
+    }
+    html += '<span class="lms-chat-poll-option-text">' + lmsChatEscapeHtml(opt.text) + '</span>';
+    if(isMyVote) {
+      html += '<span class="lms-chat-poll-option-check">&#10003;</span>';
+    }
+    if(userHasVoted) {
+      html += '<span class="lms-chat-poll-option-pct">' + pct + '%</span>';
+    }
+    html += '</div>';
+  });
+
+  html += '<div class="lms-chat-poll-footer">';
+  html += '<span>' + totalVotes + ' vote' + (totalVotes !== 1 ? 's' : '') + '</span>';
+  html += '<span>' + (msg.pollMultiSelect ? 'Multiple choice' : 'Single choice') + '</span>';
+  html += '</div>';
+  html += '</div>';
+  return html;
 }
 
 // Profile picture and status
@@ -11564,6 +12532,12 @@ function lmsEmojiClickOutside(e) {
   if(picker.contains(e.target)) return;
   // Check if clicked the emoji button itself
   if(e.target.closest && e.target.closest('.emoji-btn')) return;
+  // Check if click landed within the picker's bounding rect — handles the case
+  // where innerHTML replacement detaches the original e.target from the DOM
+  // (e.g. clicking a category button re-renders the picker content)
+  var rect = picker.getBoundingClientRect();
+  if(e.clientX >= rect.left && e.clientX <= rect.right &&
+     e.clientY >= rect.top  && e.clientY <= rect.bottom) return;
   picker.classList.remove('open');
   document.removeEventListener('click', lmsEmojiClickOutside);
 }
