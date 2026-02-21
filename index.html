@@ -1671,6 +1671,55 @@ textarea.form-control { resize:vertical; min-height:80px; }
   max-width:480px; width:90%; padding:24px; box-shadow:0 20px 60px rgba(0,0,0,0.5);
 }
 
+/* ============================== HOST CONTROLS & PARTICIPANT MANAGEMENT ============================== */
+.vc-host-controls {
+  display:flex; align-items:center; gap:8px; margin-left:auto;
+}
+.vc-host-btn {
+  padding:6px 12px; border-radius:var(--radius-sm); font-size:11px; font-weight:600;
+  border:1px solid var(--border-light); background:rgba(255,255,255,0.06);
+  color:var(--text-secondary); cursor:pointer; transition:all var(--transition);
+  display:flex; align-items:center; gap:5px; white-space:nowrap;
+}
+.vc-host-btn:hover { background:rgba(255,255,255,0.12); color:var(--text-primary); }
+.vc-host-btn.danger { border-color:rgba(231,76,60,0.3); color:var(--red); }
+.vc-host-btn.danger:hover { background:rgba(231,76,60,0.15); }
+.vc-host-btn.warning { border-color:rgba(240,165,0,0.3); color:var(--accent); }
+.vc-host-btn.warning:hover { background:rgba(240,165,0,0.15); }
+.vc-participant-item {
+  display:flex; align-items:center; gap:8px; padding:8px 10px;
+  border:1px solid var(--border); border-radius:var(--radius-sm);
+  margin-bottom:6px; transition:all var(--transition);
+}
+.vc-participant-item:hover { background:rgba(255,255,255,0.03); }
+.vc-participant-item .p-name { flex:1; font-size:12px; font-weight:600; }
+.vc-participant-item .p-role { font-size:10px; color:var(--text-muted); }
+.vc-participant-item .p-actions { display:flex; gap:4px; }
+.vc-participant-item .p-action-btn {
+  width:26px; height:26px; border-radius:50%; border:1px solid var(--border);
+  background:transparent; color:var(--text-muted); cursor:pointer;
+  display:flex; align-items:center; justify-content:center; font-size:12px;
+  transition:all var(--transition);
+}
+.vc-participant-item .p-action-btn:hover { background:rgba(255,255,255,0.1); color:var(--text-primary); }
+.vc-participant-item .p-action-btn.muted { background:rgba(231,76,60,0.15); color:var(--red); border-color:rgba(231,76,60,0.3); }
+.vc-participant-item .p-action-btn.is-host { background:rgba(240,165,0,0.15); color:var(--accent); border-color:rgba(240,165,0,0.3); }
+.vc-host-badge {
+  font-size:9px; padding:2px 6px; border-radius:4px;
+  background:rgba(240,165,0,0.15); color:var(--accent); font-weight:700;
+}
+.vc-screenshot-modal {
+  position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.7);
+  display:flex; align-items:center; justify-content:center; z-index:10000;
+}
+.vc-screenshot-modal .modal-content {
+  background:var(--bg-card); border-radius:var(--radius-lg); border:1px solid var(--border-light);
+  max-width:800px; width:90%; padding:24px; box-shadow:0 20px 60px rgba(0,0,0,0.5);
+}
+.vc-screenshot-modal canvas, .vc-screenshot-modal img {
+  max-width:100%; border-radius:var(--radius); border:1px solid var(--border);
+}
+
 /* ============================== GMAIL REGISTRATION & VERIFY USERS ============================== */
 .gmail-divider {
   display:flex; align-items:center; gap:12px; margin:12px 0 8px;
@@ -2971,6 +3020,9 @@ let vcCurrentRole = '';
 let vcCurrentUserName = '';
 let activeHostRoom = null; // {code, title, role} - persists when host leaves so they can rejoin
 let vcHostReconnectInterval = null; // interval for participants to reconnect to host
+let peerRoles = {}; // track roles: {peerId: 'student'|'instructor'|'admin'}
+let mutedPeers = {}; // track muted peers: {peerId: true}
+let vcCoHosts = {}; // track co-hosts: {peerId: true}
 let calendarMonth = 1;
 let calendarYear = 2026;
 let selectedCalendarDay = null;
@@ -4199,6 +4251,7 @@ function vcCleanupMediaIfNeeded() {
     if(peerConnections[pid].data) peerConnections[pid].data.close();
   });
   peerConnections = {}; dataConnections = {}; peerNames = {};
+  peerRoles = {}; mutedPeers = {}; vcCoHosts = {};
   if(rtcPeer) { rtcPeer.destroy(); rtcPeer = null; }
   if(vcRecordingAudioCtx) { try { vcRecordingAudioCtx.close(); } catch(e){} vcRecordingAudioCtx = null; }
   if(vcIsRecording && vcMediaRecorder && vcMediaRecorder.state !== 'inactive') { vcMediaRecorder.stop(); }
@@ -6038,7 +6091,7 @@ function vcHandleDataConn(conn) {
 
     conn.on('data', function(data) { vcOnData(data, pid); });
     conn.on('close', function() {
-      vcRemoveVideo(pid); delete peerConnections[pid]; delete dataConnections[pid]; delete peerNames[pid];
+      vcRemoveVideo(pid); delete peerConnections[pid]; delete dataConnections[pid]; delete peerNames[pid]; delete peerRoles[pid]; delete mutedPeers[pid]; delete vcCoHosts[pid];
       vcUpdateParticipants();
       if(isRoomHost) {
         Object.keys(dataConnections).forEach(function(id) {
@@ -6056,6 +6109,7 @@ function vcOnData(raw, fromId) {
   switch(msg.type) {
     case 'name':
       peerNames[fromId] = msg.name;
+      peerRoles[fromId] = msg.role || 'student';
       vcUpdateVideoLabel(fromId, msg.name + (msg.role==='instructor'?' (Instructor)':msg.role==='admin'?' (Admin)':''));
       vcUpdateParticipants();
       if(isRoomHost) {
@@ -6067,6 +6121,7 @@ function vcOnData(raw, fromId) {
       break;
     case 'peer-name':
       peerNames[msg.peerId] = msg.name;
+      peerRoles[msg.peerId] = msg.role || 'student';
       vcUpdateVideoLabel(msg.peerId, msg.name + (msg.role==='instructor'?' (Instructor)':msg.role==='admin'?' (Admin)':''));
       vcUpdateParticipants();
       break;
@@ -6077,7 +6132,7 @@ function vcOnData(raw, fromId) {
       vcConnectToPeer(msg.peerId, msg.name);
       break;
     case 'peer-left':
-      vcRemoveVideo(msg.peerId); delete peerConnections[msg.peerId]; delete dataConnections[msg.peerId]; delete peerNames[msg.peerId];
+      vcRemoveVideo(msg.peerId); delete peerConnections[msg.peerId]; delete dataConnections[msg.peerId]; delete peerNames[msg.peerId]; delete peerRoles[msg.peerId]; delete mutedPeers[msg.peerId]; delete vcCoHosts[msg.peerId];
       vcUpdateParticipants();
       break;
     case 'chat':
@@ -6090,6 +6145,92 @@ function vcOnData(raw, fromId) {
       vcStopHostReconnect();
       alert('The meeting has been ended by the host.');
       exitVideoRoom(vcCurrentRole);
+      break;
+    // ── Host Control Messages ──
+    case 'kick':
+      // Participant receives this when they are kicked
+      vcStopHostReconnect();
+      alert('You have been removed from the meeting by the host.');
+      exitVideoRoom(vcCurrentRole);
+      break;
+    case 'force-mute':
+      // Host tells a participant to mute their mic
+      if(localStream) {
+        localStream.getAudioTracks().forEach(function(t){ t.enabled = false; });
+        var micBtn = document.getElementById('vc-mic-btn');
+        if(micBtn) micBtn.classList.remove('active');
+      }
+      showToast('Your microphone has been muted by the host');
+      break;
+    case 'force-unmute':
+      // Host tells a participant they are unmuted (enables the track)
+      if(localStream) {
+        localStream.getAudioTracks().forEach(function(t){ t.enabled = true; });
+        var micBtn2 = document.getElementById('vc-mic-btn');
+        if(micBtn2) micBtn2.classList.add('active');
+      }
+      showToast('Your microphone has been unmuted by the host');
+      break;
+    case 'mute-all':
+      // Host tells all participants to mute their mics
+      if(localStream) {
+        localStream.getAudioTracks().forEach(function(t){ t.enabled = false; });
+        var micBtn3 = document.getElementById('vc-mic-btn');
+        if(micBtn3) micBtn3.classList.remove('active');
+      }
+      showToast('All participants have been muted by the host');
+      break;
+    case 'force-cam-off':
+      // Host tells a participant to turn off their camera
+      if(localStream) {
+        localStream.getVideoTracks().forEach(function(t){ t.enabled = false; });
+        var camBtn = document.getElementById('vc-cam-btn');
+        if(camBtn) camBtn.classList.remove('active');
+        var lv = document.getElementById('vc-local-video');
+        if(lv) lv.style.opacity = '0.15';
+      }
+      showToast('Your camera has been turned off by the host');
+      break;
+    case 'promote-host':
+      // This participant is promoted to co-host
+      isRoomHost = true;
+      showToast('You have been given host privileges by ' + (msg.by || 'the host'));
+      vcUpdateParticipants();
+      vcRefreshHostControls();
+      break;
+    case 'demote-host':
+      // This participant is demoted from co-host
+      isRoomHost = false;
+      showToast('Your host privileges have been removed');
+      vcUpdateParticipants();
+      vcRefreshHostControls();
+      break;
+    case 'peer-kicked':
+      // Host notifies everyone that a peer was kicked
+      vcRemoveVideo(msg.peerId); delete peerConnections[msg.peerId]; delete dataConnections[msg.peerId]; delete peerNames[msg.peerId]; delete peerRoles[msg.peerId]; delete mutedPeers[msg.peerId];
+      vcUpdateParticipants();
+      showToast((msg.name || 'A participant') + ' was removed by the host');
+      break;
+    case 'peer-muted':
+      // Notification that a peer was muted (for UI update)
+      mutedPeers[msg.peerId] = true;
+      vcUpdateParticipants();
+      break;
+    case 'peer-unmuted':
+      // Notification that a peer was unmuted (for UI update)
+      delete mutedPeers[msg.peerId];
+      vcUpdateParticipants();
+      break;
+    case 'screen-share-started':
+      // A peer started sharing their screen — highlight their video tile
+      var shareTile = document.getElementById('vc-tile-'+sanitizePeerId(msg.peerId));
+      if(shareTile) { shareTile.classList.add('screen-share'); }
+      showToast((msg.name || 'A participant') + ' is sharing their screen');
+      break;
+    case 'screen-share-stopped':
+      // A peer stopped sharing their screen
+      var unshareTile = document.getElementById('vc-tile-'+sanitizePeerId(msg.peerId));
+      if(unshareTile) { unshareTile.classList.remove('screen-share'); }
       break;
   }
 }
@@ -6106,19 +6247,46 @@ function vcConnectToPeer(peerId, name) {
     dataConnections[peerId] = conn;
     conn.send(JSON.stringify({type:'name', name:vcCurrentUserName, role:vcCurrentRole}));
     conn.on('data', function(data) { vcOnData(data, peerId); });
-    conn.on('close', function() { vcRemoveVideo(peerId); delete peerConnections[peerId]; delete dataConnections[peerId]; vcUpdateParticipants(); });
+    conn.on('close', function() { vcRemoveVideo(peerId); delete peerConnections[peerId]; delete dataConnections[peerId]; delete peerRoles[peerId]; vcUpdateParticipants(); });
+  });
+  conn.on('error', function(err) {
+    console.warn('Data connection to', peerId, 'failed:', err);
   });
 
-  if(localStream) {
-    var call = rtcPeer.call(peerId, localStream);
-    call.on('stream', function(rs) {
-      if(!peerConnections[peerId]) peerConnections[peerId] = {};
-      peerConnections[peerId].media = call;
-      peerConnections[peerId].stream = rs;
-      vcAddVideo(peerId, rs, name);
-    });
-    call.on('close', function() { vcRemoveVideo(peerId); });
+  // Establish media connection with retry logic
+  vcCallPeerWithRetry(peerId, name, 0);
+}
+
+function vcCallPeerWithRetry(peerId, name, attempt) {
+  if(!localStream || !rtcPeer || rtcPeer.destroyed) return;
+  if(attempt > 2) return; // max 3 attempts
+
+  var call = rtcPeer.call(peerId, localStream);
+  if(!call) {
+    setTimeout(function() { vcCallPeerWithRetry(peerId, name, attempt + 1); }, 2000 * (attempt + 1));
+    return;
   }
+  var streamReceived = false;
+  call.on('stream', function(rs) {
+    streamReceived = true;
+    if(!peerConnections[peerId]) peerConnections[peerId] = {};
+    peerConnections[peerId].media = call;
+    peerConnections[peerId].stream = rs;
+    vcAddVideo(peerId, rs, name);
+  });
+  call.on('close', function() { vcRemoveVideo(peerId); });
+  call.on('error', function(err) {
+    console.warn('Media call to', peerId, 'failed:', err);
+    if(!streamReceived && attempt < 2) {
+      setTimeout(function() { vcCallPeerWithRetry(peerId, name, attempt + 1); }, 2000 * (attempt + 1));
+    }
+  });
+  // If no stream received after 5s, retry
+  setTimeout(function() {
+    if(!streamReceived && attempt < 2) {
+      vcCallPeerWithRetry(peerId, name, attempt + 1);
+    }
+  }, 5000 * (attempt + 1));
 }
 
 // ── Show Conference View ──
@@ -6126,9 +6294,10 @@ function vcShowConference(title, role) {
   var containerId = role==='admin' ? 'videoRoom' : role==='instructor' ? 'iVideoRoom' : 'sVideoRoom';
   var room = document.getElementById(containerId);
   var userName = vcCurrentUserName;
+  var showHostControls = isRoomHost && (role==='instructor' || role==='admin');
 
   room.innerHTML = `
-    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px;">
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px;flex-wrap:wrap;gap:8px;">
       <div style="display:flex;align-items:center;gap:12px;">
         <button class="btn btn-secondary btn-sm" onclick="exitVideoRoom('${role}')">&#8592; Leave</button>
         <h3 style="font-family:'Playfair Display',serif;">${title}</h3>
@@ -6140,12 +6309,19 @@ function vcShowConference(title, role) {
         <div style="font-size:13px;color:var(--text-muted);" id="vTimer-${role}">00:00:00</div>
       </div>
     </div>
+    ${showHostControls ? `
+    <div id="vc-host-bar" style="display:flex;align-items:center;gap:8px;margin-bottom:12px;flex-wrap:wrap;padding:10px;background:rgba(240,165,0,0.06);border:1px solid rgba(240,165,0,0.15);border-radius:var(--radius-sm);">
+      <span style="font-size:11px;font-weight:700;color:var(--accent);margin-right:4px;">HOST CONTROLS:</span>
+      <button class="vc-host-btn warning" onclick="vcMuteAll()" title="Mute all participants">&#x1F507; Mute All</button>
+      <button class="vc-host-btn" onclick="vcTakeScreenshot()" title="Take meeting screenshot">&#x1F4F8; Screenshot</button>
+    </div>
+    ` : ''}
     <div class="grid-sidebar">
       <div>
         <div class="video-grid" id="vc-video-grid">
           <div class="video-tile local" id="vc-tile-local" style="border:2px solid var(--accent);">
             <video id="vc-local-video" autoplay muted playsinline></video>
-            <div class="participant-info">${userName} (You)</div>
+            <div class="participant-info">${userName} (You)${isRoomHost ? ' <span class="vc-host-badge">HOST</span>' : ''}</div>
           </div>
         </div>
         <div class="video-controls" style="margin-top:12px;">
@@ -6156,8 +6332,8 @@ function vcShowConference(title, role) {
             ? `<button class="vc-btn" id="vc-hand-btn" onclick="vcToggleHand()" title="Raise Hand">&#x270B;</button>`
             : `<button class="vc-btn" id="vc-rec-btn" onclick="vcToggleRecord()" title="Record Session">&#x23FA;&#xFE0F;</button>`}
           <button class="vc-btn danger" onclick="exitVideoRoom('${role}')" title="Leave Call">&#x1F4DE;</button>
-          ${(role==='instructor' || role==='admin') && isRoomHost
-            ? `<button class="vc-btn danger" onclick="vcEndMeetingForAll()" title="End Meeting for All" style="font-size:11px;width:auto;border-radius:8px;padding:8px 14px;">End All</button>`
+          ${showHostControls
+            ? `<button class="vc-btn danger vc-end-all-btn" onclick="vcEndMeetingForAll()" title="End Meeting for All" style="font-size:11px;width:auto;border-radius:8px;padding:8px 14px;">End All</button>`
             : ''}
         </div>
       </div>
@@ -6174,9 +6350,7 @@ function vcShowConference(title, role) {
         </div>
         <div class="card" style="margin-top:12px;padding:14px;">
           <h4 style="font-size:13px;margin-bottom:10px;" id="vc-part-title">Participants (1)</h4>
-          <div style="display:flex;flex-wrap:wrap;gap:6px;" id="vc-part-list">
-            <span class="badge badge-green" style="font-size:10px;">${userName} (You)</span>
-          </div>
+          <div id="vc-part-list"></div>
         </div>
       </div>
     </div>
@@ -6184,6 +6358,9 @@ function vcShowConference(title, role) {
 
   var lv = document.getElementById('vc-local-video');
   if(lv && localStream) lv.srcObject = localStream;
+
+  // Initialize participant list
+  vcUpdateParticipants();
 
   videoSeconds = 0;
   if(videoTimerInterval) clearInterval(videoTimerInterval);
@@ -6199,7 +6376,11 @@ function vcShowConference(title, role) {
 function vcAddVideo(peerId, stream, name) {
   var safeId = sanitizePeerId(peerId);
   var existing = document.getElementById('vc-vid-'+safeId);
-  if(existing) { existing.srcObject = stream; return; }
+  if(existing) {
+    existing.srcObject = stream;
+    existing.play().catch(function(){});
+    return;
+  }
 
   var grid = document.getElementById('vc-video-grid');
   if(!grid) return;
@@ -6212,8 +6393,23 @@ function vcAddVideo(peerId, stream, name) {
   video.id = 'vc-vid-'+safeId;
   video.autoplay = true;
   video.playsInline = true;
+  video.setAttribute('playsinline', '');
   video.srcObject = stream;
   video.style.cssText = 'width:100%;height:100%;object-fit:cover;border-radius:var(--radius);';
+
+  // Ensure playback starts even if autoplay is restricted
+  video.play().catch(function() {
+    // Autoplay was prevented — add click-to-play handler
+    video.muted = true;
+    video.play().catch(function(){});
+    setTimeout(function() { video.muted = false; video.play().catch(function(){}); }, 1000);
+  });
+
+  // Listen for new tracks being added to the stream
+  stream.onaddtrack = function() {
+    video.srcObject = stream;
+    video.play().catch(function(){});
+  };
 
   var info = document.createElement('div');
   info.className = 'participant-info';
@@ -6245,10 +6441,56 @@ function vcUpdateParticipants() {
   if(!list) return;
   var count = Object.keys(peerNames).length + 1;
   if(title) title.textContent = 'Participants (' + count + ')';
-  var html = '<span class="badge badge-green" style="font-size:10px;">' + vcCurrentUserName + ' (You)</span>';
+
+  var canControl = isRoomHost || vcCoHosts[rtcPeer ? rtcPeer.id : ''];
+
+  // Build self entry
+  var html = '<div class="vc-participant-item" style="border-color:var(--accent);">' +
+    '<span class="p-name" style="color:var(--accent);">' + vcCurrentUserName + ' (You)' +
+    (isRoomHost ? ' <span class="vc-host-badge">HOST</span>' : '') +
+    '</span>' +
+    '<span class="p-role" style="color:var(--text-muted);">' + vcCurrentRole + '</span>' +
+    '</div>';
+
+  // Build entries for each remote peer
   Object.keys(peerNames).forEach(function(pid) {
-    html += '<span class="badge badge-blue" style="font-size:10px;">' + peerNames[pid] + '</span>';
+    var safeName = peerNames[pid].replace(/</g,'&lt;').replace(/>/g,'&gt;');
+    var role = peerRoles[pid] || 'student';
+    var isMuted = mutedPeers[pid];
+    var isCoHost = vcCoHosts[pid];
+    var safePid = pid.replace(/'/g, "\\'");
+
+    html += '<div class="vc-participant-item">';
+    html += '<span class="p-name">' + safeName;
+    if(isCoHost) html += ' <span class="vc-host-badge">CO-HOST</span>';
+    html += '</span>';
+    html += '<span class="p-role">' + role + (isMuted ? ' &bull; muted' : '') + '</span>';
+
+    // Show action buttons only if current user can control
+    if(canControl) {
+      html += '<span class="p-actions">';
+      // Mute / Unmute mic
+      if(isMuted) {
+        html += '<button class="p-action-btn muted" onclick="vcUnmuteParticipant(\'' + safePid + '\')" title="Unmute mic">&#x1F507;</button>';
+      } else {
+        html += '<button class="p-action-btn" onclick="vcMuteParticipant(\'' + safePid + '\')" title="Mute mic">&#x1F3A4;</button>';
+      }
+      // Turn off camera
+      html += '<button class="p-action-btn" onclick="vcTurnOffParticipantCam(\'' + safePid + '\')" title="Turn off camera">&#x1F4F7;</button>';
+      // Promote / Demote co-host
+      if(isCoHost) {
+        html += '<button class="p-action-btn is-host" onclick="vcDemoteHost(\'' + safePid + '\')" title="Remove host privileges">&#x1F451;</button>';
+      } else {
+        html += '<button class="p-action-btn" onclick="vcPromoteToHost(\'' + safePid + '\')" title="Give host privileges">&#x1F451;</button>';
+      }
+      // Kick
+      html += '<button class="p-action-btn" onclick="vcKickParticipant(\'' + safePid + '\')" title="Remove from meeting" style="color:var(--red);">&#x274C;</button>';
+      html += '</span>';
+    }
+
+    html += '</div>';
   });
+
   list.innerHTML = html;
 }
 
@@ -6278,33 +6520,52 @@ async function vcToggleScreen() {
     btn.classList.remove('active');
     if(localStream && localStream.getVideoTracks()[0]) {
       var camTrack = localStream.getVideoTracks()[0];
-      Object.keys(peerConnections).forEach(function(pid) {
-        var mc = peerConnections[pid].media;
-        if(mc && mc.peerConnection) {
-          var sender = mc.peerConnection.getSenders().find(function(s){return s.track && s.track.kind==='video';});
-          if(sender) sender.replaceTrack(camTrack);
-        }
-      });
+      vcReplaceVideoTrackForAll(camTrack);
     }
     var lv = document.getElementById('vc-local-video');
     if(lv && localStream) { lv.srcObject = localStream; lv.parentElement.classList.add('local'); }
+    // Notify peers that screen share stopped
+    vcBroadcastData({type:'screen-share-stopped', peerId: rtcPeer ? rtcPeer.id : ''});
     return;
   }
   try {
-    screenStream = await navigator.mediaDevices.getDisplayMedia({video:true});
+    screenStream = await navigator.mediaDevices.getDisplayMedia({video:true, audio:false});
     btn.classList.add('active');
     var sTrack = screenStream.getVideoTracks()[0];
-    Object.keys(peerConnections).forEach(function(pid) {
-      var mc = peerConnections[pid].media;
-      if(mc && mc.peerConnection) {
-        var sender = mc.peerConnection.getSenders().find(function(s){return s.track && s.track.kind==='video';});
-        if(sender) sender.replaceTrack(sTrack);
-      }
-    });
+    vcReplaceVideoTrackForAll(sTrack);
     var lv = document.getElementById('vc-local-video');
     if(lv) { lv.srcObject = screenStream; lv.parentElement.classList.remove('local'); }
+    // Notify peers that screen is being shared
+    vcBroadcastData({type:'screen-share-started', peerId: rtcPeer ? rtcPeer.id : '', name: vcCurrentUserName});
     sTrack.onended = function() { vcToggleScreen(); };
   } catch(err) { /* user cancelled */ }
+}
+
+// Helper: Replace video track in all peer media connections
+function vcReplaceVideoTrackForAll(newTrack) {
+  Object.keys(peerConnections).forEach(function(pid) {
+    var mc = peerConnections[pid].media;
+    if(!mc) return;
+    // PeerJS exposes the underlying RTCPeerConnection
+    var pc = mc.peerConnection || (mc._pc) || null;
+    if(pc && pc.getSenders) {
+      var sender = pc.getSenders().find(function(s){return s.track && s.track.kind==='video';});
+      if(sender) {
+        sender.replaceTrack(newTrack).catch(function(err) {
+          console.warn('Failed to replace track for', pid, err);
+        });
+      }
+    }
+  });
+}
+
+// Helper: Broadcast data message to all connected peers
+function vcBroadcastData(msgObj) {
+  var raw = JSON.stringify(msgObj);
+  Object.keys(dataConnections).forEach(function(pid) {
+    if(dataConnections[pid] && dataConnections[pid].open)
+      dataConnections[pid].send(raw);
+  });
 }
 
 function vcToggleHand() {
@@ -6582,6 +6843,244 @@ function sendChatMsg(role, sender) {
   input.value = '';
 }
 
+// ── Host Control: Remove Participant (Kick) ──
+function vcKickParticipant(peerId) {
+  var name = peerNames[peerId] || 'Participant';
+  if(!confirm('Remove ' + name + ' from the meeting?')) return;
+  // Send kick message to the target
+  if(dataConnections[peerId] && dataConnections[peerId].open) {
+    dataConnections[peerId].send(JSON.stringify({type:'kick'}));
+  }
+  // Notify all other peers
+  Object.keys(dataConnections).forEach(function(id) {
+    if(id !== peerId && dataConnections[id] && dataConnections[id].open)
+      dataConnections[id].send(JSON.stringify({type:'peer-kicked', peerId:peerId, name:name}));
+  });
+  // Close the connection locally
+  if(peerConnections[peerId]) {
+    if(peerConnections[peerId].media) peerConnections[peerId].media.close();
+    if(peerConnections[peerId].data) peerConnections[peerId].data.close();
+  }
+  vcRemoveVideo(peerId);
+  delete peerConnections[peerId]; delete dataConnections[peerId]; delete peerNames[peerId]; delete peerRoles[peerId]; delete mutedPeers[peerId]; delete vcCoHosts[peerId];
+  vcUpdateParticipants();
+  showToast(name + ' has been removed from the meeting');
+}
+
+// ── Host Control: Mute Individual Participant ──
+function vcMuteParticipant(peerId) {
+  if(dataConnections[peerId] && dataConnections[peerId].open) {
+    dataConnections[peerId].send(JSON.stringify({type:'force-mute'}));
+  }
+  mutedPeers[peerId] = true;
+  // Notify other peers about the mute
+  Object.keys(dataConnections).forEach(function(id) {
+    if(id !== peerId && dataConnections[id] && dataConnections[id].open)
+      dataConnections[id].send(JSON.stringify({type:'peer-muted', peerId:peerId}));
+  });
+  vcUpdateParticipants();
+  showToast((peerNames[peerId] || 'Participant') + ' has been muted');
+}
+
+// ── Host Control: Unmute Individual Participant ──
+function vcUnmuteParticipant(peerId) {
+  if(dataConnections[peerId] && dataConnections[peerId].open) {
+    dataConnections[peerId].send(JSON.stringify({type:'force-unmute'}));
+  }
+  delete mutedPeers[peerId];
+  // Notify other peers about the unmute
+  Object.keys(dataConnections).forEach(function(id) {
+    if(id !== peerId && dataConnections[id] && dataConnections[id].open)
+      dataConnections[id].send(JSON.stringify({type:'peer-unmuted', peerId:peerId}));
+  });
+  vcUpdateParticipants();
+  showToast((peerNames[peerId] || 'Participant') + ' has been unmuted');
+}
+
+// ── Host Control: Mute All Participants ──
+function vcMuteAll() {
+  Object.keys(dataConnections).forEach(function(pid) {
+    if(dataConnections[pid] && dataConnections[pid].open) {
+      dataConnections[pid].send(JSON.stringify({type:'mute-all'}));
+      mutedPeers[pid] = true;
+    }
+  });
+  vcUpdateParticipants();
+  showToast('All participants have been muted');
+}
+
+// ── Host Control: Turn Off Participant's Camera ──
+function vcTurnOffParticipantCam(peerId) {
+  if(dataConnections[peerId] && dataConnections[peerId].open) {
+    dataConnections[peerId].send(JSON.stringify({type:'force-cam-off'}));
+  }
+  showToast((peerNames[peerId] || 'Participant') + '\'s camera has been turned off');
+}
+
+// ── Host Control: Promote Participant to Co-Host ──
+function vcPromoteToHost(peerId) {
+  var name = peerNames[peerId] || 'Participant';
+  if(!confirm('Give host privileges to ' + name + '?')) return;
+  vcCoHosts[peerId] = true;
+  if(dataConnections[peerId] && dataConnections[peerId].open) {
+    dataConnections[peerId].send(JSON.stringify({type:'promote-host', by:vcCurrentUserName}));
+  }
+  vcUpdateParticipants();
+  showToast(name + ' now has host privileges');
+}
+
+// ── Host Control: Demote Co-Host ──
+function vcDemoteHost(peerId) {
+  var name = peerNames[peerId] || 'Participant';
+  delete vcCoHosts[peerId];
+  if(dataConnections[peerId] && dataConnections[peerId].open) {
+    dataConnections[peerId].send(JSON.stringify({type:'demote-host'}));
+  }
+  vcUpdateParticipants();
+  showToast(name + '\'s host privileges have been removed');
+}
+
+// ── Host Control: Refresh host control buttons after promotion/demotion ──
+function vcRefreshHostControls() {
+  var controls = document.querySelector('.video-controls');
+  if(!controls) return;
+  // Add or remove host-only buttons dynamically
+  var existingEndAll = controls.querySelector('.vc-end-all-btn');
+  var existingHostBar = document.getElementById('vc-host-bar');
+  if(isRoomHost) {
+    if(!existingEndAll) {
+      var endAllBtn = document.createElement('button');
+      endAllBtn.className = 'vc-btn danger vc-end-all-btn';
+      endAllBtn.onclick = vcEndMeetingForAll;
+      endAllBtn.title = 'End Meeting for All';
+      endAllBtn.style.cssText = 'font-size:11px;width:auto;border-radius:8px;padding:8px 14px;';
+      endAllBtn.textContent = 'End All';
+      controls.appendChild(endAllBtn);
+    }
+    if(!existingHostBar) vcInsertHostBar();
+  } else {
+    if(existingEndAll) existingEndAll.remove();
+    if(existingHostBar) existingHostBar.remove();
+  }
+}
+
+// ── Host Control: Insert host toolbar ──
+function vcInsertHostBar() {
+  var grid = document.getElementById('vc-video-grid');
+  if(!grid) return;
+  var existing = document.getElementById('vc-host-bar');
+  if(existing) return;
+  var bar = document.createElement('div');
+  bar.id = 'vc-host-bar';
+  bar.style.cssText = 'display:flex;align-items:center;gap:8px;margin-bottom:12px;flex-wrap:wrap;';
+  bar.innerHTML =
+    '<button class="vc-host-btn warning" onclick="vcMuteAll()" title="Mute all participants">&#x1F507; Mute All</button>' +
+    '<button class="vc-host-btn" onclick="vcTakeScreenshot()" title="Take meeting screenshot">&#x1F4F8; Screenshot</button>';
+  grid.parentElement.insertBefore(bar, grid);
+}
+
+// ── Screenshot: Capture meeting view ──
+function vcTakeScreenshot() {
+  var grid = document.getElementById('vc-video-grid');
+  if(!grid) { showToast('No video grid found'); return; }
+
+  var videos = grid.querySelectorAll('video');
+  if(videos.length === 0) { showToast('No video streams to capture'); return; }
+
+  // Create a canvas to composite all video tiles
+  var cols = Math.min(videos.length, 3);
+  var rows = Math.ceil(videos.length / cols);
+  var tileW = 480, tileH = 270;
+  var canvas = document.createElement('canvas');
+  canvas.width = cols * tileW;
+  canvas.height = rows * tileH;
+  var ctx = canvas.getContext('2d');
+  ctx.fillStyle = '#0c1117';
+  ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+  videos.forEach(function(video, i) {
+    var col = i % cols;
+    var row = Math.floor(i / cols);
+    var x = col * tileW;
+    var y = row * tileH;
+    try {
+      ctx.drawImage(video, x, y, tileW, tileH);
+    } catch(e) {
+      // Video may be from a different origin or not ready
+      ctx.fillStyle = '#1a2332';
+      ctx.fillRect(x, y, tileW, tileH);
+      ctx.fillStyle = '#556677';
+      ctx.font = '16px DM Sans, sans-serif';
+      ctx.textAlign = 'center';
+      ctx.fillText('Video unavailable', x + tileW/2, y + tileH/2);
+    }
+    // Draw participant name label
+    var tile = video.closest('.video-tile');
+    var label = tile ? tile.querySelector('.participant-info') : null;
+    var name = label ? label.textContent : 'Participant ' + (i+1);
+    ctx.fillStyle = 'rgba(0,0,0,0.6)';
+    ctx.fillRect(x, y + tileH - 30, tileW, 30);
+    ctx.fillStyle = '#e8edf3';
+    ctx.font = '13px DM Sans, sans-serif';
+    ctx.textAlign = 'left';
+    ctx.fillText(name, x + 10, y + tileH - 10);
+  });
+
+  // Add timestamp header
+  ctx.fillStyle = 'rgba(0,0,0,0.7)';
+  ctx.fillRect(0, 0, canvas.width, 36);
+  ctx.fillStyle = '#f0a500';
+  ctx.font = 'bold 14px DM Sans, sans-serif';
+  ctx.textAlign = 'left';
+  ctx.fillText('CESTIS Meeting — Room: ' + currentRoomCode + ' — ' + new Date().toLocaleString(), 12, 24);
+
+  // Show modal with screenshot
+  var dataUrl = canvas.toDataURL('image/png');
+  var modalHTML = '<div id="vcScreenshotModal" class="vc-screenshot-modal">' +
+    '<div class="modal-content">' +
+    '<h3 style="font-family:Playfair Display,serif;margin-bottom:16px;">Meeting Screenshot</h3>' +
+    '<img src="' + dataUrl + '" alt="Meeting Screenshot" style="width:100%;margin-bottom:16px;">' +
+    '<div style="display:flex;gap:8px;">' +
+    '<button class="btn btn-primary" onclick="vcDownloadScreenshot()" style="flex:1;">&#x1F4BE; Download</button>' +
+    '<button class="btn btn-secondary" onclick="vcCopyScreenshot()" style="flex:1;">&#x1F4CB; Copy to Clipboard</button>' +
+    '<button class="btn btn-secondary" onclick="document.getElementById(\'vcScreenshotModal\').remove()" style="flex:1;">Close</button>' +
+    '</div></div></div>';
+
+  window._vcScreenshotData = dataUrl;
+  document.body.insertAdjacentHTML('beforeend', modalHTML);
+  showToast('Screenshot captured');
+}
+
+function vcDownloadScreenshot() {
+  var dataUrl = window._vcScreenshotData;
+  if(!dataUrl) return;
+  var dateStr = new Date().toISOString().replace(/[:.]/g, '-').substring(0, 19);
+  var a = document.createElement('a');
+  a.href = dataUrl;
+  a.download = 'CESTIS_Meeting_' + (currentRoomCode || 'screenshot') + '_' + dateStr + '.png';
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  showToast('Screenshot downloaded');
+  var modal = document.getElementById('vcScreenshotModal');
+  if(modal) modal.remove();
+}
+
+function vcCopyScreenshot() {
+  var dataUrl = window._vcScreenshotData;
+  if(!dataUrl) return;
+  // Convert data URL to blob for clipboard
+  fetch(dataUrl).then(function(res){ return res.blob(); }).then(function(blob) {
+    if(navigator.clipboard && navigator.clipboard.write) {
+      navigator.clipboard.write([new ClipboardItem({'image/png': blob})]).then(function() {
+        showToast('Screenshot copied to clipboard');
+      }).catch(function() { showToast('Could not copy — download instead'); });
+    } else {
+      showToast('Clipboard not supported — download instead');
+    }
+  });
+}
+
 // ── End Meeting for All Participants (Host only) ──
 function vcEndMeetingForAll() {
   if(!confirm('Are you sure you want to end the meeting for all participants?')) return;
@@ -6620,6 +7119,7 @@ function exitVideoRoom(role) {
     if(peerConnections[pid].data) peerConnections[pid].data.close();
   });
   peerConnections = {}; dataConnections = {}; peerNames = {};
+  peerRoles = {}; mutedPeers = {}; vcCoHosts = {};
 
   if(rtcPeer) { rtcPeer.destroy(); rtcPeer = null; }
   // Note: activeHostRoom is intentionally preserved here so instructors can rejoin.
