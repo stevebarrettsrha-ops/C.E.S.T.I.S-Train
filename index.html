@@ -2085,6 +2085,7 @@ textarea.form-control { resize:vertical; min-height:80px; }
 .lms-chat-msg .msg-file-size { font-size:10px; color:rgba(255,255,255,0.5); }
 .lms-chat-msg .msg-img { max-width:100%; width:auto; height:auto; border-radius:var(--radius-sm); margin-top:6px; cursor:pointer; display:block; }
 .lms-chat-msg .msg-img-error { display:flex; align-items:center; gap:8px; padding:12px 16px; border-radius:var(--radius-sm); background:rgba(0,0,0,0.15); margin-top:6px; color:var(--text-muted); font-size:12px; font-style:italic; }
+.lms-chat-msg .msg-deleted-admin { border-left:2px solid #f0a500; padding-left:8px; text-decoration:line-through; text-decoration-color:rgba(240,165,0,0.4); }
 
 /* Chat input area */
 .lms-chat-input-area {
@@ -2998,6 +2999,34 @@ let lmsChatPeer = null;
 // Google Drive folder for chat file uploads
 const LMS_CHAT_DRIVE_FOLDER = '1ashmmL0ZS7mW6XrwoxMuamf7yjtVWHyO';
 
+// ---- IndexedDB for chat image storage (persists base64 across reloads) ----
+var _lmsChatImageDB = null;
+function lmsChatOpenImageDB() {
+  return new Promise(function(resolve, reject) {
+    if(_lmsChatImageDB) { resolve(_lmsChatImageDB); return; }
+    var req = indexedDB.open('CESTIS_ChatImages', 1);
+    req.onupgradeneeded = function(e) { e.target.result.createObjectStore('images', {keyPath:'id'}); };
+    req.onsuccess = function(e) { _lmsChatImageDB = e.target.result; resolve(_lmsChatImageDB); };
+    req.onerror = function() { reject(req.error); };
+  });
+}
+function lmsChatSaveImageToDB(msgId, base64Data) {
+  lmsChatOpenImageDB().then(function(db) {
+    var tx = db.transaction('images', 'readwrite');
+    tx.objectStore('images').put({id: msgId, data: base64Data});
+  }).catch(function(e) { console.warn('IndexedDB save error:', e); });
+}
+function lmsChatLoadImagesFromDB() {
+  return lmsChatOpenImageDB().then(function(db) {
+    return new Promise(function(resolve) {
+      var tx = db.transaction('images', 'readonly');
+      var req = tx.objectStore('images').getAll();
+      req.onsuccess = function() { resolve(req.result || []); };
+      req.onerror = function() { resolve([]); };
+    });
+  }).catch(function() { return []; });
+}
+
 function initLmsChatData() {
   try {
     var cr = localStorage.getItem('voctrain_chatRooms');
@@ -3007,6 +3036,26 @@ function initLmsChatData() {
     if(cm) lmsChatMessages = JSON.parse(cm);
     if(cp) lmsChatProfiles = JSON.parse(cp);
   } catch(e) { console.warn('initLmsChatData parse error'); }
+
+  // Restore image base64 data from IndexedDB into in-memory messages
+  lmsChatLoadImagesFromDB().then(function(images) {
+    if(!images.length) return;
+    var imageMap = {};
+    images.forEach(function(img) { imageMap[img.id] = img.data; });
+    Object.keys(lmsChatMessages).forEach(function(roomId) {
+      lmsChatMessages[roomId].forEach(function(m) {
+        if(m.type === 'image' && !m.imageData && imageMap[m.id]) {
+          m.imageData = imageMap[m.id];
+        }
+      });
+    });
+    // Re-render if chat is currently visible
+    var prefix = lmsChatGetRolePrefix();
+    if(lmsChatActiveRoom && prefix) {
+      try { lmsChatRenderMessages(prefix); } catch(e) {}
+    }
+    console.log('Restored ' + images.length + ' chat images from IndexedDB');
+  });
 
   if(!lmsChatRooms.length) {
     // Create default chat rooms: one per skill area + admin general chat
@@ -10815,7 +10864,11 @@ function lmsChatRenderMessages(prefix) {
     }
 
     if(isDeleted) {
-      html += '<div class="msg-text" style="font-style:italic;opacity:0.5;">This message was deleted</div>';
+      if(currentRole === 'admin' && msg.originalText) {
+        html += '<div class="msg-text msg-deleted-admin" style="opacity:0.6;"><span style="font-size:10px;color:#f0a500;display:block;margin-bottom:2px;">&#128465; Deleted by '+lmsChatEscapeHtml(msg.deletedBy||msg.senderName)+'</span>'+lmsChatEscapeHtml(msg.originalText)+'</div>';
+      } else {
+        html += '<div class="msg-text" style="font-style:italic;opacity:0.5;">This message was deleted</div>';
+      }
     } else if(msg.type === 'file') {
       var fileIcon = lmsChatGetFileIcon(msg.fileName);
       html += '<div class="msg-file" onclick="lmsChatDownloadFile(\''+lmsChatEscapeHtml(msg.fileUrl||'')+'\',\''+lmsChatEscapeHtml(msg.fileName)+'\')">';
@@ -10945,6 +10998,8 @@ function lmsChatDeleteMessage(msgId) {
   if(!confirm('Delete this message?')) return;
 
   msg.deleted = true;
+  msg.deletedBy = user.name;
+  msg.originalText = msg.text;
   msg.text = '';
   msg.deletedAt = new Date().toISOString();
   saveLmsChatData();
@@ -10995,6 +11050,8 @@ function lmsChatHandleFileUpload(event) {
 
     if(isImage) {
       msg.imageData = e.target.result;
+      // Persist image data in IndexedDB so it survives page reload
+      lmsChatSaveImageToDB(msg.id, e.target.result);
     } else {
       msg.fileName = file.name;
       msg.fileSize = file.size;
