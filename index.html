@@ -633,6 +633,9 @@ textarea.form-control { resize:vertical; min-height:80px; }
 }
 .material-item:hover { background:rgba(255,255,255,0.03); border-color:var(--border-light); }
 .material-icon { width:38px; height:38px; border-radius:8px; display:flex; align-items:center; justify-content:center; font-size:16px; flex-shrink:0; }
+#driveFileDropZone.drag-over { border-color:var(--accent) !important; background:var(--accent-dim) !important; }
+.btn-danger { background:var(--red-dim); color:var(--red); border:1px solid rgba(231,76,60,0.3); }
+.btn-danger:hover { background:var(--red); color:#fff; }
 
 @keyframes pulse { 0%,100%{opacity:1;} 50%{opacity:0.4;} }
 .live-dot { width:8px; height:8px; background:var(--red); border-radius:50%; animation:pulse 1.5s infinite; display:inline-block; }
@@ -2937,6 +2940,65 @@ textarea.form-control { resize:vertical; min-height:80px; }
   </div>
 </div>
 
+<!-- DRIVE UPLOAD RESOURCE MODAL -->
+<div class="modal-overlay" id="driveUploadModal">
+  <div class="modal" style="max-width:620px;">
+    <div class="modal-header"><h3>Upload Resource to Google Drive</h3><button class="modal-close" onclick="closeModal('driveUploadModal')">✕</button></div>
+    <div class="form-group"><label>Resource Name *</label><input type="text" class="form-control" id="driveResName" placeholder="e.g. Safety Procedures & PPE Training"></div>
+    <div class="grid-2col" style="gap:12px;">
+      <div class="form-group"><label>Programme / Class *</label>
+        <select class="form-control" id="driveResCourse">
+          <option value="">— Select Programme —</option>
+        </select>
+      </div>
+      <div class="form-group"><label>Resource Type *</label>
+        <select class="form-control" id="driveResCategory">
+          <option value="video">Video</option>
+          <option value="document">Document</option>
+          <option value="worksheet">Worksheet</option>
+        </select>
+      </div>
+    </div>
+    <div class="grid-2col" style="gap:12px;">
+      <div class="form-group"><label>File Format</label>
+        <select class="form-control" id="driveResFormat">
+          <option value="PDF">PDF</option>
+          <option value="Video">Video (MP4)</option>
+          <option value="DOC">DOC / DOCX</option>
+          <option value="XLSX">XLSX / Spreadsheet</option>
+          <option value="PPT">PPT / Presentation</option>
+          <option value="Link">External Link</option>
+          <option value="Image">Image</option>
+        </select>
+      </div>
+      <div class="form-group"><label>Resource ID</label>
+        <input type="text" class="form-control" id="driveResId" readonly style="background:var(--bg-input);color:var(--accent);font-family:monospace;font-weight:600;">
+      </div>
+    </div>
+    <div class="form-group"><label>Upload File</label>
+      <div id="driveFileDropZone" style="border:2px dashed var(--border-light);border-radius:var(--radius-sm);padding:28px;text-align:center;cursor:pointer;transition:all 0.25s ease;background:var(--bg-input);" onclick="document.getElementById('driveFileInput').click()">
+        <div style="font-size:32px;margin-bottom:8px;opacity:0.5;">📤</div>
+        <div style="font-size:13px;color:var(--text-secondary);">Click to select a file or drag & drop here</div>
+        <div style="font-size:11px;color:var(--text-muted);margin-top:4px;">Supports PDF, DOC, MP4, XLSX, PPT, Images up to 100MB</div>
+        <div id="driveFileSelected" style="margin-top:10px;font-size:13px;color:var(--accent);font-weight:600;display:none;"></div>
+      </div>
+      <input type="file" id="driveFileInput" style="display:none" onchange="handleDriveFileSelect(event)" accept=".pdf,.doc,.docx,.mp4,.avi,.mov,.xlsx,.xls,.ppt,.pptx,.png,.jpg,.jpeg,.gif,.webp">
+    </div>
+    <div class="form-group"><label>External Link (if no file upload)</label><input type="text" class="form-control" id="driveResUrl" placeholder="https://..."></div>
+    <div class="form-group"><label>Description</label><textarea class="form-control" id="driveResDesc" rows="2" placeholder="Brief description of this resource..."></textarea></div>
+    <div id="driveUploadProgress" style="display:none;margin-bottom:16px;">
+      <div style="font-size:13px;color:var(--text-secondary);margin-bottom:6px;" id="driveUploadStatus">Uploading to Google Drive...</div>
+      <div style="height:6px;background:var(--bg-input);border-radius:3px;overflow:hidden;">
+        <div id="driveUploadBar" style="height:100%;background:linear-gradient(90deg,var(--accent),var(--orange));border-radius:3px;width:0%;transition:width 0.3s ease;"></div>
+      </div>
+    </div>
+    <div style="display:flex;gap:10px;justify-content:flex-end;margin-top:20px;">
+      <button class="btn btn-secondary" onclick="closeModal('driveUploadModal')">Cancel</button>
+      <button class="btn btn-primary" id="driveUploadBtn" onclick="uploadResourceToDrive()">Upload to Drive</button>
+    </div>
+  </div>
+</div>
+
 <!-- EDIT STUDENT PROFILE MODAL -->
 <div class="modal-overlay" id="editStudentProfileModal">
   <div class="modal">
@@ -3210,6 +3272,7 @@ let currentAttendanceDate = '2026-02-18';
 let classSessions = [];
 let instructorAssignments = [];
 let instructorResources = [];
+let driveResources = []; // Admin-managed resources uploaded to Google Drive
 let studentProfiles = {};
 let systemSettings = { institutionName: 'C.E.S.T.I.S LMS - Community Training Intervention', adminEmail: 'admin@heartlms.edu.jm', academicYear: '2025/2026', vcProvider: 'Built-in (WebRTC)' };
 
@@ -3359,6 +3422,7 @@ function saveState() {
     localStorage.setItem('voctrain_classSessions', JSON.stringify(classSessions));
     localStorage.setItem('voctrain_assignments', JSON.stringify(instructorAssignments));
     localStorage.setItem('voctrain_resources', JSON.stringify(instructorResources));
+    localStorage.setItem('voctrain_driveResources', JSON.stringify(driveResources));
     localStorage.setItem('voctrain_studentProfiles', JSON.stringify(studentProfiles));
     localStorage.setItem('voctrain_systemSettings', JSON.stringify(systemSettings));
     localStorage.setItem('voctrain_examResults', JSON.stringify(examResults));
@@ -3391,6 +3455,8 @@ function loadState() {
     if(cs) classSessions = JSON.parse(cs);
     if(ia) instructorAssignments = JSON.parse(ia);
     if(ir) instructorResources = JSON.parse(ir);
+    const dr = localStorage.getItem('voctrain_driveResources');
+    if(dr) driveResources = JSON.parse(dr);
     if(sp) studentProfiles = JSON.parse(sp);
     if(ss) systemSettings = JSON.parse(ss);
     if(er) examResults = JSON.parse(er);
@@ -4422,6 +4488,8 @@ function buildAdminSidebar() {
     <div class="nav-section-label">Learning</div>
     <div class="nav-item" data-page="training" onclick="showPage('training')">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/></svg>Training Centres</div>
+    <div class="nav-item" data-page="a-resources" onclick="showPage('a-resources')">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/></svg>Resource Manager</div>
     <div class="nav-item" data-page="exams" onclick="showPage('exams')">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg>Online Exams</div>
     <div class="nav-item" data-page="import-exam" onclick="showPage('import-exam')">
@@ -4548,7 +4616,7 @@ function showPage(pageId) {
   if(navItem) navItem.classList.add('active');
   const titles = {
     dashboard:'Dashboard',video:'Video Conference',students:'Student Progress',
-    training:'Training Centres',exams:'Online Exams','import-exam':'Import Exam',certificates:'Certificate Tracking',
+    training:'Training Centres','a-resources':'Resource Manager',exams:'Online Exams','import-exam':'Import Exam',certificates:'Certificate Tracking',
     reports:'Reports & Analytics','verify-users':'Verify Users',settings:'Settings',
     attendance:'Attendance Management',announcements:'Announcements',calendar:'Calendar & Schedule',
     's-dashboard':'My Dashboard','s-video':'My Classes','s-progress':'My Progress',
@@ -4563,6 +4631,8 @@ function showPage(pageId) {
   document.getElementById('topbarTitle').textContent = titles[pageId]||pageId;
   if(pageId === 'admin-duty-register') adrOnPageShow();
   if(pageId === 'verify-users') renderVerifyUsersPage();
+  if(pageId === 'a-resources') renderAdminResources();
+  if(pageId === 's-resources') renderStudentDriveResources();
   if(pageId === 'lms-chat') lmsChatOnPageShow('admin');
   if(pageId === 's-lms-chat') lmsChatOnPageShow('student');
   if(pageId === 'i-lms-chat') lmsChatOnPageShow('instructor');
@@ -4900,6 +4970,31 @@ function buildAdminPages() {
     </div>
   </section>
 
+  <!-- ADMIN RESOURCE MANAGER -->
+  <section class="page" id="page-a-resources">
+    <div style="display:flex;gap:12px;margin-bottom:18px;flex-wrap:wrap;align-items:center;">
+      <button class="btn btn-primary" onclick="openModal('driveUploadModal')">+ Upload Resource to Drive</button>
+      <select class="form-control" id="arFilterCourse" style="width:220px;" onchange="renderAdminResources()">
+        <option value="all">All Programmes</option>
+        ${courses.map(c => '<option value="'+c+'">'+c+'</option>').join('')}
+      </select>
+      <select class="form-control" id="arFilterType" style="width:180px;" onchange="renderAdminResources()">
+        <option value="all">All Types</option>
+        <option value="video">Videos</option>
+        <option value="document">Documents</option>
+        <option value="worksheet">Worksheets</option>
+      </select>
+      <input type="text" class="form-control" id="arSearch" placeholder="Search by name or ID..." style="width:240px;" oninput="renderAdminResources()">
+    </div>
+    <div class="stats-grid stats-grid-4" style="margin-bottom:18px;">
+      <div class="stat-card"><div class="stat-icon" style="background:var(--blue-dim);color:var(--blue);">📁</div><div class="stat-value" id="arStatTotal">0</div><div class="stat-label">Total Resources</div></div>
+      <div class="stat-card"><div class="stat-icon" style="background:var(--red-dim);color:var(--red);">📹</div><div class="stat-value" id="arStatVideos">0</div><div class="stat-label">Videos</div></div>
+      <div class="stat-card"><div class="stat-icon" style="background:var(--accent-dim);color:var(--accent);">📄</div><div class="stat-value" id="arStatDocs">0</div><div class="stat-label">Documents</div></div>
+      <div class="stat-card"><div class="stat-icon" style="background:var(--green-dim);color:var(--green);">📝</div><div class="stat-value" id="arStatWorksheets">0</div><div class="stat-label">Worksheets</div></div>
+    </div>
+    <div id="adminResourcesList"></div>
+  </section>
+
   <section class="page" id="page-settings">
     <div class="tabs">
       <div class="tab active" onclick="switchSettingsTab(this,'system')">System Settings</div>
@@ -5122,6 +5217,7 @@ function buildAdminPages() {
   renderCalendarEventList();
   renderUserAccountsTable();
   renderAdminClassSessions();
+  renderAdminResources();
   adrInit();
 }
 
@@ -5308,32 +5404,42 @@ function buildStudentPages() {
       </div>
     </div>
 
-    <div class="tabs">
-      <div class="tab active">All Materials</div>
-      <div class="tab">Videos</div>
-      <div class="tab">Documents</div>
-      <div class="tab">Worksheets</div>
+    <div class="tabs" id="sResourceTabs">
+      <div class="tab active" onclick="filterStudentResources('all',this)">All Materials</div>
+      <div class="tab" onclick="filterStudentResources('video',this)">Videos</div>
+      <div class="tab" onclick="filterStudentResources('document',this)">Documents</div>
+      <div class="tab" onclick="filterStudentResources('worksheet',this)">Worksheets</div>
     </div>
 
+    <div style="margin-bottom:14px;display:flex;gap:10px;align-items:center;">
+      <input type="text" class="form-control" id="sResSearch" placeholder="Search by name or resource ID..." style="max-width:340px;" oninput="renderStudentDriveResources()">
+    </div>
+
+    <!-- Drive-uploaded resources for this student's class -->
+    <div id="studentDriveResources"></div>
+
+    <!-- Static demo resources -->
+    <div id="studentStaticResources">
     ${[
-      {cat:'📹 Video Lectures',items:['Introduction to '+skill.name,'Safety Procedures & PPE Training','Core Techniques — Part 1','Core Techniques — Part 2','Advanced Methods & Best Practices','Industry Standards Overview']},
-      {cat:'📄 Study Guides & Handbooks',items:['Course Syllabus & Learning Outcomes','Theory Handbook (Complete)','Practical Assessment Preparation Guide','Exam Revision Notes & Tips','Industry Terminology Glossary']},
-      {cat:'📝 Practice Worksheets',items:['Practice Exercise Set 1','Practice Exercise Set 2','Self-Assessment Checklist','Mock Exam Questions','Past Paper — 2025']},
-      {cat:'🔗 Additional Resources',items:['Industry Standards Reference Link','Online Simulation Tool','Supplementary Reading List','Career Pathways Guide']}
+      {cat:'📹 Video Lectures',catKey:'video',items:['Introduction to '+skill.name,'Safety Procedures & PPE Training','Core Techniques — Part 1','Core Techniques — Part 2','Advanced Methods & Best Practices','Industry Standards Overview']},
+      {cat:'📄 Study Guides & Handbooks',catKey:'document',items:['Course Syllabus & Learning Outcomes','Theory Handbook (Complete)','Practical Assessment Preparation Guide','Exam Revision Notes & Tips','Industry Terminology Glossary']},
+      {cat:'📝 Practice Worksheets',catKey:'worksheet',items:['Practice Exercise Set 1','Practice Exercise Set 2','Self-Assessment Checklist','Mock Exam Questions','Past Paper — 2025']},
+      {cat:'🔗 Additional Resources',catKey:'document',items:['Industry Standards Reference Link','Online Simulation Tool','Supplementary Reading List','Career Pathways Guide']}
     ].map(section => `
-      <div class="card">
+      <div class="card s-res-section" data-rescat="${section.catKey}">
         <div class="card-header"><h3>${section.cat}</h3><span style="font-size:12px;color:var(--text-muted);">${section.items.length} items</span></div>
         <ul class="material-list">
           ${section.items.map((item,i) => `
             <li class="material-item">
               <div class="material-icon" style="background:${skill.color}22;color:${skill.color};">${section.cat.split(' ')[0]}</div>
-              <div style="flex:1;"><div style="font-size:13.5px;">${item}</div><div style="font-size:11px;color:var(--text-muted);">Course material • ${['PDF','Video','DOC','Link'][i%4]}</div></div>
+              <div style="flex:1;"><div style="font-size:13.5px;">${item}</div><div style="font-size:11px;color:var(--text-muted);">Course material &bull; ${['PDF','Video','DOC','Link'][i%4]}</div></div>
               <button class="btn btn-sm btn-secondary">${section.cat.includes('Video')?'▶ Play':'Download'}</button>
             </li>
           `).join('')}
         </ul>
       </div>
     `).join('')}
+    </div>
   </section>
 
   <!-- STUDENT EXAMS -->
@@ -7799,6 +7905,398 @@ function deleteResource(id) {
   saveState();
   showToast('Resource deleted');
   renderInstructorCustomResources();
+}
+
+// ============================== ADMIN RESOURCE MANAGER (GOOGLE DRIVE) ==============================
+const DRIVE_RESOURCES_FOLDER_ID = '122aVdNWxJG9ShRWf9Xso0MdXGdQeDuyt';
+let _driveSelectedFile = null;
+
+function generateResourceId() {
+  const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
+  let id = 'VT-';
+  for (let i = 0; i < 4; i++) id += chars[Math.floor(Math.random() * chars.length)];
+  id += '-';
+  for (let i = 0; i < 4; i++) id += chars[Math.floor(Math.random() * chars.length)];
+  // Ensure unique
+  if (driveResources.some(r => r.resourceId === id)) return generateResourceId();
+  return id;
+}
+
+// Populate course dropdown and generate ID when modal opens
+(function() {
+  const origOpen = window.openModal || function(){};
+  const patchedOpen = function(id) {
+    origOpen(id);
+    if (id === 'driveUploadModal') {
+      const sel = document.getElementById('driveResCourse');
+      if (sel && sel.options.length <= 1) {
+        courses.forEach(c => { const o = document.createElement('option'); o.value = c; o.textContent = c; sel.appendChild(o); });
+      }
+      document.getElementById('driveResId').value = generateResourceId();
+      _driveSelectedFile = null;
+      var selEl = document.getElementById('driveFileSelected');
+      if (selEl) { selEl.style.display = 'none'; selEl.textContent = ''; }
+    }
+  };
+  window.openModal = function(id) { document.getElementById(id).classList.add('active'); patchedOpen(id); };
+})();
+
+function handleDriveFileSelect(e) {
+  const file = e.target.files[0];
+  if (!file) return;
+  _driveSelectedFile = file;
+  const el = document.getElementById('driveFileSelected');
+  el.style.display = 'block';
+  el.textContent = '📎 ' + file.name + ' (' + (file.size / 1024 / 1024).toFixed(2) + ' MB)';
+
+  // Auto-detect format
+  const ext = file.name.split('.').pop().toLowerCase();
+  const formatMap = { pdf:'PDF', doc:'DOC', docx:'DOC', mp4:'Video', avi:'Video', mov:'Video', webm:'Video',
+    xlsx:'XLSX', xls:'XLSX', ppt:'PPT', pptx:'PPT', png:'Image', jpg:'Image', jpeg:'Image', gif:'Image', webp:'Image' };
+  if (formatMap[ext]) document.getElementById('driveResFormat').value = formatMap[ext];
+}
+
+// Setup drag & drop
+document.addEventListener('DOMContentLoaded', function() {
+  setTimeout(function() {
+    const dz = document.getElementById('driveFileDropZone');
+    if (!dz) return;
+    dz.addEventListener('dragover', function(e) { e.preventDefault(); dz.style.borderColor = 'var(--accent)'; dz.style.background = 'var(--accent-dim)'; });
+    dz.addEventListener('dragleave', function(e) { e.preventDefault(); dz.style.borderColor = 'var(--border-light)'; dz.style.background = 'var(--bg-input)'; });
+    dz.addEventListener('drop', function(e) {
+      e.preventDefault(); dz.style.borderColor = 'var(--border-light)'; dz.style.background = 'var(--bg-input)';
+      if (e.dataTransfer.files.length > 0) {
+        document.getElementById('driveFileInput').files = e.dataTransfer.files;
+        handleDriveFileSelect({ target: { files: e.dataTransfer.files } });
+      }
+    });
+  }, 500);
+});
+
+async function getOrCreateClassFolder(className) {
+  if (!googleAccessToken) throw new Error('Not connected to Google Drive');
+  // Search for existing class folder
+  const query = encodeURIComponent("name='" + className + "' and '" + DRIVE_RESOURCES_FOLDER_ID + "' in parents and mimeType='application/vnd.google-apps.folder' and trashed=false");
+  const searchResp = await fetch('https://www.googleapis.com/drive/v3/files?q=' + query + '&fields=files(id,name)', {
+    headers: { 'Authorization': 'Bearer ' + googleAccessToken }
+  });
+  const searchData = await searchResp.json();
+  if (searchData.files && searchData.files.length > 0) return searchData.files[0].id;
+
+  // Create new folder for this class
+  const createResp = await fetch('https://www.googleapis.com/drive/v3/files', {
+    method: 'POST',
+    headers: { 'Authorization': 'Bearer ' + googleAccessToken, 'Content-Type': 'application/json' },
+    body: JSON.stringify({ name: className, mimeType: 'application/vnd.google-apps.folder', parents: [DRIVE_RESOURCES_FOLDER_ID] })
+  });
+  const folder = await createResp.json();
+  // Make folder publicly viewable
+  try {
+    await fetch('https://www.googleapis.com/drive/v3/files/' + folder.id + '/permissions', {
+      method: 'POST',
+      headers: { 'Authorization': 'Bearer ' + googleAccessToken, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ role: 'reader', type: 'anyone' })
+    });
+  } catch(e) { /* permission may fail, that's ok */ }
+  return folder.id;
+}
+
+async function uploadFileToDriveFolder(file, folderId, resourceId) {
+  const metadata = {
+    name: resourceId + '_' + file.name,
+    parents: [folderId]
+  };
+  const form = new FormData();
+  form.append('metadata', new Blob([JSON.stringify(metadata)], { type: 'application/json' }));
+  form.append('file', file);
+
+  const resp = await fetch('https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart&fields=id,name,webViewLink,webContentLink,size', {
+    method: 'POST',
+    headers: { 'Authorization': 'Bearer ' + googleAccessToken },
+    body: form
+  });
+  if (!resp.ok) throw new Error('Upload failed: ' + resp.status);
+  const result = await resp.json();
+
+  // Make file publicly viewable
+  try {
+    await fetch('https://www.googleapis.com/drive/v3/files/' + result.id + '/permissions', {
+      method: 'POST',
+      headers: { 'Authorization': 'Bearer ' + googleAccessToken, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ role: 'reader', type: 'anyone' })
+    });
+  } catch(e) { /* ok */ }
+  return result;
+}
+
+async function uploadResourceToDrive() {
+  const name = document.getElementById('driveResName')?.value?.trim();
+  const course = document.getElementById('driveResCourse')?.value;
+  const category = document.getElementById('driveResCategory')?.value;
+  const format = document.getElementById('driveResFormat')?.value;
+  const resourceId = document.getElementById('driveResId')?.value;
+  const url = document.getElementById('driveResUrl')?.value?.trim();
+  const desc = document.getElementById('driveResDesc')?.value?.trim();
+
+  if (!name) { showToast('Please enter a resource name'); return; }
+  if (!course) { showToast('Please select a programme / class'); return; }
+  if (!_driveSelectedFile && !url) { showToast('Please select a file or enter a link'); return; }
+
+  if (!googleAccessToken) {
+    showToast('Please connect to Google Drive first (use the Cloud button in the top bar)');
+    return;
+  }
+
+  const btn = document.getElementById('driveUploadBtn');
+  const progressDiv = document.getElementById('driveUploadProgress');
+  const statusEl = document.getElementById('driveUploadStatus');
+  const barEl = document.getElementById('driveUploadBar');
+  btn.disabled = true; btn.textContent = 'Uploading...';
+  progressDiv.style.display = 'block';
+  barEl.style.width = '10%';
+  statusEl.textContent = 'Creating class folder for ' + course + '...';
+
+  try {
+    const folderId = await getOrCreateClassFolder(course);
+    barEl.style.width = '30%';
+
+    let driveFileId = null;
+    let driveViewLink = url || '';
+    let driveFileName = '';
+
+    if (_driveSelectedFile) {
+      statusEl.textContent = 'Uploading ' + _driveSelectedFile.name + ' to Google Drive...';
+      barEl.style.width = '40%';
+      const result = await uploadFileToDriveFolder(_driveSelectedFile, folderId, resourceId);
+      driveFileId = result.id;
+      driveViewLink = result.webViewLink || ('https://drive.google.com/file/d/' + result.id + '/view');
+      driveFileName = result.name;
+      barEl.style.width = '80%';
+    } else {
+      barEl.style.width = '80%';
+    }
+
+    statusEl.textContent = 'Saving resource metadata...';
+    barEl.style.width = '90%';
+
+    const resource = {
+      id: 'DRES-' + Date.now(),
+      resourceId: resourceId,
+      name: name,
+      course: course,
+      category: category,
+      format: format,
+      url: driveViewLink,
+      driveFileId: driveFileId,
+      driveFileName: driveFileName || '',
+      classFolderId: folderId,
+      description: desc || '',
+      uploadedBy: 'Admin',
+      uploadedAt: new Date().toISOString()
+    };
+
+    driveResources.push(resource);
+    saveState();
+    barEl.style.width = '100%';
+    statusEl.textContent = 'Upload complete!';
+
+    showToast('Resource "' + name + '" uploaded to Google Drive with ID: ' + resourceId);
+    addNotification('New resource uploaded for ' + course + ': "' + name + '" (ID: ' + resourceId + ')', 'resource', null, ['admin','instructor','student']);
+
+    setTimeout(function() {
+      closeModal('driveUploadModal');
+      btn.disabled = false; btn.textContent = 'Upload to Drive';
+      progressDiv.style.display = 'none'; barEl.style.width = '0%';
+      // Reset form
+      document.getElementById('driveResName').value = '';
+      document.getElementById('driveResCourse').value = '';
+      document.getElementById('driveResUrl').value = '';
+      document.getElementById('driveResDesc').value = '';
+      document.getElementById('driveFileInput').value = '';
+      _driveSelectedFile = null;
+      var selEl = document.getElementById('driveFileSelected');
+      if (selEl) { selEl.style.display = 'none'; selEl.textContent = ''; }
+      renderAdminResources();
+    }, 800);
+  } catch(err) {
+    console.error('Drive upload error:', err);
+    statusEl.textContent = 'Upload failed: ' + err.message;
+    barEl.style.width = '0%';
+    btn.disabled = false; btn.textContent = 'Upload to Drive';
+    if (err.message && err.message.indexOf('401') !== -1) {
+      showToast('Google Drive session expired. Please reconnect via the Cloud button.');
+    } else {
+      showToast('Upload failed: ' + err.message);
+    }
+  }
+}
+
+function renderAdminResources() {
+  const container = document.getElementById('adminResourcesList');
+  if (!container) return;
+
+  const filterCourse = document.getElementById('arFilterCourse')?.value || 'all';
+  const filterType = document.getElementById('arFilterType')?.value || 'all';
+  const searchTerm = (document.getElementById('arSearch')?.value || '').toLowerCase().trim();
+
+  let filtered = driveResources.filter(function(r) {
+    if (filterCourse !== 'all' && r.course !== filterCourse) return false;
+    if (filterType !== 'all' && r.category !== filterType) return false;
+    if (searchTerm && r.name.toLowerCase().indexOf(searchTerm) === -1 && r.resourceId.toLowerCase().indexOf(searchTerm) === -1 && (r.description||'').toLowerCase().indexOf(searchTerm) === -1) return false;
+    return true;
+  });
+
+  // Update stats
+  var el;
+  el = document.getElementById('arStatTotal'); if(el) el.textContent = driveResources.length;
+  el = document.getElementById('arStatVideos'); if(el) el.textContent = driveResources.filter(r=>r.category==='video').length;
+  el = document.getElementById('arStatDocs'); if(el) el.textContent = driveResources.filter(r=>r.category==='document').length;
+  el = document.getElementById('arStatWorksheets'); if(el) el.textContent = driveResources.filter(r=>r.category==='worksheet').length;
+
+  if (filtered.length === 0) {
+    container.innerHTML = '<div class="card" style="text-align:center;padding:40px;"><div style="font-size:48px;opacity:0.3;margin-bottom:12px;">📁</div><h3 style="color:var(--text-muted);margin-bottom:8px;">No Resources Found</h3><p style="color:var(--text-muted);font-size:13px;">Click "+ Upload Resource to Drive" to add your first resource.</p></div>';
+    return;
+  }
+
+  // Group by course
+  const grouped = {};
+  filtered.forEach(function(r) {
+    if (!grouped[r.course]) grouped[r.course] = [];
+    grouped[r.course].push(r);
+  });
+
+  const catIcons = { video:'📹', document:'📄', worksheet:'📝' };
+  const catLabels = { video:'Video', document:'Document', worksheet:'Worksheet' };
+  const courseSkill = function(courseName) {
+    var sk = skillAreas.find(function(s) { return courseName.toLowerCase().indexOf(s.name.split(' ')[0].toLowerCase()) !== -1; });
+    return sk || { icon:'📚', color:'var(--accent)' };
+  };
+
+  var html = '';
+  Object.keys(grouped).sort().forEach(function(courseName) {
+    var items = grouped[courseName];
+    var sk = courseSkill(courseName);
+    html += '<div class="card" style="margin-bottom:16px;border-left:3px solid ' + sk.color + ';">' +
+      '<div class="card-header"><h3>' + sk.icon + ' ' + courseName + '</h3><span style="font-size:12px;color:var(--text-muted);">' + items.length + ' resource' + (items.length!==1?'s':'') + '</span></div>' +
+      '<ul class="material-list">';
+    items.forEach(function(r) {
+      var dateStr = r.uploadedAt ? new Date(r.uploadedAt).toLocaleDateString() : 'Recently';
+      html += '<li class="material-item">' +
+        '<div class="material-icon" style="background:' + sk.color + '22;color:' + sk.color + ';">' + (catIcons[r.category]||'📁') + '</div>' +
+        '<div style="flex:1;">' +
+          '<div style="font-size:13.5px;font-weight:600;">' + r.name + '</div>' +
+          '<div style="font-size:11px;color:var(--text-muted);">' +
+            '<span style="background:var(--accent-dim);color:var(--accent);padding:1px 8px;border-radius:10px;font-size:10px;font-weight:700;font-family:monospace;margin-right:6px;">' + r.resourceId + '</span>' +
+            (catLabels[r.category]||r.category) + ' &bull; ' + r.format + ' &bull; Added ' + dateStr +
+            (r.description ? ' &bull; ' + r.description : '') +
+          '</div>' +
+        '</div>';
+      if (r.url) {
+        html += '<button class="btn btn-sm btn-secondary" onclick="window.open(\'' + r.url.replace(/'/g, "\\'") + '\',\'_blank\')" title="Open resource">' + (r.category==='video'?'▶ Play':'Open') + '</button>';
+      }
+      html += '<button class="btn btn-sm" style="background:var(--bg-input);color:var(--text-secondary);border:1px solid var(--border);margin-left:4px;" onclick="copyResourceId(\'' + r.resourceId + '\')" title="Copy Resource ID">📋 ID</button>';
+      html += '<button class="btn btn-sm btn-danger" style="margin-left:4px;" onclick="deleteDriveResource(\'' + r.id + '\')">✕</button>';
+      html += '</li>';
+    });
+    html += '</ul></div>';
+  });
+
+  container.innerHTML = html;
+}
+
+function copyResourceId(id) {
+  navigator.clipboard.writeText(id).then(function() { showToast('Resource ID copied: ' + id); });
+}
+
+function deleteDriveResource(id) {
+  if (!confirm('Are you sure you want to remove this resource? This will remove it from the dashboard but NOT delete the file from Google Drive.')) return;
+  driveResources = driveResources.filter(r => r.id !== id);
+  saveState();
+  showToast('Resource removed');
+  renderAdminResources();
+}
+
+// Lookup resource by ID for student access
+function getResourceById(resourceId) {
+  return driveResources.find(r => r.resourceId === resourceId);
+}
+
+let _sResFilter = 'all';
+function filterStudentResources(type, tabEl) {
+  _sResFilter = type;
+  // Update tab active states
+  document.querySelectorAll('#sResourceTabs .tab').forEach(t => t.classList.remove('active'));
+  if (tabEl) tabEl.classList.add('active');
+  // Filter static sections
+  document.querySelectorAll('.s-res-section').forEach(function(sec) {
+    var cat = sec.getAttribute('data-rescat');
+    sec.style.display = (type === 'all' || cat === type) ? '' : 'none';
+  });
+  renderStudentDriveResources();
+}
+
+function renderStudentDriveResources() {
+  var container = document.getElementById('studentDriveResources');
+  if (!container) return;
+  var s = currentStudent;
+  if (!s) { container.innerHTML = ''; return; }
+
+  var searchTerm = (document.getElementById('sResSearch')?.value || '').toLowerCase().trim();
+
+  // Get resources for this student's course
+  var myResources = driveResources.filter(function(r) {
+    // Match by course — try matching the student's course to the resource's course
+    var courseMatch = false;
+    if (r.course && s.course) {
+      courseMatch = s.course.toLowerCase().indexOf(r.course.toLowerCase().split(' ')[0]) !== -1 || r.course.toLowerCase().indexOf(s.course.toLowerCase().split(' ')[0]) !== -1 || r.course === s.course;
+    }
+    if (!courseMatch) return false;
+    if (_sResFilter !== 'all' && r.category !== _sResFilter) return false;
+    if (searchTerm && r.name.toLowerCase().indexOf(searchTerm) === -1 && r.resourceId.toLowerCase().indexOf(searchTerm) === -1) return false;
+    return true;
+  });
+
+  if (myResources.length === 0) {
+    container.innerHTML = '';
+    return;
+  }
+
+  var sk = skillAreas.find(function(sk) { return s.course.toLowerCase().indexOf(sk.name.split(' ')[0].toLowerCase()) !== -1; }) || skillAreas[0];
+  var catIcons = { video:'📹', document:'📄', worksheet:'📝' };
+  var catLabels = { video:'Video Lectures', document:'Documents', worksheet:'Worksheets' };
+
+  // Group by category
+  var grouped = {};
+  myResources.forEach(function(r) {
+    var key = r.category || 'document';
+    if (!grouped[key]) grouped[key] = [];
+    grouped[key].push(r);
+  });
+
+  var html = '';
+  Object.keys(grouped).forEach(function(cat) {
+    html += '<div class="card" style="margin-bottom:12px;border-left:3px solid var(--accent);">' +
+      '<div class="card-header"><h3>' + (catIcons[cat]||'📁') + ' ' + (catLabels[cat]||cat) + ' <span style="font-size:12px;font-weight:400;color:var(--accent);background:var(--accent-dim);padding:2px 10px;border-radius:10px;margin-left:6px;">☁ Drive</span></h3><span style="font-size:12px;color:var(--text-muted);">' + grouped[cat].length + ' items</span></div>' +
+      '<ul class="material-list">';
+    grouped[cat].forEach(function(r) {
+      html += '<li class="material-item">' +
+        '<div class="material-icon" style="background:' + sk.color + '22;color:' + sk.color + ';">' + (catIcons[r.category]||'📄') + '</div>' +
+        '<div style="flex:1;">' +
+          '<div style="font-size:13.5px;">' + r.name + '</div>' +
+          '<div style="font-size:11px;color:var(--text-muted);">' +
+            '<span style="background:var(--accent-dim);color:var(--accent);padding:1px 6px;border-radius:8px;font-size:10px;font-weight:700;font-family:monospace;margin-right:4px;">' + r.resourceId + '</span>' +
+            'Course material &bull; ' + r.format +
+          '</div>' +
+        '</div>';
+      if (r.url) {
+        html += '<button class="btn btn-sm btn-secondary" onclick="window.open(\'' + r.url.replace(/'/g, "\\'") + '\',\'_blank\')">' + (r.category==='video'?'▶ Play':'Download') + '</button>';
+      }
+      html += '</li>';
+    });
+    html += '</ul></div>';
+  });
+
+  container.innerHTML = html;
 }
 
 // ============================== STUDENT PROFILE FUNCTIONS ==============================
@@ -10501,7 +10999,8 @@ async function saveToCloud() {
         examResults: examResults,
         chatRooms: lmsChatRooms,
         chatMessages: lmsChatMessages,
-        chatProfiles: lmsChatProfiles
+        chatProfiles: lmsChatProfiles,
+        driveResources: driveResources
       }
     };
 
@@ -10651,6 +11150,10 @@ async function syncFromCloud() {
 
     if (backupData.data.examResults) {
       examResults = backupData.data.examResults;
+    }
+
+    if (backupData.data.driveResources) {
+      driveResources = backupData.data.driveResources;
     }
 
     // Persist all restored data to localStorage
@@ -10840,6 +11343,13 @@ async function mergeFromCloud() {
       Object.keys(backupData.data.chatProfiles).forEach(function(uid) {
         if (!lmsChatProfiles[uid]) lmsChatProfiles[uid] = {};
         Object.assign(lmsChatProfiles[uid], backupData.data.chatProfiles[uid]);
+      });
+    }
+    if (backupData.data.driveResources) {
+      backupData.data.driveResources.forEach(function(cr) {
+        if (!driveResources.some(function(lr) { return lr.id === cr.id; })) {
+          driveResources.push(cr);
+        }
       });
     }
 
@@ -11057,6 +11567,16 @@ async function silentMergeFromBackup(fileId) {
       });
     }
 
+    // Merge drive resources
+    if (backupData.data.driveResources) {
+      backupData.data.driveResources.forEach(function(cr) {
+        if (!driveResources.some(function(lr) { return lr.id === cr.id; })) {
+          driveResources.push(cr);
+          changed = true;
+        }
+      });
+    }
+
     if (changed) {
       saveState();
     }
@@ -11236,7 +11756,8 @@ async function autoSaveToAllFolders() {
         examResults: examResults,
         chatRooms: lmsChatRooms,
         chatMessages: lmsChatMessages,
-        chatProfiles: lmsChatProfiles
+        chatProfiles: lmsChatProfiles,
+        driveResources: driveResources
       }
     };
 
