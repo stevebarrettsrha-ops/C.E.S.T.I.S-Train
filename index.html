@@ -188,12 +188,15 @@ h1,h2,h3,h4 { font-family:'Playfair Display',serif; }
 .admin-card .role-icon { background:var(--accent-dim); }
 .student-card .role-icon { background:var(--blue-dim); }
 .instructor-card .role-icon { background:var(--green-dim); }
+.adminstaff-card .role-icon { background:var(--purple-dim); }
+.adminstaff-card::before { background:linear-gradient(135deg, rgba(155,89,182,0.08), transparent); }
 .role-card h2 {
   font-size:22px; margin-bottom:8px;
 }
 .admin-card h2 { color:var(--accent); }
 .student-card h2 { color:var(--blue); }
 .instructor-card h2 { color:var(--green); }
+.adminstaff-card h2 { color:var(--purple); }
 .role-card p {
   font-size:13.5px;
   color:var(--text-muted);
@@ -223,6 +226,10 @@ h1,h2,h3,h4 { font-family:'Playfair Display',serif; }
 }
 .instructor-card .role-enter-btn {
   background:linear-gradient(135deg, var(--green), #27ae60);
+  color:#fff;
+}
+.adminstaff-card .role-enter-btn {
+  background:linear-gradient(135deg, var(--purple), #8e44ad);
   color:#fff;
 }
 .role-enter-btn:hover:not(:disabled) { transform:translateY(-1px); box-shadow:0 4px 16px rgba(0,0,0,0.3); }
@@ -2538,6 +2545,38 @@ textarea.form-control { resize:vertical; min-height:80px; }
   .adr-task-card { flex-direction:column; }
   .adr-task-actions { align-self:flex-end; }
 }
+/* ADMIN STAFF ACCESS CONTROL */
+.as-access-grid {
+  display:grid; grid-template-columns:repeat(auto-fill,minmax(250px,1fr)); gap:12px; margin-top:16px;
+}
+.as-access-item {
+  display:flex; align-items:center; gap:12px; padding:14px 16px;
+  background:var(--bg-input); border:1px solid var(--border); border-radius:var(--radius-sm);
+  transition:var(--transition); cursor:pointer;
+}
+.as-access-item:hover { border-color:var(--purple); background:var(--purple-dim); }
+.as-access-item input[type="checkbox"] { width:18px; height:18px; accent-color:var(--purple); cursor:pointer; }
+.as-access-item label { font-size:13px; cursor:pointer; flex:1; }
+.as-access-item .as-access-desc { font-size:11px; color:var(--text-muted); margin-top:2px; }
+/* Admin Staff Dashboard */
+.as-welcome-banner {
+  background:linear-gradient(135deg,rgba(155,89,182,0.12),rgba(142,68,173,0.06));
+  border:1px solid rgba(155,89,182,0.2); border-radius:var(--radius-lg);
+  padding:28px 32px; margin-bottom:24px; position:relative; overflow:hidden;
+}
+.as-welcome-banner h2 { font-size:22px; margin-bottom:6px; }
+.as-welcome-banner h2 span { color:var(--purple); }
+.as-welcome-banner p { font-size:13.5px; color:var(--text-secondary); }
+.as-duty-stats {
+  display:grid; grid-template-columns:repeat(auto-fit,minmax(160px,1fr)); gap:14px; margin-bottom:24px;
+}
+.as-duty-stat {
+  background:var(--bg-card); border:1px solid var(--border); border-radius:var(--radius);
+  padding:20px; text-align:center; transition:var(--transition);
+}
+.as-duty-stat:hover { border-color:var(--purple); }
+.as-duty-stat .as-ds-val { font-size:32px; font-weight:700; font-family:'Playfair Display',serif; }
+.as-duty-stat .as-ds-label { font-size:12px; color:var(--text-muted); margin-top:4px; }
 </style>
 <script src="https://unpkg.com/peerjs@1.5.4/dist/peerjs.min.js"></script>
 <!-- Google Identity Services for OAuth -->
@@ -2648,6 +2687,24 @@ textarea.form-control { resize:vertical; min-height:80px; }
           <span class="register-link" onclick="openRegistrationModal('instructor')">New instructor? Register here</span>
         </div>
         <button class="role-enter-btn" onclick="handleInstructorClick()">Enter as Instructor →</button>
+      </div>
+
+      <!-- ADMIN STAFF CARD -->
+      <div class="role-card adminstaff-card" id="adminStaffCard">
+        <div class="role-icon">📋</div>
+        <h2>Administrative Staff</h2>
+        <p>View assigned duties, complete tasks, track your performance, and access permitted administrative functions.</p>
+        <div class="role-login" id="adminStaffLogin">
+          <div class="form-group">
+            <label>Username</label>
+            <input type="text" placeholder="your.username" id="adminStaffUser">
+          </div>
+          <div class="form-group">
+            <label>Password</label>
+            <input type="password" placeholder="••••••••" id="adminStaffPass">
+          </div>
+        </div>
+        <button class="role-enter-btn" onclick="handleAdminStaffClick()">Enter as Admin Staff →</button>
       </div>
     </div>
   </div>
@@ -2815,7 +2872,7 @@ textarea.form-control { resize:vertical; min-height:80px; }
     <div class="modal-header"><h3>Create New User</h3><button class="modal-close" onclick="closeModal('createUserModal')">✕</button></div>
     <div class="um-form-row">
       <div class="form-group"><label>Full Name</label><input type="text" class="form-control" id="newUserName" placeholder="e.g. John Smith"></div>
-      <div class="form-group"><label>Role</label><select class="form-control" id="newUserRole" onchange="toggleUserFormFields()"><option value="admin">Administrator</option><option value="instructor">Instructor</option><option value="student">Student</option></select></div>
+      <div class="form-group"><label>Role</label><select class="form-control" id="newUserRole" onchange="toggleUserFormFields()"><option value="admin">Administrator</option><option value="adminstaff">Administrative Staff</option><option value="instructor">Instructor</option><option value="student">Student</option></select></div>
     </div>
     <div class="um-form-row">
       <div class="form-group"><label>Username</label><input type="text" class="form-control" id="newUserUsername" placeholder="e.g. john.smith"></div>
@@ -2837,7 +2894,7 @@ textarea.form-control { resize:vertical; min-height:80px; }
     <input type="hidden" id="editUserId">
     <div class="um-form-row">
       <div class="form-group"><label>Full Name</label><input type="text" class="form-control" id="editUserName"></div>
-      <div class="form-group"><label>Role</label><select class="form-control" id="editUserRole" onchange="toggleEditUserFormFields()"><option value="admin">Administrator</option><option value="instructor">Instructor</option><option value="student">Student</option></select></div>
+      <div class="form-group"><label>Role</label><select class="form-control" id="editUserRole" onchange="toggleEditUserFormFields()"><option value="admin">Administrator</option><option value="adminstaff">Administrative Staff</option><option value="instructor">Instructor</option><option value="student">Student</option></select></div>
     </div>
     <div class="form-group"><label>Username</label><input type="text" class="form-control" id="editUserUsername"></div>
     <div class="form-group"><label>Email</label><input type="email" class="form-control" id="editUserEmail"></div>
@@ -3163,6 +3220,7 @@ function getFilteredNotifications() {
   if(!currentRole) return notifications;
   return notifications.filter(function(n) {
     if(!n.forRoles || !n.forRoles.length) return true;
+    if(currentRole === 'adminstaff') return n.forRoles.indexOf('adminstaff') !== -1 || n.forRoles.indexOf('admin') !== -1;
     return n.forRoles.indexOf(currentRole) !== -1;
   });
 }
@@ -3412,6 +3470,9 @@ function lmsChatScheduleDriveSync() {
   }, 3000);
 }
 
+// Admin Staff Access Settings (declared early for saveState/loadState)
+var adminStaffAccessSettings = { attendance:false, announcements:false, calendar:false, students:false, certificates:false, reports:false, training:false, exams:false, video:false, resources:false };
+
 function saveState() {
   try {
     localStorage.setItem('voctrain_students', JSON.stringify(students));
@@ -3429,6 +3490,7 @@ function saveState() {
     localStorage.setItem('voctrain_calendarEvents', JSON.stringify(calendarEvents));
     localStorage.setItem('voctrain_adrTasks', JSON.stringify(adrTasks));
     localStorage.setItem('voctrain_adrStaffMeta', JSON.stringify(adrStaffMeta));
+    localStorage.setItem('voctrain_adminStaffAccess', JSON.stringify(adminStaffAccessSettings));
     saveLmsChatData();
   } catch(e) { console.warn('saveState: storage quota exceeded or unavailable'); }
   // Push changes to Google Drive immediately (debounced)
@@ -3465,6 +3527,8 @@ function loadState() {
     var adrM = localStorage.getItem('voctrain_adrStaffMeta');
     if(adrT) adrTasks = JSON.parse(adrT);
     if(adrM) adrStaffMeta = JSON.parse(adrM);
+    var asAccess = localStorage.getItem('voctrain_adminStaffAccess');
+    if(asAccess) adminStaffAccessSettings = JSON.parse(asAccess);
   } catch(e) { /* parse error, use generated data */ }
 }
 loadState();
@@ -3482,7 +3546,9 @@ let userAccounts = [
   {id:'USR-007',name:'Keisha Brown',role:'student',username:'keisha.brown',password:'student123',email:'keisha.b@heartlms.edu.jm',programme:'Welding',status:'active',createdAt:'2026-01-10'},
   {id:'USR-008',name:'Marlon Davis',role:'student',username:'marlon.davis',password:'student123',email:'marlon.d@heartlms.edu.jm',programme:'Auto Mechanics',status:'active',createdAt:'2026-01-10'},
   {id:'USR-009',name:'Tanya Johnson',role:'student',username:'tanya.johnson',password:'student123',email:'tanya.j@heartlms.edu.jm',programme:'Business Administration',status:'active',createdAt:'2026-01-11'},
-  {id:'USR-010',name:'Andre Smith',role:'student',username:'andre.smith',password:'student123',email:'andre.s@heartlms.edu.jm',programme:'Electrical Installation',status:'disabled',createdAt:'2026-01-11'}
+  {id:'USR-010',name:'Andre Smith',role:'student',username:'andre.smith',password:'student123',email:'andre.s@heartlms.edu.jm',programme:'Electrical Installation',status:'disabled',createdAt:'2026-01-11'},
+  {id:'USR-011',name:'Ms. T. Clarke',role:'adminstaff',username:'t.clarke',password:'staff123',email:'t.clarke@heartlms.edu.jm',programme:'',status:'active',createdAt:'2026-01-15'},
+  {id:'USR-012',name:'Mr. D. Brown',role:'adminstaff',username:'d.brown',password:'staff123',email:'d.brown@heartlms.edu.jm',programme:'',status:'active',createdAt:'2026-01-15'}
 ];
 let umSelectedIds = [];
 
@@ -3517,12 +3583,12 @@ function getNextUserId() {
 
 function toggleUserFormFields() {
   var role = document.getElementById('newUserRole').value;
-  document.getElementById('newUserProgrammeGroup').style.display = (role === 'admin') ? 'none' : 'block';
+  document.getElementById('newUserProgrammeGroup').style.display = (role === 'admin' || role === 'adminstaff') ? 'none' : 'block';
 }
 
 function toggleEditUserFormFields() {
   var role = document.getElementById('editUserRole').value;
-  document.getElementById('editUserProgrammeGroup').style.display = (role === 'admin') ? 'none' : 'block';
+  document.getElementById('editUserProgrammeGroup').style.display = (role === 'admin' || role === 'adminstaff') ? 'none' : 'block';
 }
 
 function createUserAccount() {
@@ -3535,9 +3601,9 @@ function createUserAccount() {
   if(!name || !username || !password) { alert('Please fill in Name, Username, and Password.'); return; }
   if(password.length < 6) { alert('Password must be at least 6 characters.'); return; }
   if(userAccounts.find(function(u){ return u.username === username; })) { alert('Username already exists.'); return; }
-  if(role !== 'admin' && !programme) { alert('Please select a programme.'); return; }
+  if(role !== 'admin' && role !== 'adminstaff' && !programme) { alert('Please select a programme.'); return; }
   var now = new Date(); var dateStr = now.getFullYear()+'-'+String(now.getMonth()+1).padStart(2,'0')+'-'+String(now.getDate()).padStart(2,'0');
-  userAccounts.push({id:getNextUserId(),name:name,role:role,username:username,password:password,email:email,programme:role==='admin'?'':programme,status:'active',createdAt:dateStr});
+  userAccounts.push({id:getNextUserId(),name:name,role:role,username:username,password:password,email:email,programme:(role==='admin'||role==='adminstaff')?'':programme,status:'active',createdAt:dateStr});
   saveUserAccounts();
   closeModal('createUserModal');
   document.getElementById('newUserName').value='';
@@ -3581,9 +3647,9 @@ function saveUserEdit() {
   if(!name || !username) { alert('Name and Username are required.'); return; }
   var dup = userAccounts.find(function(u){ return u.username === username && u.id !== userId; });
   if(dup) { alert('Username already in use by another account.'); return; }
-  if(role !== 'admin' && !programme) { alert('Please select a programme.'); return; }
+  if(role !== 'admin' && role !== 'adminstaff' && !programme) { alert('Please select a programme.'); return; }
   user.name = name; user.role = role; user.username = username; user.email = email;
-  user.programme = role === 'admin' ? '' : programme;
+  user.programme = (role === 'admin' || role === 'adminstaff') ? '' : programme;
   saveUserAccounts();
   closeModal('editUserModal');
   renderUserAccountsTable();
@@ -3711,9 +3777,9 @@ function renderUserAccountsTable() {
   var tableBody = document.getElementById('umTableBody');
   if(!tableBody) return;
   var filtered = getFilteredUsers();
-  var roleColors = {admin:'linear-gradient(135deg,var(--accent),var(--orange))',instructor:'linear-gradient(135deg,var(--green),var(--teal))',student:'linear-gradient(135deg,var(--blue),#2980b9)'};
-  var roleBadges = {admin:'um-role-admin',instructor:'um-role-instructor',student:'um-role-student'};
-  var roleLabels = {admin:'Admin',instructor:'Instructor',student:'Student'};
+  var roleColors = {admin:'linear-gradient(135deg,var(--accent),var(--orange))',adminstaff:'linear-gradient(135deg,var(--purple),#8e44ad)',instructor:'linear-gradient(135deg,var(--green),var(--teal))',student:'linear-gradient(135deg,var(--blue),#2980b9)'};
+  var roleBadges = {admin:'um-role-admin',adminstaff:'um-role-admin',instructor:'um-role-instructor',student:'um-role-student'};
+  var roleLabels = {admin:'Admin',adminstaff:'Admin Staff',instructor:'Instructor',student:'Student'};
   tableBody.innerHTML = filtered.map(function(u) {
     var initials = u.name.split(' ').map(function(n){return n[0];}).join('').substring(0,2).toUpperCase();
     var checked = umSelectedIds.indexOf(u.id) > -1 ? 'checked' : '';
@@ -3735,9 +3801,10 @@ function renderUserAccountsTable() {
   var active = userAccounts.filter(function(u){return u.status==='active';}).length;
   var disabled = total - active;
   var admins = userAccounts.filter(function(u){return u.role==='admin';}).length;
+  var adminStaffCount = userAccounts.filter(function(u){return u.role==='adminstaff';}).length;
   var instructors = userAccounts.filter(function(u){return u.role==='instructor';}).length;
   var studs = userAccounts.filter(function(u){return u.role==='student';}).length;
-  var els = {umStatTotal:total,umStatActive:active,umStatDisabled:disabled,umStatAdmins:admins,umStatInstructors:instructors,umStatStudents:studs};
+  var els = {umStatTotal:total,umStatActive:active,umStatDisabled:disabled,umStatAdmins:admins,umStatAdminStaff:adminStaffCount,umStatInstructors:instructors,umStatStudents:studs};
   for(var key in els) {
     var el = document.getElementById(key);
     if(el) el.textContent = els[key];
@@ -3939,10 +4006,12 @@ function switchSettingsTab(tab, which) {
   tab.classList.add('active');
   document.getElementById('settingsTabSystem').style.display = which==='system' ? '' : 'none';
   document.getElementById('settingsTabUsers').style.display = which==='users' ? '' : 'none';
+  document.getElementById('settingsTabStaffAccess').style.display = which==='staffaccess' ? '' : 'none';
   if(which === 'users') renderUserAccountsTable();
+  if(which === 'staffaccess') renderAdminStaffAccessGrid();
 }
 
-let adminLoginShown = false, studentLoginShown = false, instructorLoginShown = false;
+let adminLoginShown = false, studentLoginShown = false, instructorLoginShown = false, adminStaffLoginShown = false;
 function requireLoginSync() {
   if(loginSyncCompleted) return false;
   alert('Please sync from Cloud first before signing in.\n\nClick the "Sync Now" button at the top of the page to pull the latest data.');
@@ -4049,6 +4118,33 @@ function handleInstructorClick() {
     enterApp('instructor');
   } catch(err) { console.error('handleInstructorClick error:', err); alert('Error: ' + err.message); }
 }
+function handleAdminStaffClick() {
+  try {
+    if(!adminStaffLoginShown) {
+      document.getElementById('adminStaffLogin').classList.add('active');
+      adminStaffLoginShown = true;
+      document.getElementById('adminStaffUser').focus();
+      return;
+    }
+    if(requireLoginSync()) return;
+    var uname = (document.getElementById('adminStaffUser').value || '').trim();
+    var pw = document.getElementById('adminStaffPass').value;
+    if(!uname || !pw) { alert('Please enter your username and password.'); return; }
+    var userAccount = userAccounts.find(function(u) {
+      return u.role === 'adminstaff' && (u.username === uname || u.email === uname) && u.password === pw;
+    });
+    if(!userAccount) {
+      var anyMatch = userAccounts.find(function(u) { return u.role === 'adminstaff' && (u.username === uname || u.email === uname); });
+      if(anyMatch && anyMatch.status === 'disabled') { alert('This account has been disabled. Contact the System Administrator.'); return; }
+      if(anyMatch && anyMatch.status === 'pending') { showPendingApprovalScreen(anyMatch); return; }
+      alert('Invalid username or password.'); return;
+    }
+    if(userAccount.status === 'disabled') { alert('This account has been disabled. Contact the System Administrator.'); return; }
+    if(userAccount.status === 'pending') { showPendingApprovalScreen(userAccount); return; }
+    currentLoggedInUser = userAccount;
+    enterApp('adminstaff');
+  } catch(err) { console.error('handleAdminStaffClick error:', err); alert('Error: ' + err.message); }
+}
 
 function enterApp(role) {
   try {
@@ -4075,6 +4171,17 @@ function enterApp(role) {
       document.getElementById('sidebarUserName').textContent = currentInstructor.name;
       document.getElementById('sidebarUserRole').textContent = currentInstructor.course + ' Instructor';
       showPage('i-dashboard');
+    } else if(role === 'adminstaff') {
+      buildAdminStaffSidebar();
+      buildAdminStaffPages();
+      var asInitials = currentLoggedInUser.name.split(' ').map(function(n){return n[0];}).join('').substring(0,2);
+      document.getElementById('sidebarRoleLabel').textContent = 'Admin Staff Portal';
+      document.getElementById('sidebarAvatar').textContent = asInitials;
+      document.getElementById('sidebarAvatar').style.background = 'linear-gradient(135deg,var(--purple),#8e44ad)';
+      document.getElementById('sidebarUserName').textContent = currentLoggedInUser.name;
+      document.getElementById('sidebarUserRole').textContent = 'Administrative Staff';
+      showPage('as-dashboard');
+      adrInit();
     } else {
       buildStudentSidebar();
       buildStudentPages();
@@ -4468,10 +4575,17 @@ function logout() {
   currentRole = null;
   currentStudent = null;
   currentInstructor = null;
+  currentLoggedInUser = null;
+  adminLoginShown = false; studentLoginShown = false; instructorLoginShown = false; adminStaffLoginShown = false;
   document.getElementById('appShell').classList.remove('active');
   document.getElementById('landingPage').style.display = '';
   document.getElementById('mainContent').innerHTML = '';
   document.getElementById('sidebarNav').innerHTML = '';
+  // Reset login forms
+  ['adminLogin','studentLogin','instructorLogin','adminStaffLogin'].forEach(function(id) {
+    var el = document.getElementById(id);
+    if(el) el.classList.remove('active');
+  });
 }
 
 function buildAdminSidebar() {
@@ -4626,16 +4740,22 @@ function showPage(pageId) {
     'i-attendance':'Class Attendance','i-gradebook':'Gradebook','i-resources':'Course Resources',
     'i-announcements':'Announcements','i-calendar':'Calendar','i-profile':'My Profile',
     'lms-chat':'C.E.S.T.I.S LMS Chat','s-lms-chat':'C.E.S.T.I.S LMS Chat','i-lms-chat':'C.E.S.T.I.S LMS Chat',
-    'admin-duty-register':'Admin Duty Register'
+    'admin-duty-register':'Admin Duty Register',
+    'as-dashboard':'My Dashboard','as-duties':'My Duties','as-lms-chat':'C.E.S.T.I.S LMS Chat','as-profile':'My Profile',
+    'as-attendance':'Attendance Management','as-announcements':'Announcements','as-calendar':'Calendar & Schedule',
+    'as-students':'Student Progress','as-certificates':'Certificate Tracking','as-reports':'Reports & Analytics',
+    'as-training':'Training Centres','as-exams':'Online Exams','as-video':'Video Conference','as-resources':'Resource Manager'
   };
   document.getElementById('topbarTitle').textContent = titles[pageId]||pageId;
   if(pageId === 'admin-duty-register') adrOnPageShow();
+  if(pageId === 'as-duties') asOnDutiesPageShow();
   if(pageId === 'verify-users') renderVerifyUsersPage();
   if(pageId === 'a-resources') renderAdminResources();
   if(pageId === 's-resources') renderStudentDriveResources();
   if(pageId === 'lms-chat') lmsChatOnPageShow('admin');
   if(pageId === 's-lms-chat') lmsChatOnPageShow('student');
   if(pageId === 'i-lms-chat') lmsChatOnPageShow('instructor');
+  if(pageId === 'as-lms-chat') lmsChatOnPageShow('adminstaff');
   setTimeout(animateAllCounters, 50);
 }
 
@@ -4999,6 +5119,7 @@ function buildAdminPages() {
     <div class="tabs">
       <div class="tab active" onclick="switchSettingsTab(this,'system')">System Settings</div>
       <div class="tab" onclick="switchSettingsTab(this,'users')">User Accounts</div>
+      <div class="tab" onclick="switchSettingsTab(this,'staffaccess')">Admin Staff Access</div>
     </div>
 
     <div id="settingsTabSystem">
@@ -5018,13 +5139,14 @@ function buildAdminPages() {
         <div class="um-stat"><div class="um-stat-val" style="color:var(--green);" id="umStatActive">0</div><div class="um-stat-label">Active</div></div>
         <div class="um-stat"><div class="um-stat-val" style="color:var(--red);" id="umStatDisabled">0</div><div class="um-stat-label">Disabled</div></div>
         <div class="um-stat"><div class="um-stat-val" style="color:var(--accent);" id="umStatAdmins">0</div><div class="um-stat-label">Admins</div></div>
+        <div class="um-stat"><div class="um-stat-val" style="color:var(--purple);" id="umStatAdminStaff">0</div><div class="um-stat-label">Admin Staff</div></div>
         <div class="um-stat"><div class="um-stat-val" style="color:var(--green);" id="umStatInstructors">0</div><div class="um-stat-label">Instructors</div></div>
         <div class="um-stat"><div class="um-stat-val" style="color:var(--blue);" id="umStatStudents">0</div><div class="um-stat-label">Students</div></div>
       </div>
 
       <div class="um-toolbar">
         <button class="btn btn-primary" onclick="openModal('createUserModal')">+ Create User</button>
-        <select class="form-control" style="width:160px;" id="umRoleFilter" onchange="umSelectedIds=[];renderUserAccountsTable()"><option value="all">All Roles</option><option value="admin">Admins</option><option value="instructor">Instructors</option><option value="student">Students</option></select>
+        <select class="form-control" style="width:160px;" id="umRoleFilter" onchange="umSelectedIds=[];renderUserAccountsTable()"><option value="all">All Roles</option><option value="admin">Admins</option><option value="adminstaff">Admin Staff</option><option value="instructor">Instructors</option><option value="student">Students</option></select>
         <select class="form-control" style="width:160px;" id="umStatusFilter" onchange="umSelectedIds=[];renderUserAccountsTable()"><option value="all">All Status</option><option value="active">Active</option><option value="disabled">Disabled</option></select>
         <input type="text" class="form-control um-search" placeholder="Search users..." id="umSearch" onkeyup="renderUserAccountsTable()">
         <button class="btn-export" onclick="bulkExportUsers()">📄 Export Selected</button>
@@ -5049,6 +5171,19 @@ function buildAdminPages() {
             </tr></thead>
             <tbody id="umTableBody"></tbody>
           </table>
+        </div>
+      </div>
+    </div>
+
+    <div id="settingsTabStaffAccess" style="display:none;">
+      <div class="card" style="max-width:900px;">
+        <div class="card-header"><h3>Admin Staff Access Control</h3></div>
+        <p style="font-size:13px;color:var(--text-secondary);margin-bottom:16px;line-height:1.6;">
+          Choose which pages Administrative Staff can access when they log in. All admin staff will always have access to their <strong>Dashboard</strong>, <strong>My Duties</strong>, <strong>LMS Chat</strong>, and <strong>My Profile</strong> pages. Toggle additional pages below.
+        </p>
+        <div class="as-access-grid" id="asAccessGrid"></div>
+        <div style="margin-top:20px;">
+          <button class="btn btn-primary" onclick="saveAdminStaffAccess()">Save Access Settings</button>
         </div>
       </div>
     </div>
@@ -5092,8 +5227,8 @@ function buildAdminPages() {
   </section>
 
   <!-- ADMIN DUTY REGISTER MODALS -->
-  <div class="modal" id="adrAssignTaskModal">
-    <div class="modal-content" style="max-width:620px;">
+  <div class="modal-overlay" id="adrAssignTaskModal">
+    <div class="modal" style="max-width:620px;">
       <div class="modal-header"><h3>Assign Task to Admin Staff</h3><button class="modal-close" onclick="closeModal('adrAssignTaskModal')">&times;</button></div>
       <div class="form-group"><label>Assign To</label><select class="form-control" id="adrTaskAssignee"><option value="">-- Select Staff --</option></select></div>
       <div class="form-group"><label>Task Title</label><input type="text" class="form-control" id="adrTaskTitle" placeholder="Enter task title"></div>
@@ -5114,15 +5249,15 @@ function buildAdminPages() {
     </div>
   </div>
 
-  <div class="modal" id="adrTaskDetailModal">
-    <div class="modal-content" style="max-width:700px;max-height:85vh;overflow-y:auto;">
+  <div class="modal-overlay" id="adrTaskDetailModal">
+    <div class="modal" style="max-width:700px;max-height:85vh;overflow-y:auto;">
       <div class="modal-header"><h3 id="adrDetailTitle">Task Details</h3><button class="modal-close" onclick="closeModal('adrTaskDetailModal')">&times;</button></div>
       <div id="adrDetailBody"></div>
     </div>
   </div>
 
-  <div class="modal" id="adrExtendTimeModal">
-    <div class="modal-content" style="max-width:440px;">
+  <div class="modal-overlay" id="adrExtendTimeModal">
+    <div class="modal" style="max-width:440px;">
       <div class="modal-header"><h3>Extend Task Deadline</h3><button class="modal-close" onclick="closeModal('adrExtendTimeModal')">&times;</button></div>
       <div class="form-group"><label>New Deadline Date</label><input type="date" class="form-control" id="adrExtendDate"></div>
       <div class="form-group"><label>New Deadline Time</label><input type="time" class="form-control" id="adrExtendTime" value="17:00"></div>
@@ -13542,13 +13677,14 @@ var adrViewMode = 'admin'; // 'admin' = sys admin overview, 'staff' = personal t
 var adrNotifIntervals = {};
 
 function adrGetAdminStaff() {
-  return userAccounts.filter(function(u) { return u.role === 'admin' && u.status === 'active'; });
+  return userAccounts.filter(function(u) { return (u.role === 'admin' || u.role === 'adminstaff') && u.status === 'active'; });
 }
 
 function adrIsSystemAdmin() {
-  // The first admin account (USR-001) is System Administrator
+  // The first admin account (USR-001) is System Administrator; any admin role user is a system admin
   if(!currentLoggedInUser) return true; // direct admin login = sys admin
-  return currentLoggedInUser.id === 'USR-001';
+  if(currentLoggedInUser.role === 'adminstaff') return false;
+  return currentLoggedInUser.role === 'admin';
 }
 
 function adrGetCurrentUserId() {
@@ -13687,7 +13823,7 @@ function adrRenderStaffCards() {
         '<div class="adr-staff-avatar" style="background:'+colors[colorIdx]+';">'+initials+'</div>' +
         '<div class="adr-staff-info">' +
           '<div class="adr-staff-name">'+s.name+'</div>' +
-          '<div class="adr-staff-role">'+((s.id === 'USR-001') ? 'System Administrator' : 'Admin Staff')+'</div>' +
+          '<div class="adr-staff-role">'+((s.role === 'admin') ? 'System Administrator' : 'Administrative Staff')+'</div>' +
           '<div class="adr-staff-badge-row"><span class="adr-badge '+badge.cls+'">'+badge.icon+' '+badge.label+'</span></div>' +
         '</div>' +
       '</div>' +
@@ -13950,6 +14086,7 @@ function adrToggleComplete(taskId) {
 
   adrSaveData();
   adrRenderTasks();
+  if(typeof asRenderDuties === 'function') asRenderDuties();
   if(adrViewMode === 'admin') {
     adrRenderStaffCards();
     adrRenderPerfOverview();
@@ -14275,6 +14412,353 @@ function adrUpdateBadge() {
     badge.style.display = 'none';
   }
 }
+
+// ============================== ADMIN STAFF ACCESS CONTROL ==============================
+var asAccessPages = [
+  { key:'attendance', label:'Attendance Management', desc:'Mark and view attendance records' },
+  { key:'announcements', label:'Announcements', desc:'View and create announcements' },
+  { key:'calendar', label:'Calendar & Schedule', desc:'View and manage calendar events' },
+  { key:'students', label:'Student Progress', desc:'View student data and progress' },
+  { key:'certificates', label:'Certificate Tracking', desc:'View and manage certificates' },
+  { key:'reports', label:'Reports & Analytics', desc:'Access reports and charts' },
+  { key:'training', label:'Training Centres', desc:'View training centre information' },
+  { key:'exams', label:'Online Exams', desc:'View and manage exams' },
+  { key:'video', label:'Video Conference', desc:'Join and manage video sessions' },
+  { key:'resources', label:'Resource Manager', desc:'Access shared resources' }
+];
+
+function loadAdminStaffAccess() {
+  try {
+    var stored = localStorage.getItem('voctrain_adminStaffAccess');
+    if(stored) adminStaffAccessSettings = JSON.parse(stored);
+  } catch(e) {}
+}
+loadAdminStaffAccess();
+
+function saveAdminStaffAccessToStorage() {
+  try {
+    localStorage.setItem('voctrain_adminStaffAccess', JSON.stringify(adminStaffAccessSettings));
+  } catch(e) {}
+  saveState();
+}
+
+function renderAdminStaffAccessGrid() {
+  var grid = document.getElementById('asAccessGrid');
+  if(!grid) return;
+  var html = '';
+  asAccessPages.forEach(function(pg) {
+    var checked = adminStaffAccessSettings[pg.key] ? 'checked' : '';
+    html += '<div class="as-access-item" onclick="toggleAsAccess(\''+pg.key+'\',this)">' +
+      '<input type="checkbox" id="asAccess_'+pg.key+'" '+checked+' onclick="event.stopPropagation();toggleAsAccess(\''+pg.key+'\',this.parentElement)">' +
+      '<div><label for="asAccess_'+pg.key+'">'+pg.label+'</label><div class="as-access-desc">'+pg.desc+'</div></div>' +
+    '</div>';
+  });
+  grid.innerHTML = html;
+}
+
+function toggleAsAccess(key, itemEl) {
+  adminStaffAccessSettings[key] = !adminStaffAccessSettings[key];
+  var cb = document.getElementById('asAccess_'+key);
+  if(cb) cb.checked = adminStaffAccessSettings[key];
+}
+
+function saveAdminStaffAccess() {
+  saveAdminStaffAccessToStorage();
+  showToast('Admin Staff access settings saved!');
+}
+
+// ============================== BUILD ADMIN STAFF SIDEBAR ==============================
+function buildAdminStaffSidebar() {
+  var nav = document.getElementById('sidebarNav');
+  var html = '<div class="nav-section-label">My Portal</div>';
+  html += '<div class="nav-item active" data-page="as-dashboard" onclick="showPage(\'as-dashboard\')">' +
+    '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/></svg>Dashboard</div>';
+
+  // My Duties is always visible
+  var myPendingTasks = adrTasks.filter(function(t){ return t.assigneeId === adrGetCurrentUserId() && t.status !== 'completed'; }).length;
+  html += '<div class="nav-item" data-page="as-duties" onclick="showPage(\'as-duties\')">' +
+    '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 5H7a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V7a2 2 0 0 0-2-2h-2"/><rect x="9" y="3" width="6" height="4" rx="1"/><path d="M9 14l2 2 4-4"/></svg>My Duties' +
+    (myPendingTasks > 0 ? '<span class="nav-badge" style="background:var(--accent);">'+myPendingTasks+'</span>' : '') + '</div>';
+
+  // LMS Chat always visible
+  html += '<div class="nav-item" data-page="as-lms-chat" onclick="showPage(\'as-lms-chat\')">' +
+    '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>LMS Chat<span class="nav-badge" style="background:var(--green);">NEW</span></div>';
+
+  // Conditionally show pages based on admin access settings
+  var hasAdditional = false;
+  if(adminStaffAccessSettings.video) {
+    if(!hasAdditional) { html += '<div class="nav-section-label">Permitted Functions</div>'; hasAdditional = true; }
+    html += '<div class="nav-item" data-page="as-video" onclick="showPage(\'as-video\')"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="23 7 16 12 23 17 23 7"/><rect x="1" y="5" width="15" height="14" rx="2" ry="2"/></svg>Video Conference</div>';
+  }
+  if(adminStaffAccessSettings.students) {
+    if(!hasAdditional) { html += '<div class="nav-section-label">Permitted Functions</div>'; hasAdditional = true; }
+    html += '<div class="nav-item" data-page="as-students" onclick="showPage(\'as-students\')"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>Student Progress</div>';
+  }
+  if(adminStaffAccessSettings.training) {
+    if(!hasAdditional) { html += '<div class="nav-section-label">Permitted Functions</div>'; hasAdditional = true; }
+    html += '<div class="nav-item" data-page="as-training" onclick="showPage(\'as-training\')"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M2 3h6a4 4 0 0 1 4 4v14a3 3 0 0 0-3-3H2z"/><path d="M22 3h-6a4 4 0 0 0-4 4v14a3 3 0 0 1 3-3h7z"/></svg>Training Centres</div>';
+  }
+  if(adminStaffAccessSettings.resources) {
+    if(!hasAdditional) { html += '<div class="nav-section-label">Permitted Functions</div>'; hasAdditional = true; }
+    html += '<div class="nav-item" data-page="as-resources" onclick="showPage(\'as-resources\')"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M13 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V9z"/><polyline points="13 2 13 9 20 9"/></svg>Resource Manager</div>';
+  }
+  if(adminStaffAccessSettings.exams) {
+    if(!hasAdditional) { html += '<div class="nav-section-label">Permitted Functions</div>'; hasAdditional = true; }
+    html += '<div class="nav-item" data-page="as-exams" onclick="showPage(\'as-exams\')"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg>Online Exams</div>';
+  }
+
+  var hasMgmt = false;
+  if(adminStaffAccessSettings.attendance) {
+    if(!hasMgmt) { html += '<div class="nav-section-label">Management</div>'; hasMgmt = true; }
+    html += '<div class="nav-item" data-page="as-attendance" onclick="showPage(\'as-attendance\')"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M16 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="8.5" cy="7" r="4"/><polyline points="17 11 19 13 23 9"/></svg>Attendance</div>';
+  }
+  if(adminStaffAccessSettings.announcements) {
+    if(!hasMgmt) { html += '<div class="nav-section-label">Management</div>'; hasMgmt = true; }
+    html += '<div class="nav-item" data-page="as-announcements" onclick="showPage(\'as-announcements\')"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/></svg>Announcements</div>';
+  }
+  if(adminStaffAccessSettings.calendar) {
+    if(!hasMgmt) { html += '<div class="nav-section-label">Management</div>'; hasMgmt = true; }
+    html += '<div class="nav-item" data-page="as-calendar" onclick="showPage(\'as-calendar\')"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>Calendar</div>';
+  }
+  if(adminStaffAccessSettings.certificates) {
+    if(!hasMgmt) { html += '<div class="nav-section-label">Management</div>'; hasMgmt = true; }
+    html += '<div class="nav-item" data-page="as-certificates" onclick="showPage(\'as-certificates\')"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="8" r="7"/><polyline points="8.21 13.89 7 23 12 20 17 23 15.79 13.88"/></svg>Certificates</div>';
+  }
+  if(adminStaffAccessSettings.reports) {
+    if(!hasMgmt) { html += '<div class="nav-section-label">Management</div>'; hasMgmt = true; }
+    html += '<div class="nav-item" data-page="as-reports" onclick="showPage(\'as-reports\')"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/></svg>Reports</div>';
+  }
+
+  // Profile always visible
+  html += '<div class="nav-section-label">Account</div>';
+  html += '<div class="nav-item" data-page="as-profile" onclick="showPage(\'as-profile\')">' +
+    '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>My Profile</div>';
+
+  nav.innerHTML = html;
+}
+
+// ============================== BUILD ADMIN STAFF PAGES ==============================
+function buildAdminStaffPages() {
+  var mc = document.getElementById('mainContent');
+  var user = currentLoggedInUser;
+  var uid = user.id;
+  var firstName = user.name.split(' ').pop() || user.name;
+  var myTasks = adrTasks.filter(function(t){ return t.assigneeId === uid; });
+  var pendingTasks = myTasks.filter(function(t){ return t.status !== 'completed'; });
+  var completedTasks = myTasks.filter(function(t){ return t.status === 'completed'; });
+  var overdueTasks = pendingTasks.filter(function(t){ return adrIsOverdue(t); });
+  var perf = adrGetStaffPerformance(uid);
+  var badge = adrGetBadge(perf.score);
+  var perfColor = perf.score >= 85 ? 'var(--green)' : perf.score >= 65 ? 'var(--accent)' : perf.score >= 40 ? 'var(--orange)' : 'var(--red)';
+
+  var html = '';
+
+  // ---- Dashboard Page ----
+  html += '<section class="page active" id="page-as-dashboard">';
+  html += '<div class="as-welcome-banner">' +
+    '<h2>Welcome back, <span>' + firstName + '</span>!</h2>' +
+    '<p>Administrative Staff &mdash; ' + user.email + '</p>' +
+  '</div>';
+
+  // Duty Stats
+  html += '<div class="as-duty-stats">' +
+    '<div class="as-duty-stat"><div class="as-ds-val" style="color:var(--accent);">' + myTasks.length + '</div><div class="as-ds-label">Total Duties</div></div>' +
+    '<div class="as-duty-stat"><div class="as-ds-val" style="color:var(--purple);">' + pendingTasks.length + '</div><div class="as-ds-label">Pending</div></div>' +
+    '<div class="as-duty-stat"><div class="as-ds-val" style="color:var(--green);">' + completedTasks.length + '</div><div class="as-ds-label">Completed</div></div>' +
+    '<div class="as-duty-stat"><div class="as-ds-val" style="color:var(--red);">' + overdueTasks.length + '</div><div class="as-ds-label">Overdue</div></div>' +
+  '</div>';
+
+  // Performance Card
+  html += '<div class="card" style="margin-bottom:24px;padding:24px;">' +
+    '<div style="display:flex;align-items:center;gap:20px;flex-wrap:wrap;">' +
+      '<div style="text-align:center;"><div style="font-size:42px;font-weight:800;font-family:\'Playfair Display\',serif;color:'+perfColor+';">'+perf.score+'%</div><div style="font-size:12px;color:var(--text-muted);">Performance</div></div>' +
+      '<div style="flex:1;min-width:200px;"><div class="adr-staff-perf-bar" style="height:12px;margin-bottom:8px;"><div class="adr-staff-perf-fill" style="width:'+perf.score+'%;background:'+perfColor+';"></div></div>' +
+      '<div style="display:flex;justify-content:space-between;font-size:12px;color:var(--text-muted);"><span>'+perf.onTime+' on time / '+perf.total+' total</span><span class="adr-badge '+badge.cls+'" style="font-size:12px;">'+badge.icon+' '+badge.label+'</span></div></div>' +
+    '</div>' +
+  '</div>';
+
+  // Urgent Tasks Preview
+  if(overdueTasks.length > 0) {
+    html += '<div class="card" style="margin-bottom:24px;border-color:var(--red);">' +
+      '<div class="card-header"><h3 style="color:var(--red);">Overdue Tasks</h3></div>';
+    overdueTasks.slice(0,5).forEach(function(task) {
+      html += '<div style="display:flex;align-items:center;gap:12px;padding:10px 0;border-bottom:1px solid var(--border);">' +
+        '<span class="adr-task-tag adr-tag-'+task.priority+'" style="font-size:10px;">'+task.priority.toUpperCase()+'</span>' +
+        '<span style="flex:1;font-size:13px;">'+task.title+'</span>' +
+        '<span style="font-size:11px;color:var(--red);">Due: '+adrFormatDeadline(task.deadline)+'</span>' +
+      '</div>';
+    });
+    html += '</div>';
+  }
+
+  // Recent pending tasks preview
+  if(pendingTasks.length > 0) {
+    html += '<div class="card" style="margin-bottom:24px;">' +
+      '<div class="card-header"><h3>Upcoming Duties</h3></div>';
+    pendingTasks.filter(function(t){ return !adrIsOverdue(t); }).slice(0,5).forEach(function(task) {
+      html += '<div style="display:flex;align-items:center;gap:12px;padding:10px 0;border-bottom:1px solid var(--border);">' +
+        '<span class="adr-task-tag adr-tag-'+task.priority+'" style="font-size:10px;">'+task.priority.toUpperCase()+'</span>' +
+        '<span class="adr-task-tag adr-tag-'+task.taskType+'" style="font-size:10px;">'+task.taskType.toUpperCase()+'</span>' +
+        '<span style="flex:1;font-size:13px;">'+task.title+'</span>' +
+        '<span style="font-size:11px;color:var(--text-muted);">'+adrFormatDeadline(task.deadline)+'</span>' +
+      '</div>';
+    });
+    html += '</div>';
+  }
+  html += '</section>';
+
+  // ---- My Duties Page ----
+  html += '<section class="page" id="page-as-duties">' +
+    '<div class="adr-header-bar"><div class="adr-header-left">' +
+      '<h3 style="font-family:\'Playfair Display\',serif;font-size:20px;">My Assigned Duties</h3>' +
+      '<span class="adr-subtitle">View and complete your assigned tasks</span>' +
+    '</div></div>' +
+    '<div id="asDutyBoard">' +
+      '<div class="adr-tabs" id="asDutyTabs">' +
+        '<div class="adr-tab active" onclick="asSwitchDutyTab(this,\'all\')">All Tasks</div>' +
+        '<div class="adr-tab" onclick="asSwitchDutyTab(this,\'daily\')">Daily</div>' +
+        '<div class="adr-tab" onclick="asSwitchDutyTab(this,\'weekly\')">Weekly</div>' +
+        '<div class="adr-tab" onclick="asSwitchDutyTab(this,\'monthly\')">Monthly</div>' +
+        '<div class="adr-tab" onclick="asSwitchDutyTab(this,\'completed\')">Completed</div>' +
+      '</div>' +
+      '<div class="adr-filters">' +
+        '<select class="form-control" id="asDutyPriority" onchange="asRenderDuties()" style="width:160px;"><option value="all">All Priorities</option><option value="urgent">Urgent</option><option value="high">High</option><option value="medium">Medium</option><option value="low">Low</option></select>' +
+        '<input type="text" class="form-control" id="asDutySearch" placeholder="Search duties..." onkeyup="asRenderDuties()" style="width:220px;">' +
+      '</div>' +
+      '<div class="adr-task-list" id="asDutyList"></div>' +
+    '</div>' +
+  '</section>';
+
+  // ---- LMS Chat Page ----
+  html += '<section class="page" id="page-as-lms-chat">' +
+    '<div class="lms-chat-container" id="adminStaffChatContainer">' +
+      '<div class="lms-chat-sidebar" id="adminStaffChatSidebar">' +
+        '<div class="lms-chat-sidebar-header"><h3>C.E.S.T.I.S Chat</h3>' +
+          '<div class="lms-chat-sidebar-actions"><button onclick="lmsChatOpenProfileModal()" title="My Profile">&#128100;</button></div>' +
+        '</div>' +
+        '<input type="text" class="lms-chat-search" placeholder="Search chats..." oninput="lmsChatFilterRooms(this.value,\'adminStaff\')">' +
+        '<div class="lms-chat-room-list" id="adminStaffChatRoomList"></div>' +
+      '</div>' +
+      '<div class="lms-chat-main" id="adminStaffChatMain">' +
+        '<div class="lms-chat-placeholder"><div class="lms-chat-placeholder-icon">&#128172;</div><h3>Select a chat to start messaging</h3></div>' +
+      '</div>' +
+    '</div>' +
+  '</section>';
+
+  // ---- Profile Page ----
+  var pInitials = user.name.split(' ').map(function(n){ return n[0]; }).join('').substring(0,2);
+  html += '<section class="page" id="page-as-profile">' +
+    '<div class="card" style="max-width:600px;margin:0 auto;text-align:center;padding:40px;">' +
+      '<div style="width:80px;height:80px;border-radius:50%;background:linear-gradient(135deg,var(--purple),#8e44ad);display:flex;align-items:center;justify-content:center;font-size:28px;font-weight:700;margin:0 auto 16px;">'+pInitials+'</div>' +
+      '<h3 style="font-size:20px;margin-bottom:4px;">'+user.name+'</h3>' +
+      '<p style="color:var(--text-muted);font-size:13px;margin-bottom:20px;">Administrative Staff</p>' +
+      '<div style="text-align:left;max-width:400px;margin:0 auto;">' +
+        '<div style="display:flex;justify-content:space-between;padding:10px 0;border-bottom:1px solid var(--border);"><span style="color:var(--text-muted);font-size:13px;">User ID</span><span style="font-size:13px;">'+user.id+'</span></div>' +
+        '<div style="display:flex;justify-content:space-between;padding:10px 0;border-bottom:1px solid var(--border);"><span style="color:var(--text-muted);font-size:13px;">Username</span><span style="font-size:13px;">'+user.username+'</span></div>' +
+        '<div style="display:flex;justify-content:space-between;padding:10px 0;border-bottom:1px solid var(--border);"><span style="color:var(--text-muted);font-size:13px;">Email</span><span style="font-size:13px;">'+(user.email||'N/A')+'</span></div>' +
+        '<div style="display:flex;justify-content:space-between;padding:10px 0;border-bottom:1px solid var(--border);"><span style="color:var(--text-muted);font-size:13px;">Role</span><span style="font-size:13px;">Administrative Staff</span></div>' +
+        '<div style="display:flex;justify-content:space-between;padding:10px 0;"><span style="color:var(--text-muted);font-size:13px;">Status</span><span style="font-size:13px;color:var(--green);">'+user.status+'</span></div>' +
+      '</div>' +
+    '</div>' +
+  '</section>';
+
+  mc.innerHTML = html;
+}
+
+// ---- Admin Staff Duty Page Functions ----
+var asDutyCurrentTab = 'all';
+
+function asSwitchDutyTab(tabEl, tab) {
+  asDutyCurrentTab = tab;
+  document.querySelectorAll('#asDutyTabs .adr-tab').forEach(function(t){ t.classList.remove('active'); });
+  tabEl.classList.add('active');
+  asRenderDuties();
+}
+
+function asOnDutiesPageShow() {
+  asRenderDuties();
+}
+
+function asRenderDuties() {
+  var el = document.getElementById('asDutyList');
+  if(!el) return;
+  var uid = adrGetCurrentUserId();
+  var tab = asDutyCurrentTab;
+  var priorityFilter = document.getElementById('asDutyPriority') ? document.getElementById('asDutyPriority').value : 'all';
+  var search = document.getElementById('asDutySearch') ? document.getElementById('asDutySearch').value.toLowerCase().trim() : '';
+
+  var tasks = adrTasks.filter(function(t){ return t.assigneeId === uid; });
+
+  if(tab === 'daily') tasks = tasks.filter(function(t){ return t.taskType === 'daily'; });
+  else if(tab === 'weekly') tasks = tasks.filter(function(t){ return t.taskType === 'weekly'; });
+  else if(tab === 'monthly') tasks = tasks.filter(function(t){ return t.taskType === 'monthly'; });
+  else if(tab === 'completed') tasks = tasks.filter(function(t){ return t.status === 'completed'; });
+  else tasks = tasks.filter(function(t){ return t.status !== 'completed'; });
+
+  if(priorityFilter !== 'all') tasks = tasks.filter(function(t){ return t.priority === priorityFilter; });
+  if(search) {
+    tasks = tasks.filter(function(t){
+      return t.title.toLowerCase().indexOf(search) !== -1 || t.description.toLowerCase().indexOf(search) !== -1;
+    });
+  }
+
+  var priorityOrder = {urgent:0, high:1, medium:2, low:3};
+  tasks.sort(function(a,b) {
+    if(a.status === 'completed' && b.status !== 'completed') return 1;
+    if(a.status !== 'completed' && b.status === 'completed') return -1;
+    var aOD = adrIsOverdue(a) ? 0 : 1;
+    var bOD = adrIsOverdue(b) ? 0 : 1;
+    if(aOD !== bOD) return aOD - bOD;
+    return (priorityOrder[a.priority]||2) - (priorityOrder[b.priority]||2);
+  });
+
+  if(tasks.length === 0) {
+    el.innerHTML = '<div class="adr-empty-state">' +
+      '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M9 5H7a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V7a2 2 0 0 0-2-2h-2"/><rect x="9" y="3" width="6" height="4" rx="1"/><path d="M9 14l2 2 4-4"/></svg>' +
+      '<h4>No Duties Found</h4><p>You have no duties matching this filter.</p></div>';
+    return;
+  }
+
+  var htmlOut = '';
+  tasks.forEach(function(task) {
+    var isOverdue = adrIsOverdue(task);
+    var isCompleted = task.status === 'completed';
+    var cardCls = 'adr-task-card';
+    if(isCompleted) cardCls += ' adr-completed';
+    else if(isOverdue) cardCls += ' adr-overdue';
+    else if(task.priority === 'urgent') cardCls += ' adr-urgent';
+    else if(task.priority === 'high') cardCls += ' adr-high';
+
+    var deadlineStr = adrFormatDeadline(task.deadline);
+    var deadlineCls = isOverdue && !isCompleted ? 'adr-task-deadline overdue' : 'adr-task-deadline';
+    var commentsCount = task.comments ? task.comments.length : 0;
+
+    htmlOut += '<div class="'+cardCls+'" onclick="adrOpenTaskDetail(\''+task.id+'\')">' +
+      '<div class="adr-task-check '+(isCompleted?'checked':'')+'" onclick="event.stopPropagation();adrToggleComplete(\''+task.id+'\')">'+(isCompleted?'\u2713':'')+'</div>' +
+      '<div class="adr-task-body">' +
+        '<div class="adr-task-title">'+(isCompleted?'<s>':'')+task.title+(isCompleted?'</s>':'')+'</div>' +
+        '<div class="adr-task-meta">' +
+          '<span class="adr-task-tag adr-tag-'+task.priority+'">'+task.priority.toUpperCase()+'</span>' +
+          '<span class="adr-task-tag adr-tag-'+task.taskType+'">'+task.taskType.toUpperCase()+'</span>' +
+          '<span class="'+deadlineCls+'">'+(isOverdue && !isCompleted ? '\u26A0 OVERDUE \u2014 ' : '\uD83D\uDCC5 ')+deadlineStr+'</span>' +
+          (commentsCount > 0 ? '<span class="adr-task-deadline">\uD83D\uDCAC '+commentsCount+' comment'+(commentsCount>1?'s':'')+'</span>' : '') +
+          (task.status === 'acknowledged' ? '<span class="adr-task-tag adr-tag-weekly">\u2713 Acknowledged</span>' : '') +
+          (task.fileName ? '<span class="adr-task-deadline">\uD83D\uDCCE File attached</span>' : '') +
+          '<span class="adr-task-deadline">Assigned by: '+task.assignedBy+'</span>' +
+        '</div>' +
+      '</div>' +
+      '<div class="adr-task-actions">' +
+        (!isCompleted && task.status !== 'acknowledged' && task.taskType === 'weekly' ?
+          '<button class="adr-ack-btn" onclick="event.stopPropagation();adrAcknowledgeTask(\''+task.id+'\')" title="Acknowledge">\u2713 Ack</button>' : '') +
+        '<button onclick="event.stopPropagation();adrOpenTaskDetail(\''+task.id+'\')" title="Details">\uD83D\uDD0D</button>' +
+      '</div>' +
+    '</div>';
+  });
+  el.innerHTML = htmlOut;
+}
+
+// ---- Update ADR notification targets to include adminstaff ----
+// Override notification targets for admin staff: they should receive 'admin' role notifications for their tasks
 
 </script>
 </body>
