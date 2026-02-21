@@ -2699,7 +2699,7 @@ textarea.form-control { resize:vertical; min-height:80px; }
         <div class="role-login" id="adminStaffLogin">
           <div class="form-group">
             <label>Username</label>
-            <input type="text" placeholder="your.username" id="adminStaffUser">
+            <input type="text" placeholder="adminstaff" id="adminStaffUser">
           </div>
           <div class="form-group">
             <label>Password</label>
@@ -3549,8 +3549,7 @@ let userAccounts = [
   {id:'USR-008',name:'Marlon Davis',role:'student',username:'marlon.davis',password:'student123',email:'marlon.d@heartlms.edu.jm',programme:'Auto Mechanics',status:'active',createdAt:'2026-01-10'},
   {id:'USR-009',name:'Tanya Johnson',role:'student',username:'tanya.johnson',password:'student123',email:'tanya.j@heartlms.edu.jm',programme:'Business Administration',status:'active',createdAt:'2026-01-11'},
   {id:'USR-010',name:'Andre Smith',role:'student',username:'andre.smith',password:'student123',email:'andre.s@heartlms.edu.jm',programme:'Electrical Installation',status:'disabled',createdAt:'2026-01-11'},
-  {id:'USR-011',name:'Ms. T. Clarke',role:'adminstaff',username:'t.clarke',password:'staff123',email:'t.clarke@heartlms.edu.jm',programme:'',status:'active',createdAt:'2026-01-15'},
-  {id:'USR-012',name:'Mr. D. Brown',role:'adminstaff',username:'d.brown',password:'staff123',email:'d.brown@heartlms.edu.jm',programme:'',status:'active',createdAt:'2026-01-15'}
+  {id:'USR-011',name:'Admin Staff',role:'adminstaff',username:'adminstaff',password:'cestisadmin123$',email:'adminstaff@heartlms.edu.jm',programme:'',status:'active',createdAt:'2026-01-15'}
 ];
 let umSelectedIds = [];
 
@@ -3568,6 +3567,16 @@ function loadUserAccounts() {
     if(adminAcct) {
       adminAcct.username = 'cestisadmin';
       adminAcct.password = 'cestisadmin123$';
+    }
+    // Migrate: ensure default admin staff account exists
+    var defAS = {id:'USR-011',name:'Admin Staff',role:'adminstaff',username:'adminstaff',password:'cestisadmin123$',email:'adminstaff@heartlms.edu.jm',programme:'',status:'active',createdAt:'2026-01-15'};
+    var existingAS = userAccounts.find(function(u){ return u.id === 'USR-011'; });
+    if(!existingAS) {
+      userAccounts.push(defAS);
+    } else {
+      existingAS.username = 'adminstaff';
+      existingAS.password = 'cestisadmin123$';
+      existingAS.role = 'adminstaff';
     }
   } catch(e) {}
 }
