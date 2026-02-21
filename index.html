@@ -2712,7 +2712,92 @@ textarea.form-control { resize:vertical; min-height:80px; }
   </div>
 
   <div class="landing-footer">
-    © 2026 C.E.S.T.I.S - LMS v2.0 &nbsp;|&nbsp; <a href="#">Privacy Policy</a> &nbsp;|&nbsp; <a href="#">Support</a>
+    © 2026 C.E.S.T.I.S - LMS v2.0 &nbsp;|&nbsp; <a href="#" onclick="event.preventDefault();openModal('privacyPolicyModal')">Privacy Policy</a> &nbsp;|&nbsp; <a href="#" onclick="event.preventDefault();openModal('supportContactModal')">Support</a>
+  </div>
+</div>
+
+<!-- PRIVACY POLICY MODAL -->
+<div class="modal-overlay" id="privacyPolicyModal">
+  <div class="modal" style="max-width:720px;max-height:85vh;overflow-y:auto;">
+    <div class="modal-header"><h3>Privacy Policy</h3><button class="modal-close" onclick="closeModal('privacyPolicyModal')">✕</button></div>
+    <div style="padding:0 4px;font-size:14px;line-height:1.8;color:var(--text-secondary);">
+      <p style="color:var(--text-muted);font-size:12px;margin-bottom:16px;"><strong>Last Updated:</strong> February 2026</p>
+
+      <h4 style="color:var(--text-primary);margin:18px 0 8px;">1. Introduction</h4>
+      <p>Welcome to C.E.S.T.I.S LMS (Community Education, Skills Training & Intervention System). This Privacy Policy explains how we collect, use, store, and protect your personal information when you use our Learning Management System. By accessing or using C.E.S.T.I.S LMS, you agree to the practices described in this policy.</p>
+
+      <h4 style="color:var(--text-primary);margin:18px 0 8px;">2. Information We Collect</h4>
+      <p><strong>Account Information:</strong> When an account is created for you or you register, we collect your full name, username, email address, password, and assigned role (administrator, instructor, admin staff, or student).</p>
+      <p><strong>Student Profile Data:</strong> Students may provide additional information including student ID, phone number, emergency contact name, emergency contact phone number, and programme/course enrolment details.</p>
+      <p><strong>Academic Records:</strong> We collect and store data related to your academic progress, including exam scores, grades, GPA, attendance records, certification status, assignment submissions, and training stage progress (Testing, Interview, In Training, Certified, Collected, Incomplete).</p>
+      <p><strong>Communication Data:</strong> Messages sent through the LMS Chat feature, announcements, and support messages (including email address, phone number, and message content) are stored within the system.</p>
+      <p><strong>Usage Data:</strong> We may collect information about how you interact with the system, including pages accessed, features used, and session activity for system improvement purposes.</p>
+
+      <h4 style="color:var(--text-primary);margin:18px 0 8px;">3. How We Use Your Information</h4>
+      <p>We use your personal information to:</p>
+      <ul style="margin:8px 0 8px 20px;">
+        <li>Provide access to the LMS and its features based on your role</li>
+        <li>Track and manage student academic progress and training stages</li>
+        <li>Facilitate communication between students, instructors, and administrators</li>
+        <li>Generate academic reports, certificates, and attendance records</li>
+        <li>Manage online examinations and grade assessments</li>
+        <li>Schedule and conduct video conferences and class sessions</li>
+        <li>Send announcements, notifications, and calendar reminders</li>
+        <li>Respond to support requests and provide technical assistance</li>
+        <li>Maintain system security and manage user accounts</li>
+      </ul>
+
+      <h4 style="color:var(--text-primary);margin:18px 0 8px;">4. Data Storage & Security</h4>
+      <p>Your data is stored locally within your browser using localStorage and IndexedDB technologies. We implement reasonable security measures to protect your personal information from unauthorised access, alteration, or disclosure. Passwords are stored within the system and users are encouraged to use strong, unique passwords.</p>
+
+      <h4 style="color:var(--text-primary);margin:18px 0 8px;">5. Data Sharing</h4>
+      <p>We do not sell, trade, or rent your personal information to third parties. Your data may be accessed by:</p>
+      <ul style="margin:8px 0 8px 20px;">
+        <li><strong>Administrators:</strong> System administrators can view all user accounts, student records, and system data for management purposes</li>
+        <li><strong>Admin Staff:</strong> Administrative staff may access student data, attendance, and other information as permitted by the administrator</li>
+        <li><strong>Instructors:</strong> Instructors can view their assigned students' progress, grades, and attendance</li>
+      </ul>
+
+      <h4 style="color:var(--text-primary);margin:18px 0 8px;">6. Your Rights</h4>
+      <p>You have the right to:</p>
+      <ul style="margin:8px 0 8px 20px;">
+        <li>Access the personal information we hold about you</li>
+        <li>Request correction of inaccurate personal data</li>
+        <li>Update your profile information (email, phone, emergency contacts)</li>
+        <li>Contact administration regarding any privacy concerns</li>
+      </ul>
+
+      <h4 style="color:var(--text-primary);margin:18px 0 8px;">7. Data Retention</h4>
+      <p>We retain your personal data for as long as your account is active or as needed to provide LMS services. Academic records, certificates, and attendance data may be retained for institutional record-keeping purposes even after your account is deactivated.</p>
+
+      <h4 style="color:var(--text-primary);margin:18px 0 8px;">8. Children's Privacy</h4>
+      <p>C.E.S.T.I.S LMS is designed for vocational training and educational purposes. If you are under the age of 18, your parent or guardian should be aware of and consent to your use of this system.</p>
+
+      <h4 style="color:var(--text-primary);margin:18px 0 8px;">9. Changes to This Policy</h4>
+      <p>We may update this Privacy Policy from time to time. Any changes will be reflected by the "Last Updated" date at the top of this page. Continued use of the LMS after changes constitutes acceptance of the updated policy.</p>
+
+      <h4 style="color:var(--text-primary);margin:18px 0 8px;">10. Contact Us</h4>
+      <p>If you have questions or concerns about this Privacy Policy or how your data is handled, please contact the system administrator at <strong>admin@heartlms.edu.jm</strong> or use the Support feature on the login page.</p>
+    </div>
+  </div>
+</div>
+
+<!-- SUPPORT CONTACT MODAL -->
+<div class="modal-overlay" id="supportContactModal">
+  <div class="modal" style="max-width:540px;">
+    <div class="modal-header"><h3>Contact Support</h3><button class="modal-close" onclick="closeModal('supportContactModal')">✕</button></div>
+    <p style="font-size:13px;color:var(--text-secondary);margin-bottom:16px;line-height:1.6;">Need help? Send a message directly to the administration team. Please provide your contact details so we can follow up with you.</p>
+    <div class="form-group"><label>Full Name <span style="color:var(--red);">*</span></label><input type="text" class="form-control" id="supportName" placeholder="Enter your full name"></div>
+    <div class="form-group"><label>Email Address <span style="color:var(--red);">*</span></label><input type="email" class="form-control" id="supportEmail" placeholder="e.g. yourname@email.com"></div>
+    <div class="form-group"><label>Phone Number <span style="color:var(--red);">*</span></label><input type="tel" class="form-control" id="supportPhone" placeholder="e.g. +1 (876) 000-0000"></div>
+    <div class="form-group"><label>Subject <span style="color:var(--red);">*</span></label><select class="form-control" id="supportSubject"><option value="">Select a topic...</option><option value="Account Issue">Account Issue (Login / Password)</option><option value="Technical Problem">Technical Problem</option><option value="Academic Query">Academic Query</option><option value="Feature Request">Feature Request</option><option value="General Inquiry">General Inquiry</option><option value="Other">Other</option></select></div>
+    <div class="form-group"><label>Message <span style="color:var(--red);">*</span></label><textarea class="form-control" id="supportMessage" rows="4" placeholder="Describe your issue or question in detail..."></textarea></div>
+    <div id="supportFormError" style="display:none;color:var(--red);font-size:13px;margin-bottom:12px;"></div>
+    <div id="supportFormSuccess" style="display:none;background:var(--green-dim);color:var(--green);padding:12px 16px;border-radius:8px;font-size:13px;margin-bottom:12px;"></div>
+    <div style="display:flex;gap:10px;justify-content:flex-end;margin-top:20px;">
+      <button class="btn btn-secondary" onclick="closeModal('supportContactModal')">Cancel</button>
+      <button class="btn btn-primary" id="supportSubmitBtn" onclick="submitSupportMessage()">Send Message</button>
+    </div>
   </div>
 </div>
 
@@ -4635,6 +4720,8 @@ function buildAdminSidebar() {
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="8" r="7"/><polyline points="8.21 13.89 7 23 12 20 17 23 15.79 13.88"/></svg>Certificates</div>
     <div class="nav-item" data-page="reports" onclick="showPage('reports')">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/></svg>Reports</div>
+    <div class="nav-item" data-page="support-messages" onclick="showPage('support-messages')">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"/><polyline points="22,6 12,13 2,6"/></svg>Support Messages<span class="nav-badge" id="supportMsgBadge" style="display:none;background:var(--red);">0</span></div>
     <div class="nav-item" data-page="settings" onclick="showPage('settings')">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>Settings</div>
   `;
@@ -4752,12 +4839,14 @@ function showPage(pageId) {
     'i-announcements':'Announcements','i-calendar':'Calendar','i-profile':'My Profile',
     'lms-chat':'C.E.S.T.I.S LMS Chat','s-lms-chat':'C.E.S.T.I.S LMS Chat','i-lms-chat':'C.E.S.T.I.S LMS Chat',
     'admin-duty-register':'Admin Duty Register',
+    'support-messages':'Support Messages','as-support-messages':'Support Messages',
     'as-dashboard':'My Dashboard','as-duties':'My Duties','as-lms-chat':'C.E.S.T.I.S LMS Chat','as-profile':'My Profile',
     'as-attendance':'Attendance Management','as-announcements':'Announcements','as-calendar':'Calendar & Schedule',
     'as-students':'Student Progress','as-certificates':'Certificate Tracking','as-reports':'Reports & Analytics',
     'as-training':'Training Centres','as-exams':'Online Exams','as-video':'Video Conference','as-resources':'Resource Manager'
   };
   document.getElementById('topbarTitle').textContent = titles[pageId]||pageId;
+  if(pageId === 'support-messages' || pageId === 'as-support-messages') renderSupportMessagesPage();
   if(pageId === 'admin-duty-register') adrOnPageShow();
   if(pageId === 'as-duties') asOnDutiesPageShow();
   if(pageId === 'verify-users') renderVerifyUsersPage();
@@ -5126,6 +5215,24 @@ function buildAdminPages() {
     <div id="adminResourcesList"></div>
   </section>
 
+  <!-- SUPPORT MESSAGES PAGE -->
+  <section class="page" id="page-support-messages">
+    <div class="um-stats" id="supportStatsBar"></div>
+    <div id="supportMsgListSection">
+      <div style="display:flex;gap:12px;align-items:center;margin-bottom:16px;flex-wrap:wrap;">
+        <select class="form-control" style="width:160px;" id="supportFilterStatus" onchange="renderSupportMessagesPage()">
+          <option value="all">All Messages</option>
+          <option value="unread">Unread</option>
+          <option value="read">Read</option>
+          <option value="replied">Replied</option>
+        </select>
+        <input type="text" class="form-control" style="width:260px;" id="supportSearchInput" placeholder="Search messages..." oninput="renderSupportMessagesPage()">
+      </div>
+      <div id="supportMsgList"></div>
+    </div>
+    <div id="supportMsgDetail" style="display:none;"></div>
+  </section>
+
   <section class="page" id="page-settings">
     <div class="tabs">
       <div class="tab active" onclick="switchSettingsTab(this,'system')">System Settings</div>
@@ -5365,6 +5472,8 @@ function buildAdminPages() {
   renderAdminClassSessions();
   renderAdminResources();
   adrInit();
+  loadSupportMessages();
+  updateSupportBadge();
 }
 
 // ============================== BUILD STUDENT PAGES ==============================
@@ -10012,6 +10121,192 @@ function showToast(message) {
 }
 
 
+// ============================== SUPPORT MESSAGES ==============================
+var supportMessages = [];
+
+function loadSupportMessages() {
+  try {
+    var s = localStorage.getItem('voctrain_support_messages');
+    if(s) supportMessages = JSON.parse(s);
+  } catch(e) { supportMessages = []; }
+}
+
+function saveSupportMessages() {
+  try { localStorage.setItem('voctrain_support_messages', JSON.stringify(supportMessages)); } catch(e) {}
+}
+
+function submitSupportMessage() {
+  var name = document.getElementById('supportName').value.trim();
+  var email = document.getElementById('supportEmail').value.trim();
+  var phone = document.getElementById('supportPhone').value.trim();
+  var subject = document.getElementById('supportSubject').value;
+  var message = document.getElementById('supportMessage').value.trim();
+  var errEl = document.getElementById('supportFormError');
+  var successEl = document.getElementById('supportFormSuccess');
+  errEl.style.display = 'none';
+  successEl.style.display = 'none';
+
+  if(!name || !email || !phone || !subject || !message) {
+    errEl.textContent = 'Please fill in all required fields.';
+    errEl.style.display = 'block';
+    return;
+  }
+  var emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+  if(!emailRegex.test(email)) {
+    errEl.textContent = 'Please enter a valid email address.';
+    errEl.style.display = 'block';
+    return;
+  }
+
+  loadSupportMessages();
+  var msg = {
+    id: 'SUP-' + Date.now(),
+    name: name,
+    email: email,
+    phone: phone,
+    subject: subject,
+    message: message,
+    timestamp: Date.now(),
+    date: new Date().toISOString().slice(0,10),
+    read: false,
+    replied: false
+  };
+  supportMessages.unshift(msg);
+  saveSupportMessages();
+
+  addNotification('New support message from ' + name + ': "' + subject + '"', 'info', '\u2709\uFE0F', ['admin','adminstaff']);
+
+  document.getElementById('supportName').value = '';
+  document.getElementById('supportEmail').value = '';
+  document.getElementById('supportPhone').value = '';
+  document.getElementById('supportSubject').value = '';
+  document.getElementById('supportMessage').value = '';
+  document.getElementById('supportSubmitBtn').disabled = true;
+  successEl.textContent = 'Your message has been sent successfully! An administrator will review it and contact you shortly.';
+  successEl.style.display = 'block';
+  setTimeout(function(){
+    document.getElementById('supportSubmitBtn').disabled = false;
+    successEl.style.display = 'none';
+    closeModal('supportContactModal');
+  }, 3000);
+}
+
+function renderSupportMessagesPage() {
+  loadSupportMessages();
+  var container = document.getElementById('supportMsgList');
+  if(!container) return;
+
+  var filterVal = document.getElementById('supportFilterStatus') ? document.getElementById('supportFilterStatus').value : 'all';
+  var searchVal = document.getElementById('supportSearchInput') ? document.getElementById('supportSearchInput').value.toLowerCase() : '';
+
+  var filtered = supportMessages.filter(function(m) {
+    if(filterVal === 'unread' && m.read) return false;
+    if(filterVal === 'read' && !m.read) return false;
+    if(filterVal === 'replied' && !m.replied) return false;
+    if(searchVal && m.name.toLowerCase().indexOf(searchVal) === -1 && m.email.toLowerCase().indexOf(searchVal) === -1 && m.subject.toLowerCase().indexOf(searchVal) === -1 && m.message.toLowerCase().indexOf(searchVal) === -1) return false;
+    return true;
+  });
+
+  var unreadCount = supportMessages.filter(function(m){ return !m.read; }).length;
+  var totalCount = supportMessages.length;
+  var repliedCount = supportMessages.filter(function(m){ return m.replied; }).length;
+  var el = document.getElementById('supportStatsBar');
+  if(el) el.innerHTML = '<div class="um-stat"><div class="um-stat-val">' + totalCount + '</div><div class="um-stat-label">Total Messages</div></div>' +
+    '<div class="um-stat"><div class="um-stat-val" style="color:var(--accent);">' + unreadCount + '</div><div class="um-stat-label">Unread</div></div>' +
+    '<div class="um-stat"><div class="um-stat-val" style="color:var(--green);">' + repliedCount + '</div><div class="um-stat-label">Replied</div></div>';
+
+  var badge = document.getElementById('supportMsgBadge');
+  if(badge) {
+    if(unreadCount > 0) { badge.textContent = unreadCount; badge.style.display = 'inline-block'; }
+    else { badge.style.display = 'none'; }
+  }
+
+  if(filtered.length === 0) {
+    container.innerHTML = '<div style="text-align:center;padding:60px 20px;color:var(--text-muted);"><div style="font-size:48px;margin-bottom:16px;">\u2709\uFE0F</div><h4 style="color:var(--text-secondary);margin-bottom:8px;">' +
+      (totalCount === 0 ? 'No Support Messages Yet' : 'No Messages Match Your Filter') + '</h4><p style="font-size:13px;">' +
+      (totalCount === 0 ? 'Support messages from users will appear here.' : 'Try adjusting your search or filter criteria.') + '</p></div>';
+    return;
+  }
+
+  var html = '';
+  filtered.forEach(function(m) {
+    var timeStr = getRelativeTime(m.timestamp);
+    var statusBadge = m.replied ? '<span class="badge badge-green" style="font-size:11px;">Replied</span>' :
+      (m.read ? '<span class="badge badge-blue" style="font-size:11px;">Read</span>' : '<span class="badge badge-amber" style="font-size:11px;">New</span>');
+    html += '<div class="card" style="margin-bottom:12px;border-left:4px solid ' + (m.read ? 'var(--border)' : 'var(--accent)') + ';cursor:pointer;" onclick="viewSupportMessage(\'' + m.id + '\')">' +
+      '<div style="display:flex;justify-content:space-between;align-items:flex-start;flex-wrap:wrap;gap:8px;">' +
+      '<div style="flex:1;min-width:200px;"><div style="display:flex;align-items:center;gap:8px;margin-bottom:4px;"><strong style="font-size:15px;color:var(--text-primary);">' + m.name + '</strong>' + statusBadge + '</div>' +
+      '<div style="font-size:13px;color:var(--text-secondary);margin-bottom:4px;font-weight:600;">' + m.subject + '</div>' +
+      '<div style="font-size:12px;color:var(--text-muted);line-height:1.5;">' + m.message.substring(0, 120) + (m.message.length > 120 ? '...' : '') + '</div></div>' +
+      '<div style="text-align:right;min-width:100px;"><div style="font-size:11px;color:var(--text-muted);">' + timeStr + '</div>' +
+      '<div style="font-size:11px;color:var(--text-muted);margin-top:4px;">' + m.email + '</div>' +
+      '<div style="font-size:11px;color:var(--text-muted);">' + m.phone + '</div></div></div></div>';
+  });
+  container.innerHTML = html;
+}
+
+function viewSupportMessage(id) {
+  loadSupportMessages();
+  var msg = supportMessages.find(function(m){ return m.id === id; });
+  if(!msg) return;
+  msg.read = true;
+  saveSupportMessages();
+
+  var detail = document.getElementById('supportMsgDetail');
+  if(!detail) return;
+  detail.innerHTML = '<div class="card" style="max-width:700px;">' +
+    '<div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:16px;">' +
+    '<div><h3 style="margin-bottom:4px;font-family:\'Playfair Display\',serif;">' + msg.subject + '</h3>' +
+    '<span style="font-size:12px;color:var(--text-muted);">' + msg.date + ' &bull; ' + getRelativeTime(msg.timestamp) + '</span></div>' +
+    '<button class="btn btn-secondary btn-sm" onclick="closeSupportDetail()">Back to List</button></div>' +
+    '<div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:20px;padding:16px;background:var(--bg-elevated);border-radius:8px;">' +
+    '<div><div style="font-size:11px;color:var(--text-muted);text-transform:uppercase;margin-bottom:2px;">Name</div><div style="font-size:14px;font-weight:600;">' + msg.name + '</div></div>' +
+    '<div><div style="font-size:11px;color:var(--text-muted);text-transform:uppercase;margin-bottom:2px;">Email</div><div style="font-size:14px;"><a href="mailto:' + msg.email + '" style="color:var(--blue);">' + msg.email + '</a></div></div>' +
+    '<div><div style="font-size:11px;color:var(--text-muted);text-transform:uppercase;margin-bottom:2px;">Phone</div><div style="font-size:14px;"><a href="tel:' + msg.phone + '" style="color:var(--blue);">' + msg.phone + '</a></div></div>' +
+    '<div><div style="font-size:11px;color:var(--text-muted);text-transform:uppercase;margin-bottom:2px;">Status</div><div style="font-size:14px;">' +
+    (msg.replied ? '<span class="badge badge-green">Replied</span>' : (msg.read ? '<span class="badge badge-blue">Read</span>' : '<span class="badge badge-amber">New</span>')) + '</div></div></div>' +
+    '<div style="margin-bottom:20px;"><div style="font-size:11px;color:var(--text-muted);text-transform:uppercase;margin-bottom:8px;">Message</div>' +
+    '<div style="font-size:14px;line-height:1.8;color:var(--text-secondary);padding:16px;background:var(--bg-elevated);border-radius:8px;white-space:pre-wrap;">' + msg.message.replace(/</g,'&lt;').replace(/>/g,'&gt;') + '</div></div>' +
+    '<div style="display:flex;gap:10px;justify-content:flex-end;">' +
+    (msg.replied ? '' : '<button class="btn btn-primary" onclick="markSupportReplied(\'' + msg.id + '\')">Mark as Replied</button>') +
+    '<button class="btn btn-danger btn-sm" onclick="deleteSupportMessage(\'' + msg.id + '\')">Delete</button></div></div>';
+  detail.style.display = 'block';
+  document.getElementById('supportMsgListSection').style.display = 'none';
+}
+
+function closeSupportDetail() {
+  document.getElementById('supportMsgDetail').style.display = 'none';
+  document.getElementById('supportMsgListSection').style.display = 'block';
+  renderSupportMessagesPage();
+}
+
+function markSupportReplied(id) {
+  loadSupportMessages();
+  var msg = supportMessages.find(function(m){ return m.id === id; });
+  if(msg) { msg.replied = true; saveSupportMessages(); }
+  viewSupportMessage(id);
+  showToast('Message marked as replied');
+}
+
+function deleteSupportMessage(id) {
+  if(!confirm('Are you sure you want to delete this support message?')) return;
+  loadSupportMessages();
+  supportMessages = supportMessages.filter(function(m){ return m.id !== id; });
+  saveSupportMessages();
+  closeSupportDetail();
+  showToast('Support message deleted');
+}
+
+function updateSupportBadge() {
+  loadSupportMessages();
+  var unread = supportMessages.filter(function(m){ return !m.read; }).length;
+  var badge = document.getElementById('supportMsgBadge');
+  if(badge) {
+    if(unread > 0) { badge.textContent = unread; badge.style.display = 'inline-block'; }
+    else { badge.style.display = 'none'; }
+  }
+}
+
 // ============================== EXAM IMPORT ENGINE ==============================
 var importedQuestions = [];
 var importRawTextContent = '';
@@ -14540,6 +14835,11 @@ function buildAdminStaffSidebar() {
     html += '<div class="nav-item" data-page="as-reports" onclick="showPage(\'as-reports\')"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/></svg>Reports</div>';
   }
 
+  // Support Messages always visible for admin staff
+  html += '<div class="nav-section-label">Support</div>';
+  html += '<div class="nav-item" data-page="as-support-messages" onclick="showPage(\'as-support-messages\')">' +
+    '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"/><polyline points="22,6 12,13 2,6"/></svg>Support Messages<span class="nav-badge" id="supportMsgBadge" style="display:none;background:var(--red);">0</span></div>';
+
   // Profile always visible
   html += '<div class="nav-section-label">Account</div>';
   html += '<div class="nav-item" data-page="as-profile" onclick="showPage(\'as-profile\')">' +
@@ -14656,6 +14956,21 @@ function buildAdminStaffPages() {
     '</div>' +
   '</section>';
 
+  // ---- Support Messages Page ----
+  html += '<section class="page" id="page-as-support-messages">' +
+    '<div class="um-stats" id="supportStatsBar"></div>' +
+    '<div id="supportMsgListSection">' +
+      '<div style="display:flex;gap:12px;align-items:center;margin-bottom:16px;flex-wrap:wrap;">' +
+        '<select class="form-control" style="width:160px;" id="supportFilterStatus" onchange="renderSupportMessagesPage()">' +
+          '<option value="all">All Messages</option><option value="unread">Unread</option><option value="read">Read</option><option value="replied">Replied</option>' +
+        '</select>' +
+        '<input type="text" class="form-control" style="width:260px;" id="supportSearchInput" placeholder="Search messages..." oninput="renderSupportMessagesPage()">' +
+      '</div>' +
+      '<div id="supportMsgList"></div>' +
+    '</div>' +
+    '<div id="supportMsgDetail" style="display:none;"></div>' +
+  '</section>';
+
   // ---- Profile Page ----
   var pInitials = user.name.split(' ').map(function(n){ return n[0]; }).join('').substring(0,2);
   html += '<section class="page" id="page-as-profile">' +
@@ -14674,6 +14989,8 @@ function buildAdminStaffPages() {
   '</section>';
 
   mc.innerHTML = html;
+  loadSupportMessages();
+  updateSupportBadge();
 }
 
 // ---- Admin Staff Duty Page Functions ----
