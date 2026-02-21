@@ -2876,11 +2876,15 @@ let exams = [
 
 let announcements = [
   {id:1,title:"Campus Closure - Independence Day",body:"The campus will be closed on February 20th for Independence Day celebrations. All classes and exams scheduled for that day will be rescheduled. Please check your updated timetable.",priority:"urgent",date:"2026-02-17",author:"Admin",forRoles:['admin','student','instructor']},
-  {id:2,title:"Welding Workshop Equipment Upgrade",body:"New TIG welding stations have been installed in Workshop Bay 2. All Welding students are required to attend orientation on Feb 22 at 9AM.",priority:"info",date:"2026-02-16",author:"Mr. R. Campbell",forRoles:['admin','student','instructor']},
-  {id:3,title:"Midterm Exam Schedule Released",body:"The midterm examination schedule for all programmes has been finalized. Students can view their exam dates in the Exams section. Please arrive 15 minutes early.",priority:"urgent",date:"2026-02-15",author:"Admin",forRoles:['admin','student','instructor']},
-  {id:4,title:"IT Lab Maintenance Notice",body:"The IT lab will undergo maintenance on Feb 23-24. Data Operations and IT students should plan accordingly and use the library computers.",priority:"info",date:"2026-02-14",author:"Ms. J. Williams",forRoles:['admin','student','instructor']},
-  {id:5,title:"Certificate Collection Reminder",body:"Students who completed their programmes in January are reminded to collect their certificates from the admin office. Bring your student ID.",priority:"general",date:"2026-02-13",author:"Admin",forRoles:['admin','student','instructor']},
-  {id:6,title:"Guest Lecture: Industry Trends",body:"A guest lecture on emerging industry trends will be held on March 1 in the main auditorium. All programmes welcome. Attendance counts toward professional development hours.",priority:"general",date:"2026-02-12",author:"Mrs. P. Morgan",forRoles:['admin','student','instructor']}
+  {id:2,title:"Welding Workshop Equipment Upgrade",body:"New TIG welding stations have been installed in Workshop Bay 2. All Welding students are required to attend orientation on Feb 22 at 9AM.",priority:"info",date:"2026-02-16",author:"Mr. R. Campbell",forRoles:['student','instructor']},
+  {id:3,title:"Midterm Exam Schedule Released",body:"The midterm examination schedule for all programmes has been finalized. Students can view their exam dates in the Exams section. Please arrive 15 minutes early.",priority:"urgent",date:"2026-02-15",author:"Admin",forRoles:['student','instructor']},
+  {id:4,title:"IT Lab Maintenance Notice",body:"The IT lab will undergo maintenance on Feb 23-24. Data Operations and IT students should plan accordingly and use the library computers.",priority:"info",date:"2026-02-14",author:"Ms. J. Williams",forRoles:['student','instructor']},
+  {id:5,title:"Certificate Collection Reminder",body:"Students who completed their programmes in January are reminded to collect their certificates from the admin office. Bring your student ID.",priority:"general",date:"2026-02-13",author:"Admin",forRoles:['student','admin']},
+  {id:6,title:"Guest Lecture: Industry Trends",body:"A guest lecture on emerging industry trends will be held on March 1 in the main auditorium. All programmes welcome. Attendance counts toward professional development hours.",priority:"general",date:"2026-02-12",author:"Mrs. P. Morgan",forRoles:['admin','student','instructor']},
+  {id:7,title:"Staff Meeting — Curriculum Review",body:"Mandatory staff meeting on February 25 at 2PM in Conference Room A. All instructors must attend to discuss upcoming curriculum changes and assessment strategies.",priority:"urgent",date:"2026-02-18",author:"Admin",forRoles:['instructor','admin']},
+  {id:8,title:"Quarterly Enrollment Report Due",body:"All department heads please submit your quarterly enrollment and completion statistics by February 28. Templates are available in the shared drive.",priority:"info",date:"2026-02-17",author:"Admin",forRoles:['admin']},
+  {id:9,title:"Student Portal Maintenance",body:"The student portal will be undergoing scheduled maintenance on Saturday Feb 22 from 10PM to 2AM. Please save your work beforehand.",priority:"info",date:"2026-02-18",author:"Admin",forRoles:['student']},
+  {id:10,title:"Workshop Safety Refresher Required",body:"All workshop instructors must complete the annual safety refresher training by March 15. Sign up sheets are available at the admin office.",priority:"info",date:"2026-02-16",author:"Admin",forRoles:['instructor']}
 ];
 
 let notifications = [];
@@ -2913,7 +2917,7 @@ function shakeNotificationBell() {
   setTimeout(function(){ btn.classList.remove('notif-shake'); }, 700);
 }
 
-function addNotification(text, type, icon) {
+function addNotification(text, type, icon, forRoles) {
   type = type || 'info';
   var icons = {success:'\u2705',warning:'\u26A0\uFE0F',info:'\uD83D\uDD14',exam:'\uD83D\uDCDD',student:'\uD83D\uDC64',cert:'\uD83C\uDF93',announce:'\uD83D\uDCE2',calendar:'\uD83D\uDCC5',attendance:'\uD83D\uDCCB',resource:'\uD83D\uDCC1',grade:'\uD83C\uDF1F'};
   notifications.unshift({
@@ -2923,13 +2927,22 @@ function addNotification(text, type, icon) {
     time: 'Just now',
     read: false,
     icon: icon || icons[type] || icons.info,
-    type: type === 'warning' ? 'warning' : type === 'success' || type === 'grade' || type === 'cert' ? 'success' : 'info'
+    type: type === 'warning' ? 'warning' : type === 'success' || type === 'grade' || type === 'cert' ? 'success' : 'info',
+    forRoles: forRoles || ['admin','instructor','student']
   });
   if(notifications.length > 50) notifications = notifications.slice(0, 50);
   updateNotificationDot();
   shakeNotificationBell();
   playNotificationSound();
   saveNotifications();
+}
+
+function getFilteredNotifications() {
+  if(!currentRole) return notifications;
+  return notifications.filter(function(n) {
+    if(!n.forRoles || !n.forRoles.length) return true;
+    return n.forRoles.indexOf(currentRole) !== -1;
+  });
 }
 
 function getRelativeTime(ts) {
@@ -2959,16 +2972,20 @@ function loadNotifications() {
 let examResults = [];
 
 let calendarEvents = [
-  {title:"Welding L2 Final Theory",date:"2026-02-18",time:"09:00 AM",type:"exam",color:"var(--red)"},
-  {title:"Electrical Safety Class",date:"2026-02-18",time:"11:30 AM",type:"class",color:"var(--blue)"},
-  {title:"Business Admin Midterm",date:"2026-02-22",time:"02:00 PM",type:"exam",color:"var(--red)"},
-  {title:"Cosmetology Practical",date:"2026-02-25",time:"09:30 AM",type:"exam",color:"var(--red)"},
-  {title:"Workshop Portfolio Due",date:"2026-02-22",time:"11:59 PM",type:"deadline",color:"var(--accent)"},
-  {title:"Staff Meeting",date:"2026-02-19",time:"03:00 PM",type:"meeting",color:"var(--purple)"},
-  {title:"Final Project Due",date:"2026-03-05",time:"11:59 PM",type:"deadline",color:"var(--accent)"},
-  {title:"Plumbing L2 Pipe Systems",date:"2026-03-01",time:"10:00 AM",type:"exam",color:"var(--red)"},
-  {title:"Guest Lecture: Industry Trends",date:"2026-03-01",time:"02:00 PM",type:"meeting",color:"var(--purple)"},
-  {title:"Carpentry Joints Exam",date:"2026-03-04",time:"09:00 AM",type:"exam",color:"var(--red)"}
+  {title:"Welding L2 Final Theory",date:"2026-02-18",time:"09:00 AM",type:"exam",color:"var(--red)",forRoles:['admin','instructor','student']},
+  {title:"Electrical Safety Class",date:"2026-02-18",time:"11:30 AM",type:"class",color:"var(--blue)",forRoles:['instructor','student']},
+  {title:"Business Admin Midterm",date:"2026-02-22",time:"02:00 PM",type:"exam",color:"var(--red)",forRoles:['admin','instructor','student']},
+  {title:"Cosmetology Practical",date:"2026-02-25",time:"09:30 AM",type:"exam",color:"var(--red)",forRoles:['admin','instructor','student']},
+  {title:"Workshop Portfolio Due",date:"2026-02-22",time:"11:59 PM",type:"deadline",color:"var(--accent)",forRoles:['student','instructor']},
+  {title:"Staff Meeting",date:"2026-02-19",time:"03:00 PM",type:"meeting",color:"var(--purple)",forRoles:['admin','instructor']},
+  {title:"Final Project Due",date:"2026-03-05",time:"11:59 PM",type:"deadline",color:"var(--accent)",forRoles:['student','instructor']},
+  {title:"Plumbing L2 Pipe Systems",date:"2026-03-01",time:"10:00 AM",type:"exam",color:"var(--red)",forRoles:['admin','instructor','student']},
+  {title:"Guest Lecture: Industry Trends",date:"2026-03-01",time:"02:00 PM",type:"meeting",color:"var(--purple)",forRoles:['admin','instructor','student']},
+  {title:"Carpentry Joints Exam",date:"2026-03-04",time:"09:00 AM",type:"exam",color:"var(--red)",forRoles:['admin','instructor','student']},
+  {title:"Budget Review Meeting",date:"2026-02-26",time:"10:00 AM",type:"meeting",color:"var(--purple)",forRoles:['admin']},
+  {title:"Instructor Evaluation Deadline",date:"2026-03-08",time:"05:00 PM",type:"deadline",color:"var(--accent)",forRoles:['admin']},
+  {title:"Curriculum Workshop",date:"2026-02-27",time:"01:00 PM",type:"meeting",color:"var(--purple)",forRoles:['instructor']},
+  {title:"Student ID Collection",date:"2026-02-24",time:"09:00 AM",type:"deadline",color:"var(--accent)",forRoles:['student']}
 ];
 
 let attendanceRecords = [];
@@ -3250,7 +3267,7 @@ function createUserAccount() {
   document.getElementById('newUserProgramme').value='';
   renderUserAccountsTable();
   showToast('User account created successfully!');
-  addNotification('New user account created: ' + name + ' (' + role + ')', 'student');
+  addNotification('New user account created: ' + name + ' (' + role + ')', 'student', null, ['admin']);
 
   // Auto-merge from cloud to pick up accounts created on other devices
   if (isCloudConnected && googleAccessToken) {
@@ -3535,17 +3552,20 @@ function toggleNotifications() {
   }
   if(dropdown.classList.contains('active')) { dropdown.classList.remove('active'); return; }
   refreshNotificationTimes();
-  const unreadCount = notifications.filter(n=>!n.read).length;
+  const roleNotifications = getFilteredNotifications();
+  const unreadCount = roleNotifications.filter(n=>!n.read).length;
   dropdown.innerHTML = `
-    <div class="notif-header"><span>Notifications ${unreadCount>0?'('+unreadCount+')':''}</span><div style="display:flex;gap:8px;"><button class="mark-read" onclick="event.stopPropagation();markAllNotificationsRead()">Mark all read</button>${notifications.length>0?'<button class="mark-read" style="color:var(--red);" onclick="event.stopPropagation();clearAllNotifications()">Clear all</button>':''}</div></div>
-    ${notifications.length === 0 ? '<div class="notif-empty">No notifications yet.<br><span style="font-size:11px;color:var(--text-muted);margin-top:4px;display:block;">Notifications will appear here as you use the system.</span></div>' :
-      notifications.map((n,i) => `
-        <div class="notif-item ${n.read?'':'unread'}" onclick="event.stopPropagation();markNotificationRead(${i})">
+    <div class="notif-header"><span>Notifications ${unreadCount>0?'('+unreadCount+')':''}</span><div style="display:flex;gap:8px;"><button class="mark-read" onclick="event.stopPropagation();markAllNotificationsRead()">Mark all read</button>${roleNotifications.length>0?'<button class="mark-read" style="color:var(--red);" onclick="event.stopPropagation();clearAllNotifications()">Clear all</button>':''}</div></div>
+    ${roleNotifications.length === 0 ? '<div class="notif-empty">No notifications yet.<br><span style="font-size:11px;color:var(--text-muted);margin-top:4px;display:block;">Notifications will appear here as you use the system.</span></div>' :
+      roleNotifications.map((n,i) => {
+        const realIdx = notifications.indexOf(n);
+        return `
+        <div class="notif-item ${n.read?'':'unread'}" onclick="event.stopPropagation();markNotificationRead(${realIdx})">
           <div class="notif-icon" style="background:${n.type==='success'?'var(--green-dim)':n.type==='warning'?'var(--accent-dim)':'var(--blue-dim)'};">${n.icon}</div>
           <div class="notif-content"><div class="notif-text">${n.text}</div><div class="notif-time">${n.time}</div></div>
           ${n.read?'':'<div class="notif-dot"></div>'}
         </div>
-      `).join('')}
+      `}).join('')}
   `;
   dropdown.classList.add('active');
   document.addEventListener('click', function handler(e) {
@@ -3562,7 +3582,8 @@ function markNotificationRead(idx) {
 }
 
 function markAllNotificationsRead() {
-  notifications.forEach(n => n.read = true);
+  var roleNotifs = getFilteredNotifications();
+  roleNotifs.forEach(function(n) { n.read = true; });
   updateNotificationDot();
   saveNotifications();
   toggleNotifications();
@@ -3570,7 +3591,14 @@ function markAllNotificationsRead() {
 }
 
 function clearAllNotifications() {
-  notifications = [];
+  if(currentRole) {
+    notifications = notifications.filter(function(n) {
+      if(!n.forRoles || !n.forRoles.length) return false;
+      return n.forRoles.indexOf(currentRole) === -1;
+    });
+  } else {
+    notifications = [];
+  }
   updateNotificationDot();
   saveNotifications();
   toggleNotifications();
@@ -3581,7 +3609,8 @@ function updateNotificationDot() {
   const btn = document.querySelector('.topbar-btn[title="Notifications"]');
   const dot = btn ? btn.querySelector('.dot') : null;
   if(!dot) return;
-  const unread = notifications.filter(n=>!n.read).length;
+  const roleNotifications = getFilteredNotifications();
+  const unread = roleNotifications.filter(n=>!n.read).length;
   dot.style.display = unread > 0 ? 'flex' : 'none';
   dot.textContent = unread > 99 ? '99+' : unread;
   if(btn) { if(unread > 0) btn.classList.add('notif-active'); else btn.classList.remove('notif-active'); }
@@ -4086,7 +4115,7 @@ function approveUser(userId) {
   saveState();
   renderVerifyUsersPage();
   showToast('Account approved: ' + user.name + ' (' + user.role + ')');
-  addNotification('Account approved: ' + user.name + ' (' + user.role + ')', 'success');
+  addNotification('Account approved: ' + user.name + ' (' + user.role + ')', 'success', null, ['admin']);
 }
 
 function rejectUser(userId) {
@@ -4099,7 +4128,7 @@ function rejectUser(userId) {
   saveState();
   renderVerifyUsersPage();
   showToast('Account rejected: ' + user.name);
-  addNotification('Account rejected: ' + user.name, 'warning');
+  addNotification('Account rejected: ' + user.name, 'warning', null, ['admin']);
 }
 
 function approveAllPending() {
@@ -4115,7 +4144,7 @@ function approveAllPending() {
   saveState();
   renderVerifyUsersPage();
   showToast(pending.length + ' account(s) approved!');
-  addNotification(pending.length + ' user account(s) approved', 'success');
+  addNotification(pending.length + ' user account(s) approved', 'success', null, ['admin']);
 }
 
 function rejectAllPending() {
@@ -4131,7 +4160,7 @@ function rejectAllPending() {
   saveState();
   renderVerifyUsersPage();
   showToast(pending.length + ' account(s) rejected.');
-  addNotification(pending.length + ' user account(s) rejected', 'warning');
+  addNotification(pending.length + ' user account(s) rejected', 'warning', null, ['admin']);
 }
 
 /* ============================== MOBILE SIDEBAR TOGGLE ============================== */
@@ -4572,6 +4601,13 @@ function buildAdminPages() {
           <div class="form-group"><label>Priority</label><select class="form-control" id="annPriority"><option value="general">General</option><option value="info">Info</option><option value="urgent">Urgent</option></select></div>
           <div class="form-group"><label>Author</label><input type="text" class="form-control" id="annAuthor" value="Admin"></div>
         </div>
+        <div class="form-group"><label>Target Audience</label>
+          <div style="display:flex;gap:16px;margin-top:6px;">
+            <label style="display:flex;align-items:center;gap:6px;font-size:13px;cursor:pointer;"><input type="checkbox" id="annRoleAdmin" checked> <span style="background:var(--accent-dim);color:var(--accent);padding:2px 8px;border-radius:10px;font-size:11px;font-weight:600;">Admin</span></label>
+            <label style="display:flex;align-items:center;gap:6px;font-size:13px;cursor:pointer;"><input type="checkbox" id="annRoleInstructor" checked> <span style="background:var(--green-dim);color:var(--green);padding:2px 8px;border-radius:10px;font-size:11px;font-weight:600;">Instructor</span></label>
+            <label style="display:flex;align-items:center;gap:6px;font-size:13px;cursor:pointer;"><input type="checkbox" id="annRoleStudent" checked> <span style="background:var(--blue-dim);color:var(--blue);padding:2px 8px;border-radius:10px;font-size:11px;font-weight:600;">Student</span></label>
+          </div>
+        </div>
         <button class="btn btn-primary" onclick="createAnnouncement()">Publish Announcement</button>
       </div>
     </div>
@@ -4871,7 +4907,7 @@ function buildStudentPages() {
 
     <div class="grid-2col">
       <div class="card"><div class="card-header"><h3>Announcements</h3><button class="btn btn-sm btn-secondary" onclick="showPage('s-profile')">View All</button></div>
-        ${announcements.slice(0,3).map(a => `
+        ${announcements.filter(a => { var roles = a.forRoles || ['admin','instructor','student']; return roles.indexOf('student') !== -1; }).slice(0,3).map(a => `
           <div style="padding:10px 0;border-bottom:1px solid var(--border);">
             <div style="display:flex;align-items:center;gap:8px;margin-bottom:4px;">
               <span class="announcement-badge badge-${a.priority}">${a.priority}</span>
@@ -5472,6 +5508,13 @@ function buildInstructorPages() {
         <div class="ann-form-row">
           <div class="form-group"><label>Priority</label><select class="form-control" id="iAnnPriority"><option value="general">General</option><option value="info">Info</option><option value="urgent">Urgent</option></select></div>
         </div>
+        <div class="form-group"><label>Target Audience</label>
+          <div style="display:flex;gap:16px;margin-top:6px;">
+            <label style="display:flex;align-items:center;gap:6px;font-size:13px;cursor:pointer;"><input type="checkbox" id="iAnnRoleInstructor" checked> <span style="background:var(--green-dim);color:var(--green);padding:2px 8px;border-radius:10px;font-size:11px;font-weight:600;">Instructor</span></label>
+            <label style="display:flex;align-items:center;gap:6px;font-size:13px;cursor:pointer;"><input type="checkbox" id="iAnnRoleStudent" checked> <span style="background:var(--blue-dim);color:var(--blue);padding:2px 8px;border-radius:10px;font-size:11px;font-weight:600;">Student</span></label>
+            <label style="display:flex;align-items:center;gap:6px;font-size:13px;cursor:pointer;"><input type="checkbox" id="iAnnRoleAdmin"> <span style="background:var(--accent-dim);color:var(--accent);padding:2px 8px;border-radius:10px;font-size:11px;font-weight:600;">Admin</span></label>
+          </div>
+        </div>
         <button class="btn btn-primary" onclick="createInstructorAnnouncement()">Publish Announcement</button>
       </div>
     </div>
@@ -5705,7 +5748,7 @@ function renderInstructorWeeklyChart(records) {
 function saveInstructorAttendance() {
   saveState();
   showToast('Attendance saved!');
-  addNotification('Attendance records updated', 'attendance');
+  addNotification('Attendance records updated', 'attendance', null, ['instructor','admin']);
   renderInstructorAttendance();
 }
 
@@ -5721,8 +5764,13 @@ function createInstructorAnnouncement() {
   const body = document.getElementById('iAnnBody')?.value.trim();
   if(!title || !body) { alert('Please fill in title and body'); return; }
   const priority = document.getElementById('iAnnPriority')?.value || 'general';
+  var targetRoles = [];
+  if(document.getElementById('iAnnRoleAdmin')?.checked) targetRoles.push('admin');
+  if(document.getElementById('iAnnRoleInstructor')?.checked) targetRoles.push('instructor');
+  if(document.getElementById('iAnnRoleStudent')?.checked) targetRoles.push('student');
+  if(targetRoles.length === 0) { alert('Please select at least one target audience'); return; }
   announcements.unshift({
-    id: Date.now(), title, body, priority, date: '2026-02-18', author: currentInstructor.name, forRoles: ['admin','student','instructor']
+    id: Date.now(), title, body, priority, date: new Date().toISOString().split('T')[0], author: currentInstructor.name, forRoles: targetRoles
   });
   document.getElementById('iAnnTitle').value = '';
   document.getElementById('iAnnBody').value = '';
@@ -5730,15 +5778,24 @@ function createInstructorAnnouncement() {
   renderInstructorAnnouncements();
   saveState();
   showToast('Announcement published!');
-  addNotification('New announcement: "' + title + '"' + (priority==='urgent' ? ' (URGENT)' : ''), priority==='urgent' ? 'warning' : 'announce');
+  addNotification('New announcement: "' + title + '"' + (priority==='urgent' ? ' (URGENT)' : ''), priority==='urgent' ? 'warning' : 'announce', null, targetRoles);
 }
 
 function renderInstructorAnnouncements() {
   const el = document.getElementById('iAnnouncementsList');
   if(!el) return;
   const filter = document.getElementById('iAnnPriorityFilter')?.value || 'all';
-  let filtered = filter === 'all' ? announcements : announcements.filter(a => a.priority === filter);
-  el.innerHTML = filtered.map(a => `
+  let filtered = announcements.filter(function(a) {
+    var roles = a.forRoles || ['admin','instructor','student'];
+    return roles.indexOf('instructor') !== -1;
+  });
+  if(filter !== 'all') filtered = filtered.filter(a => a.priority === filter);
+  el.innerHTML = filtered.map(a => {
+    var audienceBadges = (a.forRoles || ['admin','instructor','student']).map(function(r) {
+      var colors = {admin:'background:var(--accent-dim);color:var(--accent)',instructor:'background:var(--green-dim);color:var(--green)',student:'background:var(--blue-dim);color:var(--blue)'};
+      return '<span style="'+colors[r]+';padding:2px 8px;border-radius:10px;font-size:10px;font-weight:600;text-transform:capitalize;">'+r+'</span>';
+    }).join('');
+    return `
     <div class="announcement-card priority-${a.priority}">
       <div class="ann-header">
         <span class="announcement-badge badge-${a.priority}">${a.priority}</span>
@@ -5748,20 +5805,25 @@ function renderInstructorAnnouncements() {
       <div class="ann-body">${a.body}</div>
       <div class="ann-footer">
         <span style="font-size:11px;color:var(--text-muted);">By ${a.author}</span>
+        <span style="display:flex;gap:4px;align-items:center;margin-left:8px;">${audienceBadges}</span>
         ${a.author === (currentInstructor ? currentInstructor.name : '') ? '<button class="btn btn-sm btn-danger" style="margin-left:auto;" onclick="deleteAnnouncement(' + a.id + ');renderInstructorAnnouncements();">Delete</button>' : ''}
       </div>
     </div>
-  `).join('');
+  `}).join('');
 }
 
 function renderInstructorCalendar() {
   const titleEl = document.getElementById('iCalTitle');
   const gridEl = document.getElementById('iCalGrid');
   if(!titleEl || !gridEl) return;
-  renderCalendarGrid(calendarYear, calendarMonth, titleEl, gridEl, 'iCalDayTitle', 'iCalDayEvents');
+  var instructorEvents = calendarEvents.filter(function(e) {
+    var roles = e.forRoles || ['admin','instructor','student'];
+    return roles.indexOf('instructor') !== -1;
+  });
+  renderCalendarGrid(calendarYear, calendarMonth, titleEl, gridEl, 'iCalDayTitle', 'iCalDayEvents', instructorEvents);
   const eventListEl = document.getElementById('iCalEventList');
   if(eventListEl) {
-    eventListEl.innerHTML = calendarEvents.sort((a,b)=>a.date.localeCompare(b.date)).slice(0,8).map(e =>
+    eventListEl.innerHTML = instructorEvents.sort((a,b)=>a.date.localeCompare(b.date)).slice(0,8).map(e =>
       '<div style="display:flex;align-items:center;gap:10px;padding:8px 0;border-bottom:1px solid var(--border);">' +
         '<div style="width:8px;height:8px;border-radius:50%;background:' + e.color + ';flex-shrink:0;"></div>' +
         '<div><div style="font-size:13px;">' + e.title + '</div><div style="font-size:11px;color:var(--text-muted);">' + e.date + ' @ ' + e.time + '</div></div></div>'
@@ -7189,7 +7251,7 @@ function createClassSession() {
   saveState();
   closeModal('createClassSessionModal');
   showToast('Class session "' + name + '" created successfully');
-  addNotification('New class session: "' + name + '"', 'calendar');
+  addNotification('New class session: "' + name + '"', 'calendar', null, ['admin','instructor']);
 
   // Reset form fields
   document.getElementById('csSessionName').value = '';
@@ -7284,7 +7346,7 @@ function createAssignment() {
   saveState();
   closeModal('createAssignmentModal');
   showToast('Assignment "' + title + '" created successfully');
-  addNotification('New assignment created: "' + title + '"', 'exam');
+  addNotification('New assignment created: "' + title + '"', 'exam', null, ['instructor']);
 
   // Reset form
   document.getElementById('assignTitle').value = '';
@@ -7349,7 +7411,7 @@ function uploadResource() {
   saveState();
   closeModal('uploadResourceModal');
   showToast('Resource "' + name + '" uploaded successfully');
-  addNotification('New resource uploaded: "' + name + '"', 'resource');
+  addNotification('New resource uploaded: "' + name + '"', 'resource', null, ['instructor']);
 
   // Reset form
   document.getElementById('resName').value = '';
@@ -7572,9 +7634,9 @@ function updateStudentStage(idx) {
   if(newStage==='incomplete')students[idx].progress=Math.min(students[idx].progress,40);
   closeModal('updateStageModal');filterStudents();updatePipelineCounts();
   showToast(`${students[idx].name} moved to ${stageLabels[newStage]}`);
-  if(newStage==='certified') addNotification('Certificate issued: ' + students[idx].name + ' — ' + students[idx].course, 'cert');
-  else if(newStage==='collected') addNotification('Certificate collected: ' + students[idx].name, 'cert');
-  else addNotification(students[idx].name + ' moved to ' + stageLabels[newStage], 'student');
+  if(newStage==='certified') addNotification('Certificate issued: ' + students[idx].name + ' — ' + students[idx].course, 'cert', null, ['admin','student']);
+  else if(newStage==='collected') addNotification('Certificate collected: ' + students[idx].name, 'cert', null, ['admin']);
+  else addNotification(students[idx].name + ' moved to ' + stageLabels[newStage], 'student', null, ['admin']);
   saveState();
 }
 function updatePipelineCounts() {
@@ -7588,7 +7650,7 @@ function addStudent() {
   if(!name){alert('Please enter a name');return;}
   students.unshift({id:'STU-'+String(2026000+students.length),name,stage:document.getElementById('newStudentStage').value,course:document.getElementById('newStudentCourse').value,score:'',progress:10,certNo:null,certDate:null,certCollected:false,attendance:0,assignments:0,assignmentsTotal:8,gpa:'0.0',instructor:'Mr. R. Campbell'});
   closeModal('addStudentModal');filterStudents();updatePipelineCounts();showToast(`${name} added!`);document.getElementById('newStudentName').value='';
-  addNotification('New student enrolled: ' + name + ' — ' + document.getElementById('newStudentCourse').value, 'student');
+  addNotification('New student enrolled: ' + name + ' — ' + document.getElementById('newStudentCourse').value, 'student', null, ['admin','instructor']);
   saveState();
 
   // Auto-merge from cloud to pick up students added on other devices
@@ -7859,11 +7921,11 @@ function createExam() {
     if(newExam.title) exams[editingExamIdx].title = newExam.title;
     exams[editingExamIdx].instructions = newExam.instructions;
     showToast('Exam updated with '+newExam.questionData.length+' questions!');
-    addNotification('Exam updated: "' + exams[editingExamIdx].title + '" — ' + newExam.questionData.length + ' questions', 'exam');
+    addNotification('Exam updated: "' + exams[editingExamIdx].title + '" — ' + newExam.questionData.length + ' questions', 'exam', null, ['admin','instructor']);
   } else {
     exams.unshift(newExam);
     showToast('Exam "'+title+'" created with '+newExam.questionData.length+' questions!');
-    addNotification('New exam created: "' + title + '" — ' + newExam.questionData.length + ' questions', 'exam');
+    addNotification('New exam created: "' + title + '" — ' + newExam.questionData.length + ' questions', 'exam', null, ['admin','instructor']);
   }
 
   editingExamIdx = -1;
@@ -7902,7 +7964,7 @@ function activateExam(idx) {
   exams[idx].status = 'active';
   renderExams('upcoming');
   showToast('Exam "'+e.title+'" is now ACTIVE!');
-  addNotification('Exam activated: "' + e.title + '" — students can now take this exam', 'exam');
+  addNotification('Exam activated: "' + e.title + '" — students can now take this exam', 'exam', null, ['admin','instructor','student']);
   saveState();
 }
 
@@ -7918,7 +7980,7 @@ function completeExam(idx) {
   }
   renderExams('active');
   showToast('Exam "'+e.title+'" marked as completed');
-  addNotification('Exam completed: "' + e.title + '"' + (exams[idx].passRate ? ' — pass rate: ' + exams[idx].passRate : ''), 'exam');
+  addNotification('Exam completed: "' + e.title + '"' + (exams[idx].passRate ? ' — pass rate: ' + exams[idx].passRate : ''), 'exam', null, ['admin','instructor']);
   saveState();
 }
 
@@ -8217,7 +8279,7 @@ function submitGrading() {
 
   closeGradingPanel();
   showToast('Grades saved! Final score: ' + result.score + '% — ' + (result.passed ? 'PASSED' : 'NOT PASSED'));
-  addNotification('Grading completed: ' + result.studentName + ' scored ' + result.score + '% — ' + (result.passed ? 'PASSED' : 'NOT PASSED'), result.passed ? 'grade' : 'warning');
+  addNotification('Grading completed: ' + result.studentName + ' scored ' + result.score + '% — ' + (result.passed ? 'PASSED' : 'NOT PASSED'), result.passed ? 'grade' : 'warning', null, ['admin','instructor']);
 
   // Refresh the results view if visible
   var examIdx = exams.indexOf(exam);
@@ -8496,7 +8558,7 @@ function submitExam() {
 
   localStorage.removeItem('voctrain_examInProgress');
   currentExamSession = null;
-  addNotification(result.studentName + ' scored ' + result.score + '% on ' + (exam ? exam.title : 'exam') + (result.passed ? ' — PASSED' : result.needsReview ? ' — pending review' : ' — NOT PASSED'), result.passed ? 'grade' : result.needsReview ? 'info' : 'warning');
+  addNotification(result.studentName + ' scored ' + result.score + '% on ' + (exam ? exam.title : 'exam') + (result.passed ? ' — PASSED' : result.needsReview ? ' — pending review' : ' — NOT PASSED'), result.passed ? 'grade' : result.needsReview ? 'info' : 'warning', null, ['student','instructor']);
   saveState();
 
   // Show results
@@ -8607,7 +8669,7 @@ function renderCerts(filter,search) {
   tbody.innerHTML = certs.map(s=>`<tr><td><strong>${s.name}</strong></td><td style="font-family:monospace;font-size:12px;">${s.certNo}</td><td>${s.course}</td><td>Level ${Math.floor(Math.random()*3)+1}</td><td>${s.certDate}</td><td>${s.certCollected?'<span class="badge badge-green"><span class="badge-dot"></span>Collected</span>':'<span class="badge badge-amber"><span class="badge-dot"></span>Pending</span>'}</td><td>${!s.certCollected?`<button class="btn btn-sm btn-success" onclick="markCollected(${students.indexOf(s)})">Mark Collected</button>`:'<span style="font-size:12px;color:var(--text-muted);">✓ Done</span>'}</td></tr>`).join('');
 }
 function filterCerts() { renderCerts(document.getElementById('certFilter')?.value,document.getElementById('certSearch')?.value?.toLowerCase()); }
-function markCollected(idx) { students[idx].certCollected=true;students[idx].stage='collected';students[idx].progress=100;filterCerts();updatePipelineCounts();renderCertStats();showToast(`Certificate collected: ${students[idx].name}`);addNotification('Certificate collected: ' + students[idx].name + ' — ' + students[idx].course, 'cert');saveState(); }
+function markCollected(idx) { students[idx].certCollected=true;students[idx].stage='collected';students[idx].progress=100;filterCerts();updatePipelineCounts();renderCertStats();showToast(`Certificate collected: ${students[idx].name}`);addNotification('Certificate collected: ' + students[idx].name + ' — ' + students[idx].course, 'cert', null, ['admin']);saveState(); }
 
 function renderPassRates() {
   const progs=[{name:'Welding',rate:82},{name:'Electrical',rate:76},{name:'Cosmetology',rate:88},{name:'Business Admin',rate:71},{name:'Auto Mechanics',rate:79},{name:'Hospitality',rate:90},{name:'IT',rate:72},{name:'Plumbing',rate:84}];
@@ -8785,7 +8847,7 @@ function updateAttendanceCell(sel) {
 function saveAttendance() {
   saveState();
   showToast('Attendance saved!');
-  addNotification('Attendance records updated', 'attendance');
+  addNotification('Attendance records updated', 'attendance', null, ['admin']);
   const courseFilter = document.getElementById('attendanceCourseFilter')?.value || 'all';
   let records = courseFilter==='all' ? attendanceRecords : attendanceRecords.filter(r=>r.course===courseFilter);
   renderAttendanceSummary(records);
@@ -8804,8 +8866,13 @@ function createAnnouncement() {
   if(!title || !body) { alert('Please fill in title and body'); return; }
   const priority = document.getElementById('annPriority')?.value || 'general';
   const author = document.getElementById('annAuthor')?.value || 'Admin';
+  var targetRoles = [];
+  if(document.getElementById('annRoleAdmin')?.checked) targetRoles.push('admin');
+  if(document.getElementById('annRoleInstructor')?.checked) targetRoles.push('instructor');
+  if(document.getElementById('annRoleStudent')?.checked) targetRoles.push('student');
+  if(targetRoles.length === 0) { alert('Please select at least one target audience'); return; }
   announcements.unshift({
-    id: Date.now(), title, body, priority, date: '2026-02-18', author, forRoles: ['admin','student']
+    id: Date.now(), title, body, priority, date: new Date().toISOString().split('T')[0], author, forRoles: targetRoles
   });
   document.getElementById('annTitle').value = '';
   document.getElementById('annBody').value = '';
@@ -8813,7 +8880,7 @@ function createAnnouncement() {
   renderAnnouncements();
   saveState();
   showToast('Announcement published!');
-  addNotification('New announcement: "' + title + '"' + (priority==='urgent' ? ' (URGENT)' : ''), priority==='urgent' ? 'warning' : 'announce');
+  addNotification('New announcement: "' + title + '"' + (priority==='urgent' ? ' (URGENT)' : ''), priority==='urgent' ? 'warning' : 'announce', null, targetRoles);
 }
 
 function deleteAnnouncement(id) {
@@ -8828,7 +8895,12 @@ function renderAnnouncements() {
   if(!el) return;
   const filter = document.getElementById('annPriorityFilter')?.value || 'all';
   let filtered = filter === 'all' ? announcements : announcements.filter(a=>a.priority===filter);
-  el.innerHTML = filtered.map(a => `
+  el.innerHTML = filtered.map(a => {
+    var audienceBadges = (a.forRoles || ['admin','instructor','student']).map(function(r) {
+      var colors = {admin:'background:var(--accent-dim);color:var(--accent)',instructor:'background:var(--green-dim);color:var(--green)',student:'background:var(--blue-dim);color:var(--blue)'};
+      return '<span style="'+colors[r]+';padding:2px 8px;border-radius:10px;font-size:10px;font-weight:600;text-transform:capitalize;">'+r+'</span>';
+    }).join('');
+    return `
     <div class="announcement-card priority-${a.priority}">
       <div class="ann-header">
         <span class="announcement-badge badge-${a.priority}">${a.priority}</span>
@@ -8838,10 +8910,11 @@ function renderAnnouncements() {
       <div class="ann-body">${a.body}</div>
       <div class="ann-footer">
         <span style="font-size:11px;color:var(--text-muted);">By ${a.author}</span>
+        <span style="display:flex;gap:4px;align-items:center;margin-left:8px;">${audienceBadges}</span>
         <button class="btn btn-sm btn-danger" style="margin-left:auto;" onclick="deleteAnnouncement(${a.id})">Delete</button>
       </div>
     </div>
-  `).join('');
+  `}).join('');
 }
 
 function renderCalendar() {
@@ -8857,12 +8930,14 @@ function renderStudentCalendar() {
   const gridEl = document.getElementById('sCalGrid');
   if(!titleEl || !gridEl) return;
   const studentEvents = currentStudent ? calendarEvents.filter(e => {
+    var roles = e.forRoles || ['admin','instructor','student'];
+    if(roles.indexOf('student') === -1) return false;
     if(e.type==='class' || e.type==='meeting') return true;
     const examMatch = exams.find(ex => ex.title === e.title && ex.course === currentStudent.course);
     if(examMatch) return true;
     if(e.type === 'deadline') return true;
     return false;
-  }) : calendarEvents;
+  }) : calendarEvents.filter(function(e) { var roles = e.forRoles || ['admin','instructor','student']; return roles.indexOf('student') !== -1; });
   renderCalendarGrid(calendarYear, calendarMonth, titleEl, gridEl, 'sCalDayTitle', 'sCalDayEvents', studentEvents);
   const eventListEl = document.getElementById('sCalEventList');
   if(eventListEl) {
@@ -8913,9 +8988,23 @@ function selectCalDay(dateStr, titleId, eventsId, isStudent) {
   const titleEl = document.getElementById(titleId);
   const eventsEl = document.getElementById(eventsId);
   if(titleEl) titleEl.textContent = dateStr;
-  const events = isStudent && currentStudent ?
-    calendarEvents.filter(e => e.date === dateStr && (e.type==='deadline' || e.type==='meeting' || e.type==='class' || exams.find(ex=>ex.title===e.title && ex.course===currentStudent.course))) :
-    calendarEvents.filter(e => e.date === dateStr);
+  var events;
+  if(isStudent && currentStudent) {
+    events = calendarEvents.filter(function(e) {
+      if(e.date !== dateStr) return false;
+      var roles = e.forRoles || ['admin','instructor','student'];
+      if(roles.indexOf('student') === -1) return false;
+      return e.type==='deadline' || e.type==='meeting' || e.type==='class' || exams.find(function(ex){return ex.title===e.title && ex.course===currentStudent.course;});
+    });
+  } else if(currentRole === 'instructor') {
+    events = calendarEvents.filter(function(e) {
+      if(e.date !== dateStr) return false;
+      var roles = e.forRoles || ['admin','instructor','student'];
+      return roles.indexOf('instructor') !== -1;
+    });
+  } else {
+    events = calendarEvents.filter(function(e) { return e.date === dateStr; });
+  }
   if(eventsEl) {
     eventsEl.innerHTML = events.length === 0 ? '<p style="font-size:13px;color:var(--text-muted);">No events</p>' :
       events.map(e => `
@@ -8925,7 +9014,7 @@ function selectCalDay(dateStr, titleId, eventsId, isStudent) {
         </div>
       `).join('');
   }
-  if(isStudent) renderStudentCalendar(); else renderCalendar();
+  if(isStudent) renderStudentCalendar(); else if(currentRole === 'instructor') renderInstructorCalendar(); else renderCalendar();
 }
 
 function changeCalMonth(delta) {
@@ -8941,13 +9030,15 @@ function changeCalMonth(delta) {
 function renderCalendarEventList() {
   const el = document.getElementById('calEventList');
   if(!el) return;
-  el.innerHTML = calendarEvents.sort((a,b)=>a.date.localeCompare(b.date)).map(e =>
-    `<div style="display:flex;align-items:center;gap:10px;padding:8px 0;border-bottom:1px solid var(--border);">
+  el.innerHTML = calendarEvents.sort((a,b)=>a.date.localeCompare(b.date)).map(e => {
+    var roles = e.forRoles || ['admin','instructor','student'];
+    var audienceIcons = roles.map(function(r){var c={admin:'var(--accent)',instructor:'var(--green)',student:'var(--blue)'};return '<span style="width:6px;height:6px;border-radius:50%;background:'+c[r]+';display:inline-block;" title="'+r+'"></span>';}).join('');
+    return `<div style="display:flex;align-items:center;gap:10px;padding:8px 0;border-bottom:1px solid var(--border);">
       <div style="width:8px;height:8px;border-radius:50%;background:${e.color};flex-shrink:0;"></div>
-      <div style="flex:1;"><div style="font-size:13px;">${e.title}</div><div style="font-size:11px;color:var(--text-muted);">${e.date} @ ${e.time}</div></div>
+      <div style="flex:1;"><div style="font-size:13px;">${e.title}</div><div style="display:flex;align-items:center;gap:6px;"><span style="font-size:11px;color:var(--text-muted);">${e.date} @ ${e.time}</span><span style="display:flex;gap:3px;">${audienceIcons}</span></div></div>
       <span class="badge ${e.type==='exam'?'badge-red':e.type==='class'?'badge-blue':e.type==='deadline'?'badge-amber':'badge-purple'}" style="font-size:10px;">${e.type}</span>
     </div>`
-  ).join('');
+  }).join('');
 }
 
 function promptAddEvent() {
@@ -8957,12 +9048,15 @@ function promptAddEvent() {
   if(!date) return;
   const time = prompt('Time:', '09:00 AM') || '09:00 AM';
   const type = prompt('Type (class/exam/deadline/meeting):', 'meeting') || 'meeting';
+  const audienceInput = prompt('Target audience (comma-separated: admin, instructor, student):', 'admin, instructor, student');
+  var targetRoles = (audienceInput || 'admin, instructor, student').split(',').map(function(r){return r.trim().toLowerCase();}).filter(function(r){return ['admin','instructor','student'].indexOf(r)!==-1;});
+  if(targetRoles.length === 0) targetRoles = ['admin','instructor','student'];
   const colors = {class:'var(--blue)',exam:'var(--red)',deadline:'var(--accent)',meeting:'var(--purple)'};
-  calendarEvents.push({title, date, time, type, color: colors[type] || 'var(--blue)'});
+  calendarEvents.push({title, date, time, type, color: colors[type] || 'var(--blue)', forRoles: targetRoles});
   renderCalendar();
   saveState();
   showToast('Event added!');
-  addNotification('New ' + type + ' event: "' + title + '" on ' + date, 'calendar');
+  addNotification('New ' + type + ' event: "' + title + '" on ' + date, 'calendar', null, targetRoles);
 }
 
 function openModal(id) { document.getElementById(id).classList.add('active'); }
@@ -9566,7 +9660,7 @@ function finalizeImportExam() {
   saveState();
 
   showToast('Exam "' + title + '" created with ' + importedQuestions.length + ' questions from import!');
-  addNotification('New exam imported: "' + title + '" — ' + importedQuestions.length + ' questions', 'exam');
+  addNotification('New exam imported: "' + title + '" — ' + importedQuestions.length + ' questions', 'exam', null, ['admin','instructor']);
 
   // Reset import state
   importedQuestions = [];
