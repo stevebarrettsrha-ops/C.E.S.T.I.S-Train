@@ -2387,6 +2387,157 @@ textarea.form-control { resize:vertical; min-height:80px; }
   .lms-chat-info-panel.open { width:100%; min-width:100%; }
   .lms-chat-msg { max-width:85%; }
 }
+
+/* ============================== ADMIN DUTY REGISTER ============================== */
+.adr-header-bar { display:flex; justify-content:space-between; align-items:center; margin-bottom:20px; flex-wrap:wrap; gap:12px; }
+.adr-header-left { display:flex; flex-direction:column; gap:4px; }
+.adr-subtitle { font-size:13px; color:var(--text-secondary); }
+.adr-header-right { display:flex; gap:10px; flex-wrap:wrap; }
+.adr-perf-overview {
+  display:grid; grid-template-columns:repeat(auto-fit,minmax(180px,1fr)); gap:14px; margin-bottom:20px;
+}
+.adr-perf-card {
+  background:var(--bg-card); border:1px solid var(--border); border-radius:var(--radius);
+  padding:16px; text-align:center; transition:var(--transition);
+}
+.adr-perf-card:hover { border-color:var(--accent); }
+.adr-perf-card .adr-pc-val { font-size:28px; font-weight:700; font-family:'Playfair Display',serif; }
+.adr-perf-card .adr-pc-label { font-size:12px; color:var(--text-muted); margin-top:4px; }
+
+.adr-staff-grid { display:grid; grid-template-columns:repeat(auto-fill,minmax(300px,1fr)); gap:16px; margin-bottom:24px; }
+.adr-staff-card {
+  background:var(--bg-card); border:1px solid var(--border); border-radius:var(--radius);
+  padding:20px; transition:var(--transition); cursor:pointer; position:relative; overflow:hidden;
+}
+.adr-staff-card:hover { border-color:var(--accent); transform:translateY(-2px); box-shadow:var(--shadow); }
+.adr-staff-card-header { display:flex; align-items:center; gap:14px; margin-bottom:14px; }
+.adr-staff-avatar {
+  width:48px; height:48px; border-radius:50%; display:flex; align-items:center; justify-content:center;
+  font-weight:700; font-size:16px; color:#fff; flex-shrink:0;
+}
+.adr-staff-info { flex:1; min-width:0; }
+.adr-staff-name { font-size:15px; font-weight:600; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+.adr-staff-role { font-size:12px; color:var(--text-muted); }
+.adr-staff-badge-row { display:flex; gap:6px; margin-top:6px; flex-wrap:wrap; }
+.adr-badge {
+  display:inline-flex; align-items:center; gap:4px; padding:3px 10px; border-radius:20px;
+  font-size:11px; font-weight:600; border:1px solid transparent;
+}
+.adr-badge-gold { background:rgba(240,165,0,0.15); color:var(--accent); border-color:rgba(240,165,0,0.3); }
+.adr-badge-silver { background:rgba(189,195,199,0.15); color:#bdc3c7; border-color:rgba(189,195,199,0.3); }
+.adr-badge-bronze { background:rgba(230,126,34,0.15); color:var(--orange); border-color:rgba(230,126,34,0.3); }
+.adr-badge-low { background:rgba(231,76,60,0.12); color:var(--red); border-color:rgba(231,76,60,0.25); }
+.adr-staff-stats { display:grid; grid-template-columns:1fr 1fr 1fr; gap:8px; }
+.adr-staff-stat { text-align:center; padding:8px 4px; background:var(--bg-input); border-radius:var(--radius-sm); }
+.adr-staff-stat .ss-val { font-size:18px; font-weight:700; }
+.adr-staff-stat .ss-lbl { font-size:10px; color:var(--text-muted); margin-top:2px; }
+.adr-staff-perf-bar { height:6px; background:var(--bg-input); border-radius:3px; margin-top:12px; overflow:hidden; }
+.adr-staff-perf-fill { height:100%; border-radius:3px; transition:width 0.5s ease; }
+
+.adr-tabs { display:flex; gap:4px; margin-bottom:16px; flex-wrap:wrap; }
+.adr-tab {
+  padding:8px 18px; border-radius:var(--radius-sm); font-size:13px; font-weight:600;
+  cursor:pointer; background:var(--bg-card); color:var(--text-secondary); border:1px solid var(--border);
+  transition:var(--transition);
+}
+.adr-tab:hover { color:var(--text-primary); border-color:var(--border-light); }
+.adr-tab.active { background:var(--accent-dim); color:var(--accent); border-color:var(--accent); }
+.adr-filters { display:flex; gap:10px; margin-bottom:16px; flex-wrap:wrap; }
+.adr-task-list { display:flex; flex-direction:column; gap:10px; }
+
+.adr-task-card {
+  background:var(--bg-card); border:1px solid var(--border); border-radius:var(--radius);
+  padding:16px 20px; display:flex; align-items:flex-start; gap:16px; transition:var(--transition);
+  cursor:pointer;
+}
+.adr-task-card:hover { border-color:var(--accent); }
+.adr-task-card.adr-overdue { border-left:3px solid var(--red); }
+.adr-task-card.adr-urgent { border-left:3px solid #e74c3c; }
+.adr-task-card.adr-high { border-left:3px solid var(--orange); }
+.adr-task-card.adr-completed { border-left:3px solid var(--green); opacity:0.85; }
+
+.adr-task-check {
+  width:22px; height:22px; border-radius:50%; border:2px solid var(--text-muted);
+  display:flex; align-items:center; justify-content:center; flex-shrink:0; cursor:pointer;
+  margin-top:2px; transition:var(--transition);
+}
+.adr-task-check:hover { border-color:var(--green); }
+.adr-task-check.checked { background:var(--green); border-color:var(--green); color:#fff; font-size:12px; }
+
+.adr-task-body { flex:1; min-width:0; }
+.adr-task-title { font-size:14px; font-weight:600; margin-bottom:4px; }
+.adr-task-meta { display:flex; gap:10px; flex-wrap:wrap; align-items:center; }
+.adr-task-tag {
+  display:inline-flex; align-items:center; gap:4px; padding:2px 10px; border-radius:12px;
+  font-size:11px; font-weight:600;
+}
+.adr-tag-urgent { background:rgba(231,76,60,0.15); color:var(--red); }
+.adr-tag-high { background:rgba(230,126,34,0.15); color:var(--orange); }
+.adr-tag-medium { background:rgba(52,152,219,0.15); color:var(--blue); }
+.adr-tag-low { background:rgba(46,204,113,0.15); color:var(--green); }
+.adr-tag-daily { background:rgba(155,89,182,0.12); color:var(--purple); }
+.adr-tag-weekly { background:rgba(26,188,156,0.12); color:var(--teal); }
+.adr-tag-monthly { background:rgba(240,165,0,0.12); color:var(--accent); }
+.adr-task-deadline { font-size:11px; color:var(--text-muted); }
+.adr-task-deadline.overdue { color:var(--red); font-weight:600; }
+.adr-task-assignee { font-size:11px; color:var(--text-secondary); }
+.adr-task-actions { display:flex; gap:6px; flex-shrink:0; align-items:flex-start; }
+.adr-task-actions button {
+  background:var(--bg-input); border:1px solid var(--border); color:var(--text-secondary);
+  padding:6px 8px; border-radius:var(--radius-sm); cursor:pointer; font-size:12px; transition:var(--transition);
+}
+.adr-task-actions button:hover { background:var(--accent-dim); color:var(--accent); border-color:var(--accent); }
+.adr-ack-btn { background:rgba(46,204,113,0.1)!important; color:var(--green)!important; border-color:rgba(46,204,113,0.3)!important; }
+.adr-ack-btn:hover { background:rgba(46,204,113,0.25)!important; }
+
+/* Task Detail Modal Styles */
+.adr-detail-grid { display:grid; grid-template-columns:1fr 1fr; gap:12px; margin-bottom:18px; }
+.adr-detail-item { padding:10px; background:var(--bg-input); border-radius:var(--radius-sm); }
+.adr-detail-label { font-size:11px; color:var(--text-muted); margin-bottom:3px; }
+.adr-detail-val { font-size:14px; font-weight:600; }
+.adr-comments-section { margin-top:18px; }
+.adr-comment {
+  display:flex; gap:10px; padding:12px; background:var(--bg-input); border-radius:var(--radius-sm);
+  margin-bottom:8px;
+}
+.adr-comment-avatar {
+  width:32px; height:32px; border-radius:50%; display:flex; align-items:center; justify-content:center;
+  font-size:12px; font-weight:700; color:#fff; flex-shrink:0;
+}
+.adr-comment-body { flex:1; min-width:0; }
+.adr-comment-author { font-size:12px; font-weight:600; }
+.adr-comment-time { font-size:10px; color:var(--text-muted); }
+.adr-comment-text { font-size:13px; color:var(--text-secondary); margin-top:4px; line-height:1.5; }
+.adr-comment-input { display:flex; gap:10px; margin-top:12px; }
+.adr-comment-input input { flex:1; }
+.adr-file-upload-area {
+  border:2px dashed var(--border-light); border-radius:var(--radius); padding:18px; text-align:center;
+  margin-top:12px; cursor:pointer; transition:var(--transition);
+}
+.adr-file-upload-area:hover { border-color:var(--accent); background:var(--accent-dim); }
+.adr-file-link {
+  display:inline-flex; align-items:center; gap:6px; padding:6px 14px; background:var(--bg-input);
+  border:1px solid var(--border); border-radius:var(--radius-sm); font-size:12px; color:var(--blue);
+  cursor:pointer; margin-top:8px; text-decoration:none;
+}
+.adr-file-link:hover { background:var(--blue-dim); border-color:var(--blue); }
+.adr-perf-scale {
+  display:flex; align-items:center; gap:8px; margin-top:8px;
+}
+.adr-perf-score-big {
+  font-size:32px; font-weight:800; font-family:'Playfair Display',serif;
+}
+.adr-empty-state {
+  text-align:center; padding:60px 20px; color:var(--text-muted);
+}
+.adr-empty-state svg { width:64px; height:64px; margin-bottom:16px; opacity:0.3; }
+.adr-empty-state h4 { font-size:18px; margin-bottom:8px; color:var(--text-secondary); }
+@media(max-width:768px) {
+  .adr-staff-grid { grid-template-columns:1fr; }
+  .adr-detail-grid { grid-template-columns:1fr; }
+  .adr-task-card { flex-direction:column; }
+  .adr-task-actions { align-self:flex-end; }
+}
 </style>
 <script src="https://unpkg.com/peerjs@1.5.4/dist/peerjs.min.js"></script>
 <!-- Google Identity Services for OAuth -->
@@ -3276,6 +3427,8 @@ function saveState() {
     localStorage.setItem('voctrain_systemSettings', JSON.stringify(systemSettings));
     localStorage.setItem('voctrain_examResults', JSON.stringify(examResults));
     localStorage.setItem('voctrain_calendarEvents', JSON.stringify(calendarEvents));
+    localStorage.setItem('voctrain_adrTasks', JSON.stringify(adrTasks));
+    localStorage.setItem('voctrain_adrStaffMeta', JSON.stringify(adrStaffMeta));
     saveLmsChatData();
   } catch(e) { console.warn('saveState: storage quota exceeded or unavailable'); }
   // Push changes to Google Drive immediately (debounced)
@@ -3308,6 +3461,10 @@ function loadState() {
     if(ss) systemSettings = JSON.parse(ss);
     if(er) examResults = JSON.parse(er);
     if(ce) calendarEvents = JSON.parse(ce);
+    var adrT = localStorage.getItem('voctrain_adrTasks');
+    var adrM = localStorage.getItem('voctrain_adrStaffMeta');
+    if(adrT) adrTasks = JSON.parse(adrT);
+    if(adrM) adrStaffMeta = JSON.parse(adrM);
   } catch(e) { /* parse error, use generated data */ }
 }
 loadState();
@@ -4345,6 +4502,8 @@ function buildAdminSidebar() {
     <div class="nav-item" data-page="calendar" onclick="showPage('calendar')">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>Calendar</div>
     <div class="nav-section-label">Administration</div>
+    <div class="nav-item" data-page="admin-duty-register" onclick="showPage('admin-duty-register')">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 5H7a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V7a2 2 0 0 0-2-2h-2"/><rect x="9" y="3" width="6" height="4" rx="1"/><path d="M9 14l2 2 4-4"/></svg>Admin Duty Register<span class="nav-badge" id="dutyTasksBadge" style="display:none;background:var(--accent);">0</span></div>
     <div class="nav-item" data-page="verify-users" onclick="showPage('verify-users')">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M16 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="8.5" cy="7" r="4"/><path d="M20 8v6"/><path d="M23 11h-6"/></svg>Verify Users<span class="nav-badge" id="pendingUsersBadge" style="display:none;background:var(--red);">0</span></div>
     <div class="nav-item" data-page="certificates" onclick="showPage('certificates')">
@@ -4466,9 +4625,11 @@ function showPage(pageId) {
     'i-dashboard':'Instructor Dashboard','i-classes':'My Classes','i-students':'My Students',
     'i-attendance':'Class Attendance','i-gradebook':'Gradebook','i-resources':'Course Resources',
     'i-announcements':'Announcements','i-calendar':'Calendar','i-profile':'My Profile',
-    'lms-chat':'C.E.S.T.I.S LMS Chat','s-lms-chat':'C.E.S.T.I.S LMS Chat','i-lms-chat':'C.E.S.T.I.S LMS Chat'
+    'lms-chat':'C.E.S.T.I.S LMS Chat','s-lms-chat':'C.E.S.T.I.S LMS Chat','i-lms-chat':'C.E.S.T.I.S LMS Chat',
+    'admin-duty-register':'Admin Duty Register'
   };
   document.getElementById('topbarTitle').textContent = titles[pageId]||pageId;
+  if(pageId === 'admin-duty-register') adrOnPageShow();
   if(pageId === 'verify-users') renderVerifyUsersPage();
   if(pageId === 'a-resources') renderAdminResources();
   if(pageId === 's-resources') renderStudentDriveResources();
@@ -4893,6 +5054,87 @@ function buildAdminPages() {
     </div>
   </section>
 
+  <!-- ADMIN DUTY REGISTER PAGE -->
+  <section class="page" id="page-admin-duty-register">
+    <div class="adr-header-bar">
+      <div class="adr-header-left">
+        <h3 style="font-family:'Playfair Display',serif;font-size:20px;">Admin Duty Register</h3>
+        <span class="adr-subtitle">Track admin staff performance, assign tasks & manage accountability</span>
+      </div>
+      <div class="adr-header-right">
+        <button class="btn btn-primary" onclick="adrOpenAssignTaskModal()" id="adrAssignBtn" style="display:none;">+ Assign Task</button>
+        <button class="btn btn-secondary" onclick="adrToggleView()" id="adrViewToggle">View My Tasks</button>
+      </div>
+    </div>
+
+    <!-- Admin Staff Cards (visible to System Administrator) -->
+    <div id="adrStaffCardsSection" style="display:none;">
+      <div class="adr-perf-overview" id="adrPerfOverview"></div>
+      <div class="adr-staff-grid" id="adrStaffGrid"></div>
+    </div>
+
+    <!-- Task Board -->
+    <div id="adrTaskBoard">
+      <div class="adr-tabs">
+        <div class="adr-tab active" onclick="adrSwitchTab(this,'all')">All Tasks</div>
+        <div class="adr-tab" onclick="adrSwitchTab(this,'daily')">Daily</div>
+        <div class="adr-tab" onclick="adrSwitchTab(this,'weekly')">Weekly</div>
+        <div class="adr-tab" onclick="adrSwitchTab(this,'monthly')">Monthly</div>
+        <div class="adr-tab" onclick="adrSwitchTab(this,'completed')">Completed</div>
+      </div>
+      <div class="adr-filters">
+        <select class="form-control" id="adrFilterStaff" onchange="adrRenderTasks()" style="width:200px;"><option value="all">All Staff</option></select>
+        <select class="form-control" id="adrFilterPriority" onchange="adrRenderTasks()" style="width:160px;"><option value="all">All Priorities</option><option value="urgent">Urgent</option><option value="high">High</option><option value="medium">Medium</option><option value="low">Low</option></select>
+        <input type="text" class="form-control" id="adrSearchTasks" placeholder="Search tasks..." onkeyup="adrRenderTasks()" style="width:220px;">
+      </div>
+      <div class="adr-task-list" id="adrTaskList"></div>
+    </div>
+  </section>
+
+  <!-- ADMIN DUTY REGISTER MODALS -->
+  <div class="modal" id="adrAssignTaskModal">
+    <div class="modal-content" style="max-width:620px;">
+      <div class="modal-header"><h3>Assign Task to Admin Staff</h3><button class="modal-close" onclick="closeModal('adrAssignTaskModal')">&times;</button></div>
+      <div class="form-group"><label>Assign To</label><select class="form-control" id="adrTaskAssignee"><option value="">-- Select Staff --</option></select></div>
+      <div class="form-group"><label>Task Title</label><input type="text" class="form-control" id="adrTaskTitle" placeholder="Enter task title"></div>
+      <div class="form-group"><label>Task Description</label><textarea class="form-control" id="adrTaskDesc" rows="3" placeholder="Describe the task in detail..."></textarea></div>
+      <div class="grid-2col">
+        <div class="form-group"><label>Task Type</label><select class="form-control" id="adrTaskType"><option value="daily">Daily</option><option value="weekly">Weekly</option><option value="monthly">Monthly</option></select></div>
+        <div class="form-group"><label>Priority</label><select class="form-control" id="adrTaskPriority"><option value="medium">Medium</option><option value="urgent">Urgent</option><option value="high">High</option><option value="low">Low</option></select></div>
+      </div>
+      <div class="grid-2col">
+        <div class="form-group"><label>Deadline Date</label><input type="date" class="form-control" id="adrTaskDeadline"></div>
+        <div class="form-group"><label>Deadline Time</label><input type="time" class="form-control" id="adrTaskDeadlineTime" value="17:00"></div>
+      </div>
+      <div class="form-group"><label>Attach File (optional)</label><input type="file" class="form-control" id="adrTaskFile" accept=".pdf,.doc,.docx,.xls,.xlsx,.ppt,.pptx,.txt,.csv,.jpg,.png"></div>
+      <div style="display:flex;gap:10px;justify-content:flex-end;margin-top:16px;">
+        <button class="btn btn-secondary" onclick="closeModal('adrAssignTaskModal')">Cancel</button>
+        <button class="btn btn-primary" onclick="adrSubmitTask()">Assign Task</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="modal" id="adrTaskDetailModal">
+    <div class="modal-content" style="max-width:700px;max-height:85vh;overflow-y:auto;">
+      <div class="modal-header"><h3 id="adrDetailTitle">Task Details</h3><button class="modal-close" onclick="closeModal('adrTaskDetailModal')">&times;</button></div>
+      <div id="adrDetailBody"></div>
+    </div>
+  </div>
+
+  <div class="modal" id="adrExtendTimeModal">
+    <div class="modal-content" style="max-width:440px;">
+      <div class="modal-header"><h3>Extend Task Deadline</h3><button class="modal-close" onclick="closeModal('adrExtendTimeModal')">&times;</button></div>
+      <div class="form-group"><label>New Deadline Date</label><input type="date" class="form-control" id="adrExtendDate"></div>
+      <div class="form-group"><label>New Deadline Time</label><input type="time" class="form-control" id="adrExtendTime" value="17:00"></div>
+      <div class="form-group"><label>Reason for Extension</label><textarea class="form-control" id="adrExtendReason" rows="2" placeholder="Why is the extension needed?"></textarea></div>
+      <input type="hidden" id="adrExtendTaskId">
+      <div style="display:flex;gap:10px;justify-content:flex-end;margin-top:16px;">
+        <button class="btn btn-secondary" onclick="closeModal('adrExtendTimeModal')">Cancel</button>
+        <button class="btn btn-primary" onclick="adrSubmitExtension()">Extend Deadline</button>
+      </div>
+    </div>
+  </div>
+
   <!-- C.E.S.T.I.S LMS CHAT PAGE (ADMIN) -->
   <section class="page" id="page-lms-chat">
     <div class="lms-chat-container" id="adminChatContainer">
@@ -4976,6 +5218,7 @@ function buildAdminPages() {
   renderUserAccountsTable();
   renderAdminClassSessions();
   renderAdminResources();
+  adrInit();
 }
 
 // ============================== BUILD STUDENT PAGES ==============================
@@ -13289,6 +13532,748 @@ function lmsEmojiInsert(emoji) {
   input.value = text.substring(0, start) + emoji + text.substring(end);
   input.selectionStart = input.selectionEnd = start + emoji.length;
   input.focus();
+}
+
+// ============================== ADMIN DUTY REGISTER ==============================
+var adrTasks = [];
+var adrStaffMeta = {};
+var adrCurrentTab = 'all';
+var adrViewMode = 'admin'; // 'admin' = sys admin overview, 'staff' = personal tasks
+var adrNotifIntervals = {};
+
+function adrGetAdminStaff() {
+  return userAccounts.filter(function(u) { return u.role === 'admin' && u.status === 'active'; });
+}
+
+function adrIsSystemAdmin() {
+  // The first admin account (USR-001) is System Administrator
+  if(!currentLoggedInUser) return true; // direct admin login = sys admin
+  return currentLoggedInUser.id === 'USR-001';
+}
+
+function adrGetCurrentUserId() {
+  if(currentLoggedInUser) return currentLoggedInUser.id;
+  return 'USR-001';
+}
+
+function adrGetCurrentUserName() {
+  if(currentLoggedInUser) return currentLoggedInUser.name;
+  return 'Administrator';
+}
+
+function adrInit() {
+  adrLoadData();
+  adrPopulateStaffDropdowns();
+  adrStartNotificationTimers();
+}
+
+function adrLoadData() {
+  try {
+    var t = localStorage.getItem('voctrain_adrTasks');
+    var m = localStorage.getItem('voctrain_adrStaffMeta');
+    if(t) adrTasks = JSON.parse(t);
+    if(m) adrStaffMeta = JSON.parse(m);
+  } catch(e) {}
+}
+
+function adrSaveData() {
+  try {
+    localStorage.setItem('voctrain_adrTasks', JSON.stringify(adrTasks));
+    localStorage.setItem('voctrain_adrStaffMeta', JSON.stringify(adrStaffMeta));
+  } catch(e) {}
+  saveState();
+}
+
+function adrPopulateStaffDropdowns() {
+  var staff = adrGetAdminStaff();
+  var opts = '<option value="">-- Select Staff --</option>';
+  var filterOpts = '<option value="all">All Staff</option>';
+  staff.forEach(function(s) {
+    opts += '<option value="'+s.id+'">'+s.name+'</option>';
+    filterOpts += '<option value="'+s.id+'">'+s.name+'</option>';
+  });
+  var assignEl = document.getElementById('adrTaskAssignee');
+  var filterEl = document.getElementById('adrFilterStaff');
+  if(assignEl) assignEl.innerHTML = opts;
+  if(filterEl) filterEl.innerHTML = filterOpts;
+}
+
+function adrOnPageShow() {
+  var isSysAdmin = adrIsSystemAdmin();
+  var assignBtn = document.getElementById('adrAssignBtn');
+  var viewToggle = document.getElementById('adrViewToggle');
+  var staffSection = document.getElementById('adrStaffCardsSection');
+
+  if(isSysAdmin) {
+    if(assignBtn) assignBtn.style.display = '';
+    if(viewToggle) { viewToggle.style.display = ''; viewToggle.textContent = adrViewMode === 'admin' ? 'View My Tasks' : 'View All Staff'; }
+    if(adrViewMode === 'admin') {
+      if(staffSection) staffSection.style.display = '';
+      adrRenderStaffCards();
+      adrRenderPerfOverview();
+    } else {
+      if(staffSection) staffSection.style.display = 'none';
+    }
+  } else {
+    if(assignBtn) assignBtn.style.display = 'none';
+    if(viewToggle) viewToggle.style.display = 'none';
+    if(staffSection) staffSection.style.display = 'none';
+    adrViewMode = 'staff';
+  }
+  adrPopulateStaffDropdowns();
+  adrRenderTasks();
+  adrCheckLoginNotifications();
+  adrUpdateBadge();
+}
+
+function adrToggleView() {
+  adrViewMode = adrViewMode === 'admin' ? 'staff' : 'admin';
+  adrOnPageShow();
+}
+
+function adrRenderPerfOverview() {
+  var el = document.getElementById('adrPerfOverview');
+  if(!el) return;
+  var staff = adrGetAdminStaff();
+  var totalTasks = adrTasks.length;
+  var completed = adrTasks.filter(function(t){ return t.status === 'completed'; }).length;
+  var overdue = adrTasks.filter(function(t){ return t.status !== 'completed' && adrIsOverdue(t); }).length;
+  var pending = adrTasks.filter(function(t){ return t.status === 'pending' || t.status === 'acknowledged'; }).length;
+  el.innerHTML =
+    '<div class="adr-perf-card"><div class="adr-pc-val" style="color:var(--blue);">'+staff.length+'</div><div class="adr-pc-label">Admin Staff</div></div>' +
+    '<div class="adr-perf-card"><div class="adr-pc-val" style="color:var(--accent);">'+totalTasks+'</div><div class="adr-pc-label">Total Tasks</div></div>' +
+    '<div class="adr-perf-card"><div class="adr-pc-val" style="color:var(--green);">'+completed+'</div><div class="adr-pc-label">Completed</div></div>' +
+    '<div class="adr-perf-card"><div class="adr-pc-val" style="color:var(--red);">'+overdue+'</div><div class="adr-pc-label">Overdue</div></div>' +
+    '<div class="adr-perf-card"><div class="adr-pc-val" style="color:var(--purple);">'+pending+'</div><div class="adr-pc-label">In Progress</div></div>';
+}
+
+function adrGetStaffPerformance(userId) {
+  var tasks = adrTasks.filter(function(t){ return t.assigneeId === userId; });
+  if(tasks.length === 0) return { score:0, total:0, completed:0, onTime:0, overdue:0, pending:0 };
+  var completed = tasks.filter(function(t){ return t.status === 'completed'; });
+  var onTime = completed.filter(function(t){ return !t.completedLate; });
+  var overdue = tasks.filter(function(t){ return t.status !== 'completed' && adrIsOverdue(t); });
+  var pending = tasks.filter(function(t){ return t.status !== 'completed' && !adrIsOverdue(t); });
+  var score = tasks.length > 0 ? Math.round((onTime.length / tasks.length) * 100) : 0;
+  return { score:score, total:tasks.length, completed:completed.length, onTime:onTime.length, overdue:overdue.length, pending:pending.length };
+}
+
+function adrGetBadge(score) {
+  if(score >= 85) return { label:'Top Performer', icon:'\uD83C\uDFC6', cls:'adr-badge-gold' };
+  if(score >= 65) return { label:'Good Performer', icon:'\uD83E\uDD48', cls:'adr-badge-silver' };
+  if(score >= 40) return { label:'Improving', icon:'\uD83E\uDD49', cls:'adr-badge-bronze' };
+  return { label:'Needs Improvement', icon:'\u26A0\uFE0F', cls:'adr-badge-low' };
+}
+
+function adrRenderStaffCards() {
+  var el = document.getElementById('adrStaffGrid');
+  if(!el) return;
+  var staff = adrGetAdminStaff();
+  if(staff.length === 0) {
+    el.innerHTML = '<div class="adr-empty-state"><h4>No Admin Staff Found</h4><p>Add admin user accounts in Settings to get started.</p></div>';
+    return;
+  }
+  var html = '';
+  staff.forEach(function(s) {
+    var perf = adrGetStaffPerformance(s.id);
+    var badge = adrGetBadge(perf.score);
+    var initials = s.name.split(' ').map(function(n){ return n[0]; }).join('').substring(0,2);
+    var colors = ['linear-gradient(135deg,var(--accent),var(--orange))','linear-gradient(135deg,var(--blue),var(--teal))','linear-gradient(135deg,var(--green),#16a085)','linear-gradient(135deg,var(--purple),#8e44ad)','linear-gradient(135deg,var(--red),#c0392b)'];
+    var colorIdx = Math.abs(s.id.split('').reduce(function(a,c){ return a + c.charCodeAt(0); },0)) % colors.length;
+    var perfColor = perf.score >= 85 ? 'var(--green)' : perf.score >= 65 ? 'var(--accent)' : perf.score >= 40 ? 'var(--orange)' : 'var(--red)';
+
+    html += '<div class="adr-staff-card" onclick="adrShowStaffDetail(\''+s.id+'\')">' +
+      '<div class="adr-staff-card-header">' +
+        '<div class="adr-staff-avatar" style="background:'+colors[colorIdx]+';">'+initials+'</div>' +
+        '<div class="adr-staff-info">' +
+          '<div class="adr-staff-name">'+s.name+'</div>' +
+          '<div class="adr-staff-role">'+((s.id === 'USR-001') ? 'System Administrator' : 'Admin Staff')+'</div>' +
+          '<div class="adr-staff-badge-row"><span class="adr-badge '+badge.cls+'">'+badge.icon+' '+badge.label+'</span></div>' +
+        '</div>' +
+      '</div>' +
+      '<div class="adr-staff-stats">' +
+        '<div class="adr-staff-stat"><div class="ss-val" style="color:var(--accent);">'+perf.total+'</div><div class="ss-lbl">Total</div></div>' +
+        '<div class="adr-staff-stat"><div class="ss-val" style="color:var(--green);">'+perf.completed+'</div><div class="ss-lbl">Done</div></div>' +
+        '<div class="adr-staff-stat"><div class="ss-val" style="color:var(--red);">'+perf.overdue+'</div><div class="ss-lbl">Overdue</div></div>' +
+      '</div>' +
+      '<div class="adr-staff-perf-bar"><div class="adr-staff-perf-fill" style="width:'+perf.score+'%;background:'+perfColor+';"></div></div>' +
+      '<div style="text-align:right;font-size:12px;color:var(--text-muted);margin-top:4px;">Performance: '+perf.score+'%</div>' +
+    '</div>';
+  });
+  el.innerHTML = html;
+}
+
+function adrShowStaffDetail(userId) {
+  // Filter tasks for this staff member and switch to their view
+  document.getElementById('adrFilterStaff').value = userId;
+  adrRenderTasks();
+}
+
+function adrSwitchTab(tabEl, tab) {
+  adrCurrentTab = tab;
+  document.querySelectorAll('.adr-tab').forEach(function(t){ t.classList.remove('active'); });
+  tabEl.classList.add('active');
+  adrRenderTasks();
+}
+
+function adrIsOverdue(task) {
+  if(task.status === 'completed') return false;
+  var now = new Date();
+  var dl = new Date(task.deadline);
+  return now > dl;
+}
+
+function adrGetFilteredTasks() {
+  var tab = adrCurrentTab;
+  var staffFilter = document.getElementById('adrFilterStaff') ? document.getElementById('adrFilterStaff').value : 'all';
+  var priorityFilter = document.getElementById('adrFilterPriority') ? document.getElementById('adrFilterPriority').value : 'all';
+  var search = document.getElementById('adrSearchTasks') ? document.getElementById('adrSearchTasks').value.toLowerCase().trim() : '';
+
+  var tasks = adrTasks.slice();
+
+  // If not sys admin, only show current user's tasks
+  if(!adrIsSystemAdmin() || adrViewMode === 'staff') {
+    var uid = adrGetCurrentUserId();
+    tasks = tasks.filter(function(t){ return t.assigneeId === uid; });
+  }
+
+  // Tab filter
+  if(tab === 'daily') tasks = tasks.filter(function(t){ return t.taskType === 'daily'; });
+  else if(tab === 'weekly') tasks = tasks.filter(function(t){ return t.taskType === 'weekly'; });
+  else if(tab === 'monthly') tasks = tasks.filter(function(t){ return t.taskType === 'monthly'; });
+  else if(tab === 'completed') tasks = tasks.filter(function(t){ return t.status === 'completed'; });
+  else tasks = tasks.filter(function(t){ return t.status !== 'completed'; }); // 'all' shows active tasks
+
+  // Staff filter (for admin view)
+  if(staffFilter !== 'all') tasks = tasks.filter(function(t){ return t.assigneeId === staffFilter; });
+
+  // Priority filter
+  if(priorityFilter !== 'all') tasks = tasks.filter(function(t){ return t.priority === priorityFilter; });
+
+  // Search
+  if(search) {
+    tasks = tasks.filter(function(t){
+      return t.title.toLowerCase().indexOf(search) !== -1 ||
+             t.description.toLowerCase().indexOf(search) !== -1 ||
+             t.assigneeName.toLowerCase().indexOf(search) !== -1;
+    });
+  }
+
+  // Sort: overdue first, then by priority, then by deadline
+  var priorityOrder = {urgent:0, high:1, medium:2, low:3};
+  tasks.sort(function(a,b) {
+    if(a.status === 'completed' && b.status !== 'completed') return 1;
+    if(a.status !== 'completed' && b.status === 'completed') return -1;
+    var aOD = adrIsOverdue(a) ? 0 : 1;
+    var bOD = adrIsOverdue(b) ? 0 : 1;
+    if(aOD !== bOD) return aOD - bOD;
+    var ap = priorityOrder[a.priority] || 2;
+    var bp = priorityOrder[b.priority] || 2;
+    if(ap !== bp) return ap - bp;
+    return new Date(a.deadline) - new Date(b.deadline);
+  });
+
+  return tasks;
+}
+
+function adrRenderTasks() {
+  var el = document.getElementById('adrTaskList');
+  if(!el) return;
+  var tasks = adrGetFilteredTasks();
+
+  if(tasks.length === 0) {
+    el.innerHTML = '<div class="adr-empty-state">' +
+      '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M9 5H7a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V7a2 2 0 0 0-2-2h-2"/><rect x="9" y="3" width="6" height="4" rx="1"/><path d="M9 14l2 2 4-4"/></svg>' +
+      '<h4>No Tasks Found</h4><p>'+( adrIsSystemAdmin() ? 'Click "Assign Task" to create a new task for your admin staff.' : 'You have no tasks assigned at this time.')+'</p></div>';
+    return;
+  }
+
+  var html = '';
+  var isSysAdmin = adrIsSystemAdmin();
+  var currentUid = adrGetCurrentUserId();
+  tasks.forEach(function(task) {
+    var isOverdue = adrIsOverdue(task);
+    var isCompleted = task.status === 'completed';
+    var cardCls = 'adr-task-card';
+    if(isCompleted) cardCls += ' adr-completed';
+    else if(isOverdue) cardCls += ' adr-overdue';
+    else if(task.priority === 'urgent') cardCls += ' adr-urgent';
+    else if(task.priority === 'high') cardCls += ' adr-high';
+
+    var deadlineStr = adrFormatDeadline(task.deadline);
+    var deadlineCls = isOverdue && !isCompleted ? 'adr-task-deadline overdue' : 'adr-task-deadline';
+
+    var commentsCount = task.comments ? task.comments.length : 0;
+
+    html += '<div class="'+cardCls+'" onclick="adrOpenTaskDetail(\''+task.id+'\')">' +
+      '<div class="adr-task-check '+(isCompleted?'checked':'')+'" onclick="event.stopPropagation();adrToggleComplete(\''+task.id+'\')">'+(isCompleted?'\u2713':'')+'</div>' +
+      '<div class="adr-task-body">' +
+        '<div class="adr-task-title">'+(isCompleted?'<s>':'')+task.title+(isCompleted?'</s>':'')+'</div>' +
+        '<div class="adr-task-meta">' +
+          '<span class="adr-task-tag adr-tag-'+task.priority+'">'+task.priority.toUpperCase()+'</span>' +
+          '<span class="adr-task-tag adr-tag-'+task.taskType+'">'+task.taskType.toUpperCase()+'</span>' +
+          '<span class="'+deadlineCls+'">'+(isOverdue && !isCompleted ? '\u26A0 OVERDUE \u2014 ' : '\uD83D\uDCC5 ')+deadlineStr+'</span>' +
+          (isSysAdmin || adrViewMode === 'admin' ? '<span class="adr-task-assignee">\uD83D\uDC64 '+task.assigneeName+'</span>' : '') +
+          (commentsCount > 0 ? '<span class="adr-task-deadline">\uD83D\uDCAC '+commentsCount+' comment'+(commentsCount>1?'s':'')+'</span>' : '') +
+          (task.status === 'acknowledged' ? '<span class="adr-task-tag adr-tag-weekly">\u2713 Acknowledged</span>' : '') +
+          (task.fileName ? '<span class="adr-task-deadline">\uD83D\uDCCE File attached</span>' : '') +
+        '</div>' +
+      '</div>' +
+      '<div class="adr-task-actions">' +
+        (!isCompleted && task.assigneeId === currentUid && task.status !== 'acknowledged' && task.taskType === 'weekly' ?
+          '<button class="adr-ack-btn" onclick="event.stopPropagation();adrAcknowledgeTask(\''+task.id+'\')" title="Acknowledge">\u2713 Ack</button>' : '') +
+        (isSysAdmin && !isCompleted ? '<button onclick="event.stopPropagation();adrOpenExtendTime(\''+task.id+'\')" title="Extend Time">\u23F0</button>' : '') +
+        '<button onclick="event.stopPropagation();adrOpenTaskDetail(\''+task.id+'\')" title="Details">\uD83D\uDD0D</button>' +
+      '</div>' +
+    '</div>';
+  });
+  el.innerHTML = html;
+}
+
+function adrFormatDeadline(deadline) {
+  var d = new Date(deadline);
+  var now = new Date();
+  var diff = d - now;
+  var opts = { month:'short', day:'numeric', hour:'2-digit', minute:'2-digit' };
+  var str = d.toLocaleDateString('en-US', opts);
+  if(diff > 0 && diff < 3600000) str += ' (< 1hr left)';
+  else if(diff > 0 && diff < 86400000) str += ' (' + Math.floor(diff/3600000) + 'hrs left)';
+  return str;
+}
+
+function adrOpenAssignTaskModal() {
+  adrPopulateStaffDropdowns();
+  document.getElementById('adrTaskTitle').value = '';
+  document.getElementById('adrTaskDesc').value = '';
+  document.getElementById('adrTaskType').value = 'daily';
+  document.getElementById('adrTaskPriority').value = 'medium';
+  document.getElementById('adrTaskDeadline').value = new Date().toISOString().split('T')[0];
+  document.getElementById('adrTaskDeadlineTime').value = '17:00';
+  document.getElementById('adrTaskFile').value = '';
+  openModal('adrAssignTaskModal');
+}
+
+function adrSubmitTask() {
+  var assigneeId = document.getElementById('adrTaskAssignee').value;
+  var title = document.getElementById('adrTaskTitle').value.trim();
+  var desc = document.getElementById('adrTaskDesc').value.trim();
+  var taskType = document.getElementById('adrTaskType').value;
+  var priority = document.getElementById('adrTaskPriority').value;
+  var deadlineDate = document.getElementById('adrTaskDeadline').value;
+  var deadlineTime = document.getElementById('adrTaskDeadlineTime').value;
+  var fileInput = document.getElementById('adrTaskFile');
+
+  if(!assigneeId) { alert('Please select a staff member.'); return; }
+  if(!title) { alert('Please enter a task title.'); return; }
+  if(!deadlineDate) { alert('Please set a deadline date.'); return; }
+
+  var assignee = userAccounts.find(function(u){ return u.id === assigneeId; });
+  var deadline = deadlineDate + 'T' + (deadlineTime || '17:00') + ':00';
+
+  var task = {
+    id: 'ADR-' + Date.now(),
+    title: title,
+    description: desc,
+    taskType: taskType,
+    priority: priority,
+    assigneeId: assigneeId,
+    assigneeName: assignee ? assignee.name : 'Unknown',
+    assignedBy: adrGetCurrentUserName(),
+    assignedById: adrGetCurrentUserId(),
+    deadline: deadline,
+    originalDeadline: deadline,
+    createdAt: new Date().toISOString(),
+    status: 'pending', // pending, acknowledged, completed
+    completedAt: null,
+    completedLate: false,
+    comments: [],
+    fileName: null,
+    fileData: null,
+    completionFileName: null,
+    completionFileData: null,
+    extensions: [],
+    acknowledged: false
+  };
+
+  // Handle file attachment
+  if(fileInput && fileInput.files && fileInput.files[0]) {
+    var file = fileInput.files[0];
+    task.fileName = file.name;
+    var reader = new FileReader();
+    reader.onload = function(e) {
+      task.fileData = e.target.result;
+      adrTasks.push(task);
+      adrSaveData();
+      adrFinishTaskSubmit(task);
+    };
+    reader.readAsDataURL(file);
+  } else {
+    adrTasks.push(task);
+    adrSaveData();
+    adrFinishTaskSubmit(task);
+  }
+}
+
+function adrFinishTaskSubmit(task) {
+  closeModal('adrAssignTaskModal');
+  showToast('Task assigned to ' + task.assigneeName + '!');
+  addNotification('New ' + task.taskType + ' task assigned: "' + task.title + '" (' + task.priority.toUpperCase() + ' priority)', 'info', '\uD83D\uDCCB', ['admin']);
+  adrRenderTasks();
+  if(adrViewMode === 'admin') {
+    adrRenderStaffCards();
+    adrRenderPerfOverview();
+  }
+  adrUpdateBadge();
+}
+
+function adrToggleComplete(taskId) {
+  var task = adrTasks.find(function(t){ return t.id === taskId; });
+  if(!task) return;
+
+  if(task.status === 'completed') {
+    // Uncomplete
+    task.status = task.acknowledged ? 'acknowledged' : 'pending';
+    task.completedAt = null;
+    task.completedLate = false;
+  } else {
+    // Complete
+    task.status = 'completed';
+    task.completedAt = new Date().toISOString();
+    task.completedLate = adrIsOverdue(task);
+
+    // Notify system admin
+    if(task.assigneeId !== 'USR-001') {
+      addNotification(task.assigneeName + ' completed task: "' + task.title + '"' + (task.completedLate ? ' (LATE)' : ' (On Time)'), task.completedLate ? 'warning' : 'success', task.completedLate ? '\u26A0\uFE0F' : '\u2705', ['admin']);
+    }
+    showToast('Task marked as completed!');
+  }
+
+  adrSaveData();
+  adrRenderTasks();
+  if(adrViewMode === 'admin') {
+    adrRenderStaffCards();
+    adrRenderPerfOverview();
+  }
+  adrUpdateBadge();
+}
+
+function adrAcknowledgeTask(taskId) {
+  var task = adrTasks.find(function(t){ return t.id === taskId; });
+  if(!task) return;
+  task.status = 'acknowledged';
+  task.acknowledged = true;
+  task.acknowledgedAt = new Date().toISOString();
+
+  addNotification(task.assigneeName + ' acknowledged task: "' + task.title + '"', 'info', '\u2705', ['admin']);
+  showToast('Task acknowledged!');
+  adrSaveData();
+  adrRenderTasks();
+}
+
+function adrOpenTaskDetail(taskId) {
+  var task = adrTasks.find(function(t){ return t.id === taskId; });
+  if(!task) return;
+
+  var isSysAdmin = adrIsSystemAdmin();
+  var isMyTask = task.assigneeId === adrGetCurrentUserId();
+  var isOverdue = adrIsOverdue(task) && task.status !== 'completed';
+  var perf = adrGetStaffPerformance(task.assigneeId);
+  var badge = adrGetBadge(perf.score);
+
+  document.getElementById('adrDetailTitle').textContent = task.title;
+
+  var html = '<div class="adr-detail-grid">' +
+    '<div class="adr-detail-item"><div class="adr-detail-label">Assigned To</div><div class="adr-detail-val">' + task.assigneeName + '</div></div>' +
+    '<div class="adr-detail-item"><div class="adr-detail-label">Status</div><div class="adr-detail-val" style="color:'+(task.status==='completed'?'var(--green)':isOverdue?'var(--red)':'var(--accent)')+';">'+(task.status==='completed'?'\u2705 Completed':isOverdue?'\u26A0\uFE0F Overdue':task.status==='acknowledged'?'\u2713 Acknowledged':'\u23F3 Pending')+'</div></div>' +
+    '<div class="adr-detail-item"><div class="adr-detail-label">Priority</div><div class="adr-detail-val"><span class="adr-task-tag adr-tag-'+task.priority+'">'+task.priority.toUpperCase()+'</span></div></div>' +
+    '<div class="adr-detail-item"><div class="adr-detail-label">Type</div><div class="adr-detail-val"><span class="adr-task-tag adr-tag-'+task.taskType+'">'+task.taskType.toUpperCase()+'</span></div></div>' +
+    '<div class="adr-detail-item"><div class="adr-detail-label">Deadline</div><div class="adr-detail-val'+(isOverdue?' overdue':'')+'">'+adrFormatDeadline(task.deadline)+'</div></div>' +
+    '<div class="adr-detail-item"><div class="adr-detail-label">Assigned By</div><div class="adr-detail-val">'+task.assignedBy+'</div></div>' +
+  '</div>';
+
+  // Description
+  if(task.description) {
+    html += '<div style="margin-bottom:16px;"><div style="font-size:12px;color:var(--text-muted);margin-bottom:4px;">Description</div><div style="font-size:13px;color:var(--text-secondary);line-height:1.6;padding:12px;background:var(--bg-input);border-radius:var(--radius-sm);">'+task.description+'</div></div>';
+  }
+
+  // Performance Scale
+  if(isSysAdmin) {
+    var perfColor = perf.score >= 85 ? 'var(--green)' : perf.score >= 65 ? 'var(--accent)' : perf.score >= 40 ? 'var(--orange)' : 'var(--red)';
+    html += '<div style="margin-bottom:16px;padding:14px;background:var(--bg-input);border-radius:var(--radius-sm);">' +
+      '<div style="font-size:12px;color:var(--text-muted);margin-bottom:8px;">Staff Performance Scale</div>' +
+      '<div class="adr-perf-scale">' +
+        '<div class="adr-perf-score-big" style="color:'+perfColor+';">'+perf.score+'%</div>' +
+        '<div style="flex:1;"><div class="adr-staff-perf-bar" style="height:10px;"><div class="adr-staff-perf-fill" style="width:'+perf.score+'%;background:'+perfColor+';"></div></div>' +
+        '<div style="display:flex;justify-content:space-between;margin-top:4px;font-size:10px;color:var(--text-muted);"><span>'+perf.completed+'/'+perf.total+' completed</span><span>'+perf.onTime+' on time</span></div></div>' +
+        '<span class="adr-badge '+badge.cls+'" style="font-size:13px;">'+badge.icon+' '+badge.label+'</span>' +
+      '</div></div>';
+  }
+
+  // Attached file from admin
+  if(task.fileName) {
+    html += '<div style="margin-bottom:16px;"><div style="font-size:12px;color:var(--text-muted);margin-bottom:6px;">Task File (from Administrator)</div>';
+    if(task.fileData) {
+      html += '<a class="adr-file-link" onclick="adrDownloadFile(\''+task.id+'\',\'task\')">\uD83D\uDCC2 '+task.fileName+' \u2014 Click to Download</a>';
+    } else {
+      html += '<span class="adr-file-link">\uD83D\uDCC2 '+task.fileName+'</span>';
+    }
+    html += '</div>';
+  }
+
+  // Completion file upload (for assigned staff)
+  if(isMyTask && task.status !== 'completed') {
+    html += '<div style="margin-bottom:16px;"><div style="font-size:12px;color:var(--text-muted);margin-bottom:6px;">Upload Completed Work</div>' +
+      '<div class="adr-file-upload-area" onclick="document.getElementById(\'adrCompletionFile\').click()">' +
+        (task.completionFileName ? '\uD83D\uDCC4 '+task.completionFileName+' (uploaded) \u2014 Click to replace' : '\uD83D\uDCC1 Click to upload your completed work') +
+      '</div>' +
+      '<input type="file" id="adrCompletionFile" style="display:none" onchange="adrUploadCompletion(\''+task.id+'\',event)" accept=".pdf,.doc,.docx,.xls,.xlsx,.ppt,.pptx,.txt,.csv,.jpg,.png">' +
+    '</div>';
+  } else if(task.completionFileName) {
+    html += '<div style="margin-bottom:16px;"><div style="font-size:12px;color:var(--text-muted);margin-bottom:6px;">Completed Work Submission</div>' +
+      '<a class="adr-file-link" onclick="adrDownloadFile(\''+task.id+'\',\'completion\')">\uD83D\uDCC4 '+task.completionFileName+' \u2014 Click to Download</a></div>';
+  }
+
+  // Extensions history
+  if(task.extensions && task.extensions.length > 0) {
+    html += '<div style="margin-bottom:16px;"><div style="font-size:12px;color:var(--text-muted);margin-bottom:6px;">Deadline Extensions</div>';
+    task.extensions.forEach(function(ext) {
+      html += '<div style="padding:8px 12px;background:var(--bg-input);border-radius:var(--radius-sm);margin-bottom:4px;font-size:12px;">' +
+        '\u23F0 Extended to <strong>'+adrFormatDeadline(ext.newDeadline)+'</strong>' +
+        (ext.reason ? ' \u2014 '+ext.reason : '') +
+        '<span style="color:var(--text-muted);margin-left:8px;">by '+ext.extendedBy+'</span></div>';
+    });
+    html += '</div>';
+  }
+
+  // Comments section
+  html += '<div class="adr-comments-section"><div style="font-size:14px;font-weight:600;margin-bottom:10px;">\uD83D\uDCAC Comments ('+((task.comments||[]).length)+')</div>';
+  if(task.comments && task.comments.length > 0) {
+    task.comments.forEach(function(c) {
+      var initials = c.author.split(' ').map(function(n){ return n[0]; }).join('').substring(0,2);
+      html += '<div class="adr-comment">' +
+        '<div class="adr-comment-avatar" style="background:linear-gradient(135deg,var(--blue),var(--teal));">'+initials+'</div>' +
+        '<div class="adr-comment-body">' +
+          '<div style="display:flex;justify-content:space-between;"><div class="adr-comment-author">'+c.author+'</div><div class="adr-comment-time">'+adrTimeAgo(c.timestamp)+'</div></div>' +
+          '<div class="adr-comment-text">'+c.text+'</div>' +
+        '</div></div>';
+    });
+  } else {
+    html += '<div style="font-size:13px;color:var(--text-muted);padding:12px;text-align:center;">No comments yet</div>';
+  }
+  html += '<div class="adr-comment-input">' +
+    '<input type="text" class="form-control" id="adrCommentInput" placeholder="Add a comment..." onkeypress="if(event.key===\'Enter\')adrAddComment(\''+task.id+'\')">' +
+    '<button class="btn btn-primary btn-sm" onclick="adrAddComment(\''+task.id+'\')">Send</button>' +
+  '</div></div>';
+
+  document.getElementById('adrDetailBody').innerHTML = html;
+  openModal('adrTaskDetailModal');
+}
+
+function adrAddComment(taskId) {
+  var input = document.getElementById('adrCommentInput');
+  if(!input) return;
+  var text = input.value.trim();
+  if(!text) return;
+
+  var task = adrTasks.find(function(t){ return t.id === taskId; });
+  if(!task) return;
+
+  if(!task.comments) task.comments = [];
+  var comment = {
+    id: 'CMT-' + Date.now(),
+    author: adrGetCurrentUserName(),
+    authorId: adrGetCurrentUserId(),
+    text: text,
+    timestamp: new Date().toISOString()
+  };
+  task.comments.push(comment);
+  adrSaveData();
+
+  // Notify the other party
+  if(adrIsSystemAdmin() && task.assigneeId !== adrGetCurrentUserId()) {
+    addNotification('Admin commented on your task: "' + task.title + '"', 'info', '\uD83D\uDCAC', ['admin']);
+  } else if(!adrIsSystemAdmin()) {
+    addNotification(adrGetCurrentUserName() + ' commented on task: "' + task.title + '"', 'info', '\uD83D\uDCAC', ['admin']);
+  }
+
+  // Re-render the detail modal
+  adrOpenTaskDetail(taskId);
+  adrRenderTasks();
+}
+
+function adrTimeAgo(isoStr) {
+  var diff = Math.floor((Date.now() - new Date(isoStr).getTime()) / 1000);
+  if(diff < 60) return 'Just now';
+  if(diff < 3600) return Math.floor(diff/60) + 'm ago';
+  if(diff < 86400) return Math.floor(diff/3600) + 'h ago';
+  if(diff < 604800) return Math.floor(diff/86400) + 'd ago';
+  return new Date(isoStr).toLocaleDateString();
+}
+
+function adrUploadCompletion(taskId, event) {
+  var file = event.target.files[0];
+  if(!file) return;
+  var task = adrTasks.find(function(t){ return t.id === taskId; });
+  if(!task) return;
+
+  task.completionFileName = file.name;
+  var reader = new FileReader();
+  reader.onload = function(e) {
+    task.completionFileData = e.target.result;
+    adrSaveData();
+    showToast('Work file uploaded: ' + file.name);
+    adrOpenTaskDetail(taskId);
+  };
+  reader.readAsDataURL(file);
+}
+
+function adrDownloadFile(taskId, type) {
+  var task = adrTasks.find(function(t){ return t.id === taskId; });
+  if(!task) return;
+  var data = type === 'completion' ? task.completionFileData : task.fileData;
+  var name = type === 'completion' ? task.completionFileName : task.fileName;
+  if(!data || !name) return;
+  var a = document.createElement('a');
+  a.href = data;
+  a.download = name;
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+}
+
+// ---- Extend Deadline ----
+function adrOpenExtendTime(taskId) {
+  document.getElementById('adrExtendTaskId').value = taskId;
+  var task = adrTasks.find(function(t){ return t.id === taskId; });
+  if(task) {
+    var dl = new Date(task.deadline);
+    document.getElementById('adrExtendDate').value = dl.toISOString().split('T')[0];
+    document.getElementById('adrExtendTime').value = dl.toTimeString().substring(0,5);
+  }
+  document.getElementById('adrExtendReason').value = '';
+  openModal('adrExtendTimeModal');
+}
+
+function adrSubmitExtension() {
+  var taskId = document.getElementById('adrExtendTaskId').value;
+  var newDate = document.getElementById('adrExtendDate').value;
+  var newTime = document.getElementById('adrExtendTime').value;
+  var reason = document.getElementById('adrExtendReason').value.trim();
+
+  if(!newDate) { alert('Please set a new deadline date.'); return; }
+
+  var task = adrTasks.find(function(t){ return t.id === taskId; });
+  if(!task) return;
+
+  var newDeadline = newDate + 'T' + (newTime || '17:00') + ':00';
+  if(!task.extensions) task.extensions = [];
+  task.extensions.push({
+    previousDeadline: task.deadline,
+    newDeadline: newDeadline,
+    reason: reason,
+    extendedBy: adrGetCurrentUserName(),
+    extendedAt: new Date().toISOString()
+  });
+  task.deadline = newDeadline;
+  adrSaveData();
+
+  addNotification('Deadline extended for task: "' + task.title + '" \u2014 New deadline: ' + adrFormatDeadline(newDeadline), 'info', '\u23F0', ['admin']);
+  showToast('Deadline extended successfully!');
+  closeModal('adrExtendTimeModal');
+  adrRenderTasks();
+  if(adrViewMode === 'admin') {
+    adrRenderStaffCards();
+    adrRenderPerfOverview();
+  }
+}
+
+// ---- Notification Timers ----
+function adrStartNotificationTimers() {
+  // Clear any existing intervals
+  Object.keys(adrNotifIntervals).forEach(function(k) { clearInterval(adrNotifIntervals[k]); });
+  adrNotifIntervals = {};
+
+  // Hourly check for daily overdue/unacknowledged tasks
+  adrNotifIntervals.hourly = setInterval(function() {
+    adrCheckHourlyReminders();
+  }, 3600000); // every hour
+
+  // Also check once on init after a short delay
+  setTimeout(adrCheckHourlyReminders, 5000);
+}
+
+function adrCheckHourlyReminders() {
+  var now = new Date();
+  adrTasks.forEach(function(task) {
+    if(task.status === 'completed') return;
+
+    // Daily tasks: remind every hour if not completed and past deadline
+    if(task.taskType === 'daily' && adrIsOverdue(task)) {
+      var lastReminder = task._lastHourlyReminder ? new Date(task._lastHourlyReminder) : null;
+      if(!lastReminder || (now - lastReminder) >= 3500000) {
+        addNotification('\u23F0 OVERDUE: "' + task.title + '" assigned to ' + task.assigneeName + ' is past deadline!', 'warning', '\u26A0\uFE0F', ['admin']);
+        if(task.assigneeId !== 'USR-001') {
+          addNotification('\u23F0 Reminder: Your task "' + task.title + '" is overdue! Please complete it ASAP.', 'warning', '\u26A0\uFE0F', ['admin']);
+        }
+        task._lastHourlyReminder = now.toISOString();
+      }
+    }
+
+    // Weekly tasks: remind every hour if not acknowledged
+    if(task.taskType === 'weekly' && task.status === 'pending') {
+      var lastAckReminder = task._lastAckReminder ? new Date(task._lastAckReminder) : null;
+      if(!lastAckReminder || (now - lastAckReminder) >= 3500000) {
+        addNotification('\uD83D\uDD14 Please acknowledge your weekly task: "' + task.title + '"', 'info', '\uD83D\uDD14', ['admin']);
+        task._lastAckReminder = now.toISOString();
+      }
+    }
+  });
+  adrSaveData();
+}
+
+function adrCheckLoginNotifications() {
+  var currentUid = adrGetCurrentUserId();
+  var now = new Date();
+  var today = now.toISOString().split('T')[0];
+
+  // Monthly tasks: notify on login each day
+  adrTasks.forEach(function(task) {
+    if(task.status === 'completed') return;
+    if(task.assigneeId !== currentUid) return;
+
+    if(task.taskType === 'monthly') {
+      var lastLoginNotif = task._lastLoginNotif || '';
+      if(lastLoginNotif !== today) {
+        addNotification('\uD83D\uDCC5 Monthly task reminder: "' + task.title + '" \u2014 Deadline: ' + adrFormatDeadline(task.deadline), 'info', '\uD83D\uDCC5', ['admin']);
+        task._lastLoginNotif = today;
+      }
+    }
+
+    // Weekly tasks: notify about unacknowledged on login
+    if(task.taskType === 'weekly' && task.status === 'pending') {
+      var lastWeekNotif = task._lastWeekLoginNotif || '';
+      if(lastWeekNotif !== today) {
+        addNotification('\uD83D\uDD14 You have an unacknowledged weekly task: "' + task.title + '" \u2014 Please acknowledge it.', 'info', '\uD83D\uDD14', ['admin']);
+        task._lastWeekLoginNotif = today;
+      }
+    }
+  });
+  adrSaveData();
+}
+
+function adrUpdateBadge() {
+  var badge = document.getElementById('dutyTasksBadge');
+  if(!badge) return;
+  var currentUid = adrGetCurrentUserId();
+  var pendingCount = adrTasks.filter(function(t) {
+    return t.status !== 'completed' && (adrIsSystemAdmin() || t.assigneeId === currentUid);
+  }).length;
+  if(pendingCount > 0) {
+    badge.style.display = '';
+    badge.textContent = pendingCount;
+  } else {
+    badge.style.display = 'none';
+  }
 }
 
 </script>
