@@ -10826,7 +10826,7 @@ function lmsChatRenderMessages(prefix) {
     } else if(msg.type === 'image') {
       var imgSrc = msg.imageData || msg.imageUrl || (msg.driveFileId ? 'https://drive.google.com/thumbnail?id='+msg.driveFileId+'&sz=w800' : '') || msg.fileUrl || '';
       if(imgSrc) {
-        html += '<img class="msg-img" src="'+imgSrc+'" onclick="window.open(this.src)" alt="shared image" onerror="this.onerror=null;this.style.display=\'none\';this.nextElementSibling&&this.nextElementSibling.classList.contains(\'msg-img-error\')&&(this.nextElementSibling.style.display=\'flex\');">';
+        html += '<img class="msg-img" src="'+imgSrc+'" onclick="lmsChatOpenImage(\''+msg.id+'\')" alt="shared image" onerror="this.onerror=null;this.style.display=\'none\';this.nextElementSibling&&this.nextElementSibling.classList.contains(\'msg-img-error\')&&(this.nextElementSibling.style.display=\'flex\');">';
         html += '<div class="msg-img-error" style="display:none;">&#128444;&#65039; Image could not be loaded</div>';
       } else {
         html += '<div class="msg-img-error">&#128444;&#65039; Image not available</div>';
@@ -11083,6 +11083,29 @@ function lmsChatDownloadFile(url, name) {
       link.download = name;
       link.click();
     }
+  }
+}
+
+function lmsChatOpenImage(msgId) {
+  // Find message across all rooms
+  var msg = null;
+  var rooms = Object.keys(lmsChatMessages);
+  for(var i = 0; i < rooms.length; i++) {
+    var msgs = lmsChatMessages[rooms[i]] || [];
+    msg = msgs.find(function(m){ return m.id === msgId; });
+    if(msg) break;
+  }
+  if(!msg) return;
+
+  // Try best viewable URL: base64 in-memory > Drive viewer > fileUrl > current img src
+  if(msg.imageData) {
+    window.open(msg.imageData, '_blank');
+  } else if(msg.driveFileId) {
+    window.open('https://drive.google.com/file/d/' + msg.driveFileId + '/view', '_blank');
+  } else if(msg.imageUrl && msg.imageUrl.startsWith('http')) {
+    window.open(msg.imageUrl, '_blank');
+  } else if(msg.fileUrl && msg.fileUrl.startsWith('http')) {
+    window.open(msg.fileUrl, '_blank');
   }
 }
 
