@@ -3042,6 +3042,13 @@ function createUserAccount() {
   document.getElementById('newUserProgramme').value='';
   renderUserAccountsTable();
   showToast('User account created successfully!');
+
+  // Auto-merge from cloud then push the new account to all Drive folders
+  if (isCloudConnected && googleAccessToken) {
+    autoSyncOnLogin().then(function() {
+      autoSaveToAllFolders();
+    });
+  }
 }
 
 function openEditUser(userId) {
@@ -3077,6 +3084,13 @@ function saveUserEdit() {
   closeModal('editUserModal');
   renderUserAccountsTable();
   showToast('User updated successfully!');
+
+  // Auto-merge from cloud then push updated account to all Drive folders
+  if (isCloudConnected && googleAccessToken) {
+    autoSyncOnLogin().then(function() {
+      autoSaveToAllFolders();
+    });
+  }
 }
 
 function openResetPassword(userId) {
@@ -6868,6 +6882,13 @@ function addStudent() {
   students.unshift({id:'STU-'+String(2026000+students.length),name,stage:document.getElementById('newStudentStage').value,course:document.getElementById('newStudentCourse').value,score:'',progress:10,certNo:null,certDate:null,certCollected:false,attendance:0,assignments:0,assignmentsTotal:8,gpa:'0.0',instructor:'Mr. R. Campbell'});
   closeModal('addStudentModal');filterStudents();updatePipelineCounts();showToast(`${name} added!`);document.getElementById('newStudentName').value='';
   saveState();
+
+  // Auto-merge from cloud then push the new student to all Drive folders
+  if (isCloudConnected && googleAccessToken) {
+    autoSyncOnLogin().then(function() {
+      autoSaveToAllFolders();
+    });
+  }
 }
 
 function renderSkills() {
