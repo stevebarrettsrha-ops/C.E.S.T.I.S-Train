@@ -1939,7 +1939,7 @@ textarea.form-control { resize:vertical; min-height:80px; }
 /* ============================== C.E.S.T.I.S LMS CHAT ============================== */
 .lms-chat-container {
   display:flex; height:calc(100vh - var(--topbar-h) - 40px); border-radius:var(--radius-lg); overflow:hidden;
-  background:var(--bg-card); border:1px solid var(--border);
+  background:var(--bg-card); border:1px solid var(--border); max-width:100%;
 }
 .lms-chat-sidebar {
   width:340px; min-width:340px; background:var(--bg-secondary); border-right:1px solid var(--border);
@@ -2002,7 +2002,7 @@ textarea.form-control { resize:vertical; min-height:80px; }
 }
 
 /* Chat main area */
-.lms-chat-main { flex:1; display:flex; flex-direction:column; background:var(--bg-primary); }
+.lms-chat-main { flex:1; display:flex; flex-direction:column; background:var(--bg-primary); min-width:0; overflow:hidden; }
 .lms-chat-main-empty {
   flex:1; display:flex; flex-direction:column; align-items:center; justify-content:center;
   color:var(--text-muted); gap:12px;
@@ -2031,7 +2031,7 @@ textarea.form-control { resize:vertical; min-height:80px; }
 
 /* Messages area */
 .lms-chat-messages {
-  flex:1; overflow-y:auto; padding:20px; display:flex; flex-direction:column; gap:4px;
+  flex:1; overflow-y:auto; padding:20px; display:flex; flex-direction:column; gap:4px; min-height:0;
 }
 .lms-chat-date-divider {
   text-align:center; margin:12px 0; font-size:11px; color:var(--text-muted);
@@ -2058,7 +2058,7 @@ textarea.form-control { resize:vertical; min-height:80px; }
   border-bottom-left-radius:4px; color:var(--text-primary);
 }
 .lms-chat-msg .msg-sender { font-size:11px; font-weight:700; color:var(--accent); margin-bottom:3px; }
-.lms-chat-msg .msg-text { font-size:13.5px; line-height:1.5; word-wrap:break-word; }
+.lms-chat-msg .msg-text { font-size:13.5px; line-height:1.5; word-wrap:break-word; overflow-wrap:break-word; word-break:break-word; }
 .lms-chat-msg .msg-time { font-size:10px; color:rgba(255,255,255,0.45); text-align:right; margin-top:4px; }
 .lms-chat-msg .msg-edited { font-size:9px; color:rgba(255,255,255,0.35); font-style:italic; }
 .lms-chat-msg .msg-actions {
@@ -2083,31 +2083,87 @@ textarea.form-control { resize:vertical; min-height:80px; }
 .lms-chat-msg .msg-file-info { flex:1; min-width:0; }
 .lms-chat-msg .msg-file-name { font-size:12px; font-weight:600; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
 .lms-chat-msg .msg-file-size { font-size:10px; color:rgba(255,255,255,0.5); }
-.lms-chat-msg .msg-img { max-width:280px; border-radius:var(--radius-sm); margin-top:6px; cursor:pointer; }
+.lms-chat-msg .msg-img { max-width:280px; width:auto; height:auto; border-radius:var(--radius-sm); margin-top:6px; cursor:pointer; display:block; }
+.lms-chat-msg .msg-img-error { display:flex; align-items:center; gap:8px; padding:12px 16px; border-radius:var(--radius-sm); background:rgba(0,0,0,0.15); margin-top:6px; color:var(--text-muted); font-size:12px; font-style:italic; }
 
 /* Chat input area */
 .lms-chat-input-area {
   padding:12px 16px; border-top:1px solid var(--border); background:var(--bg-card);
-  display:flex; align-items:flex-end; gap:8px;
+  display:flex; align-items:flex-end; gap:8px; flex-shrink:0; min-height:64px; max-height:180px; overflow:visible;
 }
-.lms-chat-input-area .attach-btn, .lms-chat-input-area .send-btn, .lms-chat-input-area .emoji-btn {
+.lms-chat-input-area .attach-btn, .lms-chat-input-area .send-btn, .lms-chat-input-area .emoji-btn, .lms-chat-input-area .poll-btn {
   width:40px; height:40px; min-width:40px; border:none; border-radius:50%;
   cursor:pointer; display:flex; align-items:center; justify-content:center;
-  font-size:18px; transition:var(--transition);
+  font-size:18px; transition:var(--transition); flex-shrink:0;
 }
 .lms-chat-input-area .attach-btn { background:var(--bg-input); color:var(--text-secondary); }
 .lms-chat-input-area .attach-btn:hover { background:var(--accent-dim); color:var(--accent); }
+.lms-chat-input-area .poll-btn { background:var(--bg-input); color:var(--text-secondary); }
+.lms-chat-input-area .poll-btn:hover { background:var(--accent-dim); color:var(--accent); }
 .lms-chat-input-area .emoji-btn { background:var(--bg-input); color:var(--text-secondary); position:relative; }
 .lms-chat-input-area .emoji-btn:hover { background:var(--accent-dim); color:var(--accent); }
 .lms-chat-input-area .send-btn { background:var(--accent); color:#000; }
 .lms-chat-input-area .send-btn:hover { background:#d4900a; }
 .lms-chat-input-area .msg-input {
-  flex:1; padding:10px 16px; border:1px solid var(--border-light); border-radius:20px;
+  flex:1; min-width:0; padding:10px 16px; border:1px solid var(--border-light); border-radius:20px;
   background:var(--bg-input); color:var(--text-primary); font-size:14px;
   font-family:'DM Sans',sans-serif; outline:none; resize:none; max-height:120px;
-  min-height:40px; line-height:1.4; transition:var(--transition);
+  min-height:40px; line-height:1.4; transition:var(--transition); overflow-y:auto;
+  word-wrap:break-word; overflow-wrap:break-word;
 }
 .lms-chat-input-area .msg-input:focus { border-color:var(--accent); }
+
+/* Poll styles */
+.lms-chat-poll { background:rgba(0,0,0,0.15); border-radius:var(--radius); padding:14px; margin-top:4px; }
+.lms-chat-poll-question { font-size:14px; font-weight:600; margin-bottom:10px; line-height:1.4; }
+.lms-chat-poll-icon { font-size:16px; margin-right:6px; vertical-align:middle; }
+.lms-chat-poll-option {
+  display:flex; align-items:center; gap:10px; padding:10px 12px; margin-bottom:6px;
+  border-radius:var(--radius-sm); border:1px solid var(--border-light); cursor:pointer;
+  transition:var(--transition); position:relative; overflow:hidden;
+}
+.lms-chat-poll-option:hover { border-color:var(--accent); background:rgba(240,165,0,0.05); }
+.lms-chat-poll-option.voted { border-color:var(--accent); }
+.lms-chat-poll-option.my-vote { border-color:var(--accent); background:var(--accent-dim); }
+.lms-chat-poll-bar {
+  position:absolute; left:0; top:0; bottom:0; background:var(--accent-dim);
+  border-radius:var(--radius-sm); transition:width 0.4s ease; z-index:0;
+}
+.lms-chat-poll-option-text { flex:1; font-size:13px; position:relative; z-index:1; }
+.lms-chat-poll-option-check { font-size:14px; color:var(--accent); position:relative; z-index:1; }
+.lms-chat-poll-option-pct { font-size:12px; font-weight:600; color:var(--text-muted); min-width:36px; text-align:right; position:relative; z-index:1; }
+.lms-chat-poll-footer { display:flex; justify-content:space-between; align-items:center; margin-top:8px; font-size:11px; color:var(--text-muted); }
+
+/* Poll creation modal */
+.lms-poll-modal { position:fixed; inset:0; z-index:9999; background:rgba(0,0,0,0.6); display:none; align-items:center; justify-content:center; }
+.lms-poll-modal.active { display:flex; }
+.lms-poll-modal-content {
+  background:var(--bg-card); border:1px solid var(--border-light); border-radius:var(--radius-lg);
+  padding:24px; width:420px; max-width:90vw; max-height:80vh; overflow-y:auto;
+  box-shadow:0 20px 60px rgba(0,0,0,0.5);
+}
+.lms-poll-modal-content h3 { font-size:18px; margin-bottom:16px; color:var(--accent); }
+.lms-poll-modal-content label { font-size:12px; color:var(--text-muted); display:block; margin-bottom:6px; text-transform:uppercase; letter-spacing:0.5px; }
+.lms-poll-modal-content input[type="text"] {
+  width:100%; padding:10px 14px; border:1px solid var(--border-light); border-radius:var(--radius-sm);
+  background:var(--bg-input); color:var(--text-primary); font-size:14px; outline:none; margin-bottom:12px;
+}
+.lms-poll-modal-content input[type="text"]:focus { border-color:var(--accent); }
+.lms-poll-options-list { margin-bottom:12px; }
+.lms-poll-option-row { display:flex; gap:8px; align-items:center; margin-bottom:8px; }
+.lms-poll-option-row input { flex:1; margin-bottom:0; }
+.lms-poll-option-row button {
+  width:32px; height:32px; min-width:32px; border:none; border-radius:50%; background:var(--red-dim);
+  color:var(--red); cursor:pointer; font-size:14px; display:flex; align-items:center; justify-content:center;
+}
+.lms-poll-option-row button:hover { background:var(--red); color:#fff; }
+.lms-poll-add-option {
+  padding:8px 14px; border:1px dashed var(--border-light); border-radius:var(--radius-sm);
+  background:none; color:var(--text-muted); cursor:pointer; font-size:13px; width:100%;
+  transition:var(--transition); margin-bottom:16px;
+}
+.lms-poll-add-option:hover { border-color:var(--accent); color:var(--accent); }
+.lms-poll-modal-actions { display:flex; gap:10px; justify-content:flex-end; }
 
 /* Emoji Picker */
 .lms-emoji-picker {
@@ -4601,7 +4657,7 @@ function buildAdminPages() {
           <h3>C.E.S.T.I.S LMS Chat</h3>
           <p>Select a class chat or create a new conversation</p>
         </div>
-        <div id="adminChatActive" style="display:none;flex:1;flex-direction:column;">
+        <div id="adminChatActive" style="display:none;flex:1;flex-direction:column;min-height:0;overflow:hidden;">
           <div class="lms-chat-main-header">
             <div class="lms-chat-main-header-left">
               <button class="back-btn" onclick="lmsChatBack('admin')">&#8592;</button>
@@ -4622,6 +4678,7 @@ function buildAdminPages() {
           <div class="lms-chat-input-area">
             <button class="emoji-btn" onclick="lmsChatToggleEmojiPicker('admin')" title="Emoji">&#128522;</button>
             <button class="attach-btn" onclick="lmsChatAttachFile()" title="Attach File">&#128206;</button>
+            <button class="poll-btn" onclick="lmsChatOpenPollModal('admin')" title="Create Poll">&#128202;</button>
             <textarea class="msg-input" id="adminChatInput" placeholder="Type a message..." rows="1" onkeydown="lmsChatInputKeydown(event,'admin')"></textarea>
             <button class="send-btn" onclick="lmsChatSendMessage('admin')" title="Send">&#10148;</button>
           </div>
@@ -5043,7 +5100,7 @@ function buildStudentPages() {
           <h3>C.E.S.T.I.S LMS Chat</h3>
           <p>Select a class chat to start messaging</p>
         </div>
-        <div id="studentChatActive" style="display:none;flex:1;flex-direction:column;">
+        <div id="studentChatActive" style="display:none;flex:1;flex-direction:column;min-height:0;overflow:hidden;">
           <div class="lms-chat-main-header">
             <div class="lms-chat-main-header-left">
               <button class="back-btn" onclick="lmsChatBack('student')">&#8592;</button>
@@ -5063,6 +5120,7 @@ function buildStudentPages() {
           <div class="lms-chat-input-area">
             <button class="emoji-btn" onclick="lmsChatToggleEmojiPicker('student')" title="Emoji">&#128522;</button>
             <button class="attach-btn" onclick="lmsChatAttachFile()" title="Attach File">&#128206;</button>
+            <button class="poll-btn" onclick="lmsChatOpenPollModal('student')" title="Create Poll">&#128202;</button>
             <textarea class="msg-input" id="studentChatInput" placeholder="Type a message..." rows="1" onkeydown="lmsChatInputKeydown(event,'student')"></textarea>
             <button class="send-btn" onclick="lmsChatSendMessage('student')" title="Send">&#10148;</button>
           </div>
@@ -5429,7 +5487,7 @@ function buildInstructorPages() {
           <h3>C.E.S.T.I.S LMS Chat</h3>
           <p>Select a class chat to start messaging</p>
         </div>
-        <div id="instructorChatActive" style="display:none;flex:1;flex-direction:column;">
+        <div id="instructorChatActive" style="display:none;flex:1;flex-direction:column;min-height:0;overflow:hidden;">
           <div class="lms-chat-main-header">
             <div class="lms-chat-main-header-left">
               <button class="back-btn" onclick="lmsChatBack('instructor')">&#8592;</button>
@@ -5449,6 +5507,7 @@ function buildInstructorPages() {
           <div class="lms-chat-input-area">
             <button class="emoji-btn" onclick="lmsChatToggleEmojiPicker('instructor')" title="Emoji">&#128522;</button>
             <button class="attach-btn" onclick="lmsChatAttachFile()" title="Attach File">&#128206;</button>
+            <button class="poll-btn" onclick="lmsChatOpenPollModal('instructor')" title="Create Poll">&#128202;</button>
             <textarea class="msg-input" id="instructorChatInput" placeholder="Type a message..." rows="1" onkeydown="lmsChatInputKeydown(event,'instructor')"></textarea>
             <button class="send-btn" onclick="lmsChatSendMessage('instructor')" title="Send">&#10148;</button>
           </div>
@@ -10615,7 +10674,7 @@ function lmsChatRenderRoomList(prefix) {
   rooms.forEach(function(room) {
     var msgs = lmsChatMessages[room.id] || [];
     var lastMsg = msgs.length ? msgs[msgs.length-1] : null;
-    var lastText = lastMsg ? (lastMsg.type === 'file' ? '\uD83D\uDCCE '+lastMsg.fileName : lastMsg.text) : 'No messages yet';
+    var lastText = lastMsg ? (lastMsg.type === 'file' ? '\uD83D\uDCCE '+lastMsg.fileName : lastMsg.type === 'image' ? '\uD83D\uDDBC\uFE0F Photo' : lastMsg.type === 'poll' ? '\uD83D\uDCCA Poll: '+lastMsg.pollQuestion : lastMsg.text) : 'No messages yet';
     var lastTime = lastMsg ? lmsChatFormatTime(lastMsg.timestamp) : '';
     var unread = lmsChatCountUnread(room.id);
     var isActive = lmsChatActiveRoom === room.id ? ' active' : '';
@@ -10765,8 +10824,16 @@ function lmsChatRenderMessages(prefix) {
       html += '<div class="msg-file-size">'+lmsChatFormatFileSize(msg.fileSize||0)+'</div></div></div>';
       if(msg.text) html += '<div class="msg-text">'+lmsChatEscapeHtml(msg.text)+'</div>';
     } else if(msg.type === 'image') {
-      html += '<img class="msg-img" src="'+msg.imageData+'" onclick="window.open(this.src)" alt="shared image">';
+      var imgSrc = msg.imageData || msg.imageUrl || (msg.driveFileId ? 'https://drive.google.com/thumbnail?id='+msg.driveFileId+'&sz=w800' : '') || msg.fileUrl || '';
+      if(imgSrc) {
+        html += '<img class="msg-img" src="'+imgSrc+'" onclick="window.open(this.src)" alt="shared image" onerror="this.onerror=null;this.style.display=\'none\';this.nextElementSibling&&this.nextElementSibling.classList.contains(\'msg-img-error\')&&(this.nextElementSibling.style.display=\'flex\');">';
+        html += '<div class="msg-img-error" style="display:none;">&#128444;&#65039; Image could not be loaded</div>';
+      } else {
+        html += '<div class="msg-img-error">&#128444;&#65039; Image not available</div>';
+      }
       if(msg.text) html += '<div class="msg-text">'+lmsChatEscapeHtml(msg.text)+'</div>';
+    } else if(msg.type === 'poll') {
+      html += lmsChatRenderPoll(msg, user);
     } else if(msg.type === 'call') {
       html += '<div class="msg-text" style="font-style:italic;opacity:0.8;">'+lmsChatEscapeHtml(msg.text)+'</div>';
     } else {
@@ -10964,7 +11031,7 @@ async function lmsChatUploadFileToDrive(file, msgId) {
     formData.append('metadata', new Blob([JSON.stringify(metadata)], {type:'application/json'}));
     formData.append('file', file);
 
-    var resp = await fetch('https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart&fields=id,name,webViewLink', {
+    var resp = await fetch('https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart&fields=id,name,webViewLink,webContentLink', {
       method: 'POST',
       headers: { 'Authorization': 'Bearer ' + googleAccessToken },
       body: formData
@@ -10972,16 +11039,31 @@ async function lmsChatUploadFileToDrive(file, msgId) {
 
     if(resp.ok) {
       var result = await resp.json();
-      // Update message with Drive link
+      // Make file publicly accessible so images can be displayed inline
+      try {
+        await fetch('https://www.googleapis.com/drive/v3/files/' + result.id + '/permissions', {
+          method: 'POST',
+          headers: { 'Authorization': 'Bearer ' + googleAccessToken, 'Content-Type': 'application/json' },
+          body: JSON.stringify({ role: 'reader', type: 'anyone' })
+        });
+      } catch(permErr) { console.warn('Could not set public permission on Drive file:', permErr); }
+      // Update message with Drive link and direct image URL
+      var isImage = file.type.startsWith('image/');
       Object.keys(lmsChatMessages).forEach(function(roomId) {
         lmsChatMessages[roomId].forEach(function(m) {
           if(m.id === msgId) {
             m.fileUrl = result.webViewLink || ('https://drive.google.com/file/d/' + result.id + '/view');
             m.driveFileId = result.id;
+            if(isImage) {
+              m.imageUrl = 'https://drive.google.com/thumbnail?id=' + result.id + '&sz=w800';
+            }
           }
         });
       });
       saveLmsChatData();
+      // Re-render so Drive URL appears for images
+      var prefix = lmsChatGetRolePrefix();
+      if(prefix) lmsChatRenderMessages(prefix);
     }
   } catch(err) {
     console.error('Chat file upload to Drive failed:', err);
@@ -11002,6 +11084,192 @@ function lmsChatDownloadFile(url, name) {
       link.click();
     }
   }
+}
+
+// ============================== CHAT POLLS ==============================
+
+var _lmsChatPollPrefix = null;
+
+function lmsChatOpenPollModal(prefix) {
+  _lmsChatPollPrefix = prefix;
+  if(!lmsChatActiveRoom) { alert('Please select a chat first.'); return; }
+
+  var modal = document.getElementById('lmsChatPollModal');
+  if(!modal) {
+    modal = document.createElement('div');
+    modal.id = 'lmsChatPollModal';
+    modal.className = 'lms-poll-modal';
+    document.body.appendChild(modal);
+  }
+
+  modal.innerHTML = '<div class="lms-poll-modal-content">' +
+    '<h3>&#128202; Create Poll</h3>' +
+    '<label>Question</label>' +
+    '<input type="text" id="lmsPollQuestion" placeholder="Ask a question...">' +
+    '<label>Options</label>' +
+    '<div class="lms-poll-options-list" id="lmsPollOptionsList">' +
+      '<div class="lms-poll-option-row"><input type="text" placeholder="Option 1" class="poll-opt-input"><button onclick="lmsChatRemovePollOption(this)" title="Remove">&times;</button></div>' +
+      '<div class="lms-poll-option-row"><input type="text" placeholder="Option 2" class="poll-opt-input"><button onclick="lmsChatRemovePollOption(this)" title="Remove">&times;</button></div>' +
+    '</div>' +
+    '<button class="lms-poll-add-option" onclick="lmsChatAddPollOption()">+ Add Option</button>' +
+    '<div style="margin-bottom:16px;">' +
+      '<label style="display:flex;align-items:center;gap:8px;cursor:pointer;text-transform:none;letter-spacing:0;font-size:13px;color:var(--text-secondary);">' +
+        '<input type="checkbox" id="lmsPollMultiSelect" style="accent-color:var(--accent);width:16px;height:16px;">' +
+        'Allow multiple selections' +
+      '</label>' +
+    '</div>' +
+    '<div class="lms-poll-modal-actions">' +
+      '<button class="btn btn-secondary" onclick="lmsChatClosePollModal()">Cancel</button>' +
+      '<button class="btn btn-primary" onclick="lmsChatSendPoll()">Send Poll</button>' +
+    '</div>' +
+  '</div>';
+
+  modal.classList.add('active');
+  setTimeout(function() { document.getElementById('lmsPollQuestion').focus(); }, 100);
+}
+
+function lmsChatClosePollModal() {
+  var modal = document.getElementById('lmsChatPollModal');
+  if(modal) modal.classList.remove('active');
+}
+
+function lmsChatAddPollOption() {
+  var list = document.getElementById('lmsPollOptionsList');
+  if(!list) return;
+  var count = list.querySelectorAll('.lms-poll-option-row').length;
+  if(count >= 10) { alert('Maximum 10 options allowed.'); return; }
+  var row = document.createElement('div');
+  row.className = 'lms-poll-option-row';
+  row.innerHTML = '<input type="text" placeholder="Option '+(count+1)+'" class="poll-opt-input"><button onclick="lmsChatRemovePollOption(this)" title="Remove">&times;</button>';
+  list.appendChild(row);
+  row.querySelector('input').focus();
+}
+
+function lmsChatRemovePollOption(btn) {
+  var list = document.getElementById('lmsPollOptionsList');
+  if(!list) return;
+  if(list.querySelectorAll('.lms-poll-option-row').length <= 2) {
+    alert('A poll must have at least 2 options.');
+    return;
+  }
+  btn.parentElement.remove();
+}
+
+function lmsChatSendPoll() {
+  var question = document.getElementById('lmsPollQuestion').value.trim();
+  if(!question) { alert('Please enter a question.'); return; }
+
+  var inputs = document.querySelectorAll('#lmsPollOptionsList .poll-opt-input');
+  var options = [];
+  inputs.forEach(function(inp) {
+    var val = inp.value.trim();
+    if(val) options.push(val);
+  });
+
+  if(options.length < 2) { alert('Please provide at least 2 options.'); return; }
+
+  var multiSelect = document.getElementById('lmsPollMultiSelect').checked;
+  var user = lmsChatGetCurrentUser();
+
+  var pollOptions = options.map(function(text) {
+    return { text: text, votes: [] };
+  });
+
+  var msg = {
+    id: 'msg-' + Date.now() + '-' + Math.random().toString(36).substr(2,6),
+    roomId: lmsChatActiveRoom,
+    senderId: user.id,
+    senderName: user.name,
+    text: '',
+    type: 'poll',
+    timestamp: new Date().toISOString(),
+    readBy: [user.id],
+    pollQuestion: question,
+    pollOptions: pollOptions,
+    pollMultiSelect: multiSelect
+  };
+
+  if(!lmsChatMessages[lmsChatActiveRoom]) lmsChatMessages[lmsChatActiveRoom] = [];
+  lmsChatMessages[lmsChatActiveRoom].push(msg);
+  saveLmsChatData();
+
+  lmsChatClosePollModal();
+  var prefix = _lmsChatPollPrefix || lmsChatGetRolePrefix();
+  lmsChatRenderMessages(prefix);
+  lmsChatRenderRoomList(prefix);
+
+  var msgContainer = document.getElementById(prefix+'ChatMessages');
+  if(msgContainer) setTimeout(function(){ msgContainer.scrollTop = msgContainer.scrollHeight; }, 50);
+}
+
+function lmsChatVotePoll(msgId, optionIdx) {
+  if(!lmsChatActiveRoom) return;
+  var msgs = lmsChatMessages[lmsChatActiveRoom] || [];
+  var msg = msgs.find(function(m){ return m.id === msgId; });
+  if(!msg || msg.type !== 'poll') return;
+
+  var user = lmsChatGetCurrentUser();
+  var opt = msg.pollOptions[optionIdx];
+  if(!opt) return;
+
+  var alreadyVoted = opt.votes.indexOf(user.id) !== -1;
+
+  if(alreadyVoted) {
+    // Remove vote (toggle off)
+    opt.votes = opt.votes.filter(function(v){ return v !== user.id; });
+  } else {
+    if(!msg.pollMultiSelect) {
+      // Single select: remove vote from all other options first
+      msg.pollOptions.forEach(function(o) {
+        o.votes = o.votes.filter(function(v){ return v !== user.id; });
+      });
+    }
+    opt.votes.push(user.id);
+  }
+
+  saveLmsChatData();
+  var prefix = lmsChatGetRolePrefix();
+  lmsChatRenderMessages(prefix);
+}
+
+function lmsChatRenderPoll(msg, currentUser) {
+  var totalVoters = [];
+  msg.pollOptions.forEach(function(opt) {
+    opt.votes.forEach(function(v) {
+      if(totalVoters.indexOf(v) === -1) totalVoters.push(v);
+    });
+  });
+  var totalVotes = totalVoters.length;
+  var userHasVoted = totalVoters.indexOf(currentUser.id) !== -1;
+
+  var html = '<div class="lms-chat-poll">';
+  html += '<div class="lms-chat-poll-question"><span class="lms-chat-poll-icon">&#128202;</span>' + lmsChatEscapeHtml(msg.pollQuestion) + '</div>';
+
+  msg.pollOptions.forEach(function(opt, idx) {
+    var voteCount = opt.votes.length;
+    var pct = totalVotes > 0 ? Math.round((voteCount / totalVotes) * 100) : 0;
+    var isMyVote = opt.votes.indexOf(currentUser.id) !== -1;
+
+    html += '<div class="lms-chat-poll-option' + (isMyVote ? ' my-vote' : (userHasVoted ? ' voted' : '')) + '" onclick="lmsChatVotePoll(\'' + msg.id + '\',' + idx + ')">';
+    if(userHasVoted) {
+      html += '<div class="lms-chat-poll-bar" style="width:' + pct + '%"></div>';
+    }
+    html += '<span class="lms-chat-poll-option-text">' + lmsChatEscapeHtml(opt.text) + '</span>';
+    if(isMyVote) {
+      html += '<span class="lms-chat-poll-option-check">&#10003;</span>';
+    }
+    if(userHasVoted) {
+      html += '<span class="lms-chat-poll-option-pct">' + pct + '%</span>';
+    }
+    html += '</div>';
+  });
+
+  html += '<div class="lms-chat-poll-footer">';
+  html += '<span>' + totalVotes + ' vote' + (totalVotes !== 1 ? 's' : '') + '</span>';
+  html += '<span>' + (msg.pollMultiSelect ? 'Multiple choice' : 'Single choice') + '</span>';
+  html += '</div>';
+  html += '</div>';
+  return html;
 }
 
 // Profile picture and status
