@@ -2464,6 +2464,27 @@ textarea.form-control { resize:vertical; min-height:80px; }
 .lms-member-profile-view .mpv-info-label { color:var(--text-muted); width:110px; flex-shrink:0; }
 .lms-member-profile-view .mpv-info-value { color:var(--text-primary); font-weight:500; flex:1; }
 .lms-member-profile-view .mpv-bio { margin-top:16px; padding:14px; background:var(--bg-secondary); border-radius:var(--radius-sm); font-size:13px; color:var(--text-secondary); line-height:1.6; font-style:italic; }
+/* Follow stats row */
+.mpv-follow-stats {
+  display:flex; justify-content:center; gap:32px; margin:12px 0 4px;
+}
+.mpv-stat { display:flex; flex-direction:column; align-items:center; }
+.mpv-stat-num { font-size:18px; font-weight:700; color:var(--text-primary); }
+.mpv-stat-lbl { font-size:11px; color:var(--text-muted); margin-top:2px; }
+/* Member profile action buttons */
+.mpv-actions {
+  display:flex; gap:10px; justify-content:center; margin:14px 0 4px;
+}
+.mpv-btn {
+  padding:8px 20px; border-radius:var(--radius-sm); font-size:13px; font-weight:600;
+  cursor:pointer; border:none; transition:var(--transition);
+}
+.mpv-btn-dm { background:var(--accent); color:#fff; }
+.mpv-btn-dm:hover { opacity:0.85; }
+.mpv-btn-follow { background:var(--bg-secondary); color:var(--accent); border:1.5px solid var(--accent); }
+.mpv-btn-follow:hover { background:var(--accent); color:#fff; }
+.mpv-btn-unfollow { background:var(--bg-secondary); color:var(--text-secondary); border:1.5px solid var(--border); }
+.mpv-btn-unfollow:hover { border-color:var(--red); color:var(--red); }
 .lms-members-role-badge {
   display:inline-block; padding:2px 10px; border-radius:20px; font-size:11px; font-weight:600;
 }
@@ -3409,12 +3430,39 @@ function addNotification(text, type, icon, forRoles) {
 }
 
 function getFilteredNotifications() {
-  if(!currentRole) return notifications;
+  var currentUserId = null;
+  try { var cu = lmsChatGetCurrentUser(); currentUserId = cu ? cu.id : null; } catch(e) {}
   return notifications.filter(function(n) {
+    // Notifications targeted at specific users
+    if(n.forUsers && n.forUsers.length) {
+      return currentUserId && n.forUsers.indexOf(currentUserId) !== -1;
+    }
+    if(!currentRole) return true;
     if(!n.forRoles || !n.forRoles.length) return true;
     if(currentRole === 'adminstaff') return n.forRoles.indexOf('adminstaff') !== -1 || n.forRoles.indexOf('admin') !== -1;
     return n.forRoles.indexOf(currentRole) !== -1;
   });
+}
+
+function addNotificationForUser(text, type, icon, userId, role) {
+  type = type || 'info';
+  var icons = {success:'\u2705',warning:'\u26A0\uFE0F',info:'\uD83D\uDD14',dm:'\uD83D\uDCAC',follow:'\uD83D\uDC65'};
+  notifications.unshift({
+    id: Date.now() + Math.random(),
+    text: text,
+    timestamp: Date.now(),
+    time: 'Just now',
+    read: false,
+    icon: icon || icons[type] || icons.info,
+    type: 'info',
+    forUsers: [userId],
+    forRoles: role ? [role] : []
+  });
+  if(notifications.length > 50) notifications = notifications.slice(0, 50);
+  updateNotificationDot();
+  shakeNotificationBell();
+  playNotificationSound();
+  saveNotifications();
 }
 
 function getRelativeTime(ts) {
@@ -3530,6 +3578,8 @@ let systemSettings = { institutionName: 'C.E.S.T.I.S LMS - Community Training In
 let lmsChatRooms = [];
 let lmsChatMessages = {};
 let lmsChatProfiles = {};
+let lmsChatFollows = {};   // { userId: [followedUserId, ...] }
+let lmsChatDMNotifThrottle = {}; // prevent duplicate rapid DM notifs
 let lmsChatActiveRoom = null;
 let lmsChatCallState = null;
 let lmsChatCallTimer = null;
@@ -3573,9 +3623,11 @@ function initLmsChatData() {
     var cr = localStorage.getItem('voctrain_chatRooms');
     var cm = localStorage.getItem('voctrain_chatMessages');
     var cp = localStorage.getItem('voctrain_chatProfiles');
+    var cf = localStorage.getItem('voctrain_chatFollows');
     if(cr) lmsChatRooms = JSON.parse(cr);
     if(cm) lmsChatMessages = JSON.parse(cm);
     if(cp) lmsChatProfiles = JSON.parse(cp);
+    if(cf) lmsChatFollows = JSON.parse(cf);
   } catch(e) { console.warn('initLmsChatData parse error'); }
 
   // Restore image base64 data from IndexedDB into in-memory messages
@@ -3648,6 +3700,7 @@ function saveLmsChatData() {
       delete profCopy[uid].profilePic;
     });
     localStorage.setItem('voctrain_chatProfiles', JSON.stringify(profCopy));
+    localStorage.setItem('voctrain_chatFollows', JSON.stringify(lmsChatFollows));
   } catch(e) { console.warn('saveLmsChatData: storage error', e); }
   // Auto-save to Google Drive (debounced)
   lmsChatScheduleDriveSync();
@@ -12679,13 +12732,79 @@ function lmsChatGetRolePrefix() {
 function lmsChatGetUserRooms() {
   var user = lmsChatGetCurrentUser();
   return lmsChatRooms.filter(function(room) {
-    if(currentRole === 'admin' || currentRole === 'adminstaff') return true; // Admin and admin staff see all rooms
+    if(room.type === 'dm') return room.members.indexOf(user.id) !== -1; // DM rooms: only participants
+    if(currentRole === 'admin' || currentRole === 'adminstaff') return true; // Admin and admin staff see all group rooms
     return room.members.indexOf(user.id) !== -1;
   });
 }
 
 function lmsChatGetProfile(userId) {
   return lmsChatProfiles[userId] || {};
+}
+
+// ---- Follow helpers ----
+function lmsChatIsFollowing(targetId) {
+  var me = lmsChatGetCurrentUser();
+  return (lmsChatFollows[me.id] || []).indexOf(targetId) !== -1;
+}
+
+function lmsChatGetFollowersOf(targetId) {
+  var followers = [];
+  Object.keys(lmsChatFollows).forEach(function(uid) {
+    if(lmsChatFollows[uid].indexOf(targetId) !== -1) followers.push(uid);
+  });
+  return followers;
+}
+
+function lmsChatToggleFollow(targetId) {
+  var me = lmsChatGetCurrentUser();
+  if(targetId === me.id) return;
+  if(!lmsChatFollows[me.id]) lmsChatFollows[me.id] = [];
+  var list = lmsChatFollows[me.id];
+  var idx = list.indexOf(targetId);
+  if(idx !== -1) {
+    list.splice(idx, 1);
+    showToast('Unfollowed.');
+  } else {
+    list.push(targetId);
+    showToast('Now following!');
+    var targetAcc = userAccounts.find(function(u){ return u.id === targetId; });
+    if(targetAcc) {
+      addNotificationForUser('\uD83D\uDC65 ' + me.name + ' started following you.', 'follow', '\uD83D\uDC65', targetId, targetAcc.role);
+    }
+  }
+  saveLmsChatData();
+  // Re-render profile view to update button
+  lmsChatViewMemberProfile(targetId);
+}
+
+// ---- Direct Messaging ----
+function lmsChatStartDM(targetId) {
+  var me = lmsChatGetCurrentUser();
+  if(targetId === me.id) { showToast('You cannot send a DM to yourself.'); return; }
+  // Build a stable room ID (sorted user IDs)
+  var ids = [me.id, targetId].sort();
+  var roomId = 'dm-' + ids[0] + '-' + ids[1];
+  // Find or create the DM room
+  var room = lmsChatRooms.find(function(r){ return r.id === roomId; });
+  if(!room) {
+    room = {
+      id: roomId,
+      name: 'Direct Message',
+      icon: '\uD83D\uDCAC',
+      type: 'dm',
+      members: ids,
+      dmBetween: ids,
+      color: '#7c3aed',
+      createdBy: me.id
+    };
+    lmsChatRooms.push(room);
+    if(!lmsChatMessages[roomId]) lmsChatMessages[roomId] = [];
+    saveLmsChatData();
+  }
+  lmsChatCloseMembersDirectory();
+  var prefix = lmsChatGetRolePrefix();
+  lmsChatOpenRoom(roomId, prefix);
 }
 
 function lmsChatGetUserInitials(name) {
@@ -12715,6 +12834,7 @@ function lmsChatRenderRoomList(prefix) {
     return;
   }
 
+  var currentUser = lmsChatGetCurrentUser();
   var html = '';
   rooms.forEach(function(room) {
     var msgs = lmsChatMessages[room.id] || [];
@@ -12723,12 +12843,32 @@ function lmsChatRenderRoomList(prefix) {
     var lastTime = lastMsg ? lmsChatFormatTime(lastMsg.timestamp) : '';
     var unread = lmsChatCountUnread(room.id);
     var isActive = lmsChatActiveRoom === room.id ? ' active' : '';
-    var memberCount = room.members.length;
 
     html += '<div class="lms-chat-item'+isActive+'" onclick="lmsChatOpenRoom(\''+room.id+'\',\''+prefix+'\')" data-room-id="'+room.id+'">';
-    html += '<div class="lms-chat-avatar" style="background:'+room.color+'22;color:'+room.color+';font-size:22px;">'+room.icon+'</div>';
-    html += '<div class="lms-chat-info"><div class="lms-chat-name">'+room.name+'</div>';
-    html += '<div class="lms-chat-last-msg">'+lmsChatEscapeHtml(lastText.substring(0,50))+'</div></div>';
+
+    if(room.type === 'dm') {
+      // Show other participant's avatar
+      var otherId = (room.dmBetween||room.members).find(function(id){ return id !== currentUser.id; });
+      var otherUser = otherId ? userAccounts.find(function(u){ return u.id === otherId; }) : null;
+      var otherProf = otherId ? lmsChatGetProfile(otherId) : {};
+      var otherName = otherUser ? otherUser.name : 'Direct Message';
+      var otherStatus = otherProf.status || 'offline';
+      var roleColors = {admin:'var(--accent)',adminstaff:'var(--purple)',instructor:'var(--green)',student:'var(--blue)'};
+      var rColor = otherUser ? (roleColors[otherUser.role]||'var(--accent)') : 'var(--accent)';
+      if(otherProf.profilePic) {
+        html += '<div class="lms-chat-avatar" style="background:none;padding:0;overflow:hidden;"><img src="'+otherProf.profilePic+'" style="width:100%;height:100%;object-fit:cover;border-radius:50%;"><div class="status-dot '+otherStatus+'" style="position:absolute;bottom:0;right:0;"></div></div>';
+      } else {
+        var initials = lmsChatGetUserInitials(otherName);
+        html += '<div class="lms-chat-avatar" style="background:'+rColor+'22;color:'+rColor+';font-size:16px;font-weight:700;">'+lmsChatEscapeHtml(initials)+'<div class="status-dot '+otherStatus+'" style="position:absolute;bottom:0;right:0;"></div></div>';
+      }
+      html += '<div class="lms-chat-info"><div class="lms-chat-name">'+lmsChatEscapeHtml(otherName)+' <span style="font-size:10px;color:var(--text-muted);">DM</span></div>';
+      html += '<div class="lms-chat-last-msg">'+lmsChatEscapeHtml(lastText.substring(0,50))+'</div></div>';
+    } else {
+      html += '<div class="lms-chat-avatar" style="background:'+room.color+'22;color:'+room.color+';font-size:22px;">'+room.icon+'</div>';
+      html += '<div class="lms-chat-info"><div class="lms-chat-name">'+room.name+'</div>';
+      html += '<div class="lms-chat-last-msg">'+lmsChatEscapeHtml(lastText.substring(0,50))+'</div></div>';
+    }
+
     html += '<div class="lms-chat-meta"><div class="lms-chat-time">'+lastTime+'</div>';
     if(unread > 0) html += '<div class="lms-chat-unread">'+unread+'</div>';
     html += '</div></div>';
@@ -12808,10 +12948,33 @@ function lmsChatOpenRoom(roomId, prefix) {
   }
 
   // Update header
-  document.getElementById(prefix+'ChatHeaderAvatar').innerHTML = room.icon;
-  document.getElementById(prefix+'ChatHeaderAvatar').style.cssText = 'width:42px;height:42px;min-width:42px;background:'+room.color+'22;color:'+room.color+';font-size:20px;display:flex;align-items:center;justify-content:center;border-radius:50%;';
-  document.getElementById(prefix+'ChatHeaderName').textContent = room.name;
-  document.getElementById(prefix+'ChatHeaderStatus').textContent = room.members.length + ' members';
+  var headerAvatar = document.getElementById(prefix+'ChatHeaderAvatar');
+  var headerName = document.getElementById(prefix+'ChatHeaderName');
+  var headerStatus = document.getElementById(prefix+'ChatHeaderStatus');
+  if(room.type === 'dm') {
+    var dmCurrentUser = lmsChatGetCurrentUser();
+    var dmOtherId = (room.dmBetween||room.members).find(function(id){ return id !== dmCurrentUser.id; });
+    var dmOtherUser = dmOtherId ? userAccounts.find(function(u){ return u.id === dmOtherId; }) : null;
+    var dmOtherProf = dmOtherId ? lmsChatGetProfile(dmOtherId) : {};
+    var dmOtherName = dmOtherUser ? dmOtherUser.name : 'Direct Message';
+    var dmStatus = dmOtherProf.status || 'offline';
+    var dmRoleColors = {admin:'var(--accent)',adminstaff:'var(--purple)',instructor:'var(--green)',student:'var(--blue)'};
+    var dmColor = dmOtherUser ? (dmRoleColors[dmOtherUser.role]||'var(--accent)') : 'var(--accent)';
+    if(dmOtherProf.profilePic) {
+      headerAvatar.innerHTML = '<img src="'+dmOtherProf.profilePic+'" style="width:100%;height:100%;object-fit:cover;border-radius:50%;">';
+      headerAvatar.style.cssText = 'width:42px;height:42px;min-width:42px;background:none;overflow:hidden;display:flex;align-items:center;justify-content:center;border-radius:50%;';
+    } else {
+      headerAvatar.innerHTML = lmsChatEscapeHtml(lmsChatGetUserInitials(dmOtherName));
+      headerAvatar.style.cssText = 'width:42px;height:42px;min-width:42px;background:'+dmColor+'22;color:'+dmColor+';font-size:16px;font-weight:700;display:flex;align-items:center;justify-content:center;border-radius:50%;';
+    }
+    if(headerName) headerName.textContent = dmOtherName;
+    if(headerStatus) { var dmStatLabels={online:'Online',away:'Away',offline:'Offline'}; headerStatus.textContent = dmStatLabels[dmStatus]||'Offline'; }
+  } else {
+    headerAvatar.innerHTML = room.icon;
+    headerAvatar.style.cssText = 'width:42px;height:42px;min-width:42px;background:'+room.color+'22;color:'+room.color+';font-size:20px;display:flex;align-items:center;justify-content:center;border-radius:50%;';
+    if(headerName) headerName.textContent = room.name;
+    if(headerStatus) headerStatus.textContent = room.members.length + ' members';
+  }
 
   lmsChatRenderMessages(prefix);
   lmsChatRenderRoomList(prefix);
@@ -12934,6 +13097,19 @@ function lmsChatSendMessage(prefix) {
   if(!lmsChatMessages[lmsChatActiveRoom]) lmsChatMessages[lmsChatActiveRoom] = [];
   lmsChatMessages[lmsChatActiveRoom].push(msg);
   saveLmsChatData();
+
+  // Notify DM recipient (throttled to once per 5 s per recipient)
+  var activeRoom = lmsChatRooms.find(function(r){ return r.id === lmsChatActiveRoom; });
+  if(activeRoom && activeRoom.type === 'dm') {
+    var dmParts = activeRoom.dmBetween || activeRoom.members;
+    var recipientId = dmParts.find(function(id){ return id !== user.id; });
+    var recipientAcc = recipientId ? userAccounts.find(function(u){ return u.id === recipientId; }) : null;
+    if(recipientAcc && !lmsChatDMNotifThrottle[recipientId]) {
+      addNotificationForUser('\uD83D\uDCAC ' + user.name + ' sent you a direct message', 'dm', '\uD83D\uDCAC', recipientId, recipientAcc.role);
+      lmsChatDMNotifThrottle[recipientId] = true;
+      setTimeout(function(){ delete lmsChatDMNotifThrottle[recipientId]; }, 5000);
+    }
+  }
 
   input.value = '';
   input.style.height = 'auto';
@@ -13550,6 +13726,9 @@ function lmsChatViewMemberProfile(userId) {
   var u = userAccounts.find(function(a){ return a.id === userId; });
   if(!u) return;
 
+  var me = lmsChatGetCurrentUser();
+  var isSelf = (u.id === me.id);
+
   var prof = lmsChatGetProfile(userId);
   var status = prof.status || 'offline';
   var statusLabels = { online: 'Online', away: 'Away', offline: 'Offline' };
@@ -13566,6 +13745,22 @@ function lmsChatViewMemberProfile(userId) {
     avatarHtml = '<div class="mpv-avatar" style="background:'+roleColor+'33;color:'+roleColor+';">'+lmsChatEscapeHtml(initials)+'</div>';
   }
 
+  // Follow stats
+  var followingCount = (lmsChatFollows[userId] || []).length;
+  var followersCount = lmsChatGetFollowersOf(userId).length;
+  var isFollowing = lmsChatIsFollowing(userId);
+
+  var actionsHtml = '';
+  if(!isSelf) {
+    actionsHtml =
+      '<div class="mpv-actions">' +
+        '<button class="mpv-btn mpv-btn-dm" onclick="lmsChatStartDM(\''+lmsChatEscapeHtml(userId)+'\')">\uD83D\uDCAC Message</button>' +
+        '<button class="mpv-btn '+(isFollowing?'mpv-btn-unfollow':'mpv-btn-follow')+'" onclick="lmsChatToggleFollow(\''+lmsChatEscapeHtml(userId)+'\')">' +
+          (isFollowing ? '\u2714 Following' : '+ Follow') +
+        '</button>' +
+      '</div>';
+  }
+
   var panel = document.getElementById('lmsMembersPanel');
   if(!panel) return;
 
@@ -13576,7 +13771,7 @@ function lmsChatViewMemberProfile(userId) {
       '</div>' +
       '<div class="mpv-body" style="text-align:center;">' +
         avatarHtml +
-        '<div class="mpv-name">'+lmsChatEscapeHtml(u.name)+'</div>' +
+        '<div class="mpv-name">'+lmsChatEscapeHtml(u.name)+(isSelf?' <span style="font-size:12px;color:var(--accent);">(You)</span>':'')+'</div>' +
         '<div class="mpv-role">' +
           '<span class="lms-members-role-badge '+badgeClasses[u.role]+'">'+lmsChatEscapeHtml(roleLabels[u.role]||u.role)+'</span>' +
           (u.programme ? ' &nbsp;<span style="font-size:12px;color:var(--text-muted);">'+lmsChatEscapeHtml(u.programme)+'</span>' : '') +
@@ -13585,6 +13780,11 @@ function lmsChatViewMemberProfile(userId) {
           '<span class="mpv-status-indicator '+status+'"></span>' +
           '<span style="font-size:13px;color:var(--text-secondary);">'+statusLabels[status]+(prof.statusMsg?' &mdash; '+lmsChatEscapeHtml(prof.statusMsg):'')+'</span>' +
         '</div>' +
+        '<div class="mpv-follow-stats">' +
+          '<div class="mpv-stat"><span class="mpv-stat-num">'+followersCount+'</span><span class="mpv-stat-lbl">Followers</span></div>' +
+          '<div class="mpv-stat"><span class="mpv-stat-num">'+followingCount+'</span><span class="mpv-stat-lbl">Following</span></div>' +
+        '</div>' +
+        actionsHtml +
       '</div>' +
       '<div style="padding:0 28px 28px;">' +
         (u.email ? '<div class="mpv-info-row"><span class="mpv-info-label">Email</span><span class="mpv-info-value">'+lmsChatEscapeHtml(u.email)+'</span></div>' : '') +
@@ -14024,12 +14224,13 @@ async function lmsChatSyncToDrive() {
   if(!isCloudConnected || !googleAccessToken) return;
   try {
     var chatData = {
-      version: '1.0',
+      version: '1.1',
       timestamp: new Date().toISOString(),
       savedBy: lmsChatGetCurrentUser().name,
       chatRooms: lmsChatRooms,
       chatMessages: lmsChatMessages,
-      chatProfiles: lmsChatProfiles
+      chatProfiles: lmsChatProfiles,
+      chatFollows: lmsChatFollows
     };
 
     var jsonContent = JSON.stringify(chatData);
@@ -14104,6 +14305,16 @@ async function lmsChatSyncFromDrive() {
       });
     }
 
+    // Merge follows — cloud takes priority, union with local
+    if(data.chatFollows) {
+      Object.keys(data.chatFollows).forEach(function(uid) {
+        if(!lmsChatFollows[uid]) lmsChatFollows[uid] = [];
+        data.chatFollows[uid].forEach(function(fid) {
+          if(lmsChatFollows[uid].indexOf(fid) === -1) lmsChatFollows[uid].push(fid);
+        });
+      });
+    }
+
     // Save merged data to localStorage (stripped version)
     try {
       var msgCopy = {};
@@ -14118,6 +14329,7 @@ async function lmsChatSyncFromDrive() {
       localStorage.setItem('voctrain_chatRooms', JSON.stringify(lmsChatRooms));
       localStorage.setItem('voctrain_chatMessages', JSON.stringify(msgCopy));
       localStorage.setItem('voctrain_chatProfiles', JSON.stringify(lmsChatProfiles));
+      localStorage.setItem('voctrain_chatFollows', JSON.stringify(lmsChatFollows));
     } catch(e) {}
 
     console.log('Chat data loaded from Google Drive');
