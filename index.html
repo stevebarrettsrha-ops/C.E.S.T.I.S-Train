@@ -4722,6 +4722,8 @@ function buildAdminSidebar() {
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/></svg>Reports</div>
     <div class="nav-item" data-page="support-messages" onclick="showPage('support-messages')">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"/><polyline points="22,6 12,13 2,6"/></svg>Support Messages<span class="nav-badge" id="supportMsgBadge" style="display:none;background:var(--red);">0</span></div>
+    <div class="nav-item" data-page="timetracking" onclick="showPage('timetracking')">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>Time Tracking</div>
     <div class="nav-item" data-page="settings" onclick="showPage('settings')">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>Settings</div>
   `;
@@ -4776,6 +4778,9 @@ function buildInstructorSidebar() {
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 17H2a3 3 0 0 0 3-3V9a7 7 0 0 1 14 0v5a3 3 0 0 0 3 3zm-8.27 4a2 2 0 0 1-3.46 0"/></svg>Announcements</div>
     <div class="nav-item" data-page="i-calendar" onclick="showPage('i-calendar')">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>Calendar</div>
+    <div class="nav-section-label">Tools</div>
+    <div class="nav-item" data-page="i-timetracking" onclick="showPage('i-timetracking')">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>Time Tracking</div>
     <div class="nav-section-label">Account</div>
     <div class="nav-item" data-page="i-profile" onclick="showPage('i-profile')">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>My Profile</div>
@@ -4843,7 +4848,8 @@ function showPage(pageId) {
     'as-dashboard':'My Dashboard','as-duties':'My Duties','as-lms-chat':'C.E.S.T.I.S LMS Chat','as-profile':'My Profile',
     'as-attendance':'Attendance Management','as-announcements':'Announcements','as-calendar':'Calendar & Schedule',
     'as-students':'Student Progress','as-certificates':'Certificate Tracking','as-reports':'Reports & Analytics',
-    'as-training':'Training Centres','as-exams':'Online Exams','as-video':'Video Conference','as-resources':'Resource Manager'
+    'as-training':'Training Centres','as-exams':'Online Exams','as-video':'Video Conference','as-resources':'Resource Manager',
+    'timetracking':'Staff Time Tracking','i-timetracking':'Staff Time Tracking','as-timetracking':'Staff Time Tracking'
   };
   document.getElementById('topbarTitle').textContent = titles[pageId]||pageId;
   if(pageId === 'support-messages' || pageId === 'as-support-messages') renderSupportMessagesPage();
@@ -5449,6 +5455,11 @@ function buildAdminPages() {
     </div>
     <input type="file" id="lmsChatFileInput" style="display:none" onchange="lmsChatHandleFileUpload(event)" accept="*/*">
     <input type="file" id="lmsChatProfilePicInput" style="display:none" onchange="lmsChatHandleProfilePic(event)" accept="image/*">
+  </section>
+
+  <!-- TIME TRACKING (Admin) -->
+  <section class="page" id="page-timetracking">
+    <iframe id="timetrackingFrame" src="timetracking.html" style="width:100%;height:calc(100vh - 80px);border:none;border-radius:12px;"></iframe>
   </section>
   `;
 
@@ -6297,6 +6308,11 @@ function buildInstructorPages() {
         <div class="lms-chat-info-body" id="instructorChatInfoBody"></div>
       </div>
     </div>
+  </section>
+
+  <!-- TIME TRACKING (Instructor) -->
+  <section class="page" id="page-i-timetracking">
+    <iframe id="iTimetrackingFrame" src="timetracking.html" style="width:100%;height:calc(100vh - 80px);border:none;border-radius:12px;"></iframe>
   </section>
   `;
 
@@ -14835,6 +14851,11 @@ function buildAdminStaffSidebar() {
     html += '<div class="nav-item" data-page="as-reports" onclick="showPage(\'as-reports\')"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/></svg>Reports</div>';
   }
 
+  // Time Tracking always visible for admin staff
+  html += '<div class="nav-section-label">Tools</div>';
+  html += '<div class="nav-item" data-page="as-timetracking" onclick="showPage(\'as-timetracking\')">' +
+    '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>Time Tracking</div>';
+
   // Support Messages always visible for admin staff
   html += '<div class="nav-section-label">Support</div>';
   html += '<div class="nav-item" data-page="as-support-messages" onclick="showPage(\'as-support-messages\')">' +
@@ -14986,6 +15007,11 @@ function buildAdminStaffPages() {
         '<div style="display:flex;justify-content:space-between;padding:10px 0;"><span style="color:var(--text-muted);font-size:13px;">Status</span><span style="font-size:13px;color:var(--green);">'+user.status+'</span></div>' +
       '</div>' +
     '</div>' +
+  '</section>';
+
+  // ---- Time Tracking Page (Admin Staff) ----
+  html += '<section class="page" id="page-as-timetracking">' +
+    '<iframe id="asTimetrackingFrame" src="timetracking.html" style="width:100%;height:calc(100vh - 80px);border:none;border-radius:12px;"></iframe>' +
   '</section>';
 
   mc.innerHTML = html;
