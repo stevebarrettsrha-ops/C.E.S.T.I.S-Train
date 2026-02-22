@@ -684,6 +684,17 @@ textarea.form-control { resize:vertical; min-height:80px; }
   grid-column:1/-1; aspect-ratio:auto; min-height:300px;
   border:2px solid var(--blue);
 }
+/* Participant screen-share view: grid becomes flex column so the screen tile dominates */
+.video-grid.vc-screen-share-mode {
+  display:flex; flex-direction:column; gap:12px;
+}
+.video-grid.vc-screen-share-mode .video-tile.screen-share {
+  flex:1; min-height:340px; aspect-ratio:16/9;
+}
+.video-grid.vc-screen-share-mode .video-tile.local {
+  width:180px; aspect-ratio:16/9; align-self:flex-end;
+  border:2px solid var(--accent) !important;
+}
 .vc-divider {
   color:var(--text-muted); font-size:12px; display:flex; align-items:center; gap:12px; width:280px;
 }
@@ -3644,6 +3655,7 @@ let vcHostReconnectInterval = null; // interval for participants to reconnect to
 let peerRoles = {}; // track roles: {peerId: 'student'|'instructor'|'admin'}
 let mutedPeers = {}; // track muted peers: {peerId: true}
 let vcCoHosts = {}; // track co-hosts: {peerId: true}
+let vcScreenSharingPeerId = null; // peerId currently sharing screen, or null
 let calendarMonth = 1;
 let calendarYear = 2026;
 let selectedCalendarDay = null;
@@ -7114,6 +7126,11 @@ function vcHandleDataConn(conn) {
         if(id !== pid && dataConnections[id] && dataConnections[id].open)
           dataConnections[id].send(JSON.stringify({type:'new-peer', peerId:pid, name:peerNames[pid]||'Connecting...'}));
       });
+      // If the host is currently sharing their screen, immediately inform the new joiner
+      // so their view switches to screen-share mode right away.
+      if(screenStream) {
+        conn.send(JSON.stringify({type:'screen-share-started', peerId: rtcPeer ? rtcPeer.id : '', name: vcCurrentUserName}));
+      }
     }
 
     conn.on('data', function(data) { vcOnData(data, pid); });
@@ -7249,15 +7266,21 @@ function vcOnData(raw, fromId) {
       vcUpdateParticipants();
       break;
     case 'screen-share-started':
-      // A peer started sharing their screen — highlight their video tile
-      var shareTile = document.getElementById('vc-tile-'+sanitizePeerId(msg.peerId));
-      if(shareTile) { shareTile.classList.add('screen-share'); }
+      // Highlight the sharing tile for the host; hide all other tiles for participants.
+      if(isRoomHost) {
+        var shareTile = document.getElementById('vc-tile-'+sanitizePeerId(msg.peerId));
+        if(shareTile) { shareTile.classList.add('screen-share'); }
+      }
       showToast((msg.name || 'A participant') + ' is sharing their screen');
+      vcEnterScreenShareView(msg.peerId);
       break;
     case 'screen-share-stopped':
-      // A peer stopped sharing their screen
-      var unshareTile = document.getElementById('vc-tile-'+sanitizePeerId(msg.peerId));
-      if(unshareTile) { unshareTile.classList.remove('screen-share'); }
+      // Restore the full grid for participants; remove highlight for the host.
+      if(isRoomHost) {
+        var unshareTile = document.getElementById('vc-tile-'+sanitizePeerId(msg.peerId));
+        if(unshareTile) { unshareTile.classList.remove('screen-share'); }
+      }
+      vcExitScreenShareView();
       break;
   }
 }
@@ -7446,6 +7469,14 @@ function vcAddVideo(peerId, stream, name) {
   tile.appendChild(video);
   tile.appendChild(info);
   grid.appendChild(tile);
+
+  // If screen share is already active and this user is not the host, hide this
+  // tile immediately so only the sharing tile and the local tile remain visible.
+  if (vcScreenSharingPeerId && !isRoomHost && peerId !== vcScreenSharingPeerId) {
+    tile.style.display = 'none';
+    tile.dataset.hiddenByScreenShare = '1';
+  }
+
   vcUpdateParticipants();
 }
 
@@ -7593,6 +7624,45 @@ function vcBroadcastData(msgObj) {
     if(dataConnections[pid] && dataConnections[pid].open)
       dataConnections[pid].send(raw);
   });
+}
+
+// ── Screen Share View Management ──
+// Participants call this when the host starts sharing: hide all tiles except the sharing tile and local tile.
+// The host always skips this so they continue to see all participant tiles (needed for the screenshot feature).
+function vcEnterScreenShareView(sharingPeerId) {
+  if (isRoomHost) return;
+  vcScreenSharingPeerId = sharingPeerId;
+  var grid = document.getElementById('vc-video-grid');
+  if (!grid) return;
+  var safeId = sanitizePeerId(sharingPeerId);
+  var tiles = grid.querySelectorAll('.video-tile');
+  tiles.forEach(function(tile) {
+    var isShareTile = tile.id === 'vc-tile-' + safeId;
+    var isLocalTile = tile.id === 'vc-tile-local';
+    if (!isShareTile && !isLocalTile) {
+      tile.style.display = 'none';
+      tile.dataset.hiddenByScreenShare = '1';
+    }
+  });
+  var shareTile = document.getElementById('vc-tile-' + safeId);
+  if (shareTile) shareTile.classList.add('screen-share');
+  grid.classList.add('vc-screen-share-mode');
+}
+
+// Restore the normal multi-tile grid when screen sharing ends.
+function vcExitScreenShareView() {
+  vcScreenSharingPeerId = null;
+  var grid = document.getElementById('vc-video-grid');
+  if (!grid) return;
+  var tiles = grid.querySelectorAll('.video-tile');
+  tiles.forEach(function(tile) {
+    if (tile.dataset.hiddenByScreenShare) {
+      tile.style.display = '';
+      delete tile.dataset.hiddenByScreenShare;
+    }
+    tile.classList.remove('screen-share');
+  });
+  grid.classList.remove('vc-screen-share-mode');
 }
 
 function vcToggleHand() {
