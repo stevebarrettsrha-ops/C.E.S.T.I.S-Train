@@ -5125,6 +5125,27 @@ function showPage(pageId) {
   if(pageId === 's-lms-chat') lmsChatOnPageShow('student');
   if(pageId === 'i-lms-chat') lmsChatOnPageShow('instructor');
   if(pageId === 'as-lms-chat') lmsChatOnPageShow('adminStaff');
+  // Lazy-load external iframes only when their page is first visited after login.
+  // This avoids stale cached error states that appear when iframes are destroyed
+  // on logout and recreated on the next login with the same src URL.
+  var iframePageMap = {
+    'timetracking':      {id:'timetrackingFrame',    src:'https://stevebarrettsrha-ops.github.io/Staff-Clock-in-System/'},
+    'fee-management':    {id:'feeManagementFrame',   src:'https://stevebarrettsrha-ops.github.io/School-Fee-Management-System/'},
+    'class-attendance':  {id:'classAttendanceFrame', src:'https://stevebarrettsrha-ops.github.io/Class-Attendance-System/'},
+    'cashbook':          {id:'cashbookFrame',        src:'https://stevebarrettsrha-ops.github.io/CESTIS---Cashbook-Dashboard/'},
+    'i-timetracking':    {id:'iTimetrackingFrame',   src:'https://stevebarrettsrha-ops.github.io/Staff-Clock-in-System/'},
+    'as-timetracking':   {id:'asTimetrackingFrame',  src:'https://stevebarrettsrha-ops.github.io/Staff-Clock-in-System/'},
+    'as-fee-management': {id:'asFeeManagementFrame', src:'https://stevebarrettsrha-ops.github.io/School-Fee-Management-System/'},
+    'as-class-attendance':{id:'asClassAttendanceFrame',src:'https://stevebarrettsrha-ops.github.io/Class-Attendance-System/'}
+  };
+  if(iframePageMap[pageId]) {
+    var iframeInfo = iframePageMap[pageId];
+    var iframeEl = document.getElementById(iframeInfo.id);
+    if(iframeEl && !iframeEl.getAttribute('data-src-loaded')) {
+      iframeEl.src = iframeInfo.src;
+      iframeEl.setAttribute('data-src-loaded', '1');
+    }
+  }
   setTimeout(animateAllCounters, 50);
 }
 
@@ -5723,22 +5744,22 @@ function buildAdminPages() {
 
   <!-- TIME TRACKING (Admin) -->
   <section class="page" id="page-timetracking">
-    <iframe id="timetrackingFrame" src="https://stevebarrettsrha-ops.github.io/Staff-Clock-in-System/" style="width:100%;height:calc(100vh - 80px);border:none;border-radius:12px;"></iframe>
+    <iframe id="timetrackingFrame" style="width:100%;height:calc(100vh - 80px);border:none;border-radius:12px;"></iframe>
   </section>
 
   <!-- SCHOOL FEE MANAGEMENT (Admin) -->
   <section class="page" id="page-fee-management">
-    <iframe id="feeManagementFrame" src="https://stevebarrettsrha-ops.github.io/School-Fee-Management-System/" style="width:100%;height:calc(100vh - 80px);border:none;border-radius:12px;"></iframe>
+    <iframe id="feeManagementFrame" style="width:100%;height:calc(100vh - 80px);border:none;border-radius:12px;"></iframe>
   </section>
 
   <!-- CLASS ATTENDANCE (Admin) -->
   <section class="page" id="page-class-attendance">
-    <iframe id="classAttendanceFrame" src="https://stevebarrettsrha-ops.github.io/Class-Attendance-System/" style="width:100%;height:calc(100vh - 80px);border:none;border-radius:12px;"></iframe>
+    <iframe id="classAttendanceFrame" style="width:100%;height:calc(100vh - 80px);border:none;border-radius:12px;"></iframe>
   </section>
 
   <!-- CASHBOOK MANAGEMENT (Admin) -->
   <section class="page" id="page-cashbook">
-    <iframe id="cashbookFrame" src="https://stevebarrettsrha-ops.github.io/CESTIS---Cashbook-Dashboard/" style="width:100%;height:calc(100vh - 80px);border:none;border-radius:12px;"></iframe>
+    <iframe id="cashbookFrame" style="width:100%;height:calc(100vh - 80px);border:none;border-radius:12px;"></iframe>
   </section>
   `;
 
@@ -6593,7 +6614,7 @@ function buildInstructorPages() {
 
   <!-- TIME TRACKING (Instructor) -->
   <section class="page" id="page-i-timetracking">
-    <iframe id="iTimetrackingFrame" src="https://stevebarrettsrha-ops.github.io/Staff-Clock-in-System/" style="width:100%;height:calc(100vh - 80px);border:none;border-radius:12px;"></iframe>
+    <iframe id="iTimetrackingFrame" style="width:100%;height:calc(100vh - 80px);border:none;border-radius:12px;"></iframe>
   </section>
   `;
 
@@ -15890,17 +15911,17 @@ function buildAdminStaffPages() {
 
   // ---- Time Tracking Page (Admin Staff) ----
   html += '<section class="page" id="page-as-timetracking">' +
-    '<iframe id="asTimetrackingFrame" src="https://stevebarrettsrha-ops.github.io/Staff-Clock-in-System/" style="width:100%;height:calc(100vh - 80px);border:none;border-radius:12px;"></iframe>' +
+    '<iframe id="asTimetrackingFrame" style="width:100%;height:calc(100vh - 80px);border:none;border-radius:12px;"></iframe>' +
   '</section>';
 
   // ---- School Fee Management Page (Admin Staff) ----
   html += '<section class="page" id="page-as-fee-management">' +
-    '<iframe id="asFeeManagementFrame" src="https://stevebarrettsrha-ops.github.io/School-Fee-Management-System/" style="width:100%;height:calc(100vh - 80px);border:none;border-radius:12px;"></iframe>' +
+    '<iframe id="asFeeManagementFrame" style="width:100%;height:calc(100vh - 80px);border:none;border-radius:12px;"></iframe>' +
   '</section>';
 
   // ---- Class Attendance Page (Admin Staff) ----
   html += '<section class="page" id="page-as-class-attendance">' +
-    '<iframe id="asClassAttendanceFrame" src="https://stevebarrettsrha-ops.github.io/Class-Attendance-System/" style="width:100%;height:calc(100vh - 80px);border:none;border-radius:12px;"></iframe>' +
+    '<iframe id="asClassAttendanceFrame" style="width:100%;height:calc(100vh - 80px);border:none;border-radius:12px;"></iframe>' +
   '</section>';
 
   mc.innerHTML = html;
