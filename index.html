@@ -2118,15 +2118,36 @@ textarea.form-control { resize:vertical; min-height:80px; }
   margin-bottom:2px; animation:msgIn 0.2s ease;
 }
 @keyframes msgIn { from { opacity:0; transform:translateY(8px); } to { opacity:1; transform:translateY(0); } }
+/* Row wrapper — keeps avatar + bubble together */
+.lms-msg-row {
+  display:flex; align-items:flex-end; gap:8px; width:100%; margin-bottom:2px;
+}
+.lms-msg-row.sent    { justify-content:flex-end; }
+.lms-msg-row.received{ justify-content:flex-start; }
+/* Reset align-self when bubble is inside a row */
+.lms-msg-row .lms-chat-msg { align-self:auto; margin-bottom:0; }
 .lms-chat-msg.sent {
-  align-self:flex-end; background:linear-gradient(135deg, #1a5c2e, #145224);
+  background:linear-gradient(135deg, #1a5c2e, #145224);
   border-bottom-right-radius:4px; color:var(--text-primary);
 }
 .lms-chat-msg.received {
-  align-self:flex-start; background:var(--bg-card);
+  background:var(--bg-card);
   border-bottom-left-radius:4px; color:var(--text-primary);
 }
-.lms-chat-msg .msg-sender { font-size:11px; font-weight:700; color:var(--accent); margin-bottom:3px; }
+/* Clickable inline avatar shown next to received messages */
+.msg-inline-avatar {
+  width:34px; height:34px; border-radius:50%; flex-shrink:0; cursor:pointer;
+  display:flex; align-items:center; justify-content:center;
+  font-size:13px; font-weight:700; overflow:hidden;
+  border:1.5px solid var(--border-light);
+  transition:transform 0.15s ease, box-shadow 0.15s ease;
+  user-select:none;
+}
+.msg-inline-avatar:hover { transform:scale(1.12); box-shadow:0 3px 10px rgba(0,0,0,0.35); }
+.msg-inline-avatar img  { width:100%; height:100%; object-fit:cover; }
+/* Sender name clickable */
+.msg-sender { font-size:11px; font-weight:700; color:var(--accent); margin-bottom:3px; cursor:pointer; display:inline-block; }
+.msg-sender:hover { text-decoration:underline; }
 .lms-chat-msg .msg-text { font-size:13.5px; line-height:1.5; word-wrap:break-word; overflow-wrap:break-word; word-break:break-word; white-space:pre-wrap; }
 .lms-chat-msg .msg-time { font-size:10px; color:rgba(255,255,255,0.45); text-align:right; margin-top:4px; }
 .lms-chat-msg .msg-edited { font-size:9px; color:rgba(255,255,255,0.35); font-style:italic; }
@@ -13025,16 +13046,19 @@ function lmsChatOpenRoom(roomId, prefix) {
     var dmColor = dmOtherUser ? (dmRoleColors[dmOtherUser.role]||'var(--accent)') : 'var(--accent)';
     if(dmOtherProf.profilePic) {
       headerAvatar.innerHTML = '<img src="'+dmOtherProf.profilePic+'" style="width:100%;height:100%;object-fit:cover;border-radius:50%;">';
-      headerAvatar.style.cssText = 'width:42px;height:42px;min-width:42px;background:none;overflow:hidden;display:flex;align-items:center;justify-content:center;border-radius:50%;';
+      headerAvatar.style.cssText = 'width:42px;height:42px;min-width:42px;background:none;overflow:hidden;display:flex;align-items:center;justify-content:center;border-radius:50%;cursor:pointer;';
     } else {
       headerAvatar.innerHTML = lmsChatEscapeHtml(lmsChatGetUserInitials(dmOtherName));
-      headerAvatar.style.cssText = 'width:42px;height:42px;min-width:42px;background:'+dmColor+'22;color:'+dmColor+';font-size:16px;font-weight:700;display:flex;align-items:center;justify-content:center;border-radius:50%;';
+      headerAvatar.style.cssText = 'width:42px;height:42px;min-width:42px;background:'+dmColor+'22;color:'+dmColor+';font-size:16px;font-weight:700;display:flex;align-items:center;justify-content:center;border-radius:50%;cursor:pointer;';
     }
     if(headerName) headerName.textContent = dmOtherName;
     if(headerStatus) { var dmStatLabels={online:'Online',away:'Away',offline:'Offline'}; headerStatus.textContent = dmStatLabels[dmStatus]||'Offline'; }
+    // Click header avatar → open the other user's profile card
+    (function(oid){ headerAvatar.onclick = function(){ if(oid) lmsChatOpenProfileCard(oid); }; })(dmOtherId);
   } else {
     headerAvatar.innerHTML = room.icon;
-    headerAvatar.style.cssText = 'width:42px;height:42px;min-width:42px;background:'+room.color+'22;color:'+room.color+';font-size:20px;display:flex;align-items:center;justify-content:center;border-radius:50%;';
+    headerAvatar.style.cssText = 'width:42px;height:42px;min-width:42px;background:'+room.color+'22;color:'+room.color+';font-size:20px;display:flex;align-items:center;justify-content:center;border-radius:50%;cursor:pointer;';
+    headerAvatar.onclick = function(){ lmsChatOpenMembersDirectory(); };
     if(headerName) headerName.textContent = room.name;
     if(headerStatus) headerStatus.textContent = room.members.length + ' members';
   }
@@ -13068,9 +13092,26 @@ function lmsChatRenderMessages(prefix) {
     var isSent = msg.senderId === user.id;
     var senderUser = userAccounts.find(function(u){ return u.id === msg.senderId; });
     var senderName = senderUser ? senderUser.name : msg.senderName || 'Unknown';
-    var roleLabel = senderUser ? (' (' + senderUser.role + ')') : '';
+    var roleLabel = senderUser ? (' \u00B7 ' + (senderUser.role === 'adminstaff' ? 'Admin Staff' : senderUser.role.charAt(0).toUpperCase()+senderUser.role.slice(1))) : '';
+    var senderId  = msg.senderId;
 
     var isDeleted = msg.deleted;
+
+    // --- Row wrapper (avatar + bubble) ---
+    html += '<div class="lms-msg-row '+(isSent?'sent':'received')+'">';
+
+    // Avatar on the left for received messages
+    if(!isSent) {
+      var sProf = lmsChatGetProfile(senderId);
+      var sRoleColors = {admin:'var(--accent)',adminstaff:'var(--purple)',instructor:'var(--green)',student:'var(--blue)'};
+      var sColor = senderUser ? (sRoleColors[senderUser.role]||'var(--accent)') : 'var(--accent)';
+      if(sProf.profilePic) {
+        html += '<div class="msg-inline-avatar" onclick="lmsChatOpenProfileCard(\''+lmsChatEscapeHtml(senderId)+'\')" title="View '+lmsChatEscapeHtml(senderName)+'\'s profile"><img src="'+sProf.profilePic+'" alt=""></div>';
+      } else {
+        html += '<div class="msg-inline-avatar" onclick="lmsChatOpenProfileCard(\''+lmsChatEscapeHtml(senderId)+'\')" title="View '+lmsChatEscapeHtml(senderName)+'\'s profile" style="background:'+sColor+'22;color:'+sColor+';">'+lmsChatEscapeHtml(lmsChatGetUserInitials(senderName))+'</div>';
+      }
+    }
+
     html += '<div class="lms-chat-msg '+(isSent?'sent':'received')+'">';
 
     // Edit/Delete actions for sender's own text messages
@@ -13082,7 +13123,7 @@ function lmsChatRenderMessages(prefix) {
     }
 
     if(!isSent) {
-      html += '<div class="msg-sender">'+lmsChatEscapeHtml(senderName)+roleLabel+'</div>';
+      html += '<div class="msg-sender" onclick="lmsChatOpenProfileCard(\''+lmsChatEscapeHtml(senderId)+'\')" title="View profile">'+lmsChatEscapeHtml(senderName)+lmsChatEscapeHtml(roleLabel)+'</div>';
     }
 
     if(isDeleted) {
@@ -13115,7 +13156,8 @@ function lmsChatRenderMessages(prefix) {
       html += '<div class="msg-text">'+lmsChatLinkify(lmsChatEscapeHtml(msg.text))+'</div>';
     }
     html += '<div class="msg-time">'+lmsChatFormatFullTime(msg.timestamp)+(msg.edited?' <span class="msg-edited">edited</span>':'')+'</div>';
-    html += '</div>';
+    html += '</div>'; // .lms-chat-msg
+    html += '</div>'; // .lms-msg-row
   });
 
   container.innerHTML = html;
@@ -13727,6 +13769,13 @@ function lmsChatCloseProfileModal() {
 }
 
 // ============================== FOLLOWERS / FOLLOWING PAGES ==============================
+
+// Open the Members overlay showing a specific user's profile card
+function lmsChatOpenProfileCard(userId) {
+  var overlay = lmsChatEnsureMembersOverlay();
+  overlay.classList.add('active');
+  lmsChatViewMemberProfile(userId);
+}
 
 function lmsChatEnsureMembersOverlay() {
   var overlay = document.getElementById('lmsMembersOverlay');
