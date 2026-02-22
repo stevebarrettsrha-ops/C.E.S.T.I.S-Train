@@ -2115,7 +2115,7 @@ textarea.form-control { resize:vertical; min-height:80px; }
 }
 .lms-chat-msg {
   max-width:65%; padding:10px 14px; border-radius:12px; position:relative;
-  margin-bottom:2px; animation:msgIn 0.2s ease; overflow:hidden;
+  margin-bottom:2px; animation:msgIn 0.2s ease;
 }
 @keyframes msgIn { from { opacity:0; transform:translateY(8px); } to { opacity:1; transform:translateY(0); } }
 .lms-chat-msg.sent {
@@ -2127,7 +2127,7 @@ textarea.form-control { resize:vertical; min-height:80px; }
   border-bottom-left-radius:4px; color:var(--text-primary);
 }
 .lms-chat-msg .msg-sender { font-size:11px; font-weight:700; color:var(--accent); margin-bottom:3px; }
-.lms-chat-msg .msg-text { font-size:13.5px; line-height:1.5; word-wrap:break-word; overflow-wrap:break-word; word-break:break-word; }
+.lms-chat-msg .msg-text { font-size:13.5px; line-height:1.5; word-wrap:break-word; overflow-wrap:break-word; word-break:break-word; white-space:pre-wrap; }
 .lms-chat-msg .msg-time { font-size:10px; color:rgba(255,255,255,0.45); text-align:right; margin-top:4px; }
 .lms-chat-msg .msg-edited { font-size:9px; color:rgba(255,255,255,0.35); font-style:italic; }
 .lms-chat-msg .msg-actions {
@@ -5447,7 +5447,7 @@ function buildAdminPages() {
         <div class="lms-chat-info-body" id="adminChatInfoBody"></div>
       </div>
     </div>
-    <input type="file" id="lmsChatFileInput" style="display:none" onchange="lmsChatHandleFileUpload(event)" accept="*/*">
+    <input type="file" id="lmsChatFileInput" style="display:none" onchange="lmsChatHandleFileUpload(event)" accept=".pdf,.doc,.docx,.xls,.xlsx,.ppt,.pptx,.txt,.csv,.zip,.rar,.mp3,.wav,.mp4,.avi,.mov">
     <input type="file" id="lmsChatProfilePicInput" style="display:none" onchange="lmsChatHandleProfilePic(event)" accept="image/*">
   </section>
   `;
@@ -12868,7 +12868,7 @@ function lmsChatAttachFile() {
     input.type = 'file';
     input.id = 'lmsChatFileInput';
     input.style.display = 'none';
-    input.accept = '*/*';
+    input.accept = '.pdf,.doc,.docx,.xls,.xlsx,.ppt,.pptx,.txt,.csv,.zip,.rar,.mp3,.wav,.mp4,.avi,.mov';
     input.onchange = function(e){ lmsChatHandleFileUpload(e); };
     document.body.appendChild(input);
   }
@@ -12878,6 +12878,7 @@ function lmsChatAttachFile() {
 function lmsChatHandleFileUpload(event) {
   var file = event.target.files[0];
   if(!file) return;
+  if(file.type.startsWith('image/')) { alert('Image uploads are not supported in chat. Please share a file instead.'); event.target.value = ''; return; }
   var prefix = lmsChatGetRolePrefix();
   var user = lmsChatGetCurrentUser();
   if(!lmsChatActiveRoom) { alert('Please select a chat first.'); return; }
