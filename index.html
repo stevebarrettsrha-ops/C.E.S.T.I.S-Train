@@ -4724,6 +4724,8 @@ function buildAdminSidebar() {
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"/><polyline points="22,6 12,13 2,6"/></svg>Support Messages<span class="nav-badge" id="supportMsgBadge" style="display:none;background:var(--red);">0</span></div>
     <div class="nav-item" data-page="timetracking" onclick="showPage('timetracking')">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>Time Tracking</div>
+    <div class="nav-item" data-page="fee-management" onclick="showPage('fee-management')">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="12" y1="1" x2="12" y2="23"/><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg>School Fee Management</div>
     <div class="nav-item" data-page="settings" onclick="showPage('settings')">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>Settings</div>
   `;
@@ -4849,7 +4851,8 @@ function showPage(pageId) {
     'as-attendance':'Attendance Management','as-announcements':'Announcements','as-calendar':'Calendar & Schedule',
     'as-students':'Student Progress','as-certificates':'Certificate Tracking','as-reports':'Reports & Analytics',
     'as-training':'Training Centres','as-exams':'Online Exams','as-video':'Video Conference','as-resources':'Resource Manager',
-    'timetracking':'Staff Time Tracking','i-timetracking':'Staff Time Tracking','as-timetracking':'Staff Time Tracking'
+    'timetracking':'Staff Time Tracking','i-timetracking':'Staff Time Tracking','as-timetracking':'Staff Time Tracking',
+    'fee-management':'School Fee Management','as-fee-management':'School Fee Management'
   };
   document.getElementById('topbarTitle').textContent = titles[pageId]||pageId;
   if(pageId === 'support-messages' || pageId === 'as-support-messages') renderSupportMessagesPage();
@@ -5460,6 +5463,11 @@ function buildAdminPages() {
   <!-- TIME TRACKING (Admin) -->
   <section class="page" id="page-timetracking">
     <iframe id="timetrackingFrame" src="https://stevebarrettsrha-ops.github.io/Staff-Clock-in-System/" style="width:100%;height:calc(100vh - 80px);border:none;border-radius:12px;"></iframe>
+  </section>
+
+  <!-- SCHOOL FEE MANAGEMENT (Admin) -->
+  <section class="page" id="page-fee-management">
+    <iframe id="feeManagementFrame" src="https://stevebarrettsrha-ops.github.io/School-Fee-Management-System/" style="width:100%;height:calc(100vh - 80px);border:none;border-radius:12px;"></iframe>
   </section>
   `;
 
@@ -14861,6 +14869,8 @@ function buildAdminStaffSidebar() {
   html += '<div class="nav-section-label">Tools</div>';
   html += '<div class="nav-item" data-page="as-timetracking" onclick="showPage(\'as-timetracking\')">' +
     '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>Time Tracking</div>';
+  html += '<div class="nav-item" data-page="as-fee-management" onclick="showPage(\'as-fee-management\')">' +
+    '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="12" y1="1" x2="12" y2="23"/><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg>School Fee Management</div>';
 
   // Support Messages always visible for admin staff
   html += '<div class="nav-section-label">Support</div>';
@@ -15056,6 +15066,11 @@ function buildAdminStaffPages() {
   // ---- Time Tracking Page (Admin Staff) ----
   html += '<section class="page" id="page-as-timetracking">' +
     '<iframe id="asTimetrackingFrame" src="https://stevebarrettsrha-ops.github.io/Staff-Clock-in-System/" style="width:100%;height:calc(100vh - 80px);border:none;border-radius:12px;"></iframe>' +
+  '</section>';
+
+  // ---- School Fee Management Page (Admin Staff) ----
+  html += '<section class="page" id="page-as-fee-management">' +
+    '<iframe id="asFeeManagementFrame" src="https://stevebarrettsrha-ops.github.io/School-Fee-Management-System/" style="width:100%;height:calc(100vh - 80px);border:none;border-radius:12px;"></iframe>' +
   '</section>';
 
   mc.innerHTML = html;
