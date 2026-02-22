@@ -2007,7 +2007,7 @@ textarea.form-control { resize:vertical; min-height:80px; }
 
 /* ============================== C.E.S.T.I.S LMS CHAT ============================== */
 .lms-chat-container {
-  display:flex; height:calc(100vh - var(--topbar-h) - 40px); border-radius:var(--radius-lg); overflow:hidden;
+  display:flex; height:calc(100vh - var(--topbar-h) - 56px); border-radius:var(--radius-lg); overflow:hidden;
   background:var(--bg-card); border:1px solid var(--border); max-width:100%;
 }
 .lms-chat-sidebar {
@@ -2387,7 +2387,7 @@ textarea.form-control { resize:vertical; min-height:80px; }
 
 /* Responsive */
 @media(max-width:768px) {
-  .lms-chat-container { flex-direction:column; height:calc(100vh - var(--topbar-h)); border-radius:0; }
+  .lms-chat-container { flex-direction:column; height:calc(100vh - var(--topbar-h) - 32px); border-radius:0; }
   .lms-chat-sidebar { width:100%; min-width:100%; }
   .lms-chat-sidebar.chat-open { display:none; }
   .lms-chat-main { display:none; }
@@ -3508,11 +3508,11 @@ function initLmsChatData() {
     // Auto-populate members based on student/instructor programmes
     lmsChatRooms.forEach(function(room) {
       if(room.type === 'admin') {
-        // Admin room has all admins
-        room.members = userAccounts.filter(function(u){ return u.role==='admin'; }).map(function(u){ return u.id; });
+        // Admin room has all admins and admin staff
+        room.members = userAccounts.filter(function(u){ return u.role==='admin' || u.role==='adminstaff'; }).map(function(u){ return u.id; });
       } else if(room.type === 'class') {
-        // Class rooms have admin + instructor for that programme + students in that programme
-        var admins = userAccounts.filter(function(u){ return u.role==='admin'; }).map(function(u){ return u.id; });
+        // Class rooms have admin + admin staff + instructor for that programme + students in that programme
+        var admins = userAccounts.filter(function(u){ return u.role==='admin' || u.role==='adminstaff'; }).map(function(u){ return u.id; });
         var instructors = userAccounts.filter(function(u){ return u.role==='instructor' && room.name.toLowerCase().indexOf(u.programme.toLowerCase().split(' ')[0]) !== -1; }).map(function(u){ return u.id; });
         var studs = userAccounts.filter(function(u){ return u.role==='student' && room.name.toLowerCase().indexOf(u.programme.toLowerCase().split(' ')[0]) !== -1; }).map(function(u){ return u.id; });
         room.members = admins.concat(instructors).concat(studs);
@@ -4855,7 +4855,7 @@ function showPage(pageId) {
   if(pageId === 'lms-chat') lmsChatOnPageShow('admin');
   if(pageId === 's-lms-chat') lmsChatOnPageShow('student');
   if(pageId === 'i-lms-chat') lmsChatOnPageShow('instructor');
-  if(pageId === 'as-lms-chat') lmsChatOnPageShow('adminstaff');
+  if(pageId === 'as-lms-chat') lmsChatOnPageShow('adminStaff');
   setTimeout(animateAllCounters, 50);
 }
 
@@ -12506,6 +12506,10 @@ function lmsChatGetCurrentUser() {
     var adm = userAccounts.find(function(u){ return u.role==='admin'; });
     return adm || {id:'USR-001',name:'Administrator',role:'admin',programme:''};
   }
+  if(currentRole === 'adminstaff' && currentLoggedInUser) {
+    var asUser = userAccounts.find(function(u){ return u.id === currentLoggedInUser.id && u.role==='adminstaff'; });
+    return asUser || {id:currentLoggedInUser.id,name:currentLoggedInUser.name,role:'adminstaff',programme:''};
+  }
   if(currentRole === 'instructor' && currentInstructor) {
     var ins = userAccounts.find(function(u){ return u.name === currentInstructor.name && u.role==='instructor'; });
     return ins || {id:'unknown',name:currentInstructor.name,role:'instructor',programme:currentInstructor.course};
@@ -12519,6 +12523,7 @@ function lmsChatGetCurrentUser() {
 
 function lmsChatGetRolePrefix() {
   if(currentRole === 'admin') return 'admin';
+  if(currentRole === 'adminstaff') return 'adminStaff';
   if(currentRole === 'instructor') return 'instructor';
   return 'student';
 }
@@ -12526,7 +12531,7 @@ function lmsChatGetRolePrefix() {
 function lmsChatGetUserRooms() {
   var user = lmsChatGetCurrentUser();
   return lmsChatRooms.filter(function(room) {
-    if(currentRole === 'admin') return true; // Admin sees all rooms
+    if(currentRole === 'admin' || currentRole === 'adminstaff') return true; // Admin and admin staff see all rooms
     return room.members.indexOf(user.id) !== -1;
   });
 }
@@ -14947,11 +14952,49 @@ function buildAdminStaffPages() {
         '<div class="lms-chat-sidebar-header"><h3>C.E.S.T.I.S Chat</h3>' +
           '<div class="lms-chat-sidebar-actions"><button onclick="lmsChatOpenProfileModal()" title="My Profile">&#128100;</button></div>' +
         '</div>' +
-        '<input type="text" class="lms-chat-search" placeholder="Search chats..." oninput="lmsChatFilterRooms(this.value,\'adminStaff\')">' +
-        '<div class="lms-chat-room-list" id="adminStaffChatRoomList"></div>' +
+        '<div class="lms-chat-search"><div class="lms-chat-search-wrap">' +
+          '<input type="text" placeholder="Search chats..." oninput="lmsChatFilterRooms(this.value,\'adminStaff\')">' +
+        '</div></div>' +
+        '<div class="lms-chat-list" id="adminStaffChatList"></div>' +
       '</div>' +
       '<div class="lms-chat-main" id="adminStaffChatMain">' +
-        '<div class="lms-chat-placeholder"><div class="lms-chat-placeholder-icon">&#128172;</div><h3>Select a chat to start messaging</h3></div>' +
+        '<div class="lms-chat-main-empty" id="adminStaffChatEmpty">' +
+          '<div class="empty-icon">&#128172;</div>' +
+          '<h3>C.E.S.T.I.S LMS Chat</h3>' +
+          '<p>Select a class chat to start messaging</p>' +
+        '</div>' +
+        '<div id="adminStaffChatActive" style="display:none;flex:1;flex-direction:column;min-height:0;overflow:hidden;">' +
+          '<div class="lms-chat-main-header">' +
+            '<div class="lms-chat-main-header-left">' +
+              '<button class="back-btn" onclick="lmsChatBack(\'adminStaff\')">&#8592;</button>' +
+              '<div class="lms-chat-avatar" id="adminStaffChatHeaderAvatar"></div>' +
+              '<div class="lms-chat-header-info">' +
+                '<h4 id="adminStaffChatHeaderName"></h4>' +
+                '<span id="adminStaffChatHeaderStatus"></span>' +
+              '</div>' +
+            '</div>' +
+            '<div class="lms-chat-header-actions">' +
+              '<button onclick="lmsChatStartVoiceCall()" title="Voice Call">&#128222;</button>' +
+              '<button onclick="lmsChatStartVideoCall()" title="Video Call">&#128249;</button>' +
+              '<button onclick="lmsChatToggleInfoPanel(\'adminStaff\')" title="Chat Info">&#9432;</button>' +
+            '</div>' +
+          '</div>' +
+          '<div class="lms-chat-messages" id="adminStaffChatMessages"></div>' +
+          '<div class="lms-chat-input-area">' +
+            '<button class="emoji-btn" onclick="lmsChatToggleEmojiPicker(\'adminStaff\')" title="Emoji">&#128522;</button>' +
+            '<button class="attach-btn" onclick="lmsChatAttachFile()" title="Attach File">&#128206;</button>' +
+            '<button class="poll-btn" onclick="lmsChatOpenPollModal(\'adminStaff\')" title="Create Poll">&#128202;</button>' +
+            '<textarea class="msg-input" id="adminStaffChatInput" placeholder="Type a message..." rows="1" onkeydown="lmsChatInputKeydown(event,\'adminStaff\')"></textarea>' +
+            '<button class="send-btn" onclick="lmsChatSendMessage(\'adminStaff\')" title="Send">&#10148;</button>' +
+          '</div>' +
+        '</div>' +
+      '</div>' +
+      '<div class="lms-chat-info-panel" id="adminStaffChatInfoPanel">' +
+        '<div class="lms-chat-info-panel-header">' +
+          '<h4>Chat Info</h4>' +
+          '<button onclick="lmsChatToggleInfoPanel(\'adminStaff\')">&#10005;</button>' +
+        '</div>' +
+        '<div class="lms-chat-info-body" id="adminStaffChatInfoBody"></div>' +
       '</div>' +
     '</div>' +
   '</section>';
