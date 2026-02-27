@@ -3437,7 +3437,7 @@ const stages = ['testing','interview','training','certified','collected','incomp
 const stageLabels = {testing:'Testing',interview:'Interview',training:'In Training',certified:'Certified',collected:'Collected',incomplete:'Incomplete'};
 const stageBadge = {testing:'badge-blue',interview:'badge-purple',training:'badge-amber',certified:'badge-green',collected:'badge-green',incomplete:'badge-red'};
 const stageIcons = {testing:'\uD83D\uDCDD',interview:'\uD83D\uDDE3\uFE0F',training:'\uD83D\uDCDA',certified:'\uD83C\uDF93',collected:'\u2705',incomplete:'\u26A0\uFE0F'};
-const courses = ['Welding','Electrical Installation','Cosmetology','Business Administration','Auto Mechanics','Plumbing','Carpentry','Hospitality'];
+const courses = ['Welding','Electrical Installation','Cosmetology','Business Administration','Auto Mechanics','Plumbing','Carpentry','Hospitality & Tourism'];
 
 let students = [];
 function generateStudents() {
@@ -3470,7 +3470,7 @@ let exams = [
   {id:"EXAM-004",title:"Cosmetology L1 \u2014 Practical Theory",course:"Cosmetology",date:"2026-02-25",time:"09:30",duration:75,students:22,status:"upcoming",questions:45,passMark:60,questionData:[],shuffleQuestions:false},
   {id:"EXAM-005",title:"Auto Mechanics \u2014 Diagnostics",course:"Auto Mechanics",date:"2026-02-15",time:"08:00",duration:90,students:19,status:"active",questions:50,passMark:65,questionData:[],shuffleQuestions:false},
   {id:"EXAM-006",title:"Welding L1 \u2014 Safety Fundamentals",course:"Welding",date:"2026-02-10",time:"09:00",duration:60,students:26,status:"completed",questions:35,passMark:60,passRate:"84%",questionData:[],shuffleQuestions:false},
-  {id:"EXAM-007",title:"Hospitality \u2014 Food Safety",course:"Hospitality",date:"2026-02-08",time:"11:00",duration:45,students:30,status:"completed",questions:30,passMark:70,passRate:"90%",questionData:[],shuffleQuestions:false},
+  {id:"EXAM-007",title:"Hospitality \u2014 Food Safety",course:"Hospitality & Tourism",date:"2026-02-08",time:"11:00",duration:45,students:30,status:"completed",questions:30,passMark:70,passRate:"90%",questionData:[],shuffleQuestions:false},
   {id:"EXAM-008",title:"IT Fundamentals \u2014 Networking",course:"Information Technology",date:"2026-02-05",time:"14:00",duration:90,students:25,status:"completed",questions:60,passMark:60,passRate:"72%",questionData:[],shuffleQuestions:false},
   {id:"EXAM-009",title:"Plumbing L2 \u2014 Pipe Systems",course:"Plumbing",date:"2026-03-01",time:"10:00",duration:75,students:15,status:"upcoming",questions:40,passMark:60,questionData:[],shuffleQuestions:false},
   {id:"EXAM-010",title:"Carpentry \u2014 Joints & Framing",course:"Carpentry",date:"2026-03-04",time:"09:00",duration:90,students:20,status:"upcoming",questions:55,passMark:60,questionData:[],shuffleQuestions:false},
@@ -3479,14 +3479,14 @@ let exams = [
 ];
 
 let announcements = [
-  {id:1,title:"Campus Closure - Independence Day",body:"The campus will be closed on February 20th for Independence Day celebrations. All classes and exams scheduled for that day will be rescheduled. Please check your updated timetable.",priority:"urgent",date:"2026-02-17",author:"Admin",forRoles:['admin','student','instructor']},
+  {id:1,title:"Campus Closure - Independence Day",body:"The campus will be closed on February 20th for Independence Day celebrations. All classes and exams scheduled for that day will be rescheduled. Please check your updated timetable.",priority:"urgent",date:"2026-02-17",author:"Admin",forRoles:['admin','adminstaff','student','instructor']},
   {id:2,title:"Welding Workshop Equipment Upgrade",body:"New TIG welding stations have been installed in Workshop Bay 2. All Welding students are required to attend orientation on Feb 22 at 9AM.",priority:"info",date:"2026-02-16",author:"Mr. R. Campbell",forRoles:['student','instructor']},
-  {id:3,title:"Midterm Exam Schedule Released",body:"The midterm examination schedule for all programmes has been finalized. Students can view their exam dates in the Exams section. Please arrive 15 minutes early.",priority:"urgent",date:"2026-02-15",author:"Admin",forRoles:['student','instructor']},
+  {id:3,title:"Midterm Exam Schedule Released",body:"The midterm examination schedule for all programmes has been finalized. Students can view their exam dates in the Exams section. Please arrive 15 minutes early.",priority:"urgent",date:"2026-02-15",author:"Admin",forRoles:['student','instructor','adminstaff']},
   {id:4,title:"IT Lab Maintenance Notice",body:"The IT lab will undergo maintenance on Feb 23-24. Data Operations and IT students should plan accordingly and use the library computers.",priority:"info",date:"2026-02-14",author:"Ms. J. Williams",forRoles:['student','instructor']},
-  {id:5,title:"Certificate Collection Reminder",body:"Students who completed their programmes in January are reminded to collect their certificates from the admin office. Bring your student ID.",priority:"general",date:"2026-02-13",author:"Admin",forRoles:['student','admin']},
-  {id:6,title:"Guest Lecture: Industry Trends",body:"A guest lecture on emerging industry trends will be held on March 1 in the main auditorium. All programmes welcome. Attendance counts toward professional development hours.",priority:"general",date:"2026-02-12",author:"Mrs. P. Morgan",forRoles:['admin','student','instructor']},
-  {id:7,title:"Staff Meeting — Curriculum Review",body:"Mandatory staff meeting on February 25 at 2PM in Conference Room A. All instructors must attend to discuss upcoming curriculum changes and assessment strategies.",priority:"urgent",date:"2026-02-18",author:"Admin",forRoles:['instructor','admin']},
-  {id:8,title:"Quarterly Enrollment Report Due",body:"All department heads please submit your quarterly enrollment and completion statistics by February 28. Templates are available in the shared drive.",priority:"info",date:"2026-02-17",author:"Admin",forRoles:['admin']},
+  {id:5,title:"Certificate Collection Reminder",body:"Students who completed their programmes in January are reminded to collect their certificates from the admin office. Bring your student ID.",priority:"general",date:"2026-02-13",author:"Admin",forRoles:['student','admin','adminstaff']},
+  {id:6,title:"Guest Lecture: Industry Trends",body:"A guest lecture on emerging industry trends will be held on March 1 in the main auditorium. All programmes welcome. Attendance counts toward professional development hours.",priority:"general",date:"2026-02-12",author:"Mrs. P. Morgan",forRoles:['admin','adminstaff','student','instructor']},
+  {id:7,title:"Staff Meeting — Curriculum Review",body:"Mandatory staff meeting on February 25 at 2PM in Conference Room A. All instructors must attend to discuss upcoming curriculum changes and assessment strategies.",priority:"urgent",date:"2026-02-18",author:"Admin",forRoles:['instructor','admin','adminstaff']},
+  {id:8,title:"Quarterly Enrollment Report Due",body:"All department heads please submit your quarterly enrollment and completion statistics by February 28. Templates are available in the shared drive.",priority:"info",date:"2026-02-17",author:"Admin",forRoles:['admin','adminstaff']},
   {id:9,title:"Student Portal Maintenance",body:"The student portal will be undergoing scheduled maintenance on Saturday Feb 22 from 10PM to 2AM. Please save your work beforehand.",priority:"info",date:"2026-02-18",author:"Admin",forRoles:['student']},
   {id:10,title:"Workshop Safety Refresher Required",body:"All workshop instructors must complete the annual safety refresher training by March 15. Sign up sheets are available at the admin office.",priority:"info",date:"2026-02-16",author:"Admin",forRoles:['instructor']}
 ];
@@ -3604,18 +3604,18 @@ function loadNotifications() {
 let examResults = [];
 
 let calendarEvents = [
-  {title:"Welding L2 Final Theory",date:"2026-02-18",time:"09:00 AM",type:"exam",color:"var(--red)",forRoles:['admin','instructor','student']},
+  {title:"Welding L2 Final Theory",date:"2026-02-18",time:"09:00 AM",type:"exam",color:"var(--red)",forRoles:['admin','adminstaff','instructor','student']},
   {title:"Electrical Safety Class",date:"2026-02-18",time:"11:30 AM",type:"class",color:"var(--blue)",forRoles:['instructor','student']},
-  {title:"Business Admin Midterm",date:"2026-02-22",time:"02:00 PM",type:"exam",color:"var(--red)",forRoles:['admin','instructor','student']},
-  {title:"Cosmetology Practical",date:"2026-02-25",time:"09:30 AM",type:"exam",color:"var(--red)",forRoles:['admin','instructor','student']},
+  {title:"Business Admin Midterm",date:"2026-02-22",time:"02:00 PM",type:"exam",color:"var(--red)",forRoles:['admin','adminstaff','instructor','student']},
+  {title:"Cosmetology Practical",date:"2026-02-25",time:"09:30 AM",type:"exam",color:"var(--red)",forRoles:['admin','adminstaff','instructor','student']},
   {title:"Workshop Portfolio Due",date:"2026-02-22",time:"11:59 PM",type:"deadline",color:"var(--accent)",forRoles:['student','instructor']},
-  {title:"Staff Meeting",date:"2026-02-19",time:"03:00 PM",type:"meeting",color:"var(--purple)",forRoles:['admin','instructor']},
+  {title:"Staff Meeting",date:"2026-02-19",time:"03:00 PM",type:"meeting",color:"var(--purple)",forRoles:['admin','adminstaff','instructor']},
   {title:"Final Project Due",date:"2026-03-05",time:"11:59 PM",type:"deadline",color:"var(--accent)",forRoles:['student','instructor']},
-  {title:"Plumbing L2 Pipe Systems",date:"2026-03-01",time:"10:00 AM",type:"exam",color:"var(--red)",forRoles:['admin','instructor','student']},
-  {title:"Guest Lecture: Industry Trends",date:"2026-03-01",time:"02:00 PM",type:"meeting",color:"var(--purple)",forRoles:['admin','instructor','student']},
-  {title:"Carpentry Joints Exam",date:"2026-03-04",time:"09:00 AM",type:"exam",color:"var(--red)",forRoles:['admin','instructor','student']},
-  {title:"Budget Review Meeting",date:"2026-02-26",time:"10:00 AM",type:"meeting",color:"var(--purple)",forRoles:['admin']},
-  {title:"Instructor Evaluation Deadline",date:"2026-03-08",time:"05:00 PM",type:"deadline",color:"var(--accent)",forRoles:['admin']},
+  {title:"Plumbing L2 Pipe Systems",date:"2026-03-01",time:"10:00 AM",type:"exam",color:"var(--red)",forRoles:['admin','adminstaff','instructor','student']},
+  {title:"Guest Lecture: Industry Trends",date:"2026-03-01",time:"02:00 PM",type:"meeting",color:"var(--purple)",forRoles:['admin','adminstaff','instructor','student']},
+  {title:"Carpentry Joints Exam",date:"2026-03-04",time:"09:00 AM",type:"exam",color:"var(--red)",forRoles:['admin','adminstaff','instructor','student']},
+  {title:"Budget Review Meeting",date:"2026-02-26",time:"10:00 AM",type:"meeting",color:"var(--purple)",forRoles:['admin','adminstaff']},
+  {title:"Instructor Evaluation Deadline",date:"2026-03-08",time:"05:00 PM",type:"deadline",color:"var(--accent)",forRoles:['admin','adminstaff']},
   {title:"Curriculum Workshop",date:"2026-02-27",time:"01:00 PM",type:"meeting",color:"var(--purple)",forRoles:['instructor']},
   {title:"Student ID Collection",date:"2026-02-24",time:"09:00 AM",type:"deadline",color:"var(--accent)",forRoles:['student']}
 ];
@@ -3629,12 +3629,12 @@ function generateAttendance() {
       const r = Math.random();
       days[d] = r < 0.75 ? 'present' : r < 0.9 ? 'late' : 'absent';
     });
-    return {studentId:s.id, studentName:s.name, course:s.course, days};
+    return {studentId:s.id, studentName:s.name, course:s.course, date:currentAttendanceDate, days};
   });
 }
 generateAttendance();
 
-const instructorData = [
+let instructorData = [
   {id:'INS-2026001',name:'Mr. R. Campbell',course:'Welding',email:'r.campbell@heartlms.edu.jm',specialization:'SMAW, MIG, TIG Welding',yearsExp:12,phone:'+1 (876) 555-0101'},
   {id:'INS-2026002',name:'Ms. J. Williams',course:'Electrical Installation',email:'j.williams@heartlms.edu.jm',specialization:'Residential & Commercial Wiring',yearsExp:9,phone:'+1 (876) 555-0102'},
   {id:'INS-2026003',name:'Mrs. P. Morgan',course:'Business Administration',email:'p.morgan@heartlms.edu.jm',specialization:'Office Management & Accounting',yearsExp:15,phone:'+1 (876) 555-0103'},
@@ -3642,7 +3642,7 @@ const instructorData = [
   {id:'INS-2026005',name:'Mr. K. Edwards',course:'Auto Mechanics',email:'k.edwards@heartlms.edu.jm',specialization:'Engine Repair & Diagnostics',yearsExp:11,phone:'+1 (876) 555-0105'},
   {id:'INS-2026006',name:'Mr. L. Brown',course:'Plumbing',email:'l.brown@heartlms.edu.jm',specialization:'Pipe Fitting & Drainage Systems',yearsExp:10,phone:'+1 (876) 555-0106'},
   {id:'INS-2026007',name:'Mrs. A. Reid',course:'Carpentry',email:'a.reid@heartlms.edu.jm',specialization:'Furniture Making & Roof Framing',yearsExp:7,phone:'+1 (876) 555-0107'},
-  {id:'INS-2026008',name:'Mr. T. Henry',course:'Hospitality',email:'t.henry@heartlms.edu.jm',specialization:'Food & Beverage, Front Office',yearsExp:14,phone:'+1 (876) 555-0108'}
+  {id:'INS-2026008',name:'Mr. T. Henry',course:'Hospitality & Tourism',email:'t.henry@heartlms.edu.jm',specialization:'Food & Beverage, Front Office',yearsExp:14,phone:'+1 (876) 555-0108'}
 ];
 
 let currentRole = null;
@@ -3851,6 +3851,7 @@ function saveState() {
     localStorage.setItem('voctrain_adrTasks', JSON.stringify(adrTasks));
     localStorage.setItem('voctrain_adrStaffMeta', JSON.stringify(adrStaffMeta));
     localStorage.setItem('voctrain_adminStaffAccess', JSON.stringify(adminStaffAccessSettings));
+    localStorage.setItem('voctrain_instructorData', JSON.stringify(instructorData));
     saveLmsChatData();
   } catch(e) { console.warn('saveState: storage quota exceeded or unavailable'); }
   // Push changes to Google Drive immediately (debounced)
@@ -3891,6 +3892,20 @@ function loadState() {
     if(adrM) adrStaffMeta = JSON.parse(adrM);
     var asAccess = localStorage.getItem('voctrain_adminStaffAccess');
     if(asAccess) adminStaffAccessSettings = JSON.parse(asAccess);
+    var idData = localStorage.getItem('voctrain_instructorData');
+    if(idData) {
+      var savedInstructors = JSON.parse(idData);
+      // Merge saved instructors with base data, preserving any dynamically created ones
+      savedInstructors.forEach(function(si) {
+        if (!instructorData.some(function(li) { return li.id === si.id; })) {
+          instructorData.push(si);
+        } else {
+          // Update existing instructor with saved data (e.g. profile changes)
+          var idx = instructorData.findIndex(function(li) { return li.id === si.id; });
+          if (idx !== -1) instructorData[idx] = si;
+        }
+      });
+    }
   } catch(e) { /* parse error, use generated data */ }
 }
 loadState();
@@ -4671,7 +4686,7 @@ function openRegistrationModal(role, prefillName, prefillEmail) {
   // Remove any existing modal
   closeRegistrationModal();
   var roleLabel = role === 'student' ? 'Student' : 'Instructor';
-  var programmes = ['Welding','Electrical Installation','Cosmetology','Business Administration','Auto Mechanics','Plumbing','Carpentry','Hospitality','Information Technology'];
+  var programmes = ['Welding','Electrical Installation','Cosmetology','Business Administration','Auto Mechanics','Plumbing','Carpentry','Hospitality & Tourism','Information Technology'];
   var programmeOptions = programmes.map(function(p){ return '<option value="'+p+'">'+p+'</option>'; }).join('');
 
   var html = '<div class="reg-modal-overlay" id="regModalOverlay" onclick="if(event.target===this)closeRegistrationModal()">' +
@@ -5438,6 +5453,7 @@ function buildAdminPages() {
             <label style="display:flex;align-items:center;gap:6px;font-size:13px;cursor:pointer;"><input type="checkbox" id="annRoleAdmin" checked> <span style="background:var(--accent-dim);color:var(--accent);padding:2px 8px;border-radius:10px;font-size:11px;font-weight:600;">Admin</span></label>
             <label style="display:flex;align-items:center;gap:6px;font-size:13px;cursor:pointer;"><input type="checkbox" id="annRoleInstructor" checked> <span style="background:var(--green-dim);color:var(--green);padding:2px 8px;border-radius:10px;font-size:11px;font-weight:600;">Instructor</span></label>
             <label style="display:flex;align-items:center;gap:6px;font-size:13px;cursor:pointer;"><input type="checkbox" id="annRoleStudent" checked> <span style="background:var(--blue-dim);color:var(--blue);padding:2px 8px;border-radius:10px;font-size:11px;font-weight:600;">Student</span></label>
+            <label style="display:flex;align-items:center;gap:6px;font-size:13px;cursor:pointer;"><input type="checkbox" id="annRoleAdminStaff" checked> <span style="background:var(--purple-dim);color:var(--purple);padding:2px 8px;border-radius:10px;font-size:11px;font-weight:600;">Admin Staff</span></label>
           </div>
         </div>
         <button class="btn btn-primary" onclick="createAnnouncement()">Publish Announcement</button>
@@ -5882,7 +5898,7 @@ function buildStudentPages() {
 
     <!-- Today's Schedule -->
     <div class="card">
-      <div class="card-header"><h3>Today's Schedule</h3><span style="font-size:12px;color:var(--text-muted);">Sunday, Feb 15, 2026</span></div>
+      <div class="card-header"><h3>Today's Schedule</h3><span style="font-size:12px;color:var(--text-muted);">${new Date().toLocaleDateString('en-US',{weekday:'long',month:'short',day:'numeric',year:'numeric'})}</span></div>
       <div class="class-schedule-card" onclick="showPage('s-video')">
         <div class="class-time-block"><div class="time">9:00</div><div class="period">AM</div></div>
         <div style="flex:1;"><div style="font-size:14px;font-weight:600;">${s.course} — Theory Session</div><div style="font-size:12px;color:var(--text-muted);">${s.instructor} &nbsp;•&nbsp; Room: Virtual-01</div></div>
@@ -5981,16 +5997,25 @@ function buildStudentPages() {
     <div class="card">
       <div class="card-header"><h3>Assignments</h3><span style="font-size:13px;color:var(--text-muted);">${s.assignments}/${s.assignmentsTotal} completed</span></div>
       <div class="table-wrapper"><table><thead><tr><th>Assignment</th><th>Due Date</th><th>Score</th><th>Status</th></tr></thead><tbody>
-        ${[
-          {t:'Safety Assessment Quiz',d:'Feb 3',sc:'92%',st:'graded'},
-          {t:'Tool Identification Test',d:'Feb 6',sc:'88%',st:'graded'},
-          {t:'Theory Worksheet #1',d:'Feb 8',sc:'76%',st:'graded'},
-          {t:'Practical Report #1',d:'Feb 10',sc:'85%',st:'graded'},
-          {t:'Mid-Term Examination',d:'Feb 13',sc:s.score||'82%',st:'graded'},
-          {t:'Practical Report #2',d:'Feb 17',sc:'—',st:'submitted'},
-          {t:'Workshop Portfolio',d:'Feb 22',sc:'—',st:'pending'},
-          {t:'Final Project',d:'Mar 5',sc:'—',st:'pending'}
-        ].map((a,i) => `<tr><td>${a.t}</td><td>${a.d}</td><td style="font-weight:600;${a.sc!=='—'?'color:var(--green)':''}">${a.sc}</td><td><span class="badge ${a.st==='graded'?'badge-green':a.st==='submitted'?'badge-blue':'badge-amber'}">${a.st==='graded'?'✓ Graded':a.st==='submitted'?'Submitted':'Pending'}</span></td></tr>`).join('')}
+        ${(function(){
+          var studentResults = examResults.filter(function(r){ return r.studentId === s.id; });
+          var assignmentList = [
+            {t:'Safety Assessment Quiz',d:'Feb 3',st:'graded'},
+            {t:'Tool Identification Test',d:'Feb 6',st:'graded'},
+            {t:'Theory Worksheet #1',d:'Feb 8',st:'graded'},
+            {t:'Practical Report #1',d:'Feb 10',st:'graded'},
+            {t:'Mid-Term Examination',d:'Feb 13',st:'graded'},
+            {t:'Practical Report #2',d:'Feb 17',st:'submitted'},
+            {t:'Workshop Portfolio',d:'Feb 22',st:'pending'},
+            {t:'Final Project',d:'Mar 5',st:'pending'}
+          ];
+          return assignmentList.map(function(a,i){
+            var matchResult = studentResults.find(function(r){ return r.examTitle && r.examTitle.toLowerCase().indexOf(a.t.split(' ')[0].toLowerCase()) !== -1; });
+            var sc = a.st === 'graded' ? (matchResult ? matchResult.score + '%' : (s.score || '\u2014')) : '\u2014';
+            if(a.t === 'Mid-Term Examination' && !matchResult) sc = s.score || '\u2014';
+            return '<tr><td>'+a.t+'</td><td>'+a.d+'</td><td style="font-weight:600;'+(sc!=='\u2014'?'color:var(--green)':'')+'">'+sc+'</td><td><span class="badge '+(a.st==='graded'?'badge-green':a.st==='submitted'?'badge-blue':'badge-amber')+'">'+(a.st==='graded'?'\u2713 Graded':a.st==='submitted'?'Submitted':'Pending')+'</span></td></tr>';
+          }).join('');
+        })()}
       </tbody></table></div>
     </div>
   </section>
@@ -6520,6 +6545,7 @@ function buildInstructorPages() {
             <label style="display:flex;align-items:center;gap:6px;font-size:13px;cursor:pointer;"><input type="checkbox" id="iAnnRoleInstructor" checked> <span style="background:var(--green-dim);color:var(--green);padding:2px 8px;border-radius:10px;font-size:11px;font-weight:600;">Instructor</span></label>
             <label style="display:flex;align-items:center;gap:6px;font-size:13px;cursor:pointer;"><input type="checkbox" id="iAnnRoleStudent" checked> <span style="background:var(--blue-dim);color:var(--blue);padding:2px 8px;border-radius:10px;font-size:11px;font-weight:600;">Student</span></label>
             <label style="display:flex;align-items:center;gap:6px;font-size:13px;cursor:pointer;"><input type="checkbox" id="iAnnRoleAdmin"> <span style="background:var(--accent-dim);color:var(--accent);padding:2px 8px;border-radius:10px;font-size:11px;font-weight:600;">Admin</span></label>
+            <label style="display:flex;align-items:center;gap:6px;font-size:13px;cursor:pointer;"><input type="checkbox" id="iAnnRoleAdminStaff"> <span style="background:var(--purple-dim);color:var(--purple);padding:2px 8px;border-radius:10px;font-size:11px;font-weight:600;">Admin Staff</span></label>
           </div>
         </div>
         <button class="btn btn-primary" onclick="createInstructorAnnouncement()">Publish Announcement</button>
@@ -6782,6 +6808,7 @@ function createInstructorAnnouncement() {
   if(document.getElementById('iAnnRoleAdmin')?.checked) targetRoles.push('admin');
   if(document.getElementById('iAnnRoleInstructor')?.checked) targetRoles.push('instructor');
   if(document.getElementById('iAnnRoleStudent')?.checked) targetRoles.push('student');
+  if(document.getElementById('iAnnRoleAdminStaff')?.checked) targetRoles.push('adminstaff');
   if(targetRoles.length === 0) { alert('Please select at least one target audience'); return; }
   announcements.unshift({
     id: Date.now(), title, body, priority, date: new Date().toISOString().split('T')[0], author: currentInstructor.name, forRoles: targetRoles
@@ -10382,6 +10409,7 @@ function createAnnouncement() {
   if(document.getElementById('annRoleAdmin')?.checked) targetRoles.push('admin');
   if(document.getElementById('annRoleInstructor')?.checked) targetRoles.push('instructor');
   if(document.getElementById('annRoleStudent')?.checked) targetRoles.push('student');
+  if(document.getElementById('annRoleAdminStaff')?.checked) targetRoles.push('adminstaff');
   if(targetRoles.length === 0) { alert('Please select at least one target audience'); return; }
   announcements.unshift({
     id: Date.now(), title, body, priority, date: new Date().toISOString().split('T')[0], author, forRoles: targetRoles
@@ -11900,7 +11928,20 @@ async function saveToCloud() {
         chatRooms: lmsChatRooms,
         chatMessages: lmsChatMessages,
         chatProfiles: lmsChatProfiles,
-        driveResources: driveResources
+        chatFollows: lmsChatFollows,
+        driveResources: driveResources,
+        classSessions: classSessions,
+        instructorAssignments: instructorAssignments,
+        instructorResources: instructorResources,
+        studentProfiles: studentProfiles,
+        instructorProfiles: instructorProfiles,
+        instructorData: instructorData,
+        systemSettings: systemSettings,
+        adrTasks: adrTasks,
+        adrStaffMeta: adrStaffMeta,
+        adminStaffAccessSettings: adminStaffAccessSettings,
+        supportMessages: supportMessages,
+        notifications: notifications
       }
     };
 
@@ -12054,6 +12095,66 @@ async function syncFromCloud() {
 
     if (backupData.data.driveResources) {
       driveResources = backupData.data.driveResources;
+    }
+
+    // Restore additional data arrays from cloud backup
+    if (backupData.data.classSessions) {
+      classSessions = backupData.data.classSessions;
+    }
+
+    if (backupData.data.instructorAssignments) {
+      instructorAssignments = backupData.data.instructorAssignments;
+    }
+
+    if (backupData.data.instructorResources) {
+      instructorResources = backupData.data.instructorResources;
+    }
+
+    if (backupData.data.studentProfiles) {
+      studentProfiles = backupData.data.studentProfiles;
+    }
+
+    if (backupData.data.instructorProfiles) {
+      instructorProfiles = backupData.data.instructorProfiles;
+    }
+
+    if (backupData.data.instructorData) {
+      // Merge cloud instructors with base instructorData, preserving dynamically created ones
+      backupData.data.instructorData.forEach(function(ci) {
+        if (!instructorData.some(function(li) { return li.id === ci.id; })) {
+          instructorData.push(ci);
+        }
+      });
+    }
+
+    if (backupData.data.systemSettings) {
+      systemSettings = backupData.data.systemSettings;
+    }
+
+    if (backupData.data.adrTasks) {
+      adrTasks = backupData.data.adrTasks;
+    }
+
+    if (backupData.data.adrStaffMeta) {
+      adrStaffMeta = backupData.data.adrStaffMeta;
+    }
+
+    if (backupData.data.adminStaffAccessSettings) {
+      adminStaffAccessSettings = backupData.data.adminStaffAccessSettings;
+    }
+
+    if (backupData.data.supportMessages) {
+      supportMessages = backupData.data.supportMessages;
+      saveSupportMessages();
+    }
+
+    if (backupData.data.notifications) {
+      notifications = backupData.data.notifications;
+      saveNotifications();
+    }
+
+    if (backupData.data.chatFollows) {
+      lmsChatFollows = backupData.data.chatFollows;
     }
 
     // Persist all restored data to localStorage
@@ -12253,6 +12354,121 @@ async function mergeFromCloud() {
       });
     }
 
+    // Merge chat follows
+    if (backupData.data.chatFollows) {
+      Object.keys(backupData.data.chatFollows).forEach(function(uid) {
+        if (!lmsChatFollows[uid]) lmsChatFollows[uid] = [];
+        backupData.data.chatFollows[uid].forEach(function(followId) {
+          if (lmsChatFollows[uid].indexOf(followId) === -1) {
+            lmsChatFollows[uid].push(followId);
+          }
+        });
+      });
+    }
+
+    // Merge class sessions
+    if (backupData.data.classSessions) {
+      backupData.data.classSessions.forEach(function(cs) {
+        if (!classSessions.some(function(ls) { return ls.id === cs.id; })) {
+          classSessions.push(cs);
+          mergeStats.sessionsAdded = (mergeStats.sessionsAdded||0) + 1;
+        }
+      });
+    }
+
+    // Merge instructor assignments
+    if (backupData.data.instructorAssignments) {
+      backupData.data.instructorAssignments.forEach(function(ca) {
+        if (!instructorAssignments.some(function(la) { return la.id === ca.id; })) {
+          instructorAssignments.push(ca);
+        }
+      });
+    }
+
+    // Merge instructor resources
+    if (backupData.data.instructorResources) {
+      backupData.data.instructorResources.forEach(function(cr) {
+        if (!instructorResources.some(function(lr) { return lr.id === cr.id; })) {
+          instructorResources.push(cr);
+        }
+      });
+    }
+
+    // Merge student profiles
+    if (backupData.data.studentProfiles) {
+      Object.keys(backupData.data.studentProfiles).forEach(function(sid) {
+        if (!studentProfiles[sid]) {
+          studentProfiles[sid] = backupData.data.studentProfiles[sid];
+        }
+      });
+    }
+
+    // Merge instructor profiles
+    if (backupData.data.instructorProfiles) {
+      Object.keys(backupData.data.instructorProfiles).forEach(function(iid) {
+        if (!instructorProfiles[iid]) {
+          instructorProfiles[iid] = backupData.data.instructorProfiles[iid];
+        }
+      });
+    }
+
+    // Merge instructorData (dynamically created instructors)
+    if (backupData.data.instructorData) {
+      backupData.data.instructorData.forEach(function(ci) {
+        if (!instructorData.some(function(li) { return li.id === ci.id; })) {
+          instructorData.push(ci);
+        }
+      });
+    }
+
+    // Merge system settings (cloud version wins for settings)
+    if (backupData.data.systemSettings) {
+      Object.assign(systemSettings, backupData.data.systemSettings);
+    }
+
+    // Merge ADR tasks
+    if (backupData.data.adrTasks) {
+      backupData.data.adrTasks.forEach(function(ct) {
+        if (!adrTasks.some(function(lt) { return lt.id === ct.id; })) {
+          adrTasks.push(ct);
+        }
+      });
+    }
+
+    // Merge ADR staff meta
+    if (backupData.data.adrStaffMeta) {
+      Object.keys(backupData.data.adrStaffMeta).forEach(function(key) {
+        if (!adrStaffMeta[key]) {
+          adrStaffMeta[key] = backupData.data.adrStaffMeta[key];
+        }
+      });
+    }
+
+    // Merge admin staff access settings
+    if (backupData.data.adminStaffAccessSettings) {
+      Object.assign(adminStaffAccessSettings, backupData.data.adminStaffAccessSettings);
+    }
+
+    // Merge support messages
+    if (backupData.data.supportMessages) {
+      backupData.data.supportMessages.forEach(function(cm) {
+        if (!supportMessages.some(function(lm) { return lm.id === cm.id; })) {
+          supportMessages.push(cm);
+        }
+      });
+      saveSupportMessages();
+    }
+
+    // Merge notifications
+    if (backupData.data.notifications) {
+      backupData.data.notifications.forEach(function(cn) {
+        if (!notifications.some(function(ln) { return ln.id === cn.id; })) {
+          notifications.push(cn);
+        }
+      });
+      saveNotifications();
+    }
+
     // Persist all merged data
     saveState();
 
@@ -12276,8 +12492,9 @@ async function mergeFromCloud() {
     summary += `• Announcements added: ${mergeStats.announcementsAdded}\n`;
     summary += `• Calendar events added: ${mergeStats.eventsAdded}\n`;
     summary += `• Exam results added: ${mergeStats.examResultsAdded||0}\n`;
+    summary += `• Class sessions added: ${mergeStats.sessionsAdded||0}\n`;
 
-    const totalAdded = mergeStats.usersAdded + mergeStats.studentsAdded + mergeStats.examsAdded + mergeStats.announcementsAdded + mergeStats.eventsAdded + (mergeStats.examResultsAdded||0);
+    const totalAdded = mergeStats.usersAdded + mergeStats.studentsAdded + mergeStats.examsAdded + mergeStats.announcementsAdded + mergeStats.eventsAdded + (mergeStats.examResultsAdded||0) + (mergeStats.sessionsAdded||0);
     if (totalAdded === 0) {
       summary += '\n💡 No new data found — your local data already contains everything from the cloud.';
     } else {
@@ -12477,6 +12694,133 @@ async function silentMergeFromBackup(fileId) {
       });
     }
 
+    // Merge chat follows
+    if (backupData.data.chatFollows) {
+      Object.keys(backupData.data.chatFollows).forEach(function(uid) {
+        if (!lmsChatFollows[uid]) lmsChatFollows[uid] = [];
+        backupData.data.chatFollows[uid].forEach(function(followId) {
+          if (lmsChatFollows[uid].indexOf(followId) === -1) {
+            lmsChatFollows[uid].push(followId);
+            changed = true;
+          }
+        });
+      });
+    }
+
+    // Merge class sessions
+    if (backupData.data.classSessions) {
+      backupData.data.classSessions.forEach(function(cs) {
+        if (!classSessions.some(function(ls) { return ls.id === cs.id; })) {
+          classSessions.push(cs);
+          changed = true;
+        }
+      });
+    }
+
+    // Merge instructor assignments
+    if (backupData.data.instructorAssignments) {
+      backupData.data.instructorAssignments.forEach(function(ca) {
+        if (!instructorAssignments.some(function(la) { return la.id === ca.id; })) {
+          instructorAssignments.push(ca);
+          changed = true;
+        }
+      });
+    }
+
+    // Merge instructor resources
+    if (backupData.data.instructorResources) {
+      backupData.data.instructorResources.forEach(function(cr) {
+        if (!instructorResources.some(function(lr) { return lr.id === cr.id; })) {
+          instructorResources.push(cr);
+          changed = true;
+        }
+      });
+    }
+
+    // Merge student profiles
+    if (backupData.data.studentProfiles) {
+      Object.keys(backupData.data.studentProfiles).forEach(function(sid) {
+        if (!studentProfiles[sid]) {
+          studentProfiles[sid] = backupData.data.studentProfiles[sid];
+          changed = true;
+        }
+      });
+    }
+
+    // Merge instructor profiles
+    if (backupData.data.instructorProfiles) {
+      Object.keys(backupData.data.instructorProfiles).forEach(function(iid) {
+        if (!instructorProfiles[iid]) {
+          instructorProfiles[iid] = backupData.data.instructorProfiles[iid];
+          changed = true;
+        }
+      });
+    }
+
+    // Merge instructorData (dynamically created instructors)
+    if (backupData.data.instructorData) {
+      backupData.data.instructorData.forEach(function(ci) {
+        if (!instructorData.some(function(li) { return li.id === ci.id; })) {
+          instructorData.push(ci);
+          changed = true;
+        }
+      });
+    }
+
+    // Merge system settings
+    if (backupData.data.systemSettings) {
+      Object.assign(systemSettings, backupData.data.systemSettings);
+      changed = true;
+    }
+
+    // Merge ADR tasks
+    if (backupData.data.adrTasks) {
+      backupData.data.adrTasks.forEach(function(ct) {
+        if (!adrTasks.some(function(lt) { return lt.id === ct.id; })) {
+          adrTasks.push(ct);
+          changed = true;
+        }
+      });
+    }
+
+    // Merge ADR staff meta
+    if (backupData.data.adrStaffMeta) {
+      Object.keys(backupData.data.adrStaffMeta).forEach(function(key) {
+        if (!adrStaffMeta[key]) {
+          adrStaffMeta[key] = backupData.data.adrStaffMeta[key];
+          changed = true;
+        }
+      });
+    }
+
+    // Merge admin staff access settings
+    if (backupData.data.adminStaffAccessSettings) {
+      Object.assign(adminStaffAccessSettings, backupData.data.adminStaffAccessSettings);
+      changed = true;
+    }
+
+    // Merge support messages
+    if (backupData.data.supportMessages) {
+      backupData.data.supportMessages.forEach(function(cm) {
+        if (!supportMessages.some(function(lm) { return lm.id === cm.id; })) {
+          supportMessages.push(cm);
+          changed = true;
+        }
+      });
+      if (changed) saveSupportMessages();
+    }
+
+    // Merge notifications
+    if (backupData.data.notifications) {
+      backupData.data.notifications.forEach(function(cn) {
+        if (!notifications.some(function(ln) { return ln.id === cn.id; })) {
+          notifications.push(cn);
+          changed = true;
+        }
+      });
+      if (changed) saveNotifications();
+    }
+
     if (changed) {
       saveState();
     }
@@ -12657,7 +13001,20 @@ async function autoSaveToAllFolders() {
         chatRooms: lmsChatRooms,
         chatMessages: lmsChatMessages,
         chatProfiles: lmsChatProfiles,
-        driveResources: driveResources
+        chatFollows: lmsChatFollows,
+        driveResources: driveResources,
+        classSessions: classSessions,
+        instructorAssignments: instructorAssignments,
+        instructorResources: instructorResources,
+        studentProfiles: studentProfiles,
+        instructorProfiles: instructorProfiles,
+        instructorData: instructorData,
+        systemSettings: systemSettings,
+        adrTasks: adrTasks,
+        adrStaffMeta: adrStaffMeta,
+        adminStaffAccessSettings: adminStaffAccessSettings,
+        supportMessages: supportMessages,
+        notifications: notifications
       }
     };
 
@@ -15975,6 +16332,111 @@ function buildAdminStaffPages() {
     '<div id="supportMsgDetail" style="display:none;"></div>' +
   '</section>';
 
+  // ---- Conditional Access Pages (Admin Staff) ----
+
+  // Video Conference
+  html += '<section class="page" id="page-as-video">' +
+    '<div class="card" style="padding:24px;text-align:center;">' +
+      '<h3 style="font-family:\'Playfair Display\',serif;margin-bottom:12px;">Video Conference</h3>' +
+      '<p style="color:var(--text-muted);margin-bottom:20px;">Join or view scheduled video sessions</p>' +
+      '<div id="asVideoList">' +
+        (function(){ var vh=''; classSessions.filter(function(cs){ return cs.type==='video' || cs.isLive; }).forEach(function(cs){ vh += '<div class="card" style="text-align:left;padding:16px;margin-bottom:12px;"><div style="display:flex;justify-content:space-between;align-items:center;"><div><strong>'+cs.title+'</strong><div style="font-size:12px;color:var(--text-muted);">'+cs.course+' &bull; '+(cs.date||'')+'</div></div><span class="badge badge-blue">Scheduled</span></div></div>'; }); return vh || '<p style="color:var(--text-muted);font-size:13px;">No video sessions currently scheduled.</p>'; })() +
+      '</div>' +
+    '</div>' +
+  '</section>';
+
+  // Student Progress
+  html += '<section class="page" id="page-as-students">' +
+    '<div class="card-header" style="margin-bottom:16px;"><h3 style="font-family:\'Playfair Display\',serif;">Student Progress</h3></div>' +
+    '<div style="display:flex;gap:12px;margin-bottom:16px;flex-wrap:wrap;">' +
+      '<input type="text" class="form-control" id="asStudentSearch" placeholder="Search students..." oninput="asFilterStudents()" style="width:260px;">' +
+      '<select class="form-control" id="asStudentCourse" onchange="asFilterStudents()" style="width:200px;"><option value="all">All Courses</option>' + courses.map(function(c){ return '<option value="'+c+'">'+c+'</option>'; }).join('') + '</select>' +
+    '</div>' +
+    '<div class="table-wrapper"><table><thead><tr><th>ID</th><th>Name</th><th>Course</th><th>Status</th><th>Score</th><th>Progress</th></tr></thead><tbody id="asStudentTableBody">' +
+      students.map(function(st){ return '<tr data-course="'+st.course+'" data-name="'+st.name.toLowerCase()+'"><td>'+st.id+'</td><td>'+st.name+'</td><td>'+st.course+'</td><td><span class="badge '+(stageBadge[st.stage]||'badge-blue')+'">'+(stageLabels[st.stage]||st.stage)+'</span></td><td>'+(st.score||'N/A')+'</td><td><div class="progress-bar" style="width:100px;"><div class="fill" style="width:'+st.progress+'%;"></div></div></td></tr>'; }).join('') +
+    '</tbody></table></div>' +
+  '</section>';
+
+  // Training Centres
+  html += '<section class="page" id="page-as-training">' +
+    '<div class="card-header" style="margin-bottom:16px;"><h3 style="font-family:\'Playfair Display\',serif;">Training Centres</h3></div>' +
+    '<div class="grid-3">' +
+      skillAreas.map(function(sk){ return '<div class="card" style="padding:20px;text-align:center;"><div style="font-size:36px;margin-bottom:8px;">'+sk.icon+'</div><h4 style="font-size:14px;margin-bottom:4px;">'+sk.name+'</h4><div style="font-size:12px;color:var(--text-muted);">'+sk.students+' students &bull; '+sk.materials+' materials</div><p style="font-size:11px;color:var(--text-muted);margin-top:8px;">'+sk.desc+'</p></div>'; }).join('') +
+    '</div>' +
+  '</section>';
+
+  // Resource Manager
+  html += '<section class="page" id="page-as-resources">' +
+    '<div class="card-header" style="margin-bottom:16px;"><h3 style="font-family:\'Playfair Display\',serif;">Resources</h3></div>' +
+    '<div class="table-wrapper"><table><thead><tr><th>Title</th><th>Type</th><th>Course</th><th>Added</th></tr></thead><tbody>' +
+      (driveResources.length > 0 ? driveResources.map(function(r){ return '<tr><td>'+r.name+'</td><td>'+(r.type||'File')+'</td><td>'+(r.course||'General')+'</td><td>'+(r.date||'N/A')+'</td></tr>'; }).join('') : '<tr><td colspan="4" style="text-align:center;color:var(--text-muted);">No resources available</td></tr>') +
+      (instructorResources.length > 0 ? instructorResources.map(function(r){ return '<tr><td>'+(r.title||r.name||'Untitled')+'</td><td>'+(r.type||'File')+'</td><td>'+(r.course||'General')+'</td><td>'+(r.date||'N/A')+'</td></tr>'; }).join('') : '') +
+    '</tbody></table></div>' +
+  '</section>';
+
+  // Online Exams
+  html += '<section class="page" id="page-as-exams">' +
+    '<div class="card-header" style="margin-bottom:16px;"><h3 style="font-family:\'Playfair Display\',serif;">Online Exams Schedule</h3></div>' +
+    '<div class="table-wrapper"><table><thead><tr><th>Exam</th><th>Course</th><th>Date</th><th>Duration</th><th>Status</th></tr></thead><tbody>' +
+      exams.map(function(ex){ return '<tr><td>'+ex.title+'</td><td>'+ex.course+'</td><td>'+ex.date+'</td><td>'+ex.duration+' min</td><td><span class="badge '+(ex.status==='completed'?'badge-green':ex.status==='active'?'badge-red':'badge-blue')+'">'+ex.status.charAt(0).toUpperCase()+ex.status.slice(1)+'</span></td></tr>'; }).join('') +
+    '</tbody></table></div>' +
+  '</section>';
+
+  // Attendance Management
+  html += '<section class="page" id="page-as-attendance">' +
+    '<div class="card-header" style="margin-bottom:16px;"><h3 style="font-family:\'Playfair Display\',serif;">Attendance Records</h3></div>' +
+    '<div class="table-wrapper"><table><thead><tr><th>Student ID</th><th>Name</th><th>Course</th><th>Mon</th><th>Tue</th><th>Wed</th><th>Thu</th><th>Fri</th></tr></thead><tbody>' +
+      attendanceRecords.slice(0,40).map(function(a){ var days = a.days||{}; function badge(d){ var v=days[d]||'absent'; return '<span class="badge '+(v==='present'?'badge-green':v==='late'?'badge-amber':'badge-red')+'" style="font-size:10px;">'+v.charAt(0).toUpperCase()+v.slice(1)+'</span>'; } return '<tr><td>'+a.studentId+'</td><td>'+a.studentName+'</td><td>'+a.course+'</td><td>'+badge('Mon')+'</td><td>'+badge('Tue')+'</td><td>'+badge('Wed')+'</td><td>'+badge('Thu')+'</td><td>'+badge('Fri')+'</td></tr>'; }).join('') +
+    '</tbody></table></div>' +
+  '</section>';
+
+  // Announcements
+  html += '<section class="page" id="page-as-announcements">' +
+    '<div class="card-header" style="margin-bottom:16px;"><h3 style="font-family:\'Playfair Display\',serif;">Announcements</h3></div>' +
+    '<div id="asAnnouncementsList">' +
+      announcements.filter(function(a){ return !a.forRoles || a.forRoles.indexOf('adminstaff') !== -1 || a.forRoles.indexOf('admin') !== -1; }).map(function(a){ return '<div class="card" style="padding:16px;margin-bottom:12px;"><div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;"><strong>'+a.title+'</strong><span class="badge '+(a.priority==='urgent'?'badge-red':a.priority==='info'?'badge-blue':'badge-green')+'">'+a.priority+'</span></div><p style="font-size:13px;color:var(--text-secondary);margin-bottom:8px;">'+a.body+'</p><div style="font-size:11px;color:var(--text-muted);">By '+a.author+' &bull; '+a.date+'</div></div>'; }).join('') +
+    '</div>' +
+  '</section>';
+
+  // Calendar
+  html += '<section class="page" id="page-as-calendar">' +
+    '<div class="card-header" style="margin-bottom:16px;"><h3 style="font-family:\'Playfair Display\',serif;">Calendar & Schedule</h3></div>' +
+    '<div id="asCalendarEvents">' +
+      calendarEvents.filter(function(e){ return !e.forRoles || e.forRoles.indexOf('adminstaff') !== -1 || e.forRoles.indexOf('admin') !== -1; }).sort(function(a,b){ return new Date(a.date) - new Date(b.date); }).map(function(e){ return '<div class="card" style="padding:14px;margin-bottom:10px;border-left:4px solid '+(e.color||'var(--accent)')+';"><div style="display:flex;justify-content:space-between;align-items:center;"><div><strong style="font-size:14px;">'+e.title+'</strong><div style="font-size:12px;color:var(--text-muted);">'+e.date+' at '+e.time+'</div></div><span class="badge badge-blue" style="font-size:10px;">'+(e.type||'event')+'</span></div></div>'; }).join('') +
+    '</div>' +
+  '</section>';
+
+  // Certificate Tracking
+  html += '<section class="page" id="page-as-certificates">' +
+    '<div class="card-header" style="margin-bottom:16px;"><h3 style="font-family:\'Playfair Display\',serif;">Certificate Tracking</h3></div>' +
+    '<div class="table-wrapper"><table><thead><tr><th>Student</th><th>Course</th><th>Status</th><th>Cert #</th><th>Date</th></tr></thead><tbody>' +
+      students.filter(function(st){ return st.stage==='certified'||st.stage==='collected'; }).map(function(st){ return '<tr><td>'+st.name+'</td><td>'+st.course+'</td><td><span class="badge '+(st.stage==='collected'?'badge-green':'badge-amber')+'">'+(stageLabels[st.stage]||st.stage)+'</span></td><td>'+(st.certNo||'Pending')+'</td><td>'+(st.certDate||'N/A')+'</td></tr>'; }).join('') +
+      (students.filter(function(st){ return st.stage==='certified'||st.stage==='collected'; }).length === 0 ? '<tr><td colspan="5" style="text-align:center;color:var(--text-muted);">No certified students yet</td></tr>' : '') +
+    '</tbody></table></div>' +
+  '</section>';
+
+  // Reports
+  html += '<section class="page" id="page-as-reports">' +
+    '<div class="card-header" style="margin-bottom:16px;"><h3 style="font-family:\'Playfair Display\',serif;">Reports & Analytics</h3></div>' +
+    '<div class="grid-2">' +
+      '<div class="card" style="padding:20px;"><h4 style="margin-bottom:12px;">Enrollment Summary</h4>' +
+        '<div style="font-size:42px;font-weight:800;color:var(--accent);margin-bottom:4px;">'+students.length+'</div>' +
+        '<div style="font-size:13px;color:var(--text-muted);margin-bottom:16px;">Total Students</div>' +
+        courses.map(function(c){ var count = students.filter(function(s){ return s.course===c; }).length; return '<div style="display:flex;justify-content:space-between;padding:6px 0;border-bottom:1px solid var(--border);font-size:13px;"><span>'+c+'</span><strong>'+count+'</strong></div>'; }).join('') +
+      '</div>' +
+      '<div class="card" style="padding:20px;"><h4 style="margin-bottom:12px;">Student Pipeline</h4>' +
+        stages.map(function(st){ var count = students.filter(function(s){ return s.stage===st; }).length; return '<div style="display:flex;justify-content:space-between;padding:8px 0;border-bottom:1px solid var(--border);font-size:13px;"><span>'+stageIcons[st]+' '+(stageLabels[st]||st)+'</span><strong>'+count+'</strong></div>'; }).join('') +
+      '</div>' +
+    '</div>' +
+    '<div class="card" style="padding:20px;margin-top:16px;"><h4 style="margin-bottom:12px;">Exam Results Summary</h4>' +
+      '<div style="display:flex;gap:24px;flex-wrap:wrap;">' +
+        '<div><div style="font-size:28px;font-weight:700;color:var(--green);">'+examResults.length+'</div><div style="font-size:12px;color:var(--text-muted);">Total Submissions</div></div>' +
+        '<div><div style="font-size:28px;font-weight:700;color:var(--accent);">'+exams.filter(function(e){ return e.status==='completed'; }).length+'</div><div style="font-size:12px;color:var(--text-muted);">Exams Completed</div></div>' +
+        '<div><div style="font-size:28px;font-weight:700;color:var(--blue);">'+exams.filter(function(e){ return e.status==='upcoming'; }).length+'</div><div style="font-size:12px;color:var(--text-muted);">Upcoming Exams</div></div>' +
+      '</div>' +
+    '</div>' +
+  '</section>';
+
   // ---- Profile Page ----
   var pInitials = user.name.split(' ').map(function(n){ return n[0]; }).join('').substring(0,2);
   html += '<section class="page" id="page-as-profile">' +
@@ -16010,6 +16472,20 @@ function buildAdminStaffPages() {
   mc.innerHTML = html;
   loadSupportMessages();
   updateSupportBadge();
+}
+
+// ---- Admin Staff Student Filter ----
+function asFilterStudents() {
+  var search = (document.getElementById('asStudentSearch')?.value || '').toLowerCase();
+  var course = document.getElementById('asStudentCourse')?.value || 'all';
+  var rows = document.querySelectorAll('#asStudentTableBody tr');
+  rows.forEach(function(row) {
+    var name = row.getAttribute('data-name') || '';
+    var c = row.getAttribute('data-course') || '';
+    var matchSearch = !search || name.indexOf(search) !== -1;
+    var matchCourse = course === 'all' || c === course;
+    row.style.display = (matchSearch && matchCourse) ? '' : 'none';
+  });
 }
 
 // ---- Admin Staff Duty Page Functions ----
