@@ -3381,6 +3381,23 @@ textarea.form-control { resize:vertical; min-height:80px; }
   </div>
 </div>
 
+<!-- EDIT INSTRUCTOR PROFILE MODAL -->
+<div class="modal-overlay" id="editInstructorProfileModal">
+  <div class="modal">
+    <div class="modal-header"><h3>Edit Profile</h3><button class="modal-close" onclick="closeModal('editInstructorProfileModal')">✕</button></div>
+    <div class="form-group"><label>Full Name</label><input type="text" class="form-control" id="editInsProfileName" disabled></div>
+    <div class="form-group"><label>Staff ID</label><input type="text" class="form-control" id="editInsProfileId" disabled></div>
+    <div class="form-group"><label>Email</label><input type="email" class="form-control" id="editInsProfileEmail" placeholder="your.email@heartlms.edu.jm"></div>
+    <div class="form-group"><label>Phone</label><input type="tel" class="form-control" id="editInsProfilePhone" placeholder="+1 (876) 000-0000"></div>
+    <div class="form-group"><label>Specialization</label><input type="text" class="form-control" id="editInsProfileSpecialization" placeholder="e.g. Engine Repair & Diagnostics"></div>
+    <div class="form-group"><label>Bio</label><textarea class="form-control" id="editInsProfileBio" rows="3" placeholder="Brief professional bio..."></textarea></div>
+    <div style="display:flex;gap:10px;justify-content:flex-end;margin-top:20px;">
+      <button class="btn btn-secondary" onclick="closeModal('editInstructorProfileModal')">Cancel</button>
+      <button class="btn btn-primary" onclick="saveInstructorProfile()">Save Profile</button>
+    </div>
+  </div>
+</div>
+
 <script>
 const skillAreas = [
   {id:1,name:"Welding & Fabrication",icon:"\uD83D\uDD25",color:"#e74c3c",students:87,materials:24,desc:"SMAW, MIG, TIG welding processes and metal fabrication"},
@@ -3668,6 +3685,7 @@ let instructorAssignments = [];
 let instructorResources = [];
 let driveResources = []; // Admin-managed resources uploaded to Google Drive
 let studentProfiles = {};
+let instructorProfiles = {};
 let systemSettings = { institutionName: 'C.E.S.T.I.S LMS - Community Training Intervention', adminEmail: 'admin@heartlms.edu.jm', academicYear: '2025/2026', vcProvider: 'Built-in (WebRTC)' };
 
 // ============================== LMS CHAT DATA MODEL ==============================
@@ -3826,6 +3844,7 @@ function saveState() {
     localStorage.setItem('voctrain_resources', JSON.stringify(instructorResources));
     localStorage.setItem('voctrain_driveResources', JSON.stringify(driveResources));
     localStorage.setItem('voctrain_studentProfiles', JSON.stringify(studentProfiles));
+    localStorage.setItem('voctrain_instructorProfiles', JSON.stringify(instructorProfiles));
     localStorage.setItem('voctrain_systemSettings', JSON.stringify(systemSettings));
     localStorage.setItem('voctrain_examResults', JSON.stringify(examResults));
     localStorage.setItem('voctrain_calendarEvents', JSON.stringify(calendarEvents));
@@ -3861,6 +3880,8 @@ function loadState() {
     const dr = localStorage.getItem('voctrain_driveResources');
     if(dr) driveResources = JSON.parse(dr);
     if(sp) studentProfiles = JSON.parse(sp);
+    var ip = localStorage.getItem('voctrain_instructorProfiles');
+    if(ip) instructorProfiles = JSON.parse(ip);
     if(ss) systemSettings = JSON.parse(ss);
     if(er) examResults = JSON.parse(er);
     if(ce) calendarEvents = JSON.parse(ce);
@@ -4464,6 +4485,13 @@ function handleInstructorClick() {
       insMatch = createInstructorDataForAccount(userAccount);
     }
     currentInstructor = insMatch;
+    // Apply any saved profile edits back to the instructor data object
+    var savedInsProfile = instructorProfiles[insMatch.id];
+    if(savedInsProfile) {
+      if(savedInsProfile.email) insMatch.email = savedInsProfile.email;
+      if(savedInsProfile.phone) insMatch.phone = savedInsProfile.phone;
+      if(savedInsProfile.specialization) insMatch.specialization = savedInsProfile.specialization;
+    }
     currentLoggedInUser = userAccount;
     enterApp('instructor');
   } catch(err) { console.error('handleInstructorClick error:', err); alert('Error: ' + err.message); }
@@ -4620,6 +4648,12 @@ function handleGmailProfile(profile, role) {
       var insMatch = instructorData.find(function(ins) { return ins.name === existing.name || ins.email === existing.email; });
       if(!insMatch) insMatch = createInstructorDataForAccount(existing);
       currentInstructor = insMatch;
+      var savedInsProfile = instructorProfiles[insMatch.id];
+      if(savedInsProfile) {
+        if(savedInsProfile.email) insMatch.email = savedInsProfile.email;
+        if(savedInsProfile.phone) insMatch.phone = savedInsProfile.phone;
+        if(savedInsProfile.specialization) insMatch.specialization = savedInsProfile.specialization;
+      }
       currentLoggedInUser = existing;
       enterApp('instructor');
     } else if(existing.role === 'admin') {
@@ -6526,7 +6560,7 @@ function buildInstructorPages() {
           <span>📍 C.E.S.T.I.S LMS</span>
         </div>
       </div>
-      <button class="btn btn-secondary" onclick="openEditStudentProfile()">Edit Profile</button>
+      <button class="btn btn-secondary" onclick="openEditInstructorProfile()">Edit Profile</button>
     </div>
     <div class="stats-grid stats-grid-4">
       <div class="profile-stat"><div class="ps-value" style="color:var(--green);">${ins.yearsExp}</div><div class="ps-label">Years Experience</div></div>
@@ -6540,7 +6574,7 @@ function buildInstructorPages() {
         <div class="info-row"><span class="info-label">Full Name</span><span class="info-value">${ins.name}</span></div>
         <div class="info-row"><span class="info-label">Staff ID</span><span class="info-value">${ins.id}</span></div>
         <div class="info-row"><span class="info-label">Email</span><span class="info-value">${ins.email}</span></div>
-        <div class="info-row"><span class="info-label">Phone</span><span class="info-value">${ins.phone}</span></div>
+        <div class="info-row"><span class="info-label">Phone</span><span class="info-value">${ins.phone || 'Not provided'}</span></div>
       </div>
       <div class="info-section">
         <h4>Professional Information</h4>
@@ -6550,6 +6584,7 @@ function buildInstructorPages() {
         <div class="info-row"><span class="info-label">Joined</span><span class="info-value">${2026 - ins.yearsExp}</span></div>
       </div>
     </div>
+    ${(instructorProfiles[ins.id]?.bio) ? '<div class="info-section" style="margin-top:20px;"><h4>About</h4><p style="color:var(--text-secondary);line-height:1.6;padding:12px 0;">' + instructorProfiles[ins.id].bio + '</p></div>' : ''}
   </section>
 
   <!-- C.E.S.T.I.S LMS CHAT PAGE (INSTRUCTOR) -->
@@ -8975,6 +9010,54 @@ function saveStudentProfile() {
   var phoneEl = document.getElementById('sProfilePhone');
   if(emailEl) emailEl.textContent = email;
   if(phoneEl) phoneEl.textContent = phone || 'Not provided';
+}
+
+// ============================== INSTRUCTOR PROFILE FUNCTIONS ==============================
+function openEditInstructorProfile() {
+  const ins = currentInstructor;
+  if(!ins) return;
+  const profile = instructorProfiles[ins.id] || {};
+
+  document.getElementById('editInsProfileName').value = ins.name;
+  document.getElementById('editInsProfileId').value = ins.id;
+  document.getElementById('editInsProfileEmail').value = profile.email || ins.email;
+  document.getElementById('editInsProfilePhone').value = profile.phone || ins.phone || '';
+  document.getElementById('editInsProfileSpecialization').value = profile.specialization || ins.specialization || '';
+  document.getElementById('editInsProfileBio').value = profile.bio || '';
+  openModal('editInstructorProfileModal');
+}
+
+function saveInstructorProfile() {
+  const ins = currentInstructor;
+  if(!ins) return;
+
+  const email = document.getElementById('editInsProfileEmail')?.value?.trim();
+  const phone = document.getElementById('editInsProfilePhone')?.value?.trim();
+  const specialization = document.getElementById('editInsProfileSpecialization')?.value?.trim();
+  const bio = document.getElementById('editInsProfileBio')?.value?.trim();
+
+  if(!email) { showToast('Please enter an email address'); return; }
+
+  instructorProfiles[ins.id] = {
+    email: email,
+    phone: phone,
+    specialization: specialization,
+    bio: bio,
+    updatedAt: new Date().toISOString()
+  };
+
+  // Also update the instructor data object so changes reflect everywhere
+  ins.email = email;
+  if(phone) ins.phone = phone;
+  if(specialization) ins.specialization = specialization;
+
+  saveState();
+  closeModal('editInstructorProfileModal');
+  showToast('Profile updated successfully');
+
+  // Re-render the instructor profile page to reflect changes
+  buildInstructorPages();
+  showPage('i-profile');
 }
 
 // ============================== SYSTEM SETTINGS FUNCTIONS ==============================
