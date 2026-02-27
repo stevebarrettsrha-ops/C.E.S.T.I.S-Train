@@ -462,8 +462,8 @@ h1,h2,h3,h4 { font-family:'Playfair Display',serif; }
 
 /* MAIN */
 .main-content {
-  margin-left:var(--sidebar-w); margin-top:var(--topbar-h);
-  height:calc(100vh - var(--topbar-h)); overflow-y:auto; overflow-x:hidden; padding:28px;
+  position:fixed; left:var(--sidebar-w); top:var(--topbar-h); right:0; bottom:0;
+  overflow-y:auto; overflow-x:hidden; padding:28px;
 }
 
 /* ============================== SHARED COMPONENTS ============================== */
@@ -1282,7 +1282,7 @@ textarea.form-control { resize:vertical; min-height:80px; }
 }
 @media(max-width:768px) {
   .sidebar { transform:translateX(-100%); }
-  .main-content, .topbar { margin-left:0; left:0; }
+  .main-content, .topbar { left:0; }
   .pipeline { flex-wrap:wrap; }
   .pipeline-stage { min-width:calc(33% - 2px); }
   .notification-dropdown { width:300px; }
