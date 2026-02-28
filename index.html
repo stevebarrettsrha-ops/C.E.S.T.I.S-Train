@@ -3629,7 +3629,7 @@ function generateAttendance() {
       const r = Math.random();
       days[d] = r < 0.75 ? 'present' : r < 0.9 ? 'late' : 'absent';
     });
-    return {studentId:s.id, studentName:s.name, course:s.course, date:currentAttendanceDate, days};
+    return {studentId:s.id, studentName:s.name, course:s.course, date:new Date().toISOString().split('T')[0], days};
   });
 }
 generateAttendance();
