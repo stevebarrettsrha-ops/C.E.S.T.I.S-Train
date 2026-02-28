@@ -12098,64 +12098,27 @@ async function syncFromCloud() {
     }
 
     // Restore additional data arrays from cloud backup
-    if (backupData.data.classSessions) {
-      classSessions = backupData.data.classSessions;
-    }
-
-    if (backupData.data.instructorAssignments) {
-      instructorAssignments = backupData.data.instructorAssignments;
-    }
-
-    if (backupData.data.instructorResources) {
-      instructorResources = backupData.data.instructorResources;
-    }
-
-    if (backupData.data.studentProfiles) {
-      studentProfiles = backupData.data.studentProfiles;
-    }
-
-    if (backupData.data.instructorProfiles) {
-      instructorProfiles = backupData.data.instructorProfiles;
-    }
-
-    if (backupData.data.instructorData) {
-      // Merge cloud instructors with base instructorData, preserving dynamically created ones
-      backupData.data.instructorData.forEach(function(ci) {
-        if (!instructorData.some(function(li) { return li.id === ci.id; })) {
-          instructorData.push(ci);
-        }
-      });
-    }
-
-    if (backupData.data.systemSettings) {
-      systemSettings = backupData.data.systemSettings;
-    }
-
-    if (backupData.data.adrTasks) {
-      adrTasks = backupData.data.adrTasks;
-    }
-
-    if (backupData.data.adrStaffMeta) {
-      adrStaffMeta = backupData.data.adrStaffMeta;
-    }
-
-    if (backupData.data.adminStaffAccessSettings) {
-      adminStaffAccessSettings = backupData.data.adminStaffAccessSettings;
-    }
-
-    if (backupData.data.supportMessages) {
-      supportMessages = backupData.data.supportMessages;
-      saveSupportMessages();
-    }
-
-    if (backupData.data.notifications) {
-      notifications = backupData.data.notifications;
-      saveNotifications();
-    }
-
-    if (backupData.data.chatFollows) {
-      lmsChatFollows = backupData.data.chatFollows;
-    }
+    try {
+      if (Array.isArray(backupData.data.classSessions)) classSessions = backupData.data.classSessions;
+      if (Array.isArray(backupData.data.instructorAssignments)) instructorAssignments = backupData.data.instructorAssignments;
+      if (Array.isArray(backupData.data.instructorResources)) instructorResources = backupData.data.instructorResources;
+      if (backupData.data.studentProfiles && typeof backupData.data.studentProfiles === 'object') studentProfiles = backupData.data.studentProfiles;
+      if (backupData.data.instructorProfiles && typeof backupData.data.instructorProfiles === 'object') instructorProfiles = backupData.data.instructorProfiles;
+      if (Array.isArray(backupData.data.instructorData)) {
+        backupData.data.instructorData.forEach(function(ci) {
+          if (ci && ci.id && !instructorData.some(function(li) { return li.id === ci.id; })) {
+            instructorData.push(ci);
+          }
+        });
+      }
+      if (backupData.data.systemSettings && typeof backupData.data.systemSettings === 'object') systemSettings = backupData.data.systemSettings;
+      if (Array.isArray(backupData.data.adrTasks)) adrTasks = backupData.data.adrTasks;
+      if (backupData.data.adrStaffMeta && typeof backupData.data.adrStaffMeta === 'object') adrStaffMeta = backupData.data.adrStaffMeta;
+      if (backupData.data.adminStaffAccessSettings && typeof backupData.data.adminStaffAccessSettings === 'object') adminStaffAccessSettings = backupData.data.adminStaffAccessSettings;
+      if (Array.isArray(backupData.data.supportMessages)) { supportMessages = backupData.data.supportMessages; saveSupportMessages(); }
+      if (Array.isArray(backupData.data.notifications)) { notifications = backupData.data.notifications; saveNotifications(); }
+      if (backupData.data.chatFollows && typeof backupData.data.chatFollows === 'object') lmsChatFollows = backupData.data.chatFollows;
+    } catch(e) { console.warn('[SyncFromCloud] Error restoring additional data:', e); }
 
     // Persist all restored data to localStorage
     saveState();
@@ -12355,119 +12318,151 @@ async function mergeFromCloud() {
     }
 
     // Merge chat follows
-    if (backupData.data.chatFollows) {
-      Object.keys(backupData.data.chatFollows).forEach(function(uid) {
-        if (!lmsChatFollows[uid]) lmsChatFollows[uid] = [];
-        backupData.data.chatFollows[uid].forEach(function(followId) {
-          if (lmsChatFollows[uid].indexOf(followId) === -1) {
-            lmsChatFollows[uid].push(followId);
+    try {
+      if (backupData.data.chatFollows && typeof backupData.data.chatFollows === 'object') {
+        Object.keys(backupData.data.chatFollows).forEach(function(uid) {
+          if (!lmsChatFollows[uid]) lmsChatFollows[uid] = [];
+          if (Array.isArray(backupData.data.chatFollows[uid])) {
+            backupData.data.chatFollows[uid].forEach(function(followId) {
+              if (lmsChatFollows[uid].indexOf(followId) === -1) {
+                lmsChatFollows[uid].push(followId);
+              }
+            });
           }
         });
-      });
-    }
+      }
+    } catch(e) { console.warn('[Merge] chatFollows error:', e); }
 
     // Merge class sessions
-    if (backupData.data.classSessions) {
-      backupData.data.classSessions.forEach(function(cs) {
-        if (!classSessions.some(function(ls) { return ls.id === cs.id; })) {
-          classSessions.push(cs);
-          mergeStats.sessionsAdded = (mergeStats.sessionsAdded||0) + 1;
-        }
-      });
-    }
+    try {
+      if (Array.isArray(backupData.data.classSessions)) {
+        backupData.data.classSessions.forEach(function(cs) {
+          if (cs && cs.id && !classSessions.some(function(ls) { return ls.id === cs.id; })) {
+            classSessions.push(cs);
+            mergeStats.sessionsAdded = (mergeStats.sessionsAdded||0) + 1;
+          }
+        });
+      }
+    } catch(e) { console.warn('[Merge] classSessions error:', e); }
 
     // Merge instructor assignments
-    if (backupData.data.instructorAssignments) {
-      backupData.data.instructorAssignments.forEach(function(ca) {
-        if (!instructorAssignments.some(function(la) { return la.id === ca.id; })) {
-          instructorAssignments.push(ca);
-        }
-      });
-    }
+    try {
+      if (Array.isArray(backupData.data.instructorAssignments)) {
+        backupData.data.instructorAssignments.forEach(function(ca) {
+          if (ca && ca.id && !instructorAssignments.some(function(la) { return la.id === ca.id; })) {
+            instructorAssignments.push(ca);
+          }
+        });
+      }
+    } catch(e) { console.warn('[Merge] instructorAssignments error:', e); }
 
     // Merge instructor resources
-    if (backupData.data.instructorResources) {
-      backupData.data.instructorResources.forEach(function(cr) {
-        if (!instructorResources.some(function(lr) { return lr.id === cr.id; })) {
-          instructorResources.push(cr);
-        }
-      });
-    }
+    try {
+      if (Array.isArray(backupData.data.instructorResources)) {
+        backupData.data.instructorResources.forEach(function(cr) {
+          if (cr && cr.id && !instructorResources.some(function(lr) { return lr.id === cr.id; })) {
+            instructorResources.push(cr);
+          }
+        });
+      }
+    } catch(e) { console.warn('[Merge] instructorResources error:', e); }
 
     // Merge student profiles
-    if (backupData.data.studentProfiles) {
-      Object.keys(backupData.data.studentProfiles).forEach(function(sid) {
-        if (!studentProfiles[sid]) {
-          studentProfiles[sid] = backupData.data.studentProfiles[sid];
-        }
-      });
-    }
+    try {
+      if (backupData.data.studentProfiles && typeof backupData.data.studentProfiles === 'object') {
+        Object.keys(backupData.data.studentProfiles).forEach(function(sid) {
+          if (!studentProfiles[sid]) {
+            studentProfiles[sid] = backupData.data.studentProfiles[sid];
+          }
+        });
+      }
+    } catch(e) { console.warn('[Merge] studentProfiles error:', e); }
 
     // Merge instructor profiles
-    if (backupData.data.instructorProfiles) {
-      Object.keys(backupData.data.instructorProfiles).forEach(function(iid) {
-        if (!instructorProfiles[iid]) {
-          instructorProfiles[iid] = backupData.data.instructorProfiles[iid];
-        }
-      });
-    }
+    try {
+      if (backupData.data.instructorProfiles && typeof backupData.data.instructorProfiles === 'object') {
+        Object.keys(backupData.data.instructorProfiles).forEach(function(iid) {
+          if (!instructorProfiles[iid]) {
+            instructorProfiles[iid] = backupData.data.instructorProfiles[iid];
+          }
+        });
+      }
+    } catch(e) { console.warn('[Merge] instructorProfiles error:', e); }
 
     // Merge instructorData (dynamically created instructors)
-    if (backupData.data.instructorData) {
-      backupData.data.instructorData.forEach(function(ci) {
-        if (!instructorData.some(function(li) { return li.id === ci.id; })) {
-          instructorData.push(ci);
-        }
-      });
-    }
+    try {
+      if (Array.isArray(backupData.data.instructorData)) {
+        backupData.data.instructorData.forEach(function(ci) {
+          if (ci && ci.id && !instructorData.some(function(li) { return li.id === ci.id; })) {
+            instructorData.push(ci);
+          }
+        });
+      }
+    } catch(e) { console.warn('[Merge] instructorData error:', e); }
 
     // Merge system settings (cloud version wins for settings)
-    if (backupData.data.systemSettings) {
-      Object.assign(systemSettings, backupData.data.systemSettings);
-    }
+    try {
+      if (backupData.data.systemSettings && typeof backupData.data.systemSettings === 'object') {
+        Object.assign(systemSettings, backupData.data.systemSettings);
+      }
+    } catch(e) { console.warn('[Merge] systemSettings error:', e); }
 
     // Merge ADR tasks
-    if (backupData.data.adrTasks) {
-      backupData.data.adrTasks.forEach(function(ct) {
-        if (!adrTasks.some(function(lt) { return lt.id === ct.id; })) {
-          adrTasks.push(ct);
-        }
-      });
-    }
+    try {
+      if (Array.isArray(backupData.data.adrTasks)) {
+        backupData.data.adrTasks.forEach(function(ct) {
+          if (ct && ct.id && !adrTasks.some(function(lt) { return lt.id === ct.id; })) {
+            adrTasks.push(ct);
+          }
+        });
+      }
+    } catch(e) { console.warn('[Merge] adrTasks error:', e); }
 
     // Merge ADR staff meta
-    if (backupData.data.adrStaffMeta) {
-      Object.keys(backupData.data.adrStaffMeta).forEach(function(key) {
-        if (!adrStaffMeta[key]) {
-          adrStaffMeta[key] = backupData.data.adrStaffMeta[key];
-        }
-      });
-    }
+    try {
+      if (backupData.data.adrStaffMeta && typeof backupData.data.adrStaffMeta === 'object' && !Array.isArray(backupData.data.adrStaffMeta)) {
+        Object.keys(backupData.data.adrStaffMeta).forEach(function(key) {
+          if (!adrStaffMeta[key]) {
+            adrStaffMeta[key] = backupData.data.adrStaffMeta[key];
+          }
+        });
+      }
+    } catch(e) { console.warn('[Merge] adrStaffMeta error:', e); }
 
     // Merge admin staff access settings
-    if (backupData.data.adminStaffAccessSettings) {
-      Object.assign(adminStaffAccessSettings, backupData.data.adminStaffAccessSettings);
-    }
+    try {
+      if (backupData.data.adminStaffAccessSettings && typeof backupData.data.adminStaffAccessSettings === 'object') {
+        Object.assign(adminStaffAccessSettings, backupData.data.adminStaffAccessSettings);
+      }
+    } catch(e) { console.warn('[Merge] adminStaffAccessSettings error:', e); }
 
     // Merge support messages
-    if (backupData.data.supportMessages) {
-      backupData.data.supportMessages.forEach(function(cm) {
-        if (!supportMessages.some(function(lm) { return lm.id === cm.id; })) {
-          supportMessages.push(cm);
-        }
-      });
-      saveSupportMessages();
-    }
+    try {
+      if (Array.isArray(backupData.data.supportMessages)) {
+        var sChanged = false;
+        backupData.data.supportMessages.forEach(function(cm) {
+          if (cm && cm.id && !supportMessages.some(function(lm) { return lm.id === cm.id; })) {
+            supportMessages.push(cm);
+            sChanged = true;
+          }
+        });
+        if (sChanged) saveSupportMessages();
+      }
+    } catch(e) { console.warn('[Merge] supportMessages error:', e); }
 
     // Merge notifications
-    if (backupData.data.notifications) {
-      backupData.data.notifications.forEach(function(cn) {
-        if (!notifications.some(function(ln) { return ln.id === cn.id; })) {
-          notifications.push(cn);
-        }
-      });
-      saveNotifications();
-    }
+    try {
+      if (Array.isArray(backupData.data.notifications)) {
+        var nChanged = false;
+        backupData.data.notifications.forEach(function(cn) {
+          if (cn && cn.id && !notifications.some(function(ln) { return ln.id === cn.id; })) {
+            notifications.push(cn);
+            nChanged = true;
+          }
+        });
+        if (nChanged) saveNotifications();
+      }
+    } catch(e) { console.warn('[Merge] notifications error:', e); }
 
     // Persist all merged data
     saveState();
@@ -12695,130 +12690,174 @@ async function silentMergeFromBackup(fileId) {
     }
 
     // Merge chat follows
-    if (backupData.data.chatFollows) {
-      Object.keys(backupData.data.chatFollows).forEach(function(uid) {
-        if (!lmsChatFollows[uid]) lmsChatFollows[uid] = [];
-        backupData.data.chatFollows[uid].forEach(function(followId) {
-          if (lmsChatFollows[uid].indexOf(followId) === -1) {
-            lmsChatFollows[uid].push(followId);
-            changed = true;
+    if (backupData.data.chatFollows && typeof backupData.data.chatFollows === 'object') {
+      try {
+        Object.keys(backupData.data.chatFollows).forEach(function(uid) {
+          if (!lmsChatFollows[uid]) lmsChatFollows[uid] = [];
+          if (Array.isArray(backupData.data.chatFollows[uid])) {
+            backupData.data.chatFollows[uid].forEach(function(followId) {
+              if (lmsChatFollows[uid].indexOf(followId) === -1) {
+                lmsChatFollows[uid].push(followId);
+                changed = true;
+              }
+            });
           }
         });
-      });
+      } catch(e) { console.warn('[Merge] chatFollows error:', e); }
     }
 
     // Merge class sessions
-    if (backupData.data.classSessions) {
-      backupData.data.classSessions.forEach(function(cs) {
-        if (!classSessions.some(function(ls) { return ls.id === cs.id; })) {
-          classSessions.push(cs);
-          changed = true;
-        }
-      });
+    if (Array.isArray(backupData.data.classSessions)) {
+      try {
+        backupData.data.classSessions.forEach(function(cs) {
+          if (cs && cs.id && !classSessions.some(function(ls) { return ls.id === cs.id; })) {
+            classSessions.push(cs);
+            changed = true;
+          }
+        });
+      } catch(e) { console.warn('[Merge] classSessions error:', e); }
     }
 
     // Merge instructor assignments
-    if (backupData.data.instructorAssignments) {
-      backupData.data.instructorAssignments.forEach(function(ca) {
-        if (!instructorAssignments.some(function(la) { return la.id === ca.id; })) {
-          instructorAssignments.push(ca);
-          changed = true;
-        }
-      });
+    if (Array.isArray(backupData.data.instructorAssignments)) {
+      try {
+        backupData.data.instructorAssignments.forEach(function(ca) {
+          if (ca && ca.id && !instructorAssignments.some(function(la) { return la.id === ca.id; })) {
+            instructorAssignments.push(ca);
+            changed = true;
+          }
+        });
+      } catch(e) { console.warn('[Merge] instructorAssignments error:', e); }
     }
 
     // Merge instructor resources
-    if (backupData.data.instructorResources) {
-      backupData.data.instructorResources.forEach(function(cr) {
-        if (!instructorResources.some(function(lr) { return lr.id === cr.id; })) {
-          instructorResources.push(cr);
-          changed = true;
-        }
-      });
+    if (Array.isArray(backupData.data.instructorResources)) {
+      try {
+        backupData.data.instructorResources.forEach(function(cr) {
+          if (cr && cr.id && !instructorResources.some(function(lr) { return lr.id === cr.id; })) {
+            instructorResources.push(cr);
+            changed = true;
+          }
+        });
+      } catch(e) { console.warn('[Merge] instructorResources error:', e); }
     }
 
     // Merge student profiles
-    if (backupData.data.studentProfiles) {
-      Object.keys(backupData.data.studentProfiles).forEach(function(sid) {
-        if (!studentProfiles[sid]) {
-          studentProfiles[sid] = backupData.data.studentProfiles[sid];
-          changed = true;
-        }
-      });
+    if (backupData.data.studentProfiles && typeof backupData.data.studentProfiles === 'object') {
+      try {
+        Object.keys(backupData.data.studentProfiles).forEach(function(sid) {
+          if (!studentProfiles[sid]) {
+            studentProfiles[sid] = backupData.data.studentProfiles[sid];
+            changed = true;
+          }
+        });
+      } catch(e) { console.warn('[Merge] studentProfiles error:', e); }
     }
 
     // Merge instructor profiles
-    if (backupData.data.instructorProfiles) {
-      Object.keys(backupData.data.instructorProfiles).forEach(function(iid) {
-        if (!instructorProfiles[iid]) {
-          instructorProfiles[iid] = backupData.data.instructorProfiles[iid];
-          changed = true;
-        }
-      });
+    if (backupData.data.instructorProfiles && typeof backupData.data.instructorProfiles === 'object') {
+      try {
+        Object.keys(backupData.data.instructorProfiles).forEach(function(iid) {
+          if (!instructorProfiles[iid]) {
+            instructorProfiles[iid] = backupData.data.instructorProfiles[iid];
+            changed = true;
+          }
+        });
+      } catch(e) { console.warn('[Merge] instructorProfiles error:', e); }
     }
 
     // Merge instructorData (dynamically created instructors)
-    if (backupData.data.instructorData) {
-      backupData.data.instructorData.forEach(function(ci) {
-        if (!instructorData.some(function(li) { return li.id === ci.id; })) {
-          instructorData.push(ci);
-          changed = true;
-        }
-      });
+    if (Array.isArray(backupData.data.instructorData)) {
+      try {
+        backupData.data.instructorData.forEach(function(ci) {
+          if (ci && ci.id && !instructorData.some(function(li) { return li.id === ci.id; })) {
+            instructorData.push(ci);
+            changed = true;
+          }
+        });
+      } catch(e) { console.warn('[Merge] instructorData error:', e); }
     }
 
-    // Merge system settings
-    if (backupData.data.systemSettings) {
-      Object.assign(systemSettings, backupData.data.systemSettings);
-      changed = true;
+    // Merge system settings (only merge if cloud has newer settings)
+    if (backupData.data.systemSettings && typeof backupData.data.systemSettings === 'object') {
+      try {
+        var settingsChanged = false;
+        Object.keys(backupData.data.systemSettings).forEach(function(k) {
+          if (systemSettings[k] !== backupData.data.systemSettings[k]) {
+            systemSettings[k] = backupData.data.systemSettings[k];
+            settingsChanged = true;
+          }
+        });
+        if (settingsChanged) changed = true;
+      } catch(e) { console.warn('[Merge] systemSettings error:', e); }
     }
 
     // Merge ADR tasks
-    if (backupData.data.adrTasks) {
-      backupData.data.adrTasks.forEach(function(ct) {
-        if (!adrTasks.some(function(lt) { return lt.id === ct.id; })) {
-          adrTasks.push(ct);
-          changed = true;
-        }
-      });
+    if (Array.isArray(backupData.data.adrTasks)) {
+      try {
+        backupData.data.adrTasks.forEach(function(ct) {
+          if (ct && ct.id && !adrTasks.some(function(lt) { return lt.id === ct.id; })) {
+            adrTasks.push(ct);
+            changed = true;
+          }
+        });
+      } catch(e) { console.warn('[Merge] adrTasks error:', e); }
     }
 
     // Merge ADR staff meta
-    if (backupData.data.adrStaffMeta) {
-      Object.keys(backupData.data.adrStaffMeta).forEach(function(key) {
-        if (!adrStaffMeta[key]) {
-          adrStaffMeta[key] = backupData.data.adrStaffMeta[key];
-          changed = true;
-        }
-      });
+    if (backupData.data.adrStaffMeta && typeof backupData.data.adrStaffMeta === 'object' && !Array.isArray(backupData.data.adrStaffMeta)) {
+      try {
+        Object.keys(backupData.data.adrStaffMeta).forEach(function(key) {
+          if (!adrStaffMeta[key]) {
+            adrStaffMeta[key] = backupData.data.adrStaffMeta[key];
+            changed = true;
+          }
+        });
+      } catch(e) { console.warn('[Merge] adrStaffMeta error:', e); }
     }
 
     // Merge admin staff access settings
-    if (backupData.data.adminStaffAccessSettings) {
-      Object.assign(adminStaffAccessSettings, backupData.data.adminStaffAccessSettings);
-      changed = true;
+    if (backupData.data.adminStaffAccessSettings && typeof backupData.data.adminStaffAccessSettings === 'object') {
+      try {
+        var accessChanged = false;
+        Object.keys(backupData.data.adminStaffAccessSettings).forEach(function(k) {
+          if (adminStaffAccessSettings[k] !== backupData.data.adminStaffAccessSettings[k]) {
+            adminStaffAccessSettings[k] = backupData.data.adminStaffAccessSettings[k];
+            accessChanged = true;
+          }
+        });
+        if (accessChanged) changed = true;
+      } catch(e) { console.warn('[Merge] adminStaffAccessSettings error:', e); }
     }
 
     // Merge support messages
-    if (backupData.data.supportMessages) {
-      backupData.data.supportMessages.forEach(function(cm) {
-        if (!supportMessages.some(function(lm) { return lm.id === cm.id; })) {
-          supportMessages.push(cm);
-          changed = true;
-        }
-      });
-      if (changed) saveSupportMessages();
+    if (Array.isArray(backupData.data.supportMessages)) {
+      try {
+        var supportChanged = false;
+        backupData.data.supportMessages.forEach(function(cm) {
+          if (cm && cm.id && !supportMessages.some(function(lm) { return lm.id === cm.id; })) {
+            supportMessages.push(cm);
+            supportChanged = true;
+            changed = true;
+          }
+        });
+        if (supportChanged) saveSupportMessages();
+      } catch(e) { console.warn('[Merge] supportMessages error:', e); }
     }
 
     // Merge notifications
-    if (backupData.data.notifications) {
-      backupData.data.notifications.forEach(function(cn) {
-        if (!notifications.some(function(ln) { return ln.id === cn.id; })) {
-          notifications.push(cn);
-          changed = true;
-        }
-      });
-      if (changed) saveNotifications();
+    if (Array.isArray(backupData.data.notifications)) {
+      try {
+        var notifsChanged = false;
+        backupData.data.notifications.forEach(function(cn) {
+          if (cn && cn.id && !notifications.some(function(ln) { return ln.id === cn.id; })) {
+            notifications.push(cn);
+            notifsChanged = true;
+            changed = true;
+          }
+        });
+        if (notifsChanged) saveNotifications();
+      } catch(e) { console.warn('[Merge] notifications error:', e); }
     }
 
     if (changed) {
