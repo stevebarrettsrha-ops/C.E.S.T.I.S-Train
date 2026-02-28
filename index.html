@@ -46,8 +46,9 @@
 body { font-family:'DM Sans',sans-serif; background:var(--bg-primary); color:var(--text-primary); overflow-x:hidden; overflow-y:hidden; height:100vh; }
 h1,h2,h3,h4 { font-family:'Playfair Display',serif; }
 ::-webkit-scrollbar { width:6px; }
-::-webkit-scrollbar-track { background:transparent; }
+::-webkit-scrollbar-track { background:rgba(255,255,255,0.02); }
 ::-webkit-scrollbar-thumb { background:var(--text-muted); border-radius:3px; }
+.main-content::-webkit-scrollbar-track { background:rgba(255,255,255,0.03); }
 
 /* ============================== LANDING PAGE ============================== */
 #landingPage {
@@ -464,10 +465,11 @@ h1,h2,h3,h4 { font-family:'Playfair Display',serif; }
 .main-content {
   position:fixed; left:var(--sidebar-w); top:var(--topbar-h); right:0; bottom:0;
   overflow-y:auto; overflow-x:hidden; padding:28px;
+  scrollbar-width:thin; scrollbar-color:var(--text-muted) rgba(255,255,255,0.03);
 }
 
 /* ============================== SHARED COMPONENTS ============================== */
-.page { display:none; animation:fadeIn 0.35s ease; max-width:100%; overflow-x:hidden; }
+.page { display:none; animation:fadeIn 0.35s ease; max-width:100%; }
 .page.active { display:block; }
 @keyframes fadeIn { from{opacity:0;transform:translateY(8px);} to{opacity:1;transform:translateY(0);} }
 
