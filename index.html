@@ -3818,6 +3818,57 @@ function updateSkillAreaCounts() {
   });
 }
 loadState();
+
+// ============================== ONE-TIME DEMO DATA PURGE ==============================
+// Removes legacy hardcoded demo data that was persisted to localStorage/cloud before
+// the production-ready update. Runs once, then sets a version flag.
+(function purgeLegacyDemoData() {
+  var CURRENT_DATA_VERSION = 2;
+  var savedVersion = parseInt(localStorage.getItem('voctrain_dataVersion')) || 0;
+  if (savedVersion >= CURRENT_DATA_VERSION) return; // Already purged
+
+  console.log('[Migration] Purging legacy demo data (v' + savedVersion + ' -> v' + CURRENT_DATA_VERSION + ')');
+
+  // 1. Remove demo students (generated IDs STU-2026000 through STU-2026079)
+  var demoStudentIds = {};
+  for (var i = 0; i < 80; i++) demoStudentIds['STU-' + String(2026000 + i)] = true;
+  students = students.filter(function(s) { return !demoStudentIds[s.id]; });
+
+  // 2. Remove demo exams (EXAM-001 through EXAM-012)
+  var demoExamIds = {'EXAM-001':1,'EXAM-002':1,'EXAM-003':1,'EXAM-004':1,'EXAM-005':1,'EXAM-006':1,'EXAM-007':1,'EXAM-008':1,'EXAM-009':1,'EXAM-010':1,'EXAM-011':1,'EXAM-012':1};
+  exams = exams.filter(function(e) { return !demoExamIds[e.id]; });
+
+  // 3. Remove demo announcements (IDs 1 through 10)
+  announcements = announcements.filter(function(a) { return typeof a.id !== 'number' || a.id > 10; });
+
+  // 4. Remove demo calendar events (detect by known demo titles)
+  var demoEventTitles = ['Welding L2 Final Theory','Electrical Safety Class','Business Admin Midterm','Cosmetology Practical','Workshop Portfolio Due','Staff Meeting','Final Project Due','Plumbing L2 Pipe Systems','Guest Lecture: Industry Trends','Carpentry Joints Exam','Budget Review Meeting','Instructor Evaluation Deadline','Curriculum Workshop','Student ID Collection'];
+  var demoEventSet = {};
+  demoEventTitles.forEach(function(t) { demoEventSet[t] = true; });
+  calendarEvents = calendarEvents.filter(function(e) { return !demoEventSet[e.title]; });
+
+  // 5. Remove demo attendance records (linked to demo student IDs)
+  attendanceRecords = attendanceRecords.filter(function(r) { return !demoStudentIds[r.studentId]; });
+
+  // 6. Remove demo instructor data (IDs INS-2026001 through INS-2026008)
+  var demoInstructorIds = {};
+  for (var j = 1; j <= 8; j++) demoInstructorIds['INS-202600' + j] = true;
+  instructorData = instructorData.filter(function(ins) { return !demoInstructorIds[ins.id]; });
+
+  // 7. Remove exam results linked to demo exams or demo students
+  examResults = examResults.filter(function(r) {
+    return !demoExamIds[r.examId] && !demoStudentIds[r.studentId];
+  });
+
+  // 8. Clear notifications that reference demo data
+  notifications = [];
+
+  // Save cleaned state and set version flag
+  localStorage.setItem('voctrain_dataVersion', String(CURRENT_DATA_VERSION));
+  saveState();
+  console.log('[Migration] Demo data purge complete. Students: ' + students.length + ', Exams: ' + exams.length + ', Announcements: ' + announcements.length);
+})();
+
 loadNotifications();
 updateNotificationDot();
 
@@ -12131,6 +12182,15 @@ async function mergeFromCloud() {
 
     let mergeStats = { usersAdded: 0, studentsAdded: 0, examsAdded: 0, announcementsAdded: 0, eventsAdded: 0 };
 
+    // Legacy demo data IDs to exclude from merges (purged in data version 2)
+    var _demoStudentIds = {};
+    for (var _di = 0; _di < 80; _di++) _demoStudentIds['STU-' + String(2026000 + _di)] = true;
+    var _demoExamIds = {'EXAM-001':1,'EXAM-002':1,'EXAM-003':1,'EXAM-004':1,'EXAM-005':1,'EXAM-006':1,'EXAM-007':1,'EXAM-008':1,'EXAM-009':1,'EXAM-010':1,'EXAM-011':1,'EXAM-012':1};
+    var _demoAnnIds = {1:1,2:1,3:1,4:1,5:1,6:1,7:1,8:1,9:1,10:1};
+    var _demoEventTitles = {'Welding L2 Final Theory':1,'Electrical Safety Class':1,'Business Admin Midterm':1,'Cosmetology Practical':1,'Workshop Portfolio Due':1,'Staff Meeting':1,'Final Project Due':1,'Plumbing L2 Pipe Systems':1,'Guest Lecture: Industry Trends':1,'Carpentry Joints Exam':1,'Budget Review Meeting':1,'Instructor Evaluation Deadline':1,'Curriculum Workshop':1,'Student ID Collection':1};
+    var _demoInstructorIds = {};
+    for (var _dj = 1; _dj <= 8; _dj++) _demoInstructorIds['INS-202600' + _dj] = true;
+
     // Merge user accounts — add cloud users that don't exist locally (match by username, case-insensitive)
     if (backupData.data.userAccounts) {
       const localUsernames = userAccounts.map(u => u.username.toLowerCase());
@@ -12149,6 +12209,7 @@ async function mergeFromCloud() {
     if (backupData.data.students) {
       const localStudentIds = students.map(s => s.id);
       backupData.data.students.forEach(cloudStudent => {
+        if (_demoStudentIds[cloudStudent.id]) return; // Skip legacy demo data
         if (!localStudentIds.includes(cloudStudent.id)) {
           students.push(cloudStudent);
           mergeStats.studentsAdded++;
@@ -12160,6 +12221,7 @@ async function mergeFromCloud() {
     if (backupData.data.exams) {
       const localExamKeys = exams.map(e => (e.title + '|' + e.course).toLowerCase());
       backupData.data.exams.forEach(cloudExam => {
+        if (_demoExamIds[cloudExam.id]) return; // Skip legacy demo data
         const key = (cloudExam.title + '|' + cloudExam.course).toLowerCase();
         if (!localExamKeys.includes(key)) {
           exams.push(cloudExam);
@@ -12172,6 +12234,7 @@ async function mergeFromCloud() {
     if (backupData.data.announcements) {
       const localAnnTitles = announcements.map(a => a.title.toLowerCase());
       backupData.data.announcements.forEach(cloudAnn => {
+        if (_demoAnnIds[cloudAnn.id]) return; // Skip legacy demo data
         if (!localAnnTitles.includes(cloudAnn.title.toLowerCase())) {
           announcements.push(cloudAnn);
           mergeStats.announcementsAdded++;
@@ -12183,6 +12246,7 @@ async function mergeFromCloud() {
     if (backupData.data.calendarEvents) {
       const localEventKeys = calendarEvents.map(e => (e.title + '|' + e.date).toLowerCase());
       backupData.data.calendarEvents.forEach(cloudEvent => {
+        if (_demoEventTitles[cloudEvent.title]) return; // Skip legacy demo data
         const key = (cloudEvent.title + '|' + cloudEvent.date).toLowerCase();
         if (!localEventKeys.includes(key)) {
           calendarEvents.push(cloudEvent);
@@ -12195,6 +12259,7 @@ async function mergeFromCloud() {
     if (backupData.data.attendanceRecords) {
       const localAttKeys = attendanceRecords.map(a => a.studentId + '|' + a.date);
       backupData.data.attendanceRecords.forEach(cloudRec => {
+        if (_demoStudentIds[cloudRec.studentId]) return; // Skip legacy demo data
         const key = cloudRec.studentId + '|' + cloudRec.date;
         if (!localAttKeys.includes(key)) {
           attendanceRecords.push(cloudRec);
@@ -12206,6 +12271,7 @@ async function mergeFromCloud() {
     if (backupData.data.examResults) {
       const localResultKeys = examResults.map(r => r.examId + '|' + r.studentId);
       backupData.data.examResults.forEach(cloudResult => {
+        if (_demoExamIds[cloudResult.examId] || _demoStudentIds[cloudResult.studentId]) return; // Skip legacy demo data
         const key = cloudResult.examId + '|' + cloudResult.studentId;
         if (!localResultKeys.includes(key)) {
           examResults.push(cloudResult);
@@ -12492,6 +12558,12 @@ async function silentMergeFromBackup(fileId) {
 
     let changed = false;
 
+    // Legacy demo data IDs to exclude from merges
+    var _ds = {}; for (var _i = 0; _i < 80; _i++) _ds['STU-' + String(2026000 + _i)] = true;
+    var _de = {'EXAM-001':1,'EXAM-002':1,'EXAM-003':1,'EXAM-004':1,'EXAM-005':1,'EXAM-006':1,'EXAM-007':1,'EXAM-008':1,'EXAM-009':1,'EXAM-010':1,'EXAM-011':1,'EXAM-012':1};
+    var _da = {1:1,2:1,3:1,4:1,5:1,6:1,7:1,8:1,9:1,10:1};
+    var _dt = {'Welding L2 Final Theory':1,'Electrical Safety Class':1,'Business Admin Midterm':1,'Cosmetology Practical':1,'Workshop Portfolio Due':1,'Staff Meeting':1,'Final Project Due':1,'Plumbing L2 Pipe Systems':1,'Guest Lecture: Industry Trends':1,'Carpentry Joints Exam':1,'Budget Review Meeting':1,'Instructor Evaluation Deadline':1,'Curriculum Workshop':1,'Student ID Collection':1};
+
     // Merge user accounts
     if (backupData.data.userAccounts) {
       const localUsernames = userAccounts.map(u => u.username.toLowerCase());
@@ -12508,6 +12580,7 @@ async function silentMergeFromBackup(fileId) {
     if (backupData.data.students) {
       const localStudentIds = students.map(s => s.id);
       backupData.data.students.forEach(cloudStudent => {
+        if (_ds[cloudStudent.id]) return;
         if (!localStudentIds.includes(cloudStudent.id)) {
           students.push(cloudStudent);
           changed = true;
@@ -12519,6 +12592,7 @@ async function silentMergeFromBackup(fileId) {
     if (backupData.data.exams) {
       const localExamKeys = exams.map(e => (e.title + '|' + e.course).toLowerCase());
       backupData.data.exams.forEach(cloudExam => {
+        if (_de[cloudExam.id]) return;
         const key = (cloudExam.title + '|' + cloudExam.course).toLowerCase();
         if (!localExamKeys.includes(key)) {
           exams.push(cloudExam);
@@ -12531,6 +12605,7 @@ async function silentMergeFromBackup(fileId) {
     if (backupData.data.announcements) {
       const localAnnTitles = announcements.map(a => a.title.toLowerCase());
       backupData.data.announcements.forEach(cloudAnn => {
+        if (_da[cloudAnn.id]) return;
         if (!localAnnTitles.includes(cloudAnn.title.toLowerCase())) {
           announcements.push(cloudAnn);
           changed = true;
@@ -12542,6 +12617,7 @@ async function silentMergeFromBackup(fileId) {
     if (backupData.data.calendarEvents) {
       const localEventKeys = calendarEvents.map(e => (e.title + '|' + e.date).toLowerCase());
       backupData.data.calendarEvents.forEach(cloudEvent => {
+        if (_dt[cloudEvent.title]) return;
         const key = (cloudEvent.title + '|' + cloudEvent.date).toLowerCase();
         if (!localEventKeys.includes(key)) {
           calendarEvents.push(cloudEvent);
@@ -12554,6 +12630,7 @@ async function silentMergeFromBackup(fileId) {
     if (backupData.data.attendanceRecords) {
       const localAttKeys = attendanceRecords.map(a => a.studentId + '|' + a.date);
       backupData.data.attendanceRecords.forEach(cloudRec => {
+        if (_ds[cloudRec.studentId]) return;
         const key = cloudRec.studentId + '|' + cloudRec.date;
         if (!localAttKeys.includes(key)) {
           attendanceRecords.push(cloudRec);
@@ -12566,6 +12643,7 @@ async function silentMergeFromBackup(fileId) {
     if (backupData.data.examResults) {
       const localResultKeys = examResults.map(r => r.examId + '|' + r.studentId);
       backupData.data.examResults.forEach(cloudResult => {
+        if (_de[cloudResult.examId] || _ds[cloudResult.studentId]) return;
         const key = cloudResult.examId + '|' + cloudResult.studentId;
         if (!localResultKeys.includes(key)) {
           examResults.push(cloudResult);
