@@ -44,12 +44,14 @@
 }
 * { margin:0; padding:0; box-sizing:border-box; }
 *:focus-visible { outline:2px solid var(--accent); outline-offset:2px; }
-body { font-family:'DM Sans',sans-serif; background:var(--bg-primary); color:var(--text-primary); overflow-x:hidden; overflow-y:hidden; height:100vh; }
+body { font-family:'DM Sans',sans-serif; background:var(--bg-primary); color:var(--text-primary); overflow:hidden; height:100vh; scrollbar-width:none; }
 h1,h2,h3,h4 { font-family:'Playfair Display',serif; }
-::-webkit-scrollbar { width:6px; }
-::-webkit-scrollbar-track { background:rgba(255,255,255,0.02); }
-::-webkit-scrollbar-thumb { background:var(--text-muted); border-radius:3px; }
-.main-content::-webkit-scrollbar-track { background:rgba(255,255,255,0.03); }
+body::-webkit-scrollbar { width:0; display:none; }
+::-webkit-scrollbar { width:8px; }
+::-webkit-scrollbar-track { background:rgba(255,255,255,0.03); }
+::-webkit-scrollbar-thumb { background:var(--text-muted); border-radius:4px; }
+::-webkit-scrollbar-thumb:hover { background:var(--text-secondary); }
+.main-content { scrollbar-width:thin; scrollbar-color:var(--text-muted) rgba(255,255,255,0.03); }
 
 /* ============================== LANDING PAGE ============================== */
 #landingPage {
@@ -526,7 +528,6 @@ h1,h2,h3,h4 { font-family:'Playfair Display',serif; }
 .main-content {
   position:fixed; left:var(--sidebar-w); top:var(--topbar-h); right:0; bottom:0;
   overflow-y:auto; overflow-x:hidden; padding:28px;
-  scrollbar-width:thin; scrollbar-color:var(--text-muted) rgba(255,255,255,0.03);
 }
 
 /* ============================== SHARED COMPONENTS ============================== */
@@ -3268,7 +3269,7 @@ textarea.form-control { resize:vertical; min-height:80px; }
       <div class="form-group"><label>Password</label><input type="password" class="form-control" id="newUserPassword" placeholder="Minimum 6 characters"></div>
     </div>
     <div class="form-group"><label>Email</label><input type="email" class="form-control" id="newUserEmail" placeholder="e.g. john@heartlms.edu.jm"></div>
-    <div class="form-group" id="newUserProgrammeGroup"><label>Programme</label><select class="form-control" id="newUserProgramme"><option value="">— Select Programme —</option><option>Welding</option><option>Electrical Installation</option><option>Cosmetology</option><option>Business Administration</option><option>Auto Mechanics</option><option>Plumbing</option><option>Carpentry</option><option>Hospitality</option><option>Information Technology</option><option>Garment Construction</option></select></div>
+    <div class="form-group" id="newUserProgrammeGroup"><label>Programme</label><select class="form-control" id="newUserProgramme"><option value="">— Select Programme —</option><option>Welding</option><option>Electrical Installation</option><option>Cosmetology</option><option>Business Administration</option><option>Auto Mechanics</option><option>Plumbing</option><option>Carpentry</option><option>Hospitality &amp; Tourism</option><option>Information Technology</option><option>Garment Construction</option><option>Refrigeration &amp; AC</option><option>Heavy Equipment Ops</option><option>Commercial Cooking</option><option>Beauty Therapy</option><option>Data Operations</option><option>Agriculture</option><option>Masonry</option><option>Solar Energy Tech</option><option>Early Childhood Ed</option><option>Customer Service</option></select></div>
     <div style="display:flex;gap:10px;justify-content:flex-end;margin-top:20px;">
       <button class="btn btn-secondary" onclick="closeModal('createUserModal')">Cancel</button>
       <button class="btn btn-primary" onclick="createUserAccount()">Create User</button>
@@ -3287,7 +3288,7 @@ textarea.form-control { resize:vertical; min-height:80px; }
     </div>
     <div class="form-group"><label>Username</label><input type="text" class="form-control" id="editUserUsername"></div>
     <div class="form-group"><label>Email</label><input type="email" class="form-control" id="editUserEmail"></div>
-    <div class="form-group" id="editUserProgrammeGroup"><label>Programme</label><select class="form-control" id="editUserProgramme"><option value="">— Select Programme —</option><option>Welding</option><option>Electrical Installation</option><option>Cosmetology</option><option>Business Administration</option><option>Auto Mechanics</option><option>Plumbing</option><option>Carpentry</option><option>Hospitality</option><option>Information Technology</option><option>Garment Construction</option></select></div>
+    <div class="form-group" id="editUserProgrammeGroup"><label>Programme</label><select class="form-control" id="editUserProgramme"><option value="">— Select Programme —</option><option>Welding</option><option>Electrical Installation</option><option>Cosmetology</option><option>Business Administration</option><option>Auto Mechanics</option><option>Plumbing</option><option>Carpentry</option><option>Hospitality &amp; Tourism</option><option>Information Technology</option><option>Garment Construction</option><option>Refrigeration &amp; AC</option><option>Heavy Equipment Ops</option><option>Commercial Cooking</option><option>Beauty Therapy</option><option>Data Operations</option><option>Agriculture</option><option>Masonry</option><option>Solar Energy Tech</option><option>Early Childhood Ed</option><option>Customer Service</option></select></div>
     <div style="display:flex;gap:10px;justify-content:flex-end;margin-top:20px;">
       <button class="btn btn-secondary" onclick="closeModal('editUserModal')">Cancel</button>
       <button class="btn btn-primary" onclick="saveUserEdit()">Save Changes</button>
@@ -3902,7 +3903,7 @@ loadState();
 // Removes legacy hardcoded demo data that was persisted to localStorage/cloud before
 // the production-ready update. Runs once, then sets a version flag.
 (function purgeLegacyDemoData() {
-  var CURRENT_DATA_VERSION = 2;
+  var CURRENT_DATA_VERSION = 3;
   var savedVersion = parseInt(localStorage.getItem('voctrain_dataVersion')) || 0;
   if (savedVersion >= CURRENT_DATA_VERSION) return; // Already purged
 
@@ -3942,10 +3943,16 @@ loadState();
   // 8. Clear notifications that reference demo data
   notifications = [];
 
+  // 9. Remove generic demo user accounts (USR-002 through USR-010: demo instructors & students)
+  // Keep only USR-001 (Administrator) and USR-011 (Admin Staff) as system defaults
+  var demoUserIds = {'USR-002':1,'USR-003':1,'USR-004':1,'USR-005':1,'USR-006':1,'USR-007':1,'USR-008':1,'USR-009':1,'USR-010':1};
+  userAccounts = userAccounts.filter(function(u) { return !demoUserIds[u.id]; });
+  saveUserAccounts();
+
   // Save cleaned state and set version flag
   localStorage.setItem('voctrain_dataVersion', String(CURRENT_DATA_VERSION));
   saveState();
-  console.log('[Migration] Demo data purge complete. Students: ' + students.length + ', Exams: ' + exams.length + ', Announcements: ' + announcements.length);
+  console.log('[Migration] Demo data purge complete. Users: ' + userAccounts.length + ', Students: ' + students.length + ', Exams: ' + exams.length);
 })();
 
 loadNotifications();
@@ -3954,15 +3961,6 @@ updateNotificationDot();
 // ============================== USER ACCOUNTS MANAGEMENT ==============================
 let userAccounts = [
   {id:'USR-001',name:'Administrator',role:'admin',username:'cestisadmin',password:'cestisadmin123$',email:'admin@heartlms.edu.jm',programme:'',status:'active',createdAt:'2026-01-01'},
-  {id:'USR-002',name:'Mr. R. Campbell',role:'instructor',username:'r.campbell',password:'instr123',email:'r.campbell@heartlms.edu.jm',programme:'Welding',status:'active',createdAt:'2026-01-02'},
-  {id:'USR-003',name:'Ms. J. Williams',role:'instructor',username:'j.williams',password:'instr123',email:'j.williams@heartlms.edu.jm',programme:'Electrical Installation',status:'active',createdAt:'2026-01-02'},
-  {id:'USR-004',name:'Mrs. P. Morgan',role:'instructor',username:'p.morgan',password:'instr123',email:'p.morgan@heartlms.edu.jm',programme:'Business Administration',status:'active',createdAt:'2026-01-02'},
-  {id:'USR-005',name:'Ms. D. Stewart',role:'instructor',username:'d.stewart',password:'instr123',email:'d.stewart@heartlms.edu.jm',programme:'Cosmetology',status:'active',createdAt:'2026-01-02'},
-  {id:'USR-006',name:'Mr. K. Edwards',role:'instructor',username:'k.edwards',password:'instr123',email:'k.edwards@heartlms.edu.jm',programme:'Auto Mechanics',status:'active',createdAt:'2026-01-02'},
-  {id:'USR-007',name:'Keisha Brown',role:'student',username:'keisha.brown',password:'student123',email:'keisha.b@heartlms.edu.jm',programme:'Welding',status:'active',createdAt:'2026-01-10'},
-  {id:'USR-008',name:'Marlon Davis',role:'student',username:'marlon.davis',password:'student123',email:'marlon.d@heartlms.edu.jm',programme:'Auto Mechanics',status:'active',createdAt:'2026-01-10'},
-  {id:'USR-009',name:'Tanya Johnson',role:'student',username:'tanya.johnson',password:'student123',email:'tanya.j@heartlms.edu.jm',programme:'Business Administration',status:'active',createdAt:'2026-01-11'},
-  {id:'USR-010',name:'Andre Smith',role:'student',username:'andre.smith',password:'student123',email:'andre.s@heartlms.edu.jm',programme:'Electrical Installation',status:'disabled',createdAt:'2026-01-11'},
   {id:'USR-011',name:'Admin Staff',role:'adminstaff',username:'adminstaff',password:'cestisadmin123$',email:'adminstaff@heartlms.edu.jm',programme:'',status:'active',createdAt:'2026-01-15'}
 ];
 let umSelectedIds = [];
@@ -12346,7 +12344,7 @@ async function mergeFromCloud() {
 
     let mergeStats = { usersAdded: 0, studentsAdded: 0, examsAdded: 0, announcementsAdded: 0, eventsAdded: 0 };
 
-    // Legacy demo data IDs to exclude from merges (purged in data version 2)
+    // Legacy demo data IDs to exclude from merges (purged in data version 3)
     var _demoStudentIds = {};
     for (var _di = 0; _di < 80; _di++) _demoStudentIds['STU-' + String(2026000 + _di)] = true;
     var _demoExamIds = {'EXAM-001':1,'EXAM-002':1,'EXAM-003':1,'EXAM-004':1,'EXAM-005':1,'EXAM-006':1,'EXAM-007':1,'EXAM-008':1,'EXAM-009':1,'EXAM-010':1,'EXAM-011':1,'EXAM-012':1};
@@ -12354,11 +12352,13 @@ async function mergeFromCloud() {
     var _demoEventTitles = {'Welding L2 Final Theory':1,'Electrical Safety Class':1,'Business Admin Midterm':1,'Cosmetology Practical':1,'Workshop Portfolio Due':1,'Staff Meeting':1,'Final Project Due':1,'Plumbing L2 Pipe Systems':1,'Guest Lecture: Industry Trends':1,'Carpentry Joints Exam':1,'Budget Review Meeting':1,'Instructor Evaluation Deadline':1,'Curriculum Workshop':1,'Student ID Collection':1};
     var _demoInstructorIds = {};
     for (var _dj = 1; _dj <= 8; _dj++) _demoInstructorIds['INS-202600' + _dj] = true;
+    var _demoUserIds = {'USR-002':1,'USR-003':1,'USR-004':1,'USR-005':1,'USR-006':1,'USR-007':1,'USR-008':1,'USR-009':1,'USR-010':1};
 
     // Merge user accounts — add cloud users that don't exist locally (match by username, case-insensitive)
     if (backupData.data.userAccounts) {
       const localUsernames = userAccounts.map(u => u.username.toLowerCase());
       backupData.data.userAccounts.forEach(cloudUser => {
+        if (_demoUserIds[cloudUser.id]) return; // Skip legacy demo accounts
         if (!localUsernames.includes(cloudUser.username.toLowerCase())) {
           userAccounts.push(cloudUser);
           mergeStats.usersAdded++;
@@ -12727,11 +12727,13 @@ async function silentMergeFromBackup(fileId) {
     var _de = {'EXAM-001':1,'EXAM-002':1,'EXAM-003':1,'EXAM-004':1,'EXAM-005':1,'EXAM-006':1,'EXAM-007':1,'EXAM-008':1,'EXAM-009':1,'EXAM-010':1,'EXAM-011':1,'EXAM-012':1};
     var _da = {1:1,2:1,3:1,4:1,5:1,6:1,7:1,8:1,9:1,10:1};
     var _dt = {'Welding L2 Final Theory':1,'Electrical Safety Class':1,'Business Admin Midterm':1,'Cosmetology Practical':1,'Workshop Portfolio Due':1,'Staff Meeting':1,'Final Project Due':1,'Plumbing L2 Pipe Systems':1,'Guest Lecture: Industry Trends':1,'Carpentry Joints Exam':1,'Budget Review Meeting':1,'Instructor Evaluation Deadline':1,'Curriculum Workshop':1,'Student ID Collection':1};
+    var _du = {'USR-002':1,'USR-003':1,'USR-004':1,'USR-005':1,'USR-006':1,'USR-007':1,'USR-008':1,'USR-009':1,'USR-010':1};
 
     // Merge user accounts
     if (backupData.data.userAccounts) {
       const localUsernames = userAccounts.map(u => u.username.toLowerCase());
       backupData.data.userAccounts.forEach(cloudUser => {
+        if (_du[cloudUser.id]) return; // Skip legacy demo accounts
         if (!localUsernames.includes(cloudUser.username.toLowerCase())) {
           userAccounts.push(cloudUser);
           changed = true;
