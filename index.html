@@ -311,6 +311,23 @@ body::-webkit-scrollbar { width:0; display:none; }
   font-size:11px; color:var(--accent); margin-top:6px; text-align:center;
   animation:fadeSlideDown 0.3s ease both;
 }
+/* Role cards: grayed out before sync, bright after sync */
+.role-cards.sync-pending .role-card {
+  opacity:0.45;
+  filter:grayscale(0.7) brightness(0.7);
+  pointer-events:none;
+  transform:scale(0.97);
+}
+.role-cards.sync-complete .role-card {
+  opacity:1;
+  filter:none;
+  pointer-events:auto;
+  animation:cardBrighten 0.5s ease both;
+}
+@keyframes cardBrighten {
+  from { opacity:0.45; filter:grayscale(0.7) brightness(0.7); transform:scale(0.97); }
+  to { opacity:1; filter:none; transform:scale(1); }
+}
 
 .landing-footer {
   position:relative; z-index:1;
@@ -4446,10 +4463,14 @@ function enableLoginButtons() {
   document.querySelectorAll('.role-enter-btn').forEach(function(btn){ btn.disabled = false; });
   document.querySelectorAll('.role-card .gmail-btn').forEach(function(btn){ btn.disabled = false; });
   document.querySelectorAll('.sync-required-hint').forEach(function(el){ el.remove(); });
+  var rc = document.querySelector('.role-cards');
+  if(rc) { rc.classList.remove('sync-pending'); rc.classList.add('sync-complete'); }
 }
 function disableLoginButtons() {
   document.querySelectorAll('.role-enter-btn').forEach(function(btn){ btn.disabled = true; });
   document.querySelectorAll('.role-card .gmail-btn').forEach(function(btn){ btn.disabled = true; });
+  var rc = document.querySelector('.role-cards');
+  if(rc) { rc.classList.add('sync-pending'); rc.classList.remove('sync-complete'); }
 }
 function handleAdminClick() {
   try {
@@ -11580,7 +11601,9 @@ var _debouncedCloudSaveTimer = null;
 // Debounced immediate cloud push — called by saveState() and saveUserAccounts()
 // so ANY dashboard data change triggers a cloud save within 2 seconds
 function scheduleDebouncedCloudSave() {
-  if (!isCloudConnected || !googleAccessToken) return;
+  try {
+    if (!isCloudConnected || !googleAccessToken) return;
+  } catch(e) { return; } // Safe guard: called before cloud vars are initialized during startup
   if (_debouncedCloudSaveTimer) clearTimeout(_debouncedCloudSaveTimer);
   _debouncedCloudSaveTimer = setTimeout(function() {
     _debouncedCloudSaveTimer = null;
