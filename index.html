@@ -12854,17 +12854,35 @@ async function silentMergeFromBackup(fileId) {
     var _dt = {'Welding L2 Final Theory':1,'Electrical Safety Class':1,'Business Admin Midterm':1,'Cosmetology Practical':1,'Workshop Portfolio Due':1,'Staff Meeting':1,'Final Project Due':1,'Plumbing L2 Pipe Systems':1,'Guest Lecture: Industry Trends':1,'Carpentry Joints Exam':1,'Budget Review Meeting':1,'Instructor Evaluation Deadline':1,'Curriculum Workshop':1,'Student ID Collection':1};
     var _du = {'USR-002':1,'USR-003':1,'USR-004':1,'USR-005':1,'USR-006':1,'USR-007':1,'USR-008':1,'USR-009':1,'USR-010':1};
 
-    // Merge user accounts
+    // Merge user accounts — update existing records AND add new ones
     if (backupData.data.userAccounts) {
-      const localUsernames = userAccounts.map(u => u.username.toLowerCase());
+      var userAccountsChanged = false;
       backupData.data.userAccounts.forEach(cloudUser => {
         if (_du[cloudUser.id]) return; // Skip legacy demo accounts
-        if (!localUsernames.includes(cloudUser.username.toLowerCase())) {
+        var cloudUsername = (cloudUser.username || '').toLowerCase();
+        var cloudEmail = (cloudUser.email || '').toLowerCase();
+        // Find matching local user by id, username, or email
+        var localMatch = userAccounts.find(function(u) {
+          if (u.id === cloudUser.id) return true;
+          if (cloudUsername && u.username && u.username.toLowerCase() === cloudUsername) return true;
+          if (cloudEmail && u.email && u.email.toLowerCase() === cloudEmail) return true;
+          return false;
+        });
+        if (localMatch) {
+          // Update existing account with cloud data (password, status, name, etc.)
+          if (cloudUser.password && cloudUser.password !== localMatch.password) { localMatch.password = cloudUser.password; userAccountsChanged = true; }
+          if (cloudUser.status && cloudUser.status !== localMatch.status) { localMatch.status = cloudUser.status; userAccountsChanged = true; }
+          if (cloudUser.name && cloudUser.name !== localMatch.name) { localMatch.name = cloudUser.name; userAccountsChanged = true; }
+          if (cloudUser.email && cloudUser.email !== localMatch.email) { localMatch.email = cloudUser.email; userAccountsChanged = true; }
+          if (cloudUser.programme !== undefined && cloudUser.programme !== localMatch.programme) { localMatch.programme = cloudUser.programme; userAccountsChanged = true; }
+          if (cloudUser.role && cloudUser.role !== localMatch.role) { localMatch.role = cloudUser.role; userAccountsChanged = true; }
+        } else {
+          // New account — add it
           userAccounts.push(cloudUser);
-          changed = true;
+          userAccountsChanged = true;
         }
       });
-      if (changed) saveUserAccounts();
+      if (userAccountsChanged) { changed = true; saveUserAccounts(); }
     }
 
     // Merge students
@@ -13665,11 +13683,11 @@ function loginPageGoogleAuth() {
   });
 }
 
-// Auto-sync on page load if already connected (refresh the landing page data)
+// Auto-sync on page load if already connected — trigger sync automatically
 (function() {
   setTimeout(function() {
-    if (isCloudConnected && googleAccessToken) {
-      updateLoginSyncStatus('Previously connected. Click Sync Now to pull latest data.', '');
+    if (isCloudConnected && googleAccessToken && !loginSyncCompleted) {
+      loginPageSync();
     }
   }, 600);
 })();
