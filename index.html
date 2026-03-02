@@ -3916,6 +3916,42 @@ function updateSkillAreaCounts() {
 }
 loadState();
 
+// ============================== USER ACCOUNTS MANAGEMENT ==============================
+let userAccounts = [
+  {id:'USR-001',name:'Administrator',role:'admin',username:'cestisadmin',password:'cestisadmin123$',email:'admin@heartlms.edu.jm',programme:'',status:'active',createdAt:'2026-01-01'},
+  {id:'USR-011',name:'Admin Staff',role:'adminstaff',username:'adminstaff',password:'cestisadmin123$',email:'adminstaff@heartlms.edu.jm',programme:'',status:'active',createdAt:'2026-01-15'}
+];
+let umSelectedIds = [];
+
+function saveUserAccounts() {
+  try { localStorage.setItem('voctrain_users', JSON.stringify(userAccounts)); } catch(e) {}
+  // Push changes to Google Drive immediately (debounced)
+  scheduleDebouncedCloudSave();
+}
+function loadUserAccounts() {
+  try {
+    var u = localStorage.getItem('voctrain_users');
+    if(u) userAccounts = JSON.parse(u);
+    // Migrate: ensure admin account has current credentials
+    var adminAcct = userAccounts.find(function(a){ return a.id === 'USR-001' && a.role === 'admin'; });
+    if(adminAcct) {
+      adminAcct.username = 'cestisadmin';
+      adminAcct.password = 'cestisadmin123$';
+    }
+    // Migrate: ensure default admin staff account exists
+    var defAS = {id:'USR-011',name:'Admin Staff',role:'adminstaff',username:'adminstaff',password:'cestisadmin123$',email:'adminstaff@heartlms.edu.jm',programme:'',status:'active',createdAt:'2026-01-15'};
+    var existingAS = userAccounts.find(function(u){ return u.id === 'USR-011'; });
+    if(!existingAS) {
+      userAccounts.push(defAS);
+    } else {
+      existingAS.username = 'adminstaff';
+      existingAS.password = 'cestisadmin123$';
+      existingAS.role = 'adminstaff';
+    }
+  } catch(e) {}
+}
+loadUserAccounts();
+
 // ============================== ONE-TIME DEMO DATA PURGE ==============================
 // Removes legacy hardcoded demo data that was persisted to localStorage/cloud before
 // the production-ready update. Runs once, then sets a version flag.
@@ -3974,42 +4010,6 @@ loadState();
 
 loadNotifications();
 updateNotificationDot();
-
-// ============================== USER ACCOUNTS MANAGEMENT ==============================
-let userAccounts = [
-  {id:'USR-001',name:'Administrator',role:'admin',username:'cestisadmin',password:'cestisadmin123$',email:'admin@heartlms.edu.jm',programme:'',status:'active',createdAt:'2026-01-01'},
-  {id:'USR-011',name:'Admin Staff',role:'adminstaff',username:'adminstaff',password:'cestisadmin123$',email:'adminstaff@heartlms.edu.jm',programme:'',status:'active',createdAt:'2026-01-15'}
-];
-let umSelectedIds = [];
-
-function saveUserAccounts() {
-  try { localStorage.setItem('voctrain_users', JSON.stringify(userAccounts)); } catch(e) {}
-  // Push changes to Google Drive immediately (debounced)
-  scheduleDebouncedCloudSave();
-}
-function loadUserAccounts() {
-  try {
-    var u = localStorage.getItem('voctrain_users');
-    if(u) userAccounts = JSON.parse(u);
-    // Migrate: ensure admin account has current credentials
-    var adminAcct = userAccounts.find(function(a){ return a.id === 'USR-001' && a.role === 'admin'; });
-    if(adminAcct) {
-      adminAcct.username = 'cestisadmin';
-      adminAcct.password = 'cestisadmin123$';
-    }
-    // Migrate: ensure default admin staff account exists
-    var defAS = {id:'USR-011',name:'Admin Staff',role:'adminstaff',username:'adminstaff',password:'cestisadmin123$',email:'adminstaff@heartlms.edu.jm',programme:'',status:'active',createdAt:'2026-01-15'};
-    var existingAS = userAccounts.find(function(u){ return u.id === 'USR-011'; });
-    if(!existingAS) {
-      userAccounts.push(defAS);
-    } else {
-      existingAS.username = 'adminstaff';
-      existingAS.password = 'cestisadmin123$';
-      existingAS.role = 'adminstaff';
-    }
-  } catch(e) {}
-}
-loadUserAccounts();
 initLmsChatData();
 
 function getNextUserId() {
