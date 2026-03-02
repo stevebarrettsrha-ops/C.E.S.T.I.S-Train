@@ -10648,13 +10648,17 @@ function selectCalDay(dateStr, titleId, eventsId, isStudent) {
     events = calendarEvents.filter(function(e) { return e.date === dateStr; });
   }
   if(eventsEl) {
+    var isAdminView = currentRole === 'admin' || currentRole === 'adminstaff';
     eventsEl.innerHTML = events.length === 0 ? '<p style="font-size:13px;color:var(--text-muted);">No events</p>' :
-      events.map(e => `
-        <div style="display:flex;align-items:center;gap:10px;padding:10px 0;border-bottom:1px solid var(--border);">
-          <div style="width:4px;height:32px;border-radius:2px;background:${e.color};flex-shrink:0;"></div>
-          <div><div style="font-size:13px;font-weight:600;">${e.title}</div><div style="font-size:11px;color:var(--text-muted);">${e.time} \u2022 ${e.type}</div></div>
-        </div>
-      `).join('');
+      events.map(e => {
+        var evtIdx = calendarEvents.indexOf(e);
+        var adminBtns = isAdminView ? '<div style="display:flex;gap:4px;margin-left:auto;flex-shrink:0;"><button class="btn btn-sm btn-secondary" onclick="editCalendarEvent('+evtIdx+')" title="Edit" style="padding:3px 6px;font-size:11px;">&#9998;</button><button class="btn btn-sm btn-secondary" onclick="deleteCalendarEvent('+evtIdx+')" title="Delete" style="padding:3px 6px;font-size:11px;color:var(--red);">&#10005;</button></div>' : '';
+        return '<div style="display:flex;align-items:center;gap:10px;padding:10px 0;border-bottom:1px solid var(--border);">' +
+          '<div style="width:4px;height:32px;border-radius:2px;background:'+e.color+';flex-shrink:0;"></div>' +
+          '<div style="flex:1;"><div style="font-size:13px;font-weight:600;">'+e.title+'</div><div style="font-size:11px;color:var(--text-muted);">'+e.time+' \u2022 '+e.type+'</div></div>' +
+          adminBtns +
+        '</div>';
+      }).join('');
   }
   if(isStudent) renderStudentCalendar(); else if(currentRole === 'instructor') renderInstructorCalendar(); else renderCalendar();
 }
@@ -10672,13 +10676,20 @@ function changeCalMonth(delta) {
 function renderCalendarEventList() {
   const el = document.getElementById('calEventList');
   if(!el) return;
-  el.innerHTML = calendarEvents.sort((a,b)=>a.date.localeCompare(b.date)).map(e => {
+  if(calendarEvents.length === 0) {
+    el.innerHTML = '<p style="color:var(--text-muted);padding:16px;text-align:center;">No events scheduled. Click "+ Add Event" to create one.</p>';
+    return;
+  }
+  el.innerHTML = calendarEvents.sort((a,b)=>a.date.localeCompare(b.date)).map((e, idx) => {
     var roles = e.forRoles || ['admin','instructor','student'];
-    var audienceIcons = roles.map(function(r){var c={admin:'var(--accent)',instructor:'var(--green)',student:'var(--blue)'};return '<span style="width:6px;height:6px;border-radius:50%;background:'+c[r]+';display:inline-block;" title="'+r+'"></span>';}).join('');
+    var audienceIcons = roles.map(function(r){var c={admin:'var(--accent)',adminstaff:'var(--accent)',instructor:'var(--green)',student:'var(--blue)'};return '<span style="width:6px;height:6px;border-radius:50%;background:'+(c[r]||'var(--text-muted)')+';display:inline-block;" title="'+r+'"></span>';}).join('');
+    var evtIdx = calendarEvents.indexOf(e);
     return `<div style="display:flex;align-items:center;gap:10px;padding:8px 0;border-bottom:1px solid var(--border);">
       <div style="width:8px;height:8px;border-radius:50%;background:${e.color};flex-shrink:0;"></div>
       <div style="flex:1;"><div style="font-size:13px;">${e.title}</div><div style="display:flex;align-items:center;gap:6px;"><span style="font-size:11px;color:var(--text-muted);">${e.date} @ ${e.time}</span><span style="display:flex;gap:3px;">${audienceIcons}</span></div></div>
       <span class="badge ${e.type==='exam'?'badge-red':e.type==='class'?'badge-blue':e.type==='deadline'?'badge-amber':'badge-purple'}" style="font-size:10px;">${e.type}</span>
+      <button class="btn btn-sm btn-secondary" onclick="editCalendarEvent(${evtIdx})" title="Edit" style="padding:4px 8px;">&#9998;</button>
+      <button class="btn btn-sm btn-secondary" onclick="deleteCalendarEvent(${evtIdx})" title="Delete" style="padding:4px 8px;color:var(--red);">&#10005;</button>
     </div>`
   }).join('');
 }
@@ -10699,6 +10710,39 @@ function promptAddEvent() {
   saveState();
   showToast('Event added!');
   addNotification('New ' + type + ' event: "' + title + '" on ' + date, 'calendar', null, targetRoles);
+}
+
+function editCalendarEvent(idx) {
+  var e = calendarEvents[idx];
+  if(!e) return;
+  var title = prompt('Edit event title:', e.title);
+  if(title === null) return;
+  if(!title.trim()) { alert('Title cannot be empty.'); return; }
+  var date = prompt('Edit date (YYYY-MM-DD):', e.date);
+  if(date === null) return;
+  var time = prompt('Edit time:', e.time);
+  if(time === null) return;
+  var type = prompt('Edit type (class/exam/deadline/meeting):', e.type);
+  if(type === null) return;
+  var audienceInput = prompt('Target audience (comma-separated: admin, adminstaff, instructor, student):', (e.forRoles||[]).join(', '));
+  if(audienceInput === null) return;
+  var targetRoles = audienceInput.split(',').map(function(r){return r.trim().toLowerCase();}).filter(function(r){return ['admin','adminstaff','instructor','student'].indexOf(r)!==-1;});
+  if(targetRoles.length === 0) targetRoles = ['admin','adminstaff','instructor','student'];
+  var colors = {class:'var(--blue)',exam:'var(--red)',deadline:'var(--accent)',meeting:'var(--purple)'};
+  calendarEvents[idx] = {title:title.trim(), date:date, time:time, type:type, color:colors[type]||'var(--blue)', forRoles:targetRoles};
+  renderCalendar();
+  saveState();
+  showToast('Event updated!');
+}
+
+function deleteCalendarEvent(idx) {
+  var e = calendarEvents[idx];
+  if(!e) return;
+  if(!confirm('Delete event "' + e.title + '" on ' + e.date + '?')) return;
+  calendarEvents.splice(idx, 1);
+  renderCalendar();
+  saveState();
+  showToast('Event deleted');
 }
 
 function openModal(id) { document.getElementById(id).classList.add('active'); }
