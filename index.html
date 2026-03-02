@@ -1406,6 +1406,7 @@ textarea.form-control { resize:vertical; min-height:80px; }
 .um-role-admin { background:var(--accent-dim); color:var(--accent); }
 .um-role-instructor { background:var(--green-dim); color:var(--green); }
 .um-role-student { background:var(--blue-dim); color:var(--blue); }
+.um-role-cmc { background:rgba(26,188,156,0.12); color:var(--teal); }
 
 /* ============================== CLOUD SYNC DROPDOWN ============================== */
 .cloud-sync-btn {
@@ -3279,7 +3280,7 @@ textarea.form-control { resize:vertical; min-height:80px; }
     <div class="modal-header"><h3>Create New User</h3><button class="modal-close" onclick="closeModal('createUserModal')">✕</button></div>
     <div class="um-form-row">
       <div class="form-group"><label>Full Name</label><input type="text" class="form-control" id="newUserName" placeholder="e.g. John Smith"></div>
-      <div class="form-group"><label>Role</label><select class="form-control" id="newUserRole" onchange="toggleUserFormFields()"><option value="admin">Administrator</option><option value="adminstaff">Administrative Staff</option><option value="instructor">Instructor</option><option value="student">Student</option></select></div>
+      <div class="form-group"><label>Role</label><select class="form-control" id="newUserRole" onchange="toggleUserFormFields()"><option value="admin">Administrator</option><option value="adminstaff">Administrative Staff</option><option value="instructor">Instructor</option><option value="student">Student</option><option value="cmc">Board Member (CMC)</option></select></div>
     </div>
     <div class="um-form-row">
       <div class="form-group"><label>Username</label><input type="text" class="form-control" id="newUserUsername" placeholder="e.g. john.smith"></div>
@@ -3301,7 +3302,7 @@ textarea.form-control { resize:vertical; min-height:80px; }
     <input type="hidden" id="editUserId">
     <div class="um-form-row">
       <div class="form-group"><label>Full Name</label><input type="text" class="form-control" id="editUserName"></div>
-      <div class="form-group"><label>Role</label><select class="form-control" id="editUserRole" onchange="toggleEditUserFormFields()"><option value="admin">Administrator</option><option value="adminstaff">Administrative Staff</option><option value="instructor">Instructor</option><option value="student">Student</option></select></div>
+      <div class="form-group"><label>Role</label><select class="form-control" id="editUserRole" onchange="toggleEditUserFormFields()"><option value="admin">Administrator</option><option value="adminstaff">Administrative Staff</option><option value="instructor">Instructor</option><option value="student">Student</option><option value="cmc">Board Member (CMC)</option></select></div>
     </div>
     <div class="form-group"><label>Username</label><input type="text" class="form-control" id="editUserUsername"></div>
     <div class="form-group"><label>Email</label><input type="email" class="form-control" id="editUserEmail"></div>
@@ -4023,12 +4024,12 @@ function getNextUserId() {
 
 function toggleUserFormFields() {
   var role = document.getElementById('newUserRole').value;
-  document.getElementById('newUserProgrammeGroup').style.display = (role === 'admin' || role === 'adminstaff') ? 'none' : 'block';
+  document.getElementById('newUserProgrammeGroup').style.display = (role === 'admin' || role === 'adminstaff' || role === 'cmc') ? 'none' : 'block';
 }
 
 function toggleEditUserFormFields() {
   var role = document.getElementById('editUserRole').value;
-  document.getElementById('editUserProgrammeGroup').style.display = (role === 'admin' || role === 'adminstaff') ? 'none' : 'block';
+  document.getElementById('editUserProgrammeGroup').style.display = (role === 'admin' || role === 'adminstaff' || role === 'cmc') ? 'none' : 'block';
 }
 
 function createUserAccount() {
@@ -4041,9 +4042,9 @@ function createUserAccount() {
   if(!name || !username || !password) { alert('Please fill in Name, Username, and Password.'); return; }
   if(password.length < 6) { alert('Password must be at least 6 characters.'); return; }
   if(userAccounts.find(function(u){ return u.username === username; })) { alert('Username already exists.'); return; }
-  if(role !== 'admin' && role !== 'adminstaff' && !programme) { alert('Please select a programme.'); return; }
+  if(role !== 'admin' && role !== 'adminstaff' && role !== 'cmc' && !programme) { alert('Please select a programme.'); return; }
   var now = new Date(); var dateStr = now.getFullYear()+'-'+String(now.getMonth()+1).padStart(2,'0')+'-'+String(now.getDate()).padStart(2,'0');
-  userAccounts.push({id:getNextUserId(),name:name,role:role,username:username,password:password,email:email,programme:(role==='admin'||role==='adminstaff')?'':programme,status:'active',createdAt:dateStr});
+  userAccounts.push({id:getNextUserId(),name:name,role:role,username:username,password:password,email:email,programme:(role==='admin'||role==='adminstaff'||role==='cmc')?'':programme,status:'active',createdAt:dateStr});
   saveUserAccounts();
   closeModal('createUserModal');
   document.getElementById('newUserName').value='';
@@ -4087,9 +4088,9 @@ function saveUserEdit() {
   if(!name || !username) { alert('Name and Username are required.'); return; }
   var dup = userAccounts.find(function(u){ return u.username === username && u.id !== userId; });
   if(dup) { alert('Username already in use by another account.'); return; }
-  if(role !== 'admin' && role !== 'adminstaff' && !programme) { alert('Please select a programme.'); return; }
+  if(role !== 'admin' && role !== 'adminstaff' && role !== 'cmc' && !programme) { alert('Please select a programme.'); return; }
   user.name = name; user.role = role; user.username = username; user.email = email;
-  user.programme = (role === 'admin' || role === 'adminstaff') ? '' : programme;
+  user.programme = (role === 'admin' || role === 'adminstaff' || role === 'cmc') ? '' : programme;
   saveUserAccounts();
   closeModal('editUserModal');
   renderUserAccountsTable();
@@ -4217,9 +4218,9 @@ function renderUserAccountsTable() {
   var tableBody = document.getElementById('umTableBody');
   if(!tableBody) return;
   var filtered = getFilteredUsers();
-  var roleColors = {admin:'linear-gradient(135deg,var(--accent),var(--orange))',adminstaff:'linear-gradient(135deg,var(--purple),#8e44ad)',instructor:'linear-gradient(135deg,var(--green),var(--teal))',student:'linear-gradient(135deg,var(--blue),#2980b9)'};
-  var roleBadges = {admin:'um-role-admin',adminstaff:'um-role-admin',instructor:'um-role-instructor',student:'um-role-student'};
-  var roleLabels = {admin:'Admin',adminstaff:'Admin Staff',instructor:'Instructor',student:'Student'};
+  var roleColors = {admin:'linear-gradient(135deg,var(--accent),var(--orange))',adminstaff:'linear-gradient(135deg,var(--purple),#8e44ad)',instructor:'linear-gradient(135deg,var(--green),var(--teal))',student:'linear-gradient(135deg,var(--blue),#2980b9)',cmc:'linear-gradient(135deg,var(--teal),#16a085)'};
+  var roleBadges = {admin:'um-role-admin',adminstaff:'um-role-admin',instructor:'um-role-instructor',student:'um-role-student',cmc:'um-role-cmc'};
+  var roleLabels = {admin:'Admin',adminstaff:'Admin Staff',instructor:'Instructor',student:'Student',cmc:'Board Member'};
   tableBody.innerHTML = filtered.map(function(u) {
     var initials = u.name.split(' ').map(function(n){return n[0];}).join('').substring(0,2).toUpperCase();
     var checked = umSelectedIds.indexOf(u.id) > -1 ? 'checked' : '';
@@ -4244,7 +4245,8 @@ function renderUserAccountsTable() {
   var adminStaffCount = userAccounts.filter(function(u){return u.role==='adminstaff';}).length;
   var instructors = userAccounts.filter(function(u){return u.role==='instructor';}).length;
   var studs = userAccounts.filter(function(u){return u.role==='student';}).length;
-  var els = {umStatTotal:total,umStatActive:active,umStatDisabled:disabled,umStatAdmins:admins,umStatAdminStaff:adminStaffCount,umStatInstructors:instructors,umStatStudents:studs};
+  var cmcCount = userAccounts.filter(function(u){return u.role==='cmc';}).length;
+  var els = {umStatTotal:total,umStatActive:active,umStatDisabled:disabled,umStatAdmins:admins,umStatAdminStaff:adminStaffCount,umStatInstructors:instructors,umStatStudents:studs,umStatCmc:cmcCount};
   for(var key in els) {
     var el = document.getElementById(key);
     if(el) el.textContent = els[key];
@@ -5724,11 +5726,12 @@ function buildAdminPages() {
         <div class="um-stat"><div class="um-stat-val" style="color:var(--purple);" id="umStatAdminStaff">0</div><div class="um-stat-label">Admin Staff</div></div>
         <div class="um-stat"><div class="um-stat-val" style="color:var(--green);" id="umStatInstructors">0</div><div class="um-stat-label">Instructors</div></div>
         <div class="um-stat"><div class="um-stat-val" style="color:var(--blue);" id="umStatStudents">0</div><div class="um-stat-label">Students</div></div>
+        <div class="um-stat"><div class="um-stat-val" style="color:var(--teal);" id="umStatCmc">0</div><div class="um-stat-label">Board Members</div></div>
       </div>
 
       <div class="um-toolbar">
         <button class="btn btn-primary" onclick="openModal('createUserModal')">+ Create User</button>
-        <select class="form-control" style="width:160px;" id="umRoleFilter" onchange="umSelectedIds=[];renderUserAccountsTable()"><option value="all">All Roles</option><option value="admin">Admins</option><option value="adminstaff">Admin Staff</option><option value="instructor">Instructors</option><option value="student">Students</option></select>
+        <select class="form-control" style="width:160px;" id="umRoleFilter" onchange="umSelectedIds=[];renderUserAccountsTable()"><option value="all">All Roles</option><option value="admin">Admins</option><option value="adminstaff">Admin Staff</option><option value="instructor">Instructors</option><option value="student">Students</option><option value="cmc">Board Members</option></select>
         <select class="form-control" style="width:160px;" id="umStatusFilter" onchange="umSelectedIds=[];renderUserAccountsTable()"><option value="all">All Status</option><option value="active">Active</option><option value="disabled">Disabled</option></select>
         <input type="text" class="form-control um-search" placeholder="Search users..." id="umSearch" onkeyup="renderUserAccountsTable()">
         <button class="btn-export" onclick="bulkExportUsers()">📄 Export Selected</button>
@@ -13870,7 +13873,7 @@ function lmsChatRenderRoomList(prefix) {
       var otherProf = otherId ? lmsChatGetProfile(otherId) : {};
       var otherName = otherUser ? otherUser.name : 'Direct Message';
       var otherStatus = otherProf.status || 'offline';
-      var roleColors = {admin:'var(--accent)',adminstaff:'var(--purple)',instructor:'var(--green)',student:'var(--blue)'};
+      var roleColors = {admin:'var(--accent)',adminstaff:'var(--purple)',instructor:'var(--green)',student:'var(--blue)',cmc:'var(--teal)'};
       var rColor = otherUser ? (roleColors[otherUser.role]||'var(--accent)') : 'var(--accent)';
       if(otherProf.profilePic) {
         html += '<div class="lms-chat-avatar" style="background:none;padding:0;overflow:hidden;"><img src="'+otherProf.profilePic+'" style="width:100%;height:100%;object-fit:cover;border-radius:50%;"><div class="status-dot '+otherStatus+'" style="position:absolute;bottom:0;right:0;"></div></div>';
@@ -14737,8 +14740,8 @@ function lmsChatRenderFollowersPage() {
   if(!panel) return;
   var me = lmsChatGetCurrentUser();
   var followerIds = lmsChatGetFollowersOf(me.id);
-  var roleLabels  = { admin:'Administrator', adminstaff:'Admin Staff', instructor:'Instructor', student:'Student' };
-  var roleColors  = { admin:'var(--accent)', adminstaff:'var(--purple)', instructor:'var(--green)', student:'var(--blue)' };
+  var roleLabels  = { admin:'Administrator', adminstaff:'Admin Staff', instructor:'Instructor', student:'Student', cmc:'Board Member' };
+  var roleColors  = { admin:'var(--accent)', adminstaff:'var(--purple)', instructor:'var(--green)', student:'var(--blue)', cmc:'var(--teal)' };
 
   var cardsHtml = '';
   if(!followerIds.length) {
@@ -14796,8 +14799,8 @@ function lmsChatRenderFollowingPage() {
   if(!panel) return;
   var me = lmsChatGetCurrentUser();
   var followingIds = lmsChatFollows[me.id] || [];
-  var roleLabels   = { admin:'Administrator', adminstaff:'Admin Staff', instructor:'Instructor', student:'Student' };
-  var roleColors   = { admin:'var(--accent)', adminstaff:'var(--purple)', instructor:'var(--green)', student:'var(--blue)' };
+  var roleLabels   = { admin:'Administrator', adminstaff:'Admin Staff', instructor:'Instructor', student:'Student', cmc:'Board Member' };
+  var roleColors   = { admin:'var(--accent)', adminstaff:'var(--purple)', instructor:'var(--green)', student:'var(--blue)', cmc:'var(--teal)' };
 
   var cardsHtml = '';
   if(!followingIds.length) {
@@ -14895,8 +14898,8 @@ function lmsChatRenderMembersDirectory(filter) {
            (u.programme||'').toLowerCase().indexOf(q) !== -1;
   }) : allUsers;
 
-  var roleColors = { admin: 'var(--accent)', adminstaff: 'var(--purple)', instructor: 'var(--green)', student: 'var(--blue)' };
-  var roleLabels = { admin: 'Administrator', adminstaff: 'Admin Staff', instructor: 'Instructor', student: 'Student' };
+  var roleColors = { admin: 'var(--accent)', adminstaff: 'var(--purple)', instructor: 'var(--green)', student: 'var(--blue)', cmc: 'var(--teal)' };
+  var roleLabels = { admin: 'Administrator', adminstaff: 'Admin Staff', instructor: 'Instructor', student: 'Student', cmc: 'Board Member' };
 
   var cardsHtml = '';
   filtered.forEach(function(u) {
@@ -14943,9 +14946,9 @@ function lmsChatViewMemberProfile(userId) {
   var prof = lmsChatGetProfile(userId);
   var status = prof.status || 'offline';
   var statusLabels = { online: 'Online', away: 'Away', offline: 'Offline' };
-  var roleLabels = { admin: 'Administrator', adminstaff: 'Admin Staff', instructor: 'Instructor', student: 'Student' };
-  var roleColors = { admin: 'var(--accent)', adminstaff: 'var(--purple)', instructor: 'var(--green)', student: 'var(--blue)' };
-  var badgeClasses = { admin: 'admin', adminstaff: 'adminstaff', instructor: 'instructor', student: 'student' };
+  var roleLabels = { admin: 'Administrator', adminstaff: 'Admin Staff', instructor: 'Instructor', student: 'Student', cmc: 'Board Member' };
+  var roleColors = { admin: 'var(--accent)', adminstaff: 'var(--purple)', instructor: 'var(--green)', student: 'var(--blue)', cmc: 'var(--teal)' };
+  var badgeClasses = { admin: 'admin', adminstaff: 'adminstaff', instructor: 'instructor', student: 'student', cmc: 'cmc' };
 
   var roleColor = roleColors[u.role] || 'var(--accent)';
   var avatarHtml;
