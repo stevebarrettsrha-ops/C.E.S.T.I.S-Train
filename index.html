@@ -11594,6 +11594,131 @@ const ALL_DRIVE_FOLDERS = [
   { id: '1Yp9aLXGGjhojF1J04QxoNG-9yEgaiS-A', label: 'Class Recording' }
 ];
 
+// School Fee Management System — Google Drive folder containing fee system backup
+const FEE_SYSTEM_DRIVE_CONFIG = {
+  FOLDER_ID: '11vWe_Nc40TtJ1Hi7PoE7EZ3JrpR-K0Vj',
+  FILE_NAME: 'school_fee_management_system.json'
+};
+
+// Sync students from the School Fee Management System backup on Google Drive.
+// Reads the fee system JSON, extracts student records (Name, Student ID, Course),
+// and merges any new students into the local students[] array.
+async function syncStudentsFromFeeSystem() {
+  if (!isCloudConnected || !googleAccessToken) return false;
+  try {
+    // Find the fee system backup file in its Drive folder
+    var query = encodeURIComponent(
+      "name='" + FEE_SYSTEM_DRIVE_CONFIG.FILE_NAME + "' and '" + FEE_SYSTEM_DRIVE_CONFIG.FOLDER_ID + "' in parents and trashed=false"
+    );
+    var listResp = await fetch(
+      'https://www.googleapis.com/drive/v3/files?q=' + query + '&fields=files(id,name)&pageSize=1',
+      { headers: { 'Authorization': 'Bearer ' + googleAccessToken } }
+    );
+    if (!listResp.ok) { console.warn('[FeeSync] Drive list error:', listResp.status); return false; }
+    var listData = await listResp.json();
+    if (!listData.files || listData.files.length === 0) {
+      console.log('[FeeSync] No fee system backup found in Drive folder');
+      return false;
+    }
+
+    // Download the fee system JSON
+    var fileId = listData.files[0].id;
+    var fileResp = await fetch(
+      'https://www.googleapis.com/drive/v3/files/' + fileId + '?alt=media',
+      { headers: { 'Authorization': 'Bearer ' + googleAccessToken } }
+    );
+    if (!fileResp.ok) { console.warn('[FeeSync] File download error:', fileResp.status); return false; }
+    var feeData = await fileResp.json();
+
+    // Extract student records from fee system data.
+    // The fee system may store students at the top level as an array,
+    // or nested under a key like "students", "records", or "data".
+    var feeStudents = null;
+    if (Array.isArray(feeData)) {
+      feeStudents = feeData;
+    } else if (feeData.students && Array.isArray(feeData.students)) {
+      feeStudents = feeData.students;
+    } else if (feeData.records && Array.isArray(feeData.records)) {
+      feeStudents = feeData.records;
+    } else if (feeData.data && Array.isArray(feeData.data)) {
+      feeStudents = feeData.data;
+    }
+
+    if (!feeStudents || feeStudents.length === 0) {
+      console.log('[FeeSync] No student records found in fee system backup');
+      return false;
+    }
+
+    // Build a set of existing student IDs for fast duplicate checking
+    var existingIds = {};
+    students.forEach(function(s) { existingIds[s.id] = true; });
+    // Also index by normalised name+course to avoid duplicates with different ID formats
+    var existingKeys = {};
+    students.forEach(function(s) { existingKeys[(s.name + '|' + s.course).toLowerCase()] = true; });
+
+    var changed = false;
+    feeStudents.forEach(function(fee) {
+      // Map fee system fields: Name, Student ID, Course (Skill Area)
+      var name = fee.Name || fee.name || fee.studentName || fee.student_name || '';
+      var id = fee.ID || fee['Student ID'] || fee.studentId || fee.student_id || fee.id || '';
+      var course = fee.Course || fee['Skill Area'] || fee.course || fee.skillArea || fee.skill_area || fee.programme || '';
+      if (!name) return; // skip records without a name
+
+      // Normalise student ID to match LMS format (STU-XXXXXXX) if it's a plain number
+      var studentId = String(id).trim();
+      if (studentId && !/^STU-/.test(studentId)) {
+        studentId = 'STU-' + studentId;
+      }
+      if (!studentId) {
+        studentId = 'STU-FEE-' + Date.now() + '-' + Math.floor(Math.random() * 1000);
+      }
+
+      // Skip if this student already exists (by ID or by name+course)
+      if (existingIds[studentId]) return;
+      var dupKey = (name + '|' + course).toLowerCase();
+      if (existingKeys[dupKey]) return;
+
+      // Find an instructor for this course
+      var assignedInstructor = '';
+      var matchedInstructor = instructorData.find(function(ins) { return ins.course === course; });
+      if (matchedInstructor) assignedInstructor = matchedInstructor.name;
+
+      // Create the student record in LMS format
+      students.push({
+        id: studentId,
+        name: name.trim(),
+        stage: 'training',
+        course: course.trim(),
+        score: '',
+        progress: 5,
+        certNo: null,
+        certDate: null,
+        certCollected: false,
+        attendance: 0,
+        assignments: 0,
+        assignmentsTotal: 10,
+        gpa: '0.0',
+        instructor: assignedInstructor
+      });
+
+      existingIds[studentId] = true;
+      existingKeys[dupKey] = true;
+      changed = true;
+    });
+
+    if (changed) {
+      saveState();
+      console.log('[FeeSync] Merged new students from fee system into LMS');
+    } else {
+      console.log('[FeeSync] No new students to merge from fee system');
+    }
+    return changed;
+  } catch (err) {
+    console.warn('[FeeSync] Error syncing from fee system:', err);
+    return false;
+  }
+}
+
 // Google Token Client for OAuth
 let googleTokenClient = null;
 
@@ -13090,6 +13215,14 @@ async function autoSyncOnLogin() {
       console.warn('[AutoSync] Chat sync error:', e);
     }
 
+    // 2b. Sync students from School Fee Management System
+    try {
+      var feeChanged = await syncStudentsFromFeeSystem();
+      if (feeChanged) anyChanged = true;
+    } catch (e) {
+      console.warn('[AutoSync] Fee system student sync error:', e);
+    }
+
     // 3. Update sync timestamp
     lastSyncTime = new Date();
     localStorage.setItem('schoolDashboardLastSyncTime', lastSyncTime.toISOString());
@@ -13110,6 +13243,8 @@ async function autoSyncOnLogin() {
         try { showPage('i-dashboard'); } catch (e) {}
       } else if (currentRole === 'student') {
         try { showPage('s-dashboard'); } catch (e) {}
+      } else if (currentRole === 'cmc') {
+        try { showPage('cmc-dashboard'); } catch (e) {}
       }
     }
   } catch (err) {
@@ -13437,6 +13572,17 @@ async function loginPageSync() {
       await lmsChatSyncFromDrive();
     } catch (e) {
       console.warn('[LoginSync] Chat sync error:', e);
+    }
+
+    // Step 3b: Sync students from School Fee Management System
+    try {
+      if (isAdmin) {
+        updateLoginSyncStatus('Syncing students from Fee Management System...', '');
+      }
+      var feeChanged = await syncStudentsFromFeeSystem();
+      if (feeChanged) totalMerged++;
+    } catch (e) {
+      console.warn('[LoginSync] Fee system student sync error:', e);
     }
 
     // Step 4: Ensure main cloudFileId is set
