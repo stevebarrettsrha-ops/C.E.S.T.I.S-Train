@@ -7035,6 +7035,7 @@ function enterVideoRoom(title, role) {
   var listEl = document.getElementById(listId);
   if(listEl) listEl.style.display = 'none';
   const room = document.getElementById(containerId);
+  if(!room) { showToast('Video room container not found'); return; }
   room.style.display = 'block';
 
   const userName = role==='admin' ? 'Admin' : role==='adminstaff' ? (currentLoggedInUser ? currentLoggedInUser.name : 'Admin Staff') : role==='instructor' ? currentInstructor.name : currentStudent.name;
@@ -7211,8 +7212,8 @@ async function vcRejoinRoom(title, role) {
 }
 
 // ── Join Room ──
-async function vcJoinRoom(title, role) {
-  var code = (document.getElementById('vc-join-code')?.value || '').toUpperCase().trim();
+async function vcJoinRoom(title, role, codeOverride) {
+  var code = codeOverride ? codeOverride.toUpperCase().trim() : (document.getElementById('vc-join-code')?.value || '').toUpperCase().trim();
   if(!code || code.length < 4) { vcUpdateStatus('error', 'Please enter a valid room code'); return; }
 
   currentRoomCode = code;
@@ -8611,29 +8612,49 @@ function createAdminMeeting() {
 }
 
 function renderAdminMeetingsList() {
-  var container = document.getElementById('adminMeetingsList');
-  if(!container) return;
-
-  if(adminMeetings.length === 0) {
-    container.innerHTML = '<tr><td colspan="6" style="text-align:center;color:var(--text-muted);padding:24px;">No admin meetings scheduled. Click "Schedule Admin Meeting" to create one.</td></tr>';
-    return;
+  // Render to admin page container
+  var adminContainer = document.getElementById('adminMeetingsList');
+  if(adminContainer) {
+    if(adminMeetings.length === 0) {
+      adminContainer.innerHTML = '<tr><td colspan="6" style="text-align:center;color:var(--text-muted);padding:24px;">No admin meetings scheduled. Click "Schedule Admin Meeting" to create one.</td></tr>';
+    } else {
+      adminContainer.innerHTML = adminMeetings.map(function(m) {
+        var timeStr = m.time ? new Date('2000-01-01T'+m.time).toLocaleTimeString([],{hour:'numeric',minute:'2-digit'}) : m.time;
+        var escapedTitle = m.title.replace(/'/g,"\\'");
+        return '<tr>' +
+          '<td><strong>' + m.title + '</strong>' + (m.description ? '<div style="font-size:11px;color:var(--text-muted);margin-top:2px;">' + m.description.substring(0,60) + (m.description.length > 60 ? '...' : '') + '</div>' : '') + '</td>' +
+          '<td>' + (m.createdBy || 'Admin') + '</td>' +
+          '<td>' + m.date + ' ' + timeStr + '</td>' +
+          '<td>' + m.duration + 'min</td>' +
+          '<td><span class="badge badge-purple"><span class="badge-dot"></span>Admin Only</span></td>' +
+          '<td>' +
+            '<button class="btn btn-sm btn-primary" onclick="enterVideoRoom(\'' + escapedTitle + '\',\'admin\')" style="margin-right:6px;">Join</button>' +
+            '<button class="btn btn-sm btn-danger" onclick="deleteAdminMeeting(\'' + m.id + '\')">Delete</button>' +
+          '</td>' +
+        '</tr>';
+      }).join('');
+    }
   }
 
-  container.innerHTML = adminMeetings.map(function(m) {
-    var timeStr = m.time ? new Date('2000-01-01T'+m.time).toLocaleTimeString([],{hour:'numeric',minute:'2-digit'}) : m.time;
-    var escapedTitle = m.title.replace(/'/g,"\\'");
-    return '<tr>' +
-      '<td><strong>' + m.title + '</strong>' + (m.description ? '<div style="font-size:11px;color:var(--text-muted);margin-top:2px;">' + m.description.substring(0,60) + (m.description.length > 60 ? '...' : '') + '</div>' : '') + '</td>' +
-      '<td>' + (m.createdBy || 'Admin') + '</td>' +
-      '<td>' + m.date + ' ' + timeStr + '</td>' +
-      '<td>' + m.duration + 'min</td>' +
-      '<td><span class="badge badge-purple"><span class="badge-dot"></span>Admin Only</span></td>' +
-      '<td>' +
-        '<button class="btn btn-sm btn-primary" onclick="enterVideoRoom(\'' + escapedTitle + '\',\'admin\')" style="margin-right:6px;">Join</button>' +
-        '<button class="btn btn-sm btn-danger" onclick="deleteAdminMeeting(\'' + m.id + '\')">Delete</button>' +
-      '</td>' +
-    '</tr>';
-  }).join('');
+  // Render to admin staff page container (no delete button, adminstaff role)
+  var asContainer = document.getElementById('asAdminMeetingsList');
+  if(asContainer) {
+    if(adminMeetings.length === 0) {
+      asContainer.innerHTML = '<tr><td colspan="5" style="text-align:center;color:var(--text-muted);padding:24px;">No admin meetings scheduled.</td></tr>';
+    } else {
+      asContainer.innerHTML = adminMeetings.map(function(m) {
+        var timeStr = m.time ? new Date('2000-01-01T'+m.time).toLocaleTimeString([],{hour:'numeric',minute:'2-digit'}) : m.time;
+        var escapedTitle = m.title.replace(/'/g,"\\'");
+        return '<tr>' +
+          '<td><strong>' + m.title + '</strong>' + (m.description ? '<div style="font-size:11px;color:var(--text-muted);margin-top:2px;">' + m.description.substring(0,60) + (m.description.length > 60 ? '...' : '') + '</div>' : '') + '</td>' +
+          '<td>' + (m.createdBy || 'Admin') + '</td>' +
+          '<td>' + m.date + ' ' + timeStr + '</td>' +
+          '<td>' + m.duration + 'min</td>' +
+          '<td><button class="btn btn-sm btn-primary" onclick="enterVideoRoom(\'' + escapedTitle + '\',\'adminstaff\')">Join</button></td>' +
+        '</tr>';
+      }).join('');
+    }
+  }
 }
 
 function deleteAdminMeeting(id) {
@@ -17061,6 +17082,7 @@ function asJoinMeetingByCode() {
   var listEl = document.getElementById('asVideoContent');
   if(listEl) listEl.style.display = 'none';
   var room = document.getElementById('asVideoRoom');
+  if(!room) return;
   room.style.display = 'block';
   room.innerHTML = '<div style="display:flex;align-items:center;gap:12px;margin-bottom:24px;">' +
     '<button class="btn btn-secondary btn-sm" onclick="exitVideoRoom(\'adminstaff\')">&#8592; Back</button>' +
@@ -17076,11 +17098,8 @@ function asJoinMeetingByCode() {
         '<div style="font-size:13px;color:var(--text-muted);margin-bottom:8px;">Joining room with code:</div>' +
         '<div style="font-family:monospace;font-size:22px;letter-spacing:4px;color:var(--accent);margin-bottom:16px;">' + code + '</div></div></div>';
   vcStartCameraPreview();
-  document.getElementById('vc-join-code')?.remove();
-  var fakeInput = document.createElement('input');
-  fakeInput.type = 'hidden'; fakeInput.id = 'vc-join-code'; fakeInput.value = code;
-  room.appendChild(fakeInput);
-  setTimeout(function(){ vcJoinRoom('Admin Meeting','adminstaff'); }, 500);
+  // Pass code directly to vcJoinRoom via codeOverride parameter (no hidden input needed)
+  setTimeout(function(){ vcJoinRoom('Admin Meeting','adminstaff', code); }, 500);
 }
 
 // ---- Admin Staff Duty Page Functions ----
