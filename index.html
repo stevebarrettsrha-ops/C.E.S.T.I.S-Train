@@ -5395,7 +5395,7 @@ function buildAdminPages() {
   <!-- VIDEO -->
   <section class="page" id="page-video">
     <div style="display:flex;gap:12px;margin-bottom:18px;"><button class="btn btn-primary" onclick="openModal('createClassSessionModal')">+ New Class Session</button><button class="btn btn-secondary" onclick="document.getElementById('vc-join-code')?.focus();showToast('Enter a room code below and click Join to connect')">Join Existing Class</button></div>
-    <div class="card" id="videoClassList"><div class="card-header"><h3>Active & Scheduled Classes</h3></div><div class="table-wrapper"><table><thead><tr><th>Class</th><th>Instructor</th><th>Time</th><th>Students</th><th>Status</th><th>Action</th></tr></thead><tbody>
+    <div class="card" id="videoClassList"><div class="card-header"><h3>Active & Scheduled Classes</h3></div><div class="table-wrapper"><table><thead><tr><th>Class</th><th>Instructor</th><th>Time</th><th>Students</th><th>Status</th><th>Action</th></tr></thead><tbody id="adminAllSessionsList">
       ${classSessions.length > 0 ? classSessions.map(cs =>
         '<tr><td><strong>'+cs.name+'</strong></td><td>'+(cs.instructor||'—')+'</td><td>'+(cs.time||'—')+' - '+(cs.endTime||'—')+'</td><td>'+(cs.students||'—')+'</td><td><span class="badge badge-blue"><span class="badge-dot"></span>Scheduled</span></td><td><button class="btn btn-sm btn-primary" onclick="enterVideoRoom(\''+cs.name.replace(/'/g,"\\'")+'\',\'admin\')">Join</button></td></tr>'
       ).join('') : '<tr><td colspan="6" style="text-align:center;color:var(--text-muted);padding:24px;">No class sessions scheduled. Create a new session above.</td></tr>'}
@@ -8496,30 +8496,45 @@ function renderInstructorClassSessions() {
   container.innerHTML = mySessions.map(s => {
     const timeStr = s.time ? new Date('2000-01-01T'+s.time).toLocaleTimeString([],{hour:'numeric',minute:'2-digit'}) : s.time;
     const timeParts = timeStr.split(' ');
+    const escapedName = s.name.replace(/'/g,"\\'");
     return '<div class="class-schedule-card">' +
       '<div class="class-time-block" style="background:'+((typeColors[s.type]||'var(--blue)')+'22')+';">' +
         '<div class="time" style="font-size:13px;">'+(timeParts[0]||s.time)+'</div><div class="period">'+(timeParts[1]||'')+'</div></div>' +
       '<div style="flex:1;"><div style="font-size:14px;font-weight:600;">' + s.name + '</div>' +
         '<div style="font-size:12px;color:var(--text-muted);">' + s.date + ' &bull; ' + s.duration + 'min &bull; ' + s.location + '</div></div>' +
       '<span class="badge badge-blue">' + (typeLabels[s.type]||s.type) + '</span>' +
+      '<button class="btn btn-sm btn-primary" onclick="enterVideoRoom(\'' + escapedName + '\',\'instructor\')" style="margin-right:6px;">Join</button>' +
       '<button class="btn btn-sm btn-danger" onclick="deleteClassSession(\''+s.id+'\')">Delete</button>' +
     '</div>';
   }).join('');
 }
 
 function renderAdminClassSessions() {
-  const container = document.getElementById('adminClassSessionsList');
+  var container = document.getElementById('adminClassSessionsList');
   if(!container) return;
 
   if(classSessions.length === 0) {
     container.innerHTML = '<p style="color:var(--text-muted);padding:16px;">No custom class sessions created yet.</p>';
-    return;
+  } else {
+    container.innerHTML = classSessions.map(s => {
+      const timeStr = s.time ? new Date('2000-01-01T'+s.time).toLocaleTimeString([],{hour:'numeric',minute:'2-digit'}) : s.time;
+      const escapedName = s.name.replace(/'/g,"\\'");
+      return '<tr><td><strong>' + s.name + '</strong></td><td>' + (s.createdBy||'Admin') + '</td><td>' + s.date + ' ' + timeStr + '</td><td>' + s.duration + 'min</td><td><span class="badge badge-blue">Scheduled</span></td><td><button class="btn btn-sm btn-primary" onclick="enterVideoRoom(\'' + escapedName + '\',\'admin\')" style="margin-right:6px;">Join</button><button class="btn btn-sm btn-danger" onclick="deleteClassSession(\''+s.id+'\')">Delete</button></td></tr>';
+    }).join('');
   }
 
-  container.innerHTML = classSessions.map(s => {
-    const timeStr = s.time ? new Date('2000-01-01T'+s.time).toLocaleTimeString([],{hour:'numeric',minute:'2-digit'}) : s.time;
-    return '<tr><td><strong>' + s.name + '</strong></td><td>' + (s.createdBy||'Admin') + '</td><td>' + s.date + ' ' + timeStr + '</td><td>' + s.duration + 'min</td><td><span class="badge badge-blue">Scheduled</span></td><td><button class="btn btn-sm btn-danger" onclick="deleteClassSession(\''+s.id+'\')">Delete</button></td></tr>';
-  }).join('');
+  // Also refresh the top "Active & Scheduled Classes" table
+  var allList = document.getElementById('adminAllSessionsList');
+  if(allList) {
+    if(classSessions.length === 0) {
+      allList.innerHTML = '<tr><td colspan="6" style="text-align:center;color:var(--text-muted);padding:24px;">No class sessions scheduled. Create a new session above.</td></tr>';
+    } else {
+      allList.innerHTML = classSessions.map(function(cs) {
+        var escapedName = cs.name.replace(/'/g,"\\'");
+        return '<tr><td><strong>'+cs.name+'</strong></td><td>'+(cs.instructor||cs.createdBy||'—')+'</td><td>'+(cs.time||'—')+' - '+(cs.endTime||'—')+'</td><td>'+(cs.students||'—')+'</td><td><span class="badge badge-blue"><span class="badge-dot"></span>Scheduled</span></td><td><button class="btn btn-sm btn-primary" onclick="enterVideoRoom(\''+escapedName+'\',\'admin\')">Join</button></td></tr>';
+      }).join('');
+    }
+  }
 }
 
 function deleteClassSession(id) {
