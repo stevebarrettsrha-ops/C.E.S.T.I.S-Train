@@ -776,6 +776,23 @@ textarea.form-control { resize:vertical; min-height:80px; }
   width:180px; aspect-ratio:16/9; align-self:flex-end;
   border:2px solid var(--accent) !important;
 }
+/* Host-focus mode: participants only see host video + their own small local tile */
+.video-grid.vc-host-focus-mode {
+  display:flex; flex-direction:column; gap:12px; position:relative;
+}
+.video-grid.vc-host-focus-mode .video-tile.host-tile {
+  flex:1; min-height:400px; aspect-ratio:16/9; border:2px solid var(--blue);
+}
+.video-grid.vc-host-focus-mode .video-tile.local {
+  position:absolute; bottom:12px; right:12px; width:180px; aspect-ratio:16/9;
+  z-index:10; border:2px solid var(--accent) !important; border-radius:var(--radius);
+  box-shadow:0 4px 16px rgba(0,0,0,0.4);
+}
+/* When screen share is active on top of host-focus, use screen-share layout */
+.video-grid.vc-host-focus-mode.vc-screen-share-mode .video-tile.local {
+  position:relative; bottom:auto; right:auto; align-self:flex-end;
+  box-shadow:none;
+}
 .vc-divider {
   color:var(--text-muted); font-size:12px; display:flex; align-items:center; gap:12px; width:280px;
 }
@@ -7634,6 +7651,12 @@ function vcShowConference(title, role) {
   var lv = document.getElementById('vc-local-video');
   if(lv && localStream) lv.srcObject = localStream;
 
+  // Host-focus mode: participants only see the host video + their own local tile
+  if (!isRoomHost) {
+    var grid = document.getElementById('vc-video-grid');
+    if (grid) grid.classList.add('vc-host-focus-mode');
+  }
+
   // Initialize participant list
   vcUpdateParticipants();
 
@@ -7694,6 +7717,26 @@ function vcAddVideo(peerId, stream, name) {
   tile.appendChild(video);
   tile.appendChild(info);
   grid.appendChild(tile);
+
+  // Host-focus mode: participants only see the host's video + their own local tile.
+  // The host peer ID always ends with '-host'. Non-host peers are hidden.
+  var isPeerHost = peerId.endsWith('-host');
+  if (!isRoomHost) {
+    if (isPeerHost) {
+      // This is the host tile — mark it for CSS styling
+      tile.classList.add('host-tile');
+    } else {
+      // This is another participant — hide it (participants only see host + self)
+      tile.style.display = 'none';
+      tile.dataset.hiddenByHostView = '1';
+    }
+  }
+
+  // If this tile is the active screen-sharer (e.g. late joiner receives host tile
+  // after screen-share-started message), mark it with screen-share class.
+  if (vcScreenSharingPeerId && peerId === vcScreenSharingPeerId) {
+    tile.classList.add('screen-share');
+  }
 
   // If screen share is already active and this user is not the host, hide this
   // tile immediately so only the sharing tile and the local tile remain visible.
@@ -7856,6 +7899,10 @@ function vcBroadcastData(msgObj) {
 // The host always skips this so they continue to see all participant tiles (needed for the screenshot feature).
 function vcEnterScreenShareView(sharingPeerId) {
   if (isRoomHost) return;
+  // In host-focus mode, participants can only see the host tile. If a non-host
+  // participant shares their screen, their tile is hidden anyway — skip the
+  // layout change so the host tile remains visible.
+  if (!sharingPeerId.endsWith('-host')) return;
   vcScreenSharingPeerId = sharingPeerId;
   var grid = document.getElementById('vc-video-grid');
   if (!grid) return;
@@ -7882,7 +7929,10 @@ function vcExitScreenShareView() {
   var tiles = grid.querySelectorAll('.video-tile');
   tiles.forEach(function(tile) {
     if (tile.dataset.hiddenByScreenShare) {
-      tile.style.display = '';
+      // Only restore visibility if the tile isn't also hidden by host-focus mode
+      if (!tile.dataset.hiddenByHostView) {
+        tile.style.display = '';
+      }
       delete tile.dataset.hiddenByScreenShare;
     }
     tile.classList.remove('screen-share');
