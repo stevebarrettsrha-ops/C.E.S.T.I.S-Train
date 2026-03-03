@@ -3353,6 +3353,24 @@ textarea.form-control { resize:vertical; min-height:80px; }
   </div>
 </div>
 
+<!-- ADMIN MEETING MODAL -->
+<div class="modal-overlay" id="createAdminMeetingModal">
+  <div class="modal">
+    <div class="modal-header"><h3>Schedule Admin Meeting</h3><button class="modal-close" onclick="closeModal('createAdminMeetingModal')">&#10005;</button></div>
+    <div class="form-group"><label>Meeting Title</label><input type="text" class="form-control" id="amTitle" placeholder="e.g. Weekly Staff Briefing"></div>
+    <div class="form-group"><label>Description / Agenda</label><textarea class="form-control" id="amDescription" rows="3" placeholder="Meeting agenda or notes..."></textarea></div>
+    <div class="grid-2col" style="gap:12px;">
+      <div class="form-group"><label>Date</label><input type="date" class="form-control" id="amDate"></div>
+      <div class="form-group"><label>Start Time</label><input type="time" class="form-control" id="amTime"></div>
+    </div>
+    <div class="form-group"><label>Duration (minutes)</label><input type="number" class="form-control" id="amDuration" value="60" min="15" max="300"></div>
+    <div style="display:flex;gap:10px;justify-content:flex-end;margin-top:20px;">
+      <button class="btn btn-secondary" onclick="closeModal('createAdminMeetingModal')">Cancel</button>
+      <button class="btn btn-primary" onclick="createAdminMeeting()">Schedule Meeting</button>
+    </div>
+  </div>
+</div>
+
 <!-- ASSIGNMENT MODAL -->
 <div class="modal-overlay" id="createAssignmentModal">
   <div class="modal">
@@ -3688,6 +3706,7 @@ let currentAttendanceDate = '2026-02-18';
 
 // ============================== PERSISTENT DATA ARRAYS ==============================
 let classSessions = [];
+let adminMeetings = []; // Admin-only meetings (admin + admin staff)
 let instructorAssignments = [];
 let instructorResources = [];
 let driveResources = []; // Admin-managed resources uploaded to Google Drive
@@ -3847,6 +3866,7 @@ function saveState() {
     localStorage.setItem('voctrain_attendance', JSON.stringify(attendanceRecords));
     localStorage.setItem('voctrain_users', JSON.stringify(userAccounts));
     localStorage.setItem('voctrain_classSessions', JSON.stringify(classSessions));
+    localStorage.setItem('voctrain_adminMeetings', JSON.stringify(adminMeetings));
     localStorage.setItem('voctrain_assignments', JSON.stringify(instructorAssignments));
     localStorage.setItem('voctrain_resources', JSON.stringify(instructorResources));
     localStorage.setItem('voctrain_driveResources', JSON.stringify(driveResources));
@@ -3883,6 +3903,8 @@ function loadState() {
     if(a) announcements = JSON.parse(a);
     if(at) attendanceRecords = JSON.parse(at);
     if(cs) classSessions = JSON.parse(cs);
+    var am = localStorage.getItem('voctrain_adminMeetings');
+    if(am) adminMeetings = JSON.parse(am);
     if(ia) instructorAssignments = JSON.parse(ia);
     if(ir) instructorResources = JSON.parse(ir);
     const dr = localStorage.getItem('voctrain_driveResources');
@@ -5224,7 +5246,7 @@ function vcCleanupMediaIfNeeded() {
 }
 
 // Track which pages are video-related so we know when the user leaves one
-var vcVideoPages = ['video','s-video','i-classes'];
+var vcVideoPages = ['video','s-video','i-classes','as-video'];
 var vcLastPage = '';
 
 function showPage(pageId) {
@@ -5394,13 +5416,14 @@ function buildAdminPages() {
 
   <!-- VIDEO -->
   <section class="page" id="page-video">
-    <div style="display:flex;gap:12px;margin-bottom:18px;"><button class="btn btn-primary" onclick="openModal('createClassSessionModal')">+ New Class Session</button><button class="btn btn-secondary" onclick="document.getElementById('vc-join-code')?.focus();showToast('Enter a room code below and click Join to connect')">Join Existing Class</button></div>
+    <div style="display:flex;gap:12px;margin-bottom:18px;flex-wrap:wrap;"><button class="btn btn-primary" onclick="openModal('createClassSessionModal')">+ New Class Session</button><button class="btn btn-secondary" onclick="document.getElementById('vc-join-code')?.focus();showToast('Enter a room code below and click Join to connect')">Join Existing Class</button><button class="btn btn-primary" style="background:var(--purple);" onclick="openModal('createAdminMeetingModal')">+ Schedule Admin Meeting</button></div>
     <div class="card" id="videoClassList"><div class="card-header"><h3>Active & Scheduled Classes</h3></div><div class="table-wrapper"><table><thead><tr><th>Class</th><th>Instructor</th><th>Time</th><th>Students</th><th>Status</th><th>Action</th></tr></thead><tbody id="adminAllSessionsList">
       ${classSessions.length > 0 ? classSessions.map(cs =>
         '<tr><td><strong>'+cs.name+'</strong></td><td>'+(cs.instructor||'—')+'</td><td>'+(cs.time||'—')+' - '+(cs.endTime||'—')+'</td><td>'+(cs.students||'—')+'</td><td><span class="badge badge-blue"><span class="badge-dot"></span>Scheduled</span></td><td><button class="btn btn-sm btn-primary" onclick="enterVideoRoom(\''+cs.name.replace(/'/g,"\\'")+'\',\'admin\')">Join</button></td></tr>'
       ).join('') : '<tr><td colspan="6" style="text-align:center;color:var(--text-muted);padding:24px;">No class sessions scheduled. Create a new session above.</td></tr>'}
     </tbody></table></div></div>
     <div class="card" style="margin-top:18px;"><div class="card-header"><h3>My Scheduled Sessions</h3><span style="font-size:12px;color:var(--text-muted);">Custom created sessions</span></div><div class="table-wrapper"><table><thead><tr><th>Class</th><th>Created By</th><th>Date & Time</th><th>Duration</th><th>Status</th><th>Action</th></tr></thead><tbody id="adminClassSessionsList"></tbody></table></div></div>
+    <div class="card" style="margin-top:18px;border-color:var(--purple);"><div class="card-header"><h3 style="color:var(--purple);">Admin Meetings</h3><span style="font-size:12px;color:var(--text-muted);">Restricted to Administrator &amp; Admin Staff only</span></div><div class="table-wrapper"><table><thead><tr><th>Meeting</th><th>Created By</th><th>Date &amp; Time</th><th>Duration</th><th>Access</th><th>Action</th></tr></thead><tbody id="adminMeetingsList"></tbody></table></div></div>
     <div id="videoRoom" style="display:none;"></div>
   </section>
 
@@ -5958,6 +5981,7 @@ function buildAdminPages() {
   renderCalendarEventList();
   renderUserAccountsTable();
   renderAdminClassSessions();
+  renderAdminMeetingsList();
   renderAdminResources();
   adrInit();
   loadSupportMessages();
@@ -7006,13 +7030,14 @@ function generateRoomCode() {
 function sanitizePeerId(str) { return str.replace(/[^a-zA-Z0-9-]/g, ''); }
 
 function enterVideoRoom(title, role) {
-  const listId = role==='admin' ? 'videoClassList' : role==='instructor' ? 'iVideoClassList' : 'sVideoClassList';
-  const containerId = role==='admin' ? 'videoRoom' : role==='instructor' ? 'iVideoRoom' : 'sVideoRoom';
-  document.getElementById(listId).style.display = 'none';
+  const listId = role==='admin' ? 'videoClassList' : role==='adminstaff' ? 'asVideoContent' : role==='instructor' ? 'iVideoClassList' : 'sVideoClassList';
+  const containerId = role==='admin' ? 'videoRoom' : role==='adminstaff' ? 'asVideoRoom' : role==='instructor' ? 'iVideoRoom' : 'sVideoRoom';
+  var listEl = document.getElementById(listId);
+  if(listEl) listEl.style.display = 'none';
   const room = document.getElementById(containerId);
   room.style.display = 'block';
 
-  const userName = role==='admin' ? 'Admin' : role==='instructor' ? currentInstructor.name : currentStudent.name;
+  const userName = role==='admin' ? 'Admin' : role==='adminstaff' ? (currentLoggedInUser ? currentLoggedInUser.name : 'Admin Staff') : role==='instructor' ? currentInstructor.name : currentStudent.name;
   vcCurrentRole = role;
   vcCurrentUserName = userName;
 
@@ -7353,7 +7378,7 @@ function vcOnData(raw, fromId) {
     case 'name':
       peerNames[fromId] = msg.name;
       peerRoles[fromId] = msg.role || 'student';
-      vcUpdateVideoLabel(fromId, msg.name + (msg.role==='instructor'?' (Instructor)':msg.role==='admin'?' (Admin)':''));
+      vcUpdateVideoLabel(fromId, msg.name + (msg.role==='instructor'?' (Instructor)':msg.role==='admin'?' (Admin)':msg.role==='adminstaff'?' (Admin Staff)':''));
       vcUpdateParticipants();
       if(isRoomHost) {
         Object.keys(dataConnections).forEach(function(id) {
@@ -7365,7 +7390,7 @@ function vcOnData(raw, fromId) {
     case 'peer-name':
       peerNames[msg.peerId] = msg.name;
       peerRoles[msg.peerId] = msg.role || 'student';
-      vcUpdateVideoLabel(msg.peerId, msg.name + (msg.role==='instructor'?' (Instructor)':msg.role==='admin'?' (Admin)':''));
+      vcUpdateVideoLabel(msg.peerId, msg.name + (msg.role==='instructor'?' (Instructor)':msg.role==='admin'?' (Admin)':msg.role==='adminstaff'?' (Admin Staff)':''));
       vcUpdateParticipants();
       break;
     case 'peer-list':
@@ -7540,10 +7565,10 @@ function vcCallPeerWithRetry(peerId, name, attempt) {
 
 // ── Show Conference View ──
 function vcShowConference(title, role) {
-  var containerId = role==='admin' ? 'videoRoom' : role==='instructor' ? 'iVideoRoom' : 'sVideoRoom';
+  var containerId = role==='admin' ? 'videoRoom' : role==='adminstaff' ? 'asVideoRoom' : role==='instructor' ? 'iVideoRoom' : 'sVideoRoom';
   var room = document.getElementById(containerId);
   var userName = vcCurrentUserName;
-  var showHostControls = isRoomHost && (role==='instructor' || role==='admin');
+  var showHostControls = isRoomHost && (role==='instructor' || role==='admin' || role==='adminstaff');
 
   room.innerHTML = `
     <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px;flex-wrap:wrap;gap:8px;">
@@ -8423,15 +8448,16 @@ function exitVideoRoom(role) {
   isRoomHost = false; currentRoomCode = '';
 
   // Clear all video element srcObjects to fully release media references
-  var containerId = role==='admin' ? 'videoRoom' : role==='instructor' ? 'iVideoRoom' : 'sVideoRoom';
+  var containerId = role==='admin' ? 'videoRoom' : role==='adminstaff' ? 'asVideoRoom' : role==='instructor' ? 'iVideoRoom' : 'sVideoRoom';
   var container = document.getElementById(containerId);
   if(container) {
     container.querySelectorAll('video').forEach(function(v){ v.srcObject = null; });
   }
 
-  var listId = role==='admin' ? 'videoClassList' : role==='instructor' ? 'iVideoClassList' : 'sVideoClassList';
-  document.getElementById(listId).style.display = 'block';
-  container.style.display = 'none';
+  var listId = role==='admin' ? 'videoClassList' : role==='adminstaff' ? 'asVideoContent' : role==='instructor' ? 'iVideoClassList' : 'sVideoClassList';
+  var listEl = document.getElementById(listId);
+  if(listEl) listEl.style.display = 'block';
+  if(container) container.style.display = 'none';
 }
 
 // ============================== CLASS SESSION FUNCTIONS ==============================
@@ -8543,6 +8569,78 @@ function deleteClassSession(id) {
   showToast('Class session deleted');
   if(currentRole === 'instructor') renderInstructorClassSessions();
   if(currentRole === 'admin') renderAdminClassSessions();
+}
+
+// ============================== ADMIN MEETING FUNCTIONS ==============================
+function createAdminMeeting() {
+  var title = (document.getElementById('amTitle')?.value || '').trim();
+  var description = (document.getElementById('amDescription')?.value || '').trim();
+  var date = document.getElementById('amDate')?.value;
+  var time = document.getElementById('amTime')?.value;
+  var duration = parseInt(document.getElementById('amDuration')?.value) || 60;
+
+  if(!title) { showToast('Please enter a meeting title'); return; }
+  if(!date) { showToast('Please select a date'); return; }
+  if(!time) { showToast('Please select a start time'); return; }
+
+  var meeting = {
+    id: 'AM-' + Date.now(),
+    title: title,
+    description: description,
+    date: date,
+    time: time,
+    duration: duration,
+    status: 'scheduled',
+    createdBy: currentLoggedInUser ? currentLoggedInUser.name : 'Admin',
+    createdAt: new Date().toISOString()
+  };
+
+  adminMeetings.push(meeting);
+  saveState();
+  closeModal('createAdminMeetingModal');
+  showToast('Admin meeting "' + title + '" scheduled successfully');
+  addNotification('Admin meeting scheduled: "' + title + '"', 'calendar', null, ['admin','adminstaff']);
+
+  document.getElementById('amTitle').value = '';
+  document.getElementById('amDescription').value = '';
+  document.getElementById('amDate').value = '';
+  document.getElementById('amTime').value = '';
+  document.getElementById('amDuration').value = '60';
+
+  renderAdminMeetingsList();
+}
+
+function renderAdminMeetingsList() {
+  var container = document.getElementById('adminMeetingsList');
+  if(!container) return;
+
+  if(adminMeetings.length === 0) {
+    container.innerHTML = '<tr><td colspan="6" style="text-align:center;color:var(--text-muted);padding:24px;">No admin meetings scheduled. Click "Schedule Admin Meeting" to create one.</td></tr>';
+    return;
+  }
+
+  container.innerHTML = adminMeetings.map(function(m) {
+    var timeStr = m.time ? new Date('2000-01-01T'+m.time).toLocaleTimeString([],{hour:'numeric',minute:'2-digit'}) : m.time;
+    var escapedTitle = m.title.replace(/'/g,"\\'");
+    return '<tr>' +
+      '<td><strong>' + m.title + '</strong>' + (m.description ? '<div style="font-size:11px;color:var(--text-muted);margin-top:2px;">' + m.description.substring(0,60) + (m.description.length > 60 ? '...' : '') + '</div>' : '') + '</td>' +
+      '<td>' + (m.createdBy || 'Admin') + '</td>' +
+      '<td>' + m.date + ' ' + timeStr + '</td>' +
+      '<td>' + m.duration + 'min</td>' +
+      '<td><span class="badge badge-purple"><span class="badge-dot"></span>Admin Only</span></td>' +
+      '<td>' +
+        '<button class="btn btn-sm btn-primary" onclick="enterVideoRoom(\'' + escapedTitle + '\',\'admin\')" style="margin-right:6px;">Join</button>' +
+        '<button class="btn btn-sm btn-danger" onclick="deleteAdminMeeting(\'' + m.id + '\')">Delete</button>' +
+      '</td>' +
+    '</tr>';
+  }).join('');
+}
+
+function deleteAdminMeeting(id) {
+  adminMeetings = adminMeetings.filter(function(m){ return m.id !== id; });
+  saveState();
+  showToast('Admin meeting deleted');
+  renderAdminMeetingsList();
 }
 
 // ============================== ASSIGNMENT FUNCTIONS ==============================
@@ -12242,6 +12340,7 @@ async function saveToCloud() {
         chatFollows: lmsChatFollows,
         driveResources: driveResources,
         classSessions: classSessions,
+        adminMeetings: adminMeetings,
         instructorAssignments: instructorAssignments,
         instructorResources: instructorResources,
         studentProfiles: studentProfiles,
@@ -12411,6 +12510,7 @@ async function syncFromCloud() {
     // Restore additional data arrays from cloud backup
     try {
       if (Array.isArray(backupData.data.classSessions)) classSessions = backupData.data.classSessions;
+      if (Array.isArray(backupData.data.adminMeetings)) adminMeetings = backupData.data.adminMeetings;
       if (Array.isArray(backupData.data.instructorAssignments)) instructorAssignments = backupData.data.instructorAssignments;
       if (Array.isArray(backupData.data.instructorResources)) instructorResources = backupData.data.instructorResources;
       if (backupData.data.studentProfiles && typeof backupData.data.studentProfiles === 'object') studentProfiles = backupData.data.studentProfiles;
@@ -12672,6 +12772,17 @@ async function mergeFromCloud() {
         });
       }
     } catch(e) { console.warn('[Merge] classSessions error:', e); }
+
+    // Merge admin meetings
+    try {
+      if (Array.isArray(backupData.data.adminMeetings)) {
+        backupData.data.adminMeetings.forEach(function(m) {
+          if (m && m.id && !adminMeetings.some(function(lm) { return lm.id === m.id; })) {
+            adminMeetings.push(m);
+          }
+        });
+      }
+    } catch(e) { console.warn('[Merge] adminMeetings error:', e); }
 
     // Merge instructor assignments
     try {
@@ -13078,6 +13189,18 @@ async function silentMergeFromBackup(fileId) {
       } catch(e) { console.warn('[Merge] classSessions error:', e); }
     }
 
+    // Merge admin meetings
+    if (Array.isArray(backupData.data.adminMeetings)) {
+      try {
+        backupData.data.adminMeetings.forEach(function(m) {
+          if (m && m.id && !adminMeetings.some(function(lm) { return lm.id === m.id; })) {
+            adminMeetings.push(m);
+            changed = true;
+          }
+        });
+      } catch(e) { console.warn('[Merge] adminMeetings error:', e); }
+    }
+
     // Merge instructor assignments
     if (Array.isArray(backupData.data.instructorAssignments)) {
       try {
@@ -13413,6 +13536,7 @@ async function autoSaveToAllFolders() {
         chatFollows: lmsChatFollows,
         driveResources: driveResources,
         classSessions: classSessions,
+        adminMeetings: adminMeetings,
         instructorAssignments: instructorAssignments,
         instructorResources: instructorResources,
         studentProfiles: studentProfiles,
@@ -16756,13 +16880,25 @@ function buildAdminStaffPages() {
 
   // Video Conference
   html += '<section class="page" id="page-as-video">' +
-    '<div class="card" style="padding:24px;text-align:center;">' +
-      '<h3 style="font-family:\'Playfair Display\',serif;margin-bottom:12px;">Video Conference</h3>' +
-      '<p style="color:var(--text-muted);margin-bottom:20px;">Join or view scheduled video sessions</p>' +
-      '<div id="asVideoList">' +
-        (function(){ var vh=''; classSessions.filter(function(cs){ return cs.type==='video' || cs.isLive; }).forEach(function(cs){ vh += '<div class="card" style="text-align:left;padding:16px;margin-bottom:12px;"><div style="display:flex;justify-content:space-between;align-items:center;"><div><strong>'+cs.title+'</strong><div style="font-size:12px;color:var(--text-muted);">'+cs.course+' &bull; '+(cs.date||'')+'</div></div><span class="badge badge-blue">Scheduled</span></div></div>'; }); return vh || '<p style="color:var(--text-muted);font-size:13px;">No video sessions currently scheduled.</p>'; })() +
+    '<div id="asVideoContent">' +
+      '<div class="card" style="margin-bottom:18px;border-color:var(--purple);">' +
+        '<div class="card-header"><h3 style="color:var(--purple);">Admin Meetings</h3><span style="font-size:12px;color:var(--text-muted);">Meetings for Administrator &amp; Admin Staff</span></div>' +
+        '<div class="table-wrapper"><table><thead><tr><th>Meeting</th><th>Scheduled By</th><th>Date &amp; Time</th><th>Duration</th><th>Action</th></tr></thead><tbody id="asAdminMeetingsList">' +
+          (function(){ if(adminMeetings.length===0) return '<tr><td colspan="5" style="text-align:center;color:var(--text-muted);padding:24px;">No admin meetings scheduled.</td></tr>'; return adminMeetings.map(function(m){ var ts=m.time?new Date('2000-01-01T'+m.time).toLocaleTimeString([],{hour:'numeric',minute:'2-digit'}):m.time; var en=m.title.replace(/\'/g,"\\'"); return '<tr><td><strong>'+m.title+'</strong>'+(m.description?'<div style="font-size:11px;color:var(--text-muted);margin-top:2px;">'+m.description.substring(0,60)+(m.description.length>60?'...':'')+'</div>':'')+'</td><td>'+(m.createdBy||'Admin')+'</td><td>'+m.date+' '+ts+'</td><td>'+m.duration+'min</td><td><button class="btn btn-sm btn-primary" onclick="enterVideoRoom(\''+en+'\',\'adminstaff\')">Join</button></td></tr>'; }).join(''); })() +
+        '</tbody></table></div>' +
+      '</div>' +
+      '<div class="card">' +
+        '<div class="card-header"><h3>Join a Meeting</h3></div>' +
+        '<div style="padding:20px;text-align:center;">' +
+          '<p style="color:var(--text-muted);font-size:13px;margin-bottom:16px;">Enter a room code shared by the meeting host to join</p>' +
+          '<div style="display:flex;gap:8px;align-items:center;justify-content:center;">' +
+            '<input type="text" class="form-control" id="as-vc-join-code" placeholder="ABC123" maxlength="6" style="font-family:monospace;font-size:20px;letter-spacing:4px;text-align:center;text-transform:uppercase;width:200px;" onkeyup="this.value=this.value.toUpperCase();if(event.key===\'Enter\')asJoinMeetingByCode()">' +
+            '<button class="btn btn-primary" onclick="asJoinMeetingByCode()">Join</button>' +
+          '</div>' +
+        '</div>' +
       '</div>' +
     '</div>' +
+    '<div id="asVideoRoom" style="display:none;"></div>' +
   '</section>';
 
   // Student Progress
@@ -16914,6 +17050,37 @@ function asFilterStudents() {
     var matchCourse = course === 'all' || c === course;
     row.style.display = (matchSearch && matchCourse) ? '' : 'none';
   });
+}
+
+// ---- Admin Staff Video Meeting Functions ----
+function asJoinMeetingByCode() {
+  var code = (document.getElementById('as-vc-join-code')?.value || '').toUpperCase().trim();
+  if(!code || code.length < 4) { showToast('Please enter a valid room code'); return; }
+  vcCurrentRole = 'adminstaff';
+  vcCurrentUserName = currentLoggedInUser ? currentLoggedInUser.name : 'Admin Staff';
+  var listEl = document.getElementById('asVideoContent');
+  if(listEl) listEl.style.display = 'none';
+  var room = document.getElementById('asVideoRoom');
+  room.style.display = 'block';
+  room.innerHTML = '<div style="display:flex;align-items:center;gap:12px;margin-bottom:24px;">' +
+    '<button class="btn btn-secondary btn-sm" onclick="exitVideoRoom(\'adminstaff\')">&#8592; Back</button>' +
+    '<h3 style="font-family:\'Playfair Display\',serif;">Admin Meeting</h3></div>' +
+    '<div class="vc-lobby">' +
+      '<div class="vc-lobby-preview"><video id="vc-preview" autoplay muted playsinline></video>' +
+        '<div id="vc-preview-ph" style="position:absolute;inset:0;display:flex;align-items:center;justify-content:center;"><div style="text-align:center;color:var(--text-muted);"><div style="font-size:48px;margin-bottom:8px;">&#x1F4F9;</div><div>Starting camera...</div></div></div></div>' +
+      '<div style="display:flex;gap:12px;">' +
+        '<button class="vc-btn active" id="vc-lobby-mic" onclick="toggleLobbyDevice(\'audio\')" title="Microphone">&#x1F3A4;</button>' +
+        '<button class="vc-btn active" id="vc-lobby-cam" onclick="toggleLobbyDevice(\'video\')" title="Camera">&#x1F4F9;</button></div>' +
+      '<div id="vc-status" class="vc-status">Ready to connect</div>' +
+      '<div style="text-align:center;">' +
+        '<div style="font-size:13px;color:var(--text-muted);margin-bottom:8px;">Joining room with code:</div>' +
+        '<div style="font-family:monospace;font-size:22px;letter-spacing:4px;color:var(--accent);margin-bottom:16px;">' + code + '</div></div></div>';
+  vcStartCameraPreview();
+  document.getElementById('vc-join-code')?.remove();
+  var fakeInput = document.createElement('input');
+  fakeInput.type = 'hidden'; fakeInput.id = 'vc-join-code'; fakeInput.value = code;
+  room.appendChild(fakeInput);
+  setTimeout(function(){ vcJoinRoom('Admin Meeting','adminstaff'); }, 500);
 }
 
 // ---- Admin Staff Duty Page Functions ----
