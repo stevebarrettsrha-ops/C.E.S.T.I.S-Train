@@ -16621,7 +16621,7 @@ function buildAdminStaffPages() {
     html += '<div class="card" style="margin-bottom:24px;border-color:var(--red);">' +
       '<div class="card-header"><h3 style="color:var(--red);">Overdue Tasks</h3></div>';
     overdueTasks.slice(0,5).forEach(function(task) {
-      html += '<div style="display:flex;align-items:center;gap:12px;padding:10px 0;border-bottom:1px solid var(--border);">' +
+      html += '<div style="display:flex;align-items:center;gap:12px;padding:10px 0;border-bottom:1px solid var(--border);cursor:pointer;transition:background var(--transition);border-radius:var(--radius-sm);" onclick="adrOpenTaskDetail(\''+task.id+'\')" onmouseover="this.style.background=\'var(--bg-card-hover)\'" onmouseout="this.style.background=\'transparent\'">' +
         '<span class="adr-task-tag adr-tag-'+task.priority+'" style="font-size:10px;">'+task.priority.toUpperCase()+'</span>' +
         '<span style="flex:1;font-size:13px;">'+task.title+'</span>' +
         '<span style="font-size:11px;color:var(--red);">Due: '+adrFormatDeadline(task.deadline)+'</span>' +
@@ -16635,7 +16635,7 @@ function buildAdminStaffPages() {
     html += '<div class="card" style="margin-bottom:24px;">' +
       '<div class="card-header"><h3>Upcoming Duties</h3></div>';
     pendingTasks.filter(function(t){ return !adrIsOverdue(t); }).slice(0,5).forEach(function(task) {
-      html += '<div style="display:flex;align-items:center;gap:12px;padding:10px 0;border-bottom:1px solid var(--border);">' +
+      html += '<div style="display:flex;align-items:center;gap:12px;padding:10px 0;border-bottom:1px solid var(--border);cursor:pointer;transition:background var(--transition);border-radius:var(--radius-sm);" onclick="adrOpenTaskDetail(\''+task.id+'\')" onmouseover="this.style.background=\'var(--bg-card-hover)\'" onmouseout="this.style.background=\'transparent\'">' +
         '<span class="adr-task-tag adr-tag-'+task.priority+'" style="font-size:10px;">'+task.priority.toUpperCase()+'</span>' +
         '<span class="adr-task-tag adr-tag-'+task.taskType+'" style="font-size:10px;">'+task.taskType.toUpperCase()+'</span>' +
         '<span style="flex:1;font-size:13px;">'+task.title+'</span>' +
@@ -16873,6 +16873,14 @@ function buildAdminStaffPages() {
   html += '<section class="page" id="page-as-class-attendance">' +
     '<iframe id="asClassAttendanceFrame" style="width:100%;height:calc(100vh - 80px);border:none;border-radius:12px;"></iframe>' +
   '</section>';
+
+  // ---- Task Detail Modal (needed for My Duties click-to-view) ----
+  html += '<div class="modal-overlay" id="adrTaskDetailModal">' +
+    '<div class="modal" style="max-width:700px;max-height:85vh;overflow-y:auto;">' +
+      '<div class="modal-header"><h3 id="adrDetailTitle">Task Details</h3><button class="modal-close" onclick="closeModal(\'adrTaskDetailModal\')">&times;</button></div>' +
+      '<div id="adrDetailBody"></div>' +
+    '</div>' +
+  '</div>';
 
   mc.innerHTML = html;
   loadSupportMessages();
