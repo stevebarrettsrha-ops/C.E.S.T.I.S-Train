@@ -17360,43 +17360,54 @@ function buildCmcPages() {
   html += '<button class="cmc-refresh-btn" id="cmcRefreshBtn" onclick="cmcRefreshFromDrive()">Refresh from Drive</button>';
   html += '</div>';
 
-  // KPI Cards
+  // Compute local metrics
+  var completionRate = totalStudents > 0 ? Math.round((totalCertified/totalStudents)*100) : 0;
+  var incompleteCount = students.filter(function(s){ return s.stage==='incomplete'; }).length;
+  var inTrainingCount = students.filter(function(s){ return s.stage==='training'; }).length;
+  var totalExams = (exams||[]).length;
+  var completedExams = (exams||[]).filter(function(e){ return e.status==='completed'; }).length;
+  var totalExamResults = (examResults||[]).length;
+  var passedResults = (examResults||[]).filter(function(r){ return r.passed; }).length;
+  var examPassRate = totalExamResults > 0 ? Math.round((passedResults/totalExamResults)*100) : 0;
+  var attRecCount = (attendanceRecords||[]).length;
+
+  // KPI Cards — all driven by local data
   html += '<div class="cmc-kpi-grid">';
-  html += '<div class="cmc-kpi-card kpi-payroll" onclick="cmcShowDetail(\'payroll\')"><div class="cmc-kpi-icon">💰</div>';
-  html += '<div class="cmc-kpi-label">Staff Payroll</div>';
-  html += '<div class="cmc-kpi-value" id="cmcKpiPayroll">--</div>';
-  html += '<div class="cmc-kpi-sub" id="cmcKpiPayrollSub">' + totalStaff + ' staff members on record</div>';
+  html += '<div class="cmc-kpi-card kpi-attendance" onclick="cmcShowDetail(\'attendance\')"><div class="cmc-kpi-icon">👥</div>';
+  html += '<div class="cmc-kpi-label">Total Enrolment</div>';
+  html += '<div class="cmc-kpi-value">' + totalStudents + '</div>';
+  html += '<div class="cmc-kpi-sub">' + inTrainingCount + ' in training, ' + totalCertified + ' certified</div>';
   html += '<div class="cmc-kpi-hint">Click to view details</div></div>';
 
-  html += '<div class="cmc-kpi-card kpi-clockin" onclick="cmcShowDetail(\'clockin\')"><div class="cmc-kpi-icon">⏰</div>';
-  html += '<div class="cmc-kpi-label">Staff Attendance</div>';
-  html += '<div class="cmc-kpi-value" id="cmcKpiClockin">--</div>';
-  html += '<div class="cmc-kpi-sub" id="cmcKpiClockinSub">Clock-in data pending</div>';
-  html += '<div class="cmc-kpi-hint">Click to view details</div></div>';
-
-  html += '<div class="cmc-kpi-card kpi-cashbook" onclick="cmcShowDetail(\'cashbook\')"><div class="cmc-kpi-icon">📒</div>';
-  html += '<div class="cmc-kpi-label">Cashbook Balance</div>';
-  html += '<div class="cmc-kpi-value" id="cmcKpiCashbook">--</div>';
-  html += '<div class="cmc-kpi-sub" id="cmcKpiCashbookSub">Income &amp; expenditure</div>';
-  html += '<div class="cmc-kpi-hint">Click to view details</div></div>';
-
-  html += '<div class="cmc-kpi-card kpi-virement" onclick="cmcShowDetail(\'virement\')"><div class="cmc-kpi-icon">🔄</div>';
-  html += '<div class="cmc-kpi-label">Virement Requests</div>';
-  html += '<div class="cmc-kpi-value" id="cmcKpiVirement">--</div>';
-  html += '<div class="cmc-kpi-sub" id="cmcKpiVirementSub">Budget transfer requests</div>';
-  html += '<div class="cmc-kpi-hint">Click to view details</div></div>';
-
-  html += '<div class="cmc-kpi-card kpi-attendance" onclick="cmcShowDetail(\'attendance\')"><div class="cmc-kpi-icon">📋</div>';
-  html += '<div class="cmc-kpi-label">Student Attendance</div>';
+  html += '<div class="cmc-kpi-card kpi-clockin" onclick="cmcShowDetail(\'attendance\')"><div class="cmc-kpi-icon">📋</div>';
+  html += '<div class="cmc-kpi-label">Avg Attendance</div>';
   html += '<div class="cmc-kpi-value" id="cmcKpiAttendance">' + avgAttendance + '%</div>';
-  html += '<div class="cmc-kpi-sub">' + totalStudents + ' students enrolled</div>';
+  html += '<div class="cmc-kpi-sub">' + attRecCount + ' attendance records</div>';
   html += '<div class="cmc-kpi-hint">Click to view details</div></div>';
 
-  html += '<div class="cmc-kpi-card kpi-fees" onclick="cmcShowDetail(\'fees\')"><div class="cmc-kpi-icon">🎓</div>';
-  html += '<div class="cmc-kpi-label">School Fees</div>';
-  html += '<div class="cmc-kpi-value" id="cmcKpiFees">--</div>';
-  html += '<div class="cmc-kpi-sub" id="cmcKpiFeesSub">Fee collection status</div>';
+  html += '<div class="cmc-kpi-card kpi-cashbook" onclick="cmcShowDetail(\'fees\')"><div class="cmc-kpi-icon">🏆</div>';
+  html += '<div class="cmc-kpi-label">Completion Rate</div>';
+  html += '<div class="cmc-kpi-value">' + completionRate + '%</div>';
+  html += '<div class="cmc-kpi-sub">' + totalCertified + ' of ' + totalStudents + ' certified</div>';
   html += '<div class="cmc-kpi-hint">Click to view details</div></div>';
+
+  html += '<div class="cmc-kpi-card kpi-virement"><div class="cmc-kpi-icon">📝</div>';
+  html += '<div class="cmc-kpi-label">Exam Pass Rate</div>';
+  html += '<div class="cmc-kpi-value">' + examPassRate + '%</div>';
+  html += '<div class="cmc-kpi-sub">' + passedResults + ' of ' + totalExamResults + ' passed (' + completedExams + ' exams)</div>';
+  html += '</div>';
+
+  html += '<div class="cmc-kpi-card kpi-payroll"><div class="cmc-kpi-icon">👨‍🏫</div>';
+  html += '<div class="cmc-kpi-label">Staff Count</div>';
+  html += '<div class="cmc-kpi-value">' + (totalInstructors + totalStaff) + '</div>';
+  html += '<div class="cmc-kpi-sub">' + totalInstructors + ' instructors, ' + totalStaff + ' admin staff</div>';
+  html += '</div>';
+
+  html += '<div class="cmc-kpi-card kpi-fees"><div class="cmc-kpi-icon">⚠️</div>';
+  html += '<div class="cmc-kpi-label">At Risk</div>';
+  html += '<div class="cmc-kpi-value">' + incompleteCount + '</div>';
+  html += '<div class="cmc-kpi-sub">Students marked incomplete</div>';
+  html += '</div>';
   html += '</div>';
 
   // Charts Row
@@ -17409,42 +17420,86 @@ function buildCmcPages() {
   html += '<div class="cmc-chart-card"><h4>Academic Performance (GPA)</h4><canvas id="cmcChartGpa"></canvas></div>';
   html += '</div>';
 
-  // Summary Table
-  html += '<div class="cmc-table-card"><h4>System Status Overview</h4>';
-  html += '<table class="cmc-table"><thead><tr><th>System</th><th>Status</th><th>Last Sync</th><th>Records</th></tr></thead>';
-  html += '<tbody id="cmcSystemTable">';
-  html += '<tr><td>Staff Payslip Dashboard</td><td><span class="cmc-status info" id="cmcStatusPayslip">Pending</span></td><td id="cmcSyncPayslip">--</td><td id="cmcRecPayslip">--</td></tr>';
-  html += '<tr><td>Staff Clock-in System</td><td><span class="cmc-status info" id="cmcStatusClockin">Pending</span></td><td id="cmcSyncClockin">--</td><td id="cmcRecClockin">--</td></tr>';
-  html += '<tr><td>CESTIS Cashbook</td><td><span class="cmc-status info" id="cmcStatusCashbook">Pending</span></td><td id="cmcSyncCashbook">--</td><td id="cmcRecCashbook">--</td></tr>';
-  html += '<tr><td>Virement Requests</td><td><span class="cmc-status info" id="cmcStatusVirement">Pending</span></td><td id="cmcSyncVirement">--</td><td id="cmcRecVirement">--</td></tr>';
-  html += '<tr><td>Class Attendance</td><td><span class="cmc-status good">Local</span></td><td>Live</td><td>' + students.length + ' students</td></tr>';
-  html += '<tr><td>School Fee Management</td><td><span class="cmc-status good">Local</span></td><td>Live</td><td>' + students.length + ' records</td></tr>';
+  // Summary Table — shows all local data sources + Drive sources
+  html += '<div class="cmc-table-card"><h4>Data Sources</h4>';
+  html += '<table class="cmc-table"><thead><tr><th>System</th><th>Source</th><th>Status</th><th>Records</th></tr></thead>';
+  html += '<tbody>';
+  html += '<tr><td>Student Enrolment</td><td><span class="cmc-status good">Local</span></td><td>Active</td><td>' + students.length + ' students</td></tr>';
+  html += '<tr><td>Class Attendance</td><td><span class="cmc-status good">Local</span></td><td>Active</td><td>' + attRecCount + ' records</td></tr>';
+  html += '<tr><td>Exam Results</td><td><span class="cmc-status good">Local</span></td><td>Active</td><td>' + totalExamResults + ' results</td></tr>';
+  html += '<tr><td>Instructor Data</td><td><span class="cmc-status good">Local</span></td><td>Active</td><td>' + totalInstructors + ' instructors</td></tr>';
+  html += '<tr><td>User Accounts</td><td><span class="cmc-status good">Local</span></td><td>Active</td><td>' + userAccounts.length + ' accounts</td></tr>';
+  html += '<tr><td>Staff Payslip Dashboard</td><td><span class="cmc-status info">Drive</span></td><td id="cmcStatusPayslip">Not synced</td><td id="cmcRecPayslip">--</td></tr>';
+  html += '<tr><td>Staff Clock-in System</td><td><span class="cmc-status info">Drive</span></td><td id="cmcStatusClockin">Not synced</td><td id="cmcRecClockin">--</td></tr>';
+  html += '<tr><td>CESTIS Cashbook</td><td><span class="cmc-status info">Drive</span></td><td id="cmcStatusCashbook">Not synced</td><td id="cmcRecCashbook">--</td></tr>';
+  html += '<tr><td>Virement Requests</td><td><span class="cmc-status info">Drive</span></td><td id="cmcStatusVirement">Not synced</td><td id="cmcRecVirement">--</td></tr>';
   html += '</tbody></table></div>';
 
   html += '</section>';
 
   // ---- Financial Overview Page ----
+  // Compute fee/programme data locally
+  var programmes = ['Welding','Electrical Installation','Cosmetology','Business Administration','Auto Mechanics','Plumbing','Carpentry','Hospitality & Tourism','Information Technology'];
+  var progData = programmes.map(function(p) {
+    var enrolled = students.filter(function(s){return s.course===p;}).length;
+    var cert = students.filter(function(s){return s.course===p&&(s.stage==='certified'||s.stage==='collected');}).length;
+    var inc = students.filter(function(s){return s.course===p&&s.stage==='incomplete';}).length;
+    return {name:p, enrolled:enrolled, certified:cert, incomplete:inc};
+  }).filter(function(p){return p.enrolled>0;});
+
   html += '<section class="page" id="page-cmc-financial">';
   html += '<div class="cmc-refresh-bar">';
-  html += '<h3 class="cmc-section-title">Financial Overview</h3>';
-  html += '<button class="cmc-refresh-btn" onclick="cmcRefreshFromDrive()">Refresh Data</button>';
+  html += '<h3 class="cmc-section-title">Financial & Programme Overview</h3>';
+  html += '<button class="cmc-refresh-btn" onclick="cmcRefreshFromDrive()">Sync Drive Data</button>';
   html += '</div>';
-  html += '<div class="cmc-kpi-grid" style="grid-template-columns:repeat(2,1fr);">';
-  html += '<div class="cmc-kpi-card kpi-cashbook"><div class="cmc-kpi-icon">📒</div>';
-  html += '<div class="cmc-kpi-label">Cash Book Summary</div>';
+
+  // Programme enrolment KPIs
+  html += '<div class="cmc-kpi-grid" style="grid-template-columns:repeat(3,1fr);">';
+  html += '<div class="cmc-kpi-card kpi-attendance"><div class="cmc-kpi-icon">🎓</div>';
+  html += '<div class="cmc-kpi-label">Programmes Active</div>';
+  html += '<div class="cmc-kpi-value">' + progData.length + '</div>';
+  html += '<div class="cmc-kpi-sub">Of ' + programmes.length + ' available</div></div>';
+  html += '<div class="cmc-kpi-card kpi-cashbook"><div class="cmc-kpi-icon">📊</div>';
+  html += '<div class="cmc-kpi-label">Fee Completion</div>';
+  html += '<div class="cmc-kpi-value" id="cmcKpiFees">' + completionRate + '%</div>';
+  html += '<div class="cmc-kpi-sub" id="cmcKpiFeesSub">' + totalCertified + ' certified of ' + totalStudents + '</div></div>';
+  html += '<div class="cmc-kpi-card kpi-virement"><div class="cmc-kpi-icon">📒</div>';
+  html += '<div class="cmc-kpi-label">Drive Finance</div>';
   html += '<div class="cmc-kpi-value" id="cmcFinCashbook">--</div>';
-  html += '<div class="cmc-kpi-sub" id="cmcFinCashbookSub">Total income vs expenditure</div></div>';
-  html += '<div class="cmc-kpi-card kpi-virement"><div class="cmc-kpi-icon">🔄</div>';
-  html += '<div class="cmc-kpi-label">Virement Summary</div>';
-  html += '<div class="cmc-kpi-value" id="cmcFinVirement">--</div>';
-  html += '<div class="cmc-kpi-sub" id="cmcFinVirementSub">Pending / Approved transfers</div></div>';
+  html += '<div class="cmc-kpi-sub" id="cmcFinCashbookSub">Sync to load cashbook data</div></div>';
   html += '</div>';
+
+  // Charts: Fee completion doughnut + Enrolment by programme bar
+  html += '<div class="cmc-charts-grid">';
+  html += '<div class="cmc-chart-card"><h4>Fee Collection Status</h4><canvas id="cmcChartFees"></canvas></div>';
+  html += '<div class="cmc-chart-card"><h4>Enrolment by Programme</h4><canvas id="cmcChartEnrolment"></canvas></div>';
+  html += '</div>';
+
+  // Cashbook Trends (populated after Drive sync)
   html += '<div class="cmc-charts-grid">';
   html += '<div class="cmc-chart-card"><h4>Cashbook Trends</h4><canvas id="cmcChartCashbookTrend"></canvas></div>';
-  html += '<div class="cmc-chart-card"><h4>Fee Collection Status</h4><canvas id="cmcChartFees"></canvas></div>';
+  html += '<div class="cmc-chart-card"><h4>Virement Summary</h4>';
+  html += '<div id="cmcFinVirementPanel" style="padding:20px;text-align:center;color:var(--text-muted);font-size:13px;">';
+  html += '<div class="cmc-kpi-value" id="cmcFinVirement" style="font-size:28px;">--</div>';
+  html += '<div id="cmcFinVirementSub">Sync Google Drive to load virement data</div>';
+  html += '</div></div>';
   html += '</div>';
-  html += '<div class="cmc-table-card"><h4>Recent Financial Activity</h4>';
-  html += '<div id="cmcFinancialActivity" style="color:var(--text-muted);font-size:13px;padding:12px;">Connect to Google Drive to view financial records from Cashbook and Virement systems.</div>';
+
+  // Programme breakdown table
+  html += '<div class="cmc-table-card"><h4>Programme Breakdown</h4>';
+  html += '<table class="cmc-table"><thead><tr><th>Programme</th><th>Enrolled</th><th>Certified</th><th>Incomplete</th><th>Completion</th></tr></thead><tbody>';
+  progData.forEach(function(p) {
+    var pct = p.enrolled > 0 ? Math.round(p.certified/p.enrolled*100) : 0;
+    var cls = pct >= 60 ? 'good' : pct >= 30 ? 'warning' : 'critical';
+    html += '<tr><td><strong>' + p.name + '</strong></td><td>' + p.enrolled + '</td><td>' + p.certified + '</td><td>' + p.incomplete + '</td>';
+    html += '<td><span class="cmc-status ' + cls + '">' + pct + '%</span></td></tr>';
+  });
+  if(progData.length === 0) html += '<tr><td colspan="5" style="text-align:center;color:var(--text-muted);">No students enrolled yet</td></tr>';
+  html += '</tbody></table></div>';
+
+  // Drive financial activity (populated after sync)
+  html += '<div class="cmc-table-card"><h4>Financial Activity (Google Drive)</h4>';
+  html += '<div id="cmcFinancialActivity" style="color:var(--text-muted);font-size:13px;padding:12px;">Click "Sync Drive Data" to load cashbook and virement records from Google Drive.</div>';
   html += '</div>';
 
   // Cashbook Checks / Transactions Section
@@ -17456,33 +17511,68 @@ function buildCmcPages() {
   html += '</div>';
   html += '<div id="cmcChecksTable" style="overflow-x:auto;">';
   html += '<table class="cmc-table"><thead><tr><th>Date</th><th>Description</th><th>Type</th><th>Check #</th><th>Amount</th><th>Balance</th></tr></thead>';
-  html += '<tbody id="cmcChecksBody"><tr><td colspan="6" style="text-align:center;color:var(--text-muted);padding:20px;">Click "Refresh Data" to load cashbook transactions from Google Drive.</td></tr></tbody></table>';
+  html += '<tbody id="cmcChecksBody"><tr><td colspan="6" style="text-align:center;color:var(--text-muted);padding:20px;">Click "Sync Drive Data" to load cashbook transactions.</td></tr></tbody></table>';
   html += '</div></div>';
 
   html += '</section>';
 
   // ---- Staff & HR Page ----
   html += '<section class="page" id="page-cmc-staff">';
-  html += '<div class="cmc-refresh-bar">';
-  html += '<h3 class="cmc-section-title">Staff & HR Overview</h3>';
-  html += '<button class="cmc-refresh-btn" onclick="cmcRefreshFromDrive()">Refresh Data</button>';
+  html += '<h3 class="cmc-section-title" style="margin-bottom:20px;">Staff & HR Overview</h3>';
+
+  // Staff KPIs from local data
+  html += '<div class="cmc-kpi-grid" style="grid-template-columns:repeat(3,1fr);">';
+  html += '<div class="cmc-kpi-card kpi-payroll"><div class="cmc-kpi-icon">👨‍🏫</div>';
+  html += '<div class="cmc-kpi-label">Instructors</div>';
+  html += '<div class="cmc-kpi-value">' + totalInstructors + '</div>';
+  html += '<div class="cmc-kpi-sub">Teaching staff on record</div></div>';
+  html += '<div class="cmc-kpi-card kpi-clockin"><div class="cmc-kpi-icon">🏢</div>';
+  html += '<div class="cmc-kpi-label">Admin Staff</div>';
+  html += '<div class="cmc-kpi-value">' + totalStaff + '</div>';
+  html += '<div class="cmc-kpi-sub">Administrative personnel</div></div>';
+  html += '<div class="cmc-kpi-card kpi-attendance"><div class="cmc-kpi-icon">👥</div>';
+  html += '<div class="cmc-kpi-label">Total Staff</div>';
+  html += '<div class="cmc-kpi-value">' + (totalInstructors + totalStaff) + '</div>';
+  html += '<div class="cmc-kpi-sub">All staff members</div></div>';
   html += '</div>';
-  html += '<div class="cmc-kpi-grid" style="grid-template-columns:repeat(2,1fr);">';
-  html += '<div class="cmc-kpi-card kpi-payroll"><div class="cmc-kpi-icon">💰</div>';
-  html += '<div class="cmc-kpi-label">Payroll Summary</div>';
-  html += '<div class="cmc-kpi-value" id="cmcHrPayroll">--</div>';
-  html += '<div class="cmc-kpi-sub" id="cmcHrPayrollSub">Total staff payroll data</div></div>';
-  html += '<div class="cmc-kpi-card kpi-clockin"><div class="cmc-kpi-icon">⏰</div>';
-  html += '<div class="cmc-kpi-label">Clock-in Summary</div>';
-  html += '<div class="cmc-kpi-value" id="cmcHrClockin">--</div>';
-  html += '<div class="cmc-kpi-sub" id="cmcHrClockinSub">Staff attendance &amp; punctuality</div></div>';
-  html += '</div>';
+
+  // Charts
   html += '<div class="cmc-charts-grid">';
-  html += '<div class="cmc-chart-card"><h4>Payroll Breakdown</h4><canvas id="cmcChartPayroll"></canvas></div>';
-  html += '<div class="cmc-chart-card"><h4>Staff Clock-in Trends</h4><canvas id="cmcChartClockin"></canvas></div>';
+  html += '<div class="cmc-chart-card"><h4>Staff Distribution</h4><canvas id="cmcChartStaffHR"></canvas></div>';
+  html += '<div class="cmc-chart-card"><h4>Students per Instructor</h4><canvas id="cmcChartStudentInstr"></canvas></div>';
   html += '</div>';
-  html += '<div class="cmc-table-card"><h4>Staff Records</h4>';
-  html += '<div id="cmcStaffRecords" style="color:var(--text-muted);font-size:13px;padding:12px;">Connect to Google Drive to view payslip and clock-in data from HR systems.</div>';
+
+  // Instructor table with local data
+  html += '<div class="cmc-table-card"><h4>Instructor Roster</h4>';
+  html += '<table class="cmc-table"><thead><tr><th>#</th><th>Name</th><th>Course</th><th>Students</th><th>Avg Attendance</th></tr></thead><tbody>';
+  (instructorData||[]).forEach(function(ins, i) {
+    var insStudents = students.filter(function(s){return s.instructor===ins.name;});
+    var insAtt = 0;
+    if(attendanceRecords && attendanceRecords.length > 0 && insStudents.length > 0) {
+      var insStudentIds = insStudents.map(function(s){return s.id;});
+      var insRecs = attendanceRecords.filter(function(r){return insStudentIds.indexOf(r.studentId) !== -1;});
+      if(insRecs.length > 0) {
+        var sum = 0;
+        insRecs.forEach(function(r) {
+          var days = r.days||{}, total=0, present=0;
+          ['Mon','Tue','Wed','Thu','Fri'].forEach(function(d){if(days[d]){total++;if(days[d]==='present'||days[d]==='late')present++;}});
+          sum += (total>0?(present/total*100):0);
+        });
+        insAtt = Math.round(sum/insRecs.length);
+      }
+    }
+    var attCls = insAtt >= 80 ? 'good' : insAtt >= 60 ? 'warning' : 'critical';
+    html += '<tr><td>' + (i+1) + '</td><td><strong>' + ins.name + '</strong></td><td>' + (ins.course||'--') + '</td>';
+    html += '<td>' + insStudents.length + '</td>';
+    html += '<td><span class="cmc-status ' + attCls + '">' + insAtt + '%</span></td></tr>';
+  });
+  if(!instructorData||instructorData.length===0) html += '<tr><td colspan="5" style="text-align:center;color:var(--text-muted);">No instructors on record</td></tr>';
+  html += '</tbody></table></div>';
+
+  // Drive data section
+  html += '<div class="cmc-table-card"><h4>Drive Data: Payslip & Clock-in</h4>';
+  html += '<div style="display:flex;justify-content:flex-end;margin-bottom:12px;"><button class="cmc-refresh-btn" onclick="cmcRefreshFromDrive()">Sync Drive Data</button></div>';
+  html += '<div id="cmcStaffRecords" style="color:var(--text-muted);font-size:13px;padding:12px;">Click "Sync Drive Data" to load payslip and clock-in records from Google Drive.</div>';
   html += '</div>';
   html += '</section>';
 
@@ -17505,10 +17595,10 @@ function buildCmcPages() {
   html += '</div>';
 
   // Student pipeline breakdown
-  var stages = {testing:0,interview:0,intraining:0,certified:0,collected:0,incomplete:0};
+  var stages = {testing:0,interview:0,training:0,certified:0,collected:0,incomplete:0};
   students.forEach(function(s){
     var st = (s.stage||'').toLowerCase().replace(/\s+/g,'');
-    if(st === 'in training' || st === 'intraining') stages.intraining++;
+    if(st === 'intraining' || st === 'training') stages.training++;
     else if(stages.hasOwnProperty(st)) stages[st]++;
   });
 
@@ -17517,17 +17607,41 @@ function buildCmcPages() {
   html += '<div class="cmc-chart-card"><h4>Attendance Distribution</h4><canvas id="cmcChartAttDist"></canvas></div>';
   html += '</div>';
 
-  // Top performers table
-  var topStudents = students.slice().sort(function(a,b){ return parseFloat(b.gpa)-parseFloat(a.gpa); }).slice(0,10);
+  // Top performers table — use examResults for scores and attendanceRecords for attendance
+  var studentExamAvg = {};
+  if(examResults && examResults.length > 0) {
+    examResults.forEach(function(r) {
+      var sid = r.studentId||r.student_id;
+      if(!sid) return;
+      if(!studentExamAvg[sid]) studentExamAvg[sid] = {total:0,count:0};
+      studentExamAvg[sid].total += (parseFloat(r.score)||0);
+      studentExamAvg[sid].count++;
+    });
+  }
+  var studentAttPct = {};
+  if(attendanceRecords && attendanceRecords.length > 0) {
+    attendanceRecords.forEach(function(r) {
+      var days = r.days||{}, total=0, present=0;
+      ['Mon','Tue','Wed','Thu','Fri'].forEach(function(d){if(days[d]){total++;if(days[d]==='present'||days[d]==='late')present++;}});
+      studentAttPct[r.studentId] = total > 0 ? Math.round(present/total*100) : 0;
+    });
+  }
+  var topStudents = students.slice().map(function(s) {
+    var examAvg = studentExamAvg[s.id] ? Math.round(studentExamAvg[s.id].total / studentExamAvg[s.id].count) : 0;
+    var att = studentAttPct[s.id] !== undefined ? studentAttPct[s.id] : (parseFloat(s.attendance)||0);
+    return {name:s.name, course:s.course, examAvg:examAvg, att:att, stage:s.stage};
+  }).sort(function(a,b){ return b.examAvg - a.examAvg; }).slice(0,10);
   html += '<div class="cmc-table-card"><h4>Top 10 Performers</h4>';
-  html += '<table class="cmc-table"><thead><tr><th>#</th><th>Name</th><th>Course</th><th>GPA</th><th>Attendance</th><th>Stage</th></tr></thead><tbody>';
+  html += '<table class="cmc-table"><thead><tr><th>#</th><th>Name</th><th>Course</th><th>Avg Score</th><th>Attendance</th><th>Stage</th></tr></thead><tbody>';
   topStudents.forEach(function(s, i) {
-    var attCls = s.attendance >= 80 ? 'good' : s.attendance >= 60 ? 'warning' : 'critical';
+    var attCls = s.att >= 80 ? 'good' : s.att >= 60 ? 'warning' : 'critical';
+    var scoreCls = s.examAvg >= 80 ? 'good' : s.examAvg >= 60 ? 'warning' : 'critical';
     html += '<tr><td>' + (i+1) + '</td><td>' + s.name + '</td><td>' + (s.course||'--') + '</td>';
-    html += '<td><strong>' + (s.gpa||'--') + '</strong></td>';
-    html += '<td><span class="cmc-status ' + attCls + '">' + (s.attendance||0) + '%</span></td>';
+    html += '<td><span class="cmc-status ' + scoreCls + '">' + s.examAvg + '%</span></td>';
+    html += '<td><span class="cmc-status ' + attCls + '">' + s.att + '%</span></td>';
     html += '<td>' + (s.stage||'--') + '</td></tr>';
   });
+  if(topStudents.length===0) html += '<tr><td colspan="6" style="text-align:center;color:var(--text-muted);">No students enrolled yet</td></tr>';
   html += '</tbody></table></div>';
   html += '</section>';
 
@@ -17743,7 +17857,41 @@ function cmcRenderCharts() {
     });
   }
 
-  // Financial page charts (placeholder data until Drive connected)
+  // Fee Collection Status — show real data immediately
+  var feeCollected = students.filter(function(s){ return s.stage === 'certified' || s.stage === 'collected'; }).length;
+  var feeOutstanding = students.length - feeCollected;
+  var feesEl = document.getElementById('cmcChartFees');
+  if(feesEl) {
+    cmcChartInstances.fees = new Chart(feesEl, {
+      type: 'doughnut',
+      data: {
+        labels: ['Completed (' + feeCollected + ')','In Progress (' + feeOutstanding + ')'],
+        datasets: [{ data: [feeCollected, feeOutstanding], backgroundColor: ['#2ecc71','#e74c3c'] }]
+      },
+      options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { position: 'right', labels: { color: '#8899aa', font: { family: 'DM Sans', size: 11 } } } } }
+    });
+  }
+
+  // Enrolment by Programme chart
+  var progLabels = []; var progCounts = [];
+  var progs = ['Welding','Electrical Installation','Cosmetology','Business Administration','Auto Mechanics','Plumbing','Carpentry','Hospitality & Tourism','Information Technology'];
+  progs.forEach(function(p) {
+    var count = students.filter(function(s){return s.course===p;}).length;
+    if(count > 0) { progLabels.push(p); progCounts.push(count); }
+  });
+  var enrolEl = document.getElementById('cmcChartEnrolment');
+  if(enrolEl) {
+    cmcChartInstances.enrolment = new Chart(enrolEl, {
+      type: 'bar',
+      data: {
+        labels: progLabels,
+        datasets: [{ label: 'Students', data: progCounts, backgroundColor: '#3498db', borderRadius: 6 }]
+      },
+      options: Object.assign({}, chartDefaults, { indexAxis: 'y', plugins: { legend: { display: false } } })
+    });
+  }
+
+  // Cashbook Trends chart (placeholder, populated after Drive sync)
   var cashTrendEl = document.getElementById('cmcChartCashbookTrend');
   if(cashTrendEl) {
     cmcChartInstances.cashTrend = new Chart(cashTrendEl, {
@@ -17759,42 +17907,39 @@ function cmcRenderCharts() {
     });
   }
 
-  var feesEl = document.getElementById('cmcChartFees');
-  if(feesEl) {
-    cmcChartInstances.fees = new Chart(feesEl, {
-      type: 'doughnut',
+  // Staff & HR page charts — use local data
+  var staffHREl = document.getElementById('cmcChartStaffHR');
+  if(staffHREl) {
+    var hrAdminCount = userAccounts.filter(function(u){ return u.role === 'admin'; }).length;
+    var hrInstrCount = (instructorData && instructorData.length) || 0;
+    var hrStaffCount = userAccounts.filter(function(u){ return u.role === 'adminstaff'; }).length;
+    var hrCmcCount = userAccounts.filter(function(u){ return u.role === 'cmc'; }).length;
+    cmcChartInstances.staffHR = new Chart(staffHREl, {
+      type: 'pie',
       data: {
-        labels: ['Collected','Outstanding'],
-        datasets: [{ data: [0,0], backgroundColor: ['#2ecc71','#e74c3c'] }]
+        labels: ['Administrators (' + hrAdminCount + ')','Instructors (' + hrInstrCount + ')','Admin Staff (' + hrStaffCount + ')','CMC Board (' + hrCmcCount + ')'],
+        datasets: [{ data: [hrAdminCount, hrInstrCount, hrStaffCount, hrCmcCount], backgroundColor: ['#f0a500','#2ecc71','#9b59b6','#1abc9c'] }]
       },
       options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { position: 'right', labels: { color: '#8899aa', font: { family: 'DM Sans', size: 11 } } } } }
     });
   }
 
-  var payrollEl = document.getElementById('cmcChartPayroll');
-  if(payrollEl) {
-    cmcChartInstances.payroll = new Chart(payrollEl, {
+  // Students per Instructor chart
+  var studInstrEl = document.getElementById('cmcChartStudentInstr');
+  if(studInstrEl && instructorData && instructorData.length > 0) {
+    var instrLabels = []; var instrStudCounts = [];
+    instructorData.forEach(function(ins) {
+      var cnt = students.filter(function(s){return s.instructor===ins.name;}).length;
+      instrLabels.push(ins.name.split(' ')[0]);
+      instrStudCounts.push(cnt);
+    });
+    cmcChartInstances.studInstr = new Chart(studInstrEl, {
       type: 'bar',
       data: {
-        labels: ['Basic Salary','Allowances','Deductions','Net Pay'],
-        datasets: [{ label: 'Amount', data: [0,0,0,0], backgroundColor: ['#3498db','#2ecc71','#e74c3c','#f0a500'], borderRadius: 6 }]
+        labels: instrLabels,
+        datasets: [{ label: 'Students', data: instrStudCounts, backgroundColor: '#1abc9c', borderRadius: 6 }]
       },
       options: Object.assign({}, chartDefaults, { plugins: { legend: { display: false } } })
-    });
-  }
-
-  var clockinEl = document.getElementById('cmcChartClockin');
-  if(clockinEl) {
-    cmcChartInstances.clockin = new Chart(clockinEl, {
-      type: 'line',
-      data: {
-        labels: ['Mon','Tue','Wed','Thu','Fri'],
-        datasets: [
-          { label: 'On Time', data: [0,0,0,0,0], borderColor: '#2ecc71', tension: 0.3 },
-          { label: 'Late', data: [0,0,0,0,0], borderColor: '#e74c3c', tension: 0.3 }
-        ]
-      },
-      options: chartDefaults
     });
   }
 }
