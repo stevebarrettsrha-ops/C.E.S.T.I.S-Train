@@ -250,8 +250,23 @@ body::-webkit-scrollbar { width:0; display:none; }
 .cmc-kpi-grid { display:grid; grid-template-columns:repeat(3,1fr); gap:16px; margin-bottom:24px; }
 .cmc-kpi-card {
   background:var(--bg-card); border:1px solid var(--border); border-radius:var(--radius);
-  padding:20px; position:relative; overflow:hidden;
+  padding:20px; position:relative; overflow:hidden; cursor:pointer; transition:all var(--transition);
 }
+.cmc-kpi-card:hover { transform:translateY(-2px); box-shadow:0 6px 20px rgba(0,0,0,0.3); border-color:var(--border-light); }
+.cmc-kpi-card .cmc-kpi-hint { font-size:10px; color:var(--text-muted); margin-top:6px; opacity:0.6; }
+.cmc-kpi-card:hover .cmc-kpi-hint { opacity:1; }
+.cmc-detail-overlay { position:fixed; inset:0; z-index:9999; background:rgba(0,0,0,0.6); display:flex; align-items:center; justify-content:center; animation:cmcFadeIn 0.2s ease; }
+@keyframes cmcFadeIn { from { opacity:0; } to { opacity:1; } }
+.cmc-detail-panel { background:var(--bg-secondary); border:1px solid var(--border-light); border-radius:var(--radius-lg); width:90%; max-width:720px; max-height:80vh; overflow:hidden; display:flex; flex-direction:column; box-shadow:0 16px 48px rgba(0,0,0,0.5); }
+.cmc-detail-header { display:flex; align-items:center; justify-content:space-between; padding:20px 24px; border-bottom:1px solid var(--border); }
+.cmc-detail-header h3 { font-size:18px; font-family:'Playfair Display',serif; margin:0; }
+.cmc-detail-close { background:none; border:none; color:var(--text-secondary); font-size:22px; cursor:pointer; padding:4px 8px; border-radius:var(--radius-sm); }
+.cmc-detail-close:hover { background:rgba(255,255,255,0.08); color:var(--text-primary); }
+.cmc-detail-body { padding:24px; overflow-y:auto; flex:1; }
+.cmc-detail-summary { display:grid; grid-template-columns:repeat(auto-fit,minmax(140px,1fr)); gap:12px; margin-bottom:20px; }
+.cmc-detail-stat { background:var(--bg-card); border:1px solid var(--border); border-radius:var(--radius-sm); padding:14px; text-align:center; }
+.cmc-detail-stat .stat-label { font-size:10px; text-transform:uppercase; letter-spacing:0.5px; color:var(--text-muted); font-weight:600; }
+.cmc-detail-stat .stat-value { font-size:20px; font-weight:700; color:var(--text-primary); margin-top:4px; font-family:'Playfair Display',serif; }
 .cmc-kpi-card::before {
   content:''; position:absolute; top:0; left:0; right:0; height:3px;
 }
@@ -17318,35 +17333,41 @@ function buildCmcPages() {
 
   // KPI Cards
   html += '<div class="cmc-kpi-grid">';
-  html += '<div class="cmc-kpi-card kpi-payroll"><div class="cmc-kpi-icon">💰</div>';
+  html += '<div class="cmc-kpi-card kpi-payroll" onclick="cmcShowDetail(\'payroll\')"><div class="cmc-kpi-icon">💰</div>';
   html += '<div class="cmc-kpi-label">Staff Payroll</div>';
   html += '<div class="cmc-kpi-value" id="cmcKpiPayroll">--</div>';
-  html += '<div class="cmc-kpi-sub" id="cmcKpiPayrollSub">' + totalStaff + ' staff members on record</div></div>';
+  html += '<div class="cmc-kpi-sub" id="cmcKpiPayrollSub">' + totalStaff + ' staff members on record</div>';
+  html += '<div class="cmc-kpi-hint">Click to view details</div></div>';
 
-  html += '<div class="cmc-kpi-card kpi-clockin"><div class="cmc-kpi-icon">⏰</div>';
+  html += '<div class="cmc-kpi-card kpi-clockin" onclick="cmcShowDetail(\'clockin\')"><div class="cmc-kpi-icon">⏰</div>';
   html += '<div class="cmc-kpi-label">Staff Attendance</div>';
   html += '<div class="cmc-kpi-value" id="cmcKpiClockin">--</div>';
-  html += '<div class="cmc-kpi-sub" id="cmcKpiClockinSub">Clock-in data pending</div></div>';
+  html += '<div class="cmc-kpi-sub" id="cmcKpiClockinSub">Clock-in data pending</div>';
+  html += '<div class="cmc-kpi-hint">Click to view details</div></div>';
 
-  html += '<div class="cmc-kpi-card kpi-cashbook"><div class="cmc-kpi-icon">📒</div>';
+  html += '<div class="cmc-kpi-card kpi-cashbook" onclick="cmcShowDetail(\'cashbook\')"><div class="cmc-kpi-icon">📒</div>';
   html += '<div class="cmc-kpi-label">Cashbook Balance</div>';
   html += '<div class="cmc-kpi-value" id="cmcKpiCashbook">--</div>';
-  html += '<div class="cmc-kpi-sub" id="cmcKpiCashbookSub">Income &amp; expenditure</div></div>';
+  html += '<div class="cmc-kpi-sub" id="cmcKpiCashbookSub">Income &amp; expenditure</div>';
+  html += '<div class="cmc-kpi-hint">Click to view details</div></div>';
 
-  html += '<div class="cmc-kpi-card kpi-virement"><div class="cmc-kpi-icon">🔄</div>';
+  html += '<div class="cmc-kpi-card kpi-virement" onclick="cmcShowDetail(\'virement\')"><div class="cmc-kpi-icon">🔄</div>';
   html += '<div class="cmc-kpi-label">Virement Requests</div>';
   html += '<div class="cmc-kpi-value" id="cmcKpiVirement">--</div>';
-  html += '<div class="cmc-kpi-sub" id="cmcKpiVirementSub">Budget transfer requests</div></div>';
+  html += '<div class="cmc-kpi-sub" id="cmcKpiVirementSub">Budget transfer requests</div>';
+  html += '<div class="cmc-kpi-hint">Click to view details</div></div>';
 
-  html += '<div class="cmc-kpi-card kpi-attendance"><div class="cmc-kpi-icon">📋</div>';
+  html += '<div class="cmc-kpi-card kpi-attendance" onclick="cmcShowDetail(\'attendance\')"><div class="cmc-kpi-icon">📋</div>';
   html += '<div class="cmc-kpi-label">Student Attendance</div>';
   html += '<div class="cmc-kpi-value" id="cmcKpiAttendance">' + avgAttendance + '%</div>';
-  html += '<div class="cmc-kpi-sub">' + totalStudents + ' students enrolled</div></div>';
+  html += '<div class="cmc-kpi-sub">' + totalStudents + ' students enrolled</div>';
+  html += '<div class="cmc-kpi-hint">Click to view details</div></div>';
 
-  html += '<div class="cmc-kpi-card kpi-fees"><div class="cmc-kpi-icon">🎓</div>';
+  html += '<div class="cmc-kpi-card kpi-fees" onclick="cmcShowDetail(\'fees\')"><div class="cmc-kpi-icon">🎓</div>';
   html += '<div class="cmc-kpi-label">School Fees</div>';
   html += '<div class="cmc-kpi-value" id="cmcKpiFees">--</div>';
-  html += '<div class="cmc-kpi-sub" id="cmcKpiFeesSub">Fee collection status</div></div>';
+  html += '<div class="cmc-kpi-sub" id="cmcKpiFeesSub">Fee collection status</div>';
+  html += '<div class="cmc-kpi-hint">Click to view details</div></div>';
   html += '</div>';
 
   // Charts Row
@@ -17396,6 +17417,19 @@ function buildCmcPages() {
   html += '<div class="cmc-table-card"><h4>Recent Financial Activity</h4>';
   html += '<div id="cmcFinancialActivity" style="color:var(--text-muted);font-size:13px;padding:12px;">Connect to Google Drive to view financial records from Cashbook and Virement systems.</div>';
   html += '</div>';
+
+  // Cashbook Checks / Transactions Section
+  html += '<div class="cmc-table-card"><h4>Cashbook Transactions &amp; Checks</h4>';
+  html += '<div style="display:flex;align-items:center;gap:12px;margin-bottom:14px;flex-wrap:wrap;">';
+  html += '<input type="text" id="cmcCheckSearch" placeholder="Search transactions..." oninput="cmcFilterChecks()" style="flex:1;min-width:200px;padding:8px 14px;border-radius:var(--radius-sm);border:1px solid var(--border);background:var(--bg-input);color:var(--text-primary);font-size:13px;font-family:\'DM Sans\',sans-serif;">';
+  html += '<select id="cmcCheckFilter" onchange="cmcFilterChecks()" style="padding:8px 14px;border-radius:var(--radius-sm);border:1px solid var(--border);background:var(--bg-input);color:var(--text-primary);font-size:13px;font-family:\'DM Sans\',sans-serif;">';
+  html += '<option value="all">All Types</option><option value="check">Checks Only</option><option value="income">Income Only</option><option value="expense">Expenses Only</option></select>';
+  html += '</div>';
+  html += '<div id="cmcChecksTable" style="overflow-x:auto;">';
+  html += '<table class="cmc-table"><thead><tr><th>Date</th><th>Description</th><th>Type</th><th>Check #</th><th>Amount</th><th>Balance</th></tr></thead>';
+  html += '<tbody id="cmcChecksBody"><tr><td colspan="6" style="text-align:center;color:var(--text-muted);padding:20px;">Click "Refresh Data" to load cashbook transactions from Google Drive.</td></tr></tbody></table>';
+  html += '</div></div>';
+
   html += '</section>';
 
   // ---- Staff & HR Page ----
@@ -17766,19 +17800,129 @@ async function cmcRefreshFromDrive() {
 }
 
 async function cmcFetchBackupFromFolder(folderId) {
+  // First try: search for JSON files by mime type
   var query = encodeURIComponent("'" + folderId + "' in parents and trashed=false and mimeType='application/json'");
-  var resp = await fetch('https://www.googleapis.com/drive/v3/files?q=' + query + '&fields=files(id,name,modifiedTime)&orderBy=modifiedTime desc&pageSize=1', {
+  var resp = await fetch('https://www.googleapis.com/drive/v3/files?q=' + query + '&fields=files(id,name,modifiedTime)&orderBy=modifiedTime desc&pageSize=5', {
     headers: { 'Authorization': 'Bearer ' + googleAccessToken }
   });
   if(!resp.ok) throw new Error('Drive API error: ' + resp.status);
   var data = await resp.json();
+
+  // Second try: if no JSON mime type files found, search for files with .json extension
+  if(!data.files || data.files.length === 0) {
+    var query2 = encodeURIComponent("'" + folderId + "' in parents and trashed=false and name contains '.json'");
+    resp = await fetch('https://www.googleapis.com/drive/v3/files?q=' + query2 + '&fields=files(id,name,modifiedTime)&orderBy=modifiedTime desc&pageSize=5', {
+      headers: { 'Authorization': 'Bearer ' + googleAccessToken }
+    });
+    if(resp.ok) data = await resp.json();
+  }
+
+  // Third try: if still nothing, get any file from the folder (some backup systems use different mime types)
+  if(!data.files || data.files.length === 0) {
+    var query3 = encodeURIComponent("'" + folderId + "' in parents and trashed=false");
+    resp = await fetch('https://www.googleapis.com/drive/v3/files?q=' + query3 + '&fields=files(id,name,modifiedTime,mimeType)&orderBy=modifiedTime desc&pageSize=10', {
+      headers: { 'Authorization': 'Bearer ' + googleAccessToken }
+    });
+    if(resp.ok) {
+      data = await resp.json();
+      // Filter to parseable file types (JSON, text, or sheets export)
+      if(data.files) {
+        var jsonFiles = data.files.filter(function(f) {
+          return f.name.endsWith('.json') ||
+                 f.mimeType === 'application/json' ||
+                 f.mimeType === 'text/plain' ||
+                 f.mimeType === 'text/csv';
+        });
+        // If we found parseable files, use those; otherwise try the most recent file
+        if(jsonFiles.length > 0) {
+          data.files = jsonFiles;
+        }
+      }
+    }
+  }
+
   if(!data.files || data.files.length === 0) return null;
-  var fileId = data.files[0].id;
-  var fileResp = await fetch('https://www.googleapis.com/drive/v3/files/' + fileId + '?alt=media', {
-    headers: { 'Authorization': 'Bearer ' + googleAccessToken }
-  });
-  if(!fileResp.ok) throw new Error('File download error: ' + fileResp.status);
-  return await fileResp.json();
+
+  // Try each file until we find one that parses as valid JSON
+  for(var i = 0; i < data.files.length; i++) {
+    try {
+      var fileId = data.files[i].id;
+      var mimeType = data.files[i].mimeType || '';
+
+      // For Google Sheets, export as JSON via Sheets API
+      if(mimeType === 'application/vnd.google-apps.spreadsheet') {
+        var sheetResp = await fetch('https://sheets.googleapis.com/v4/spreadsheets/' + fileId + '/values/Sheet1', {
+          headers: { 'Authorization': 'Bearer ' + googleAccessToken }
+        });
+        if(sheetResp.ok) {
+          var sheetData = await sheetResp.json();
+          if(sheetData.values && sheetData.values.length > 1) {
+            return cmcConvertSheetToJson(sheetData.values);
+          }
+        }
+        continue;
+      }
+
+      var fileResp = await fetch('https://www.googleapis.com/drive/v3/files/' + fileId + '?alt=media', {
+        headers: { 'Authorization': 'Bearer ' + googleAccessToken }
+      });
+      if(!fileResp.ok) continue;
+
+      var contentType = fileResp.headers.get('content-type') || '';
+      var text = await fileResp.text();
+
+      // Try to parse as JSON
+      if(text.trim().startsWith('{') || text.trim().startsWith('[')) {
+        return JSON.parse(text);
+      }
+
+      // If CSV, convert to JSON structure
+      if(mimeType === 'text/csv' || data.files[i].name.endsWith('.csv')) {
+        return cmcConvertCsvToJson(text);
+      }
+    } catch(parseErr) {
+      console.warn('CMC: Could not parse file ' + data.files[i].name + ':', parseErr.message);
+      continue;
+    }
+  }
+
+  return null;
+}
+
+// Convert Google Sheets data (array of arrays) to a usable JSON structure
+function cmcConvertSheetToJson(rows) {
+  if(!rows || rows.length < 2) return null;
+  var headers = rows[0].map(function(h) { return (h || '').toString().trim().toLowerCase().replace(/\s+/g, '_'); });
+  var records = [];
+  for(var i = 1; i < rows.length; i++) {
+    var row = rows[i];
+    if(!row || row.length === 0) continue;
+    var obj = {};
+    headers.forEach(function(h, idx) { obj[h] = row[idx] || ''; });
+    records.push(obj);
+  }
+  // Detect data type from headers and wrap appropriately
+  var hasAmount = headers.some(function(h) { return h.includes('amount') || h.includes('balance') || h.includes('total'); });
+  var hasDate = headers.some(function(h) { return h.includes('date') || h.includes('time'); });
+  if(hasAmount && hasDate) return { transactions: records, entries: records };
+  return { records: records };
+}
+
+// Convert CSV text to JSON structure
+function cmcConvertCsvToJson(csvText) {
+  var lines = csvText.split('\n').filter(function(l) { return l.trim().length > 0; });
+  if(lines.length < 2) return null;
+  var headers = lines[0].split(',').map(function(h) { return h.trim().replace(/^"|"$/g, '').toLowerCase().replace(/\s+/g, '_'); });
+  var records = [];
+  for(var i = 1; i < lines.length; i++) {
+    var vals = lines[i].split(',').map(function(v) { return v.trim().replace(/^"|"$/g, ''); });
+    var obj = {};
+    headers.forEach(function(h, idx) { obj[h] = vals[idx] || ''; });
+    records.push(obj);
+  }
+  var hasAmount = headers.some(function(h) { return h.includes('amount') || h.includes('balance') || h.includes('total'); });
+  if(hasAmount) return { transactions: records, entries: records };
+  return { records: records };
 }
 
 function cmcUpdateSourceStatus(key, statusClass, statusText, syncTime) {
@@ -17854,6 +17998,10 @@ function cmcUpdateCashbookKpi(data) {
   if(finEl) finEl.textContent = balance !== 0 ? 'D' + balance.toLocaleString() : count + ' Entries';
   var finSub = document.getElementById('cmcFinCashbookSub');
   if(finSub) finSub.textContent = 'Income: D' + income.toLocaleString() + ' | Exp: D' + expenses.toLocaleString();
+
+  // Render checks table on Financial Overview page
+  var records = (data && data.transactions) ? data.transactions : ((data && data.entries) ? data.entries : []);
+  cmcRenderChecksTable(records);
 }
 
 function cmcUpdateVirementKpi(data) {
@@ -17883,36 +18031,511 @@ function cmcUpdateVirementKpi(data) {
 
 function cmcUpdateDriveCharts() {
   // Update cashbook trend chart if data exists
-  if(cmcData.cashbook && cmcData.cashbook.transactions && cmcChartInstances.cashTrend) {
-    var monthlyIncome = {};
-    var monthlyExpense = {};
-    cmcData.cashbook.transactions.forEach(function(t) {
-      var d = new Date(t.date || t.timestamp || Date.now());
-      var key = d.toLocaleString('default', {month:'short'});
-      var amt = parseFloat(t.amount || 0);
-      if(t.type === 'income' || t.type === 'credit' || amt > 0) {
-        monthlyIncome[key] = (monthlyIncome[key]||0) + Math.abs(amt);
-      } else {
-        monthlyExpense[key] = (monthlyExpense[key]||0) + Math.abs(amt);
+  if(cmcData.cashbook && cmcChartInstances.cashTrend) {
+    var transactions = cmcData.cashbook.transactions || cmcData.cashbook.entries || [];
+    if(transactions.length > 0) {
+      var monthlyIncome = {};
+      var monthlyExpense = {};
+      transactions.forEach(function(t) {
+        var d = new Date(t.date || t.transaction_date || t.timestamp || Date.now());
+        var key = d.toLocaleString('default', {month:'short'});
+        var amt = parseFloat(t.amount || t.total || 0);
+        var tp = (t.type || t.transaction_type || t.category || '').toLowerCase();
+        if(tp === 'income' || tp === 'credit' || tp === 'receipt' || amt > 0) {
+          monthlyIncome[key] = (monthlyIncome[key]||0) + Math.abs(amt);
+        } else {
+          monthlyExpense[key] = (monthlyExpense[key]||0) + Math.abs(amt);
+        }
+      });
+      var labels = Object.keys(monthlyIncome).length > 0 ? Object.keys(monthlyIncome) : Object.keys(monthlyExpense);
+      if(labels.length > 0) {
+        cmcChartInstances.cashTrend.data.labels = labels;
+        cmcChartInstances.cashTrend.data.datasets[0].data = labels.map(function(l){ return monthlyIncome[l]||0; });
+        cmcChartInstances.cashTrend.data.datasets[1].data = labels.map(function(l){ return monthlyExpense[l]||0; });
+        cmcChartInstances.cashTrend.update();
       }
-    });
-    var labels = Object.keys(monthlyIncome).length > 0 ? Object.keys(monthlyIncome) : Object.keys(monthlyExpense);
-    if(labels.length > 0) {
-      cmcChartInstances.cashTrend.data.labels = labels;
-      cmcChartInstances.cashTrend.data.datasets[0].data = labels.map(function(l){ return monthlyIncome[l]||0; });
-      cmcChartInstances.cashTrend.data.datasets[1].data = labels.map(function(l){ return monthlyExpense[l]||0; });
-      cmcChartInstances.cashTrend.update();
     }
   }
 
-  // Update fees chart from fee data if available
-  if(cmcData.clockin && cmcChartInstances.fees) {
-    // Use fee data from local or drive source
+  // Update fees chart from local student data
+  if(cmcChartInstances.fees) {
     var collected = students.filter(function(s){ return s.stage === 'certified' || s.stage === 'collected'; }).length;
     var outstanding = students.length - collected;
     cmcChartInstances.fees.data.datasets[0].data = [collected, outstanding];
     cmcChartInstances.fees.update();
   }
+
+  // Populate Financial Activity section with recent cashbook + virement entries
+  var finActivityEl = document.getElementById('cmcFinancialActivity');
+  if(finActivityEl) {
+    var activityHtml = '';
+    var activityItems = [];
+
+    // Gather cashbook transactions
+    if(cmcData.cashbook) {
+      var cbRecords = cmcData.cashbook.transactions || cmcData.cashbook.entries || [];
+      cbRecords.forEach(function(t) {
+        var amt = parseFloat(t.amount || t.total || 0);
+        var tp = (t.type || t.transaction_type || t.category || '').toLowerCase();
+        var isIncome = tp === 'income' || tp === 'credit' || tp === 'receipt' || amt > 0;
+        activityItems.push({
+          date: t.date || t.transaction_date || t.timestamp || '--',
+          desc: t.description || t.memo || t.details || t.narration || t.particular || 'Cashbook Entry',
+          amount: Math.abs(amt),
+          isIncome: isIncome,
+          source: 'Cashbook',
+          checkNum: t.check_number || t.checkNumber || t.cheque_no || t.check_no || t.chequeNumber || ''
+        });
+      });
+    }
+
+    // Gather virement requests
+    if(cmcData.virement) {
+      var virRecords = cmcData.virement.requests || cmcData.virement.virements || cmcData.virement.entries || [];
+      virRecords.forEach(function(r) {
+        activityItems.push({
+          date: r.date || r.request_date || r.timestamp || '--',
+          desc: (r.from || r.from_budget || r.source || '') + ' -> ' + (r.to || r.to_budget || r.destination || '') + (r.reason ? ': ' + r.reason : ''),
+          amount: parseFloat(r.amount || r.total || 0),
+          isIncome: false,
+          source: 'Virement (' + (r.status || 'pending') + ')',
+          checkNum: ''
+        });
+      });
+    }
+
+    if(activityItems.length > 0) {
+      // Sort by date descending (most recent first)
+      activityItems.sort(function(a, b) {
+        return new Date(b.date || 0) - new Date(a.date || 0);
+      });
+
+      activityHtml = '<table class="cmc-table"><thead><tr><th>Date</th><th>Description</th><th>Source</th><th>Check #</th><th>Amount</th></tr></thead><tbody>';
+      activityItems.slice(0, 30).forEach(function(item) {
+        activityHtml += '<tr>';
+        activityHtml += '<td>' + item.date + '</td>';
+        activityHtml += '<td>' + item.desc + '</td>';
+        activityHtml += '<td><span class="cmc-status info">' + item.source + '</span></td>';
+        activityHtml += '<td>' + (item.checkNum || '--') + '</td>';
+        activityHtml += '<td style="color:' + (item.isIncome ? 'var(--green)' : 'var(--red)') + ';font-weight:600;">' +
+          (item.isIncome ? '+' : '-') + 'D' + item.amount.toLocaleString() + '</td>';
+        activityHtml += '</tr>';
+      });
+      activityHtml += '</tbody></table>';
+      if(activityItems.length > 30) activityHtml += '<div style="text-align:center;color:var(--text-muted);padding:8px;font-size:12px;">Showing 30 of ' + activityItems.length + ' entries</div>';
+    } else {
+      activityHtml = '<div style="color:var(--text-muted);font-size:13px;padding:12px;">No financial activity data found. Ensure cashbook and virement data exists in Google Drive folders.</div>';
+    }
+
+    finActivityEl.innerHTML = activityHtml;
+  }
+
+  // Populate Staff Records section
+  var staffRecEl = document.getElementById('cmcStaffRecords');
+  if(staffRecEl) {
+    var staffHtml = '';
+    var hasPayslip = cmcData.payslip;
+    var hasClockin = cmcData.clockin;
+
+    if(hasPayslip || hasClockin) {
+      staffHtml = '<table class="cmc-table"><thead><tr><th>#</th><th>Name</th><th>Type</th><th>Details</th><th>Status</th></tr></thead><tbody>';
+      var rowIdx = 0;
+
+      if(hasPayslip) {
+        var payRecords = cmcData.payslip.payslips || cmcData.payslip.records || [];
+        payRecords.slice(0, 25).forEach(function(p) {
+          rowIdx++;
+          var name = p.name || p.employee || p.staff_name || p.employeeName || ('Staff ' + rowIdx);
+          var net = parseFloat(p.netPay || p.net || p.net_pay || p.amount || 0);
+          staffHtml += '<tr><td>' + rowIdx + '</td><td>' + name + '</td><td><span class="cmc-status info">Payslip</span></td>';
+          staffHtml += '<td>Net: D' + net.toLocaleString() + '</td>';
+          staffHtml += '<td><span class="cmc-status good">Processed</span></td></tr>';
+        });
+      }
+
+      if(hasClockin) {
+        var clockRecords = cmcData.clockin.records || cmcData.clockin.clockins || cmcData.clockin.entries || [];
+        clockRecords.slice(0, 25).forEach(function(r) {
+          rowIdx++;
+          var name = r.name || r.employee || r.staff_name || r.employeeName || ('Staff ' + rowIdx);
+          var time = r.time || r.clock_in || r.timeIn || r.time_in || '--';
+          var status = r.status || r.clockin_status || 'Present';
+          var statusCls = status.toLowerCase() === 'late' ? 'warning' : status.toLowerCase() === 'absent' ? 'critical' : 'good';
+          staffHtml += '<tr><td>' + rowIdx + '</td><td>' + name + '</td><td><span class="cmc-status info">Clock-in</span></td>';
+          staffHtml += '<td>' + time + '</td>';
+          staffHtml += '<td><span class="cmc-status ' + statusCls + '">' + status + '</span></td></tr>';
+        });
+      }
+
+      staffHtml += '</tbody></table>';
+    } else {
+      staffHtml = '<div style="color:var(--text-muted);font-size:13px;padding:12px;">No staff data found. Ensure payslip and clock-in data exists in Google Drive folders.</div>';
+    }
+
+    staffRecEl.innerHTML = staffHtml;
+  }
+
+  // Update payroll chart from Drive data
+  if(cmcData.payslip && cmcChartInstances.payroll) {
+    var payRecords = cmcData.payslip.payslips || cmcData.payslip.records || [];
+    if(payRecords.length > 0) {
+      var totalBasic = 0; var totalAllowances = 0; var totalDeductions = 0; var totalNetPay = 0;
+      payRecords.forEach(function(p) {
+        totalBasic += parseFloat(p.basic || p.basicSalary || p.basic_salary || 0);
+        totalAllowances += parseFloat(p.allowances || p.allowance || p.total_allowances || 0);
+        totalDeductions += parseFloat(p.deductions || p.deduction || p.total_deductions || 0);
+        totalNetPay += parseFloat(p.netPay || p.net || p.net_pay || p.amount || 0);
+      });
+      cmcChartInstances.payroll.data.datasets[0].data = [totalBasic, totalAllowances, totalDeductions, totalNetPay];
+      cmcChartInstances.payroll.update();
+    }
+  }
+
+  // Update clock-in chart from Drive data
+  if(cmcData.clockin && cmcChartInstances.clockin) {
+    var clockRecords = cmcData.clockin.records || cmcData.clockin.clockins || cmcData.clockin.entries || [];
+    if(clockRecords.length > 0) {
+      var dayStats = {Mon:{onTime:0,late:0},Tue:{onTime:0,late:0},Wed:{onTime:0,late:0},Thu:{onTime:0,late:0},Fri:{onTime:0,late:0}};
+      clockRecords.forEach(function(r) {
+        var d = new Date(r.date || r.clock_date || r.timestamp || Date.now());
+        var dayNames = ['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];
+        var dayKey = dayNames[d.getDay()] || 'Mon';
+        if(dayStats[dayKey]) {
+          var status = (r.status || r.clockin_status || '').toLowerCase();
+          if(status === 'late' || status === 'tardy') dayStats[dayKey].late++;
+          else dayStats[dayKey].onTime++;
+        }
+      });
+      cmcChartInstances.clockin.data.datasets[0].data = ['Mon','Tue','Wed','Thu','Fri'].map(function(d){ return dayStats[d].onTime; });
+      cmcChartInstances.clockin.data.datasets[1].data = ['Mon','Tue','Wed','Thu','Fri'].map(function(d){ return dayStats[d].late; });
+      cmcChartInstances.clockin.update();
+    }
+  }
+}
+
+// ---- KPI Card Detail Modal ----
+function cmcShowDetail(type) {
+  var overlay = document.createElement('div');
+  overlay.className = 'cmc-detail-overlay';
+  overlay.onclick = function(e) { if(e.target === overlay) overlay.remove(); };
+
+  var title = '';
+  var bodyHtml = '';
+
+  switch(type) {
+    case 'payroll':
+      title = 'Staff Payroll Details';
+      bodyHtml = cmcBuildPayrollDetail();
+      break;
+    case 'clockin':
+      title = 'Staff Clock-in Details';
+      bodyHtml = cmcBuildClockinDetail();
+      break;
+    case 'cashbook':
+      title = 'Cashbook Details';
+      bodyHtml = cmcBuildCashbookDetail();
+      break;
+    case 'virement':
+      title = 'Virement Request Details';
+      bodyHtml = cmcBuildVirementDetail();
+      break;
+    case 'attendance':
+      title = 'Student Attendance Details';
+      bodyHtml = cmcBuildAttendanceDetail();
+      break;
+    case 'fees':
+      title = 'School Fees Details';
+      bodyHtml = cmcBuildFeesDetail();
+      break;
+  }
+
+  overlay.innerHTML =
+    '<div class="cmc-detail-panel">' +
+      '<div class="cmc-detail-header"><h3>' + title + '</h3>' +
+      '<button class="cmc-detail-close" onclick="this.closest(\'.cmc-detail-overlay\').remove()">&#10005;</button></div>' +
+      '<div class="cmc-detail-body">' + bodyHtml + '</div>' +
+    '</div>';
+
+  document.body.appendChild(overlay);
+}
+
+function cmcBuildPayrollDetail() {
+  var data = cmcData.payslip;
+  if(!data) return '<div style="text-align:center;color:var(--text-muted);padding:30px;">No payroll data loaded. Click "Refresh from Drive" to sync data from Google Drive.</div>';
+
+  var records = data.payslips || data.records || (Array.isArray(data) ? data : []);
+  if(records.length === 0 && typeof data === 'object' && !Array.isArray(data)) {
+    records = Object.keys(data).filter(function(k) { return typeof data[k] === 'object'; }).map(function(k) { return data[k]; });
+  }
+
+  var totalNet = 0; var totalGross = 0; var totalDeductions = 0;
+  records.forEach(function(p) {
+    totalNet += parseFloat(p.netPay || p.net || p.net_pay || p.amount || 0);
+    totalGross += parseFloat(p.grossPay || p.gross || p.gross_pay || p.basic || 0);
+    totalDeductions += parseFloat(p.deductions || p.deduction || p.total_deductions || 0);
+  });
+
+  var html = '<div class="cmc-detail-summary">';
+  html += '<div class="cmc-detail-stat"><div class="stat-label">Total Records</div><div class="stat-value">' + records.length + '</div></div>';
+  html += '<div class="cmc-detail-stat"><div class="stat-label">Total Gross</div><div class="stat-value">D' + totalGross.toLocaleString() + '</div></div>';
+  html += '<div class="cmc-detail-stat"><div class="stat-label">Total Deductions</div><div class="stat-value">D' + totalDeductions.toLocaleString() + '</div></div>';
+  html += '<div class="cmc-detail-stat"><div class="stat-label">Total Net Pay</div><div class="stat-value">D' + totalNet.toLocaleString() + '</div></div>';
+  html += '</div>';
+
+  if(records.length > 0) {
+    html += '<table class="cmc-table"><thead><tr><th>#</th><th>Name</th><th>Gross Pay</th><th>Deductions</th><th>Net Pay</th></tr></thead><tbody>';
+    records.slice(0, 50).forEach(function(p, i) {
+      var name = p.name || p.employee || p.staff_name || p.employeeName || ('Record ' + (i+1));
+      var gross = parseFloat(p.grossPay || p.gross || p.gross_pay || p.basic || 0);
+      var ded = parseFloat(p.deductions || p.deduction || p.total_deductions || 0);
+      var net = parseFloat(p.netPay || p.net || p.net_pay || p.amount || 0);
+      html += '<tr><td>' + (i+1) + '</td><td>' + name + '</td><td>D' + gross.toLocaleString() + '</td><td>D' + ded.toLocaleString() + '</td><td><strong>D' + net.toLocaleString() + '</strong></td></tr>';
+    });
+    html += '</tbody></table>';
+    if(records.length > 50) html += '<div style="text-align:center;color:var(--text-muted);padding:10px;font-size:12px;">Showing first 50 of ' + records.length + ' records</div>';
+  }
+  return html;
+}
+
+function cmcBuildClockinDetail() {
+  var data = cmcData.clockin;
+  if(!data) return '<div style="text-align:center;color:var(--text-muted);padding:30px;">No clock-in data loaded. Click "Refresh from Drive" to sync data from Google Drive.</div>';
+
+  var records = data.records || data.clockins || data.entries || (Array.isArray(data) ? data : []);
+  if(records.length === 0 && typeof data === 'object' && !Array.isArray(data)) {
+    records = Object.keys(data).filter(function(k) { return typeof data[k] === 'object'; }).map(function(k) { return data[k]; });
+  }
+
+  var onTime = 0; var late = 0; var absent = 0;
+  records.forEach(function(r) {
+    var status = (r.status || r.clockin_status || '').toLowerCase();
+    if(status === 'late' || status === 'tardy') late++;
+    else if(status === 'absent' || status === 'no show') absent++;
+    else onTime++;
+  });
+
+  var html = '<div class="cmc-detail-summary">';
+  html += '<div class="cmc-detail-stat"><div class="stat-label">Total Entries</div><div class="stat-value">' + records.length + '</div></div>';
+  html += '<div class="cmc-detail-stat"><div class="stat-label">On Time</div><div class="stat-value" style="color:var(--green)">' + onTime + '</div></div>';
+  html += '<div class="cmc-detail-stat"><div class="stat-label">Late</div><div class="stat-value" style="color:var(--orange)">' + late + '</div></div>';
+  html += '<div class="cmc-detail-stat"><div class="stat-label">Absent</div><div class="stat-value" style="color:var(--red)">' + absent + '</div></div>';
+  html += '</div>';
+
+  if(records.length > 0) {
+    html += '<table class="cmc-table"><thead><tr><th>#</th><th>Name</th><th>Date</th><th>Time In</th><th>Status</th></tr></thead><tbody>';
+    records.slice(0, 50).forEach(function(r, i) {
+      var name = r.name || r.employee || r.staff_name || r.employeeName || ('Staff ' + (i+1));
+      var date = r.date || r.clock_date || r.timestamp || '--';
+      var time = r.time || r.clock_in || r.timeIn || r.time_in || '--';
+      var status = r.status || r.clockin_status || 'Present';
+      var statusCls = status.toLowerCase() === 'late' ? 'warning' : status.toLowerCase() === 'absent' ? 'critical' : 'good';
+      html += '<tr><td>' + (i+1) + '</td><td>' + name + '</td><td>' + date + '</td><td>' + time + '</td><td><span class="cmc-status ' + statusCls + '">' + status + '</span></td></tr>';
+    });
+    html += '</tbody></table>';
+    if(records.length > 50) html += '<div style="text-align:center;color:var(--text-muted);padding:10px;font-size:12px;">Showing first 50 of ' + records.length + ' records</div>';
+  }
+  return html;
+}
+
+function cmcBuildCashbookDetail() {
+  var data = cmcData.cashbook;
+  if(!data) return '<div style="text-align:center;color:var(--text-muted);padding:30px;">No cashbook data loaded. Click "Refresh from Drive" to sync data from Google Drive.</div>';
+
+  var records = data.transactions || data.entries || (Array.isArray(data) ? data : []);
+  if(records.length === 0 && typeof data === 'object' && !Array.isArray(data)) {
+    records = Object.keys(data).filter(function(k) { return typeof data[k] === 'object'; }).map(function(k) { var o = data[k]; o._key = k; return o; });
+  }
+
+  var income = 0; var expenses = 0; var checkCount = 0;
+  records.forEach(function(t) {
+    var amt = parseFloat(t.amount || t.total || 0);
+    var tp = (t.type || t.transaction_type || t.category || '').toLowerCase();
+    if(tp === 'income' || tp === 'credit' || tp === 'receipt' || amt > 0) income += Math.abs(amt);
+    else expenses += Math.abs(amt);
+    if(t.check_number || t.checkNumber || t.cheque_no || t.check_no || t.chequeNumber || (tp === 'check' || tp === 'cheque')) checkCount++;
+  });
+
+  var html = '<div class="cmc-detail-summary">';
+  html += '<div class="cmc-detail-stat"><div class="stat-label">Total Transactions</div><div class="stat-value">' + records.length + '</div></div>';
+  html += '<div class="cmc-detail-stat"><div class="stat-label">Total Income</div><div class="stat-value" style="color:var(--green)">D' + income.toLocaleString() + '</div></div>';
+  html += '<div class="cmc-detail-stat"><div class="stat-label">Total Expenses</div><div class="stat-value" style="color:var(--red)">D' + expenses.toLocaleString() + '</div></div>';
+  html += '<div class="cmc-detail-stat"><div class="stat-label">Balance</div><div class="stat-value">D' + (income - expenses).toLocaleString() + '</div></div>';
+  if(checkCount > 0) html += '<div class="cmc-detail-stat"><div class="stat-label">Checks Logged</div><div class="stat-value">' + checkCount + '</div></div>';
+  html += '</div>';
+
+  if(records.length > 0) {
+    html += '<table class="cmc-table"><thead><tr><th>#</th><th>Date</th><th>Description</th><th>Type</th><th>Check #</th><th>Amount</th></tr></thead><tbody>';
+    records.slice(0, 50).forEach(function(t, i) {
+      var date = t.date || t.transaction_date || t.timestamp || '--';
+      var desc = t.description || t.memo || t.details || t.narration || t.particular || '--';
+      var amt = parseFloat(t.amount || t.total || 0);
+      var tp = (t.type || t.transaction_type || t.category || '').toLowerCase();
+      var isIncome = tp === 'income' || tp === 'credit' || tp === 'receipt' || amt > 0;
+      var checkNum = t.check_number || t.checkNumber || t.cheque_no || t.check_no || t.chequeNumber || '--';
+      var typeLabel = isIncome ? 'Income' : 'Expense';
+      var typeCls = isIncome ? 'good' : 'critical';
+      html += '<tr><td>' + (i+1) + '</td><td>' + date + '</td><td>' + desc + '</td>';
+      html += '<td><span class="cmc-status ' + typeCls + '">' + typeLabel + '</span></td>';
+      html += '<td>' + checkNum + '</td>';
+      html += '<td style="color:' + (isIncome ? 'var(--green)' : 'var(--red)') + ';font-weight:600;">D' + Math.abs(amt).toLocaleString() + '</td></tr>';
+    });
+    html += '</tbody></table>';
+    if(records.length > 50) html += '<div style="text-align:center;color:var(--text-muted);padding:10px;font-size:12px;">Showing first 50 of ' + records.length + ' records</div>';
+  }
+  return html;
+}
+
+function cmcBuildVirementDetail() {
+  var data = cmcData.virement;
+  if(!data) return '<div style="text-align:center;color:var(--text-muted);padding:30px;">No virement data loaded. Click "Refresh from Drive" to sync data from Google Drive.</div>';
+
+  var records = data.requests || data.virements || data.entries || (Array.isArray(data) ? data : []);
+  if(records.length === 0 && typeof data === 'object' && !Array.isArray(data)) {
+    records = Object.keys(data).filter(function(k) { return typeof data[k] === 'object'; }).map(function(k) { return data[k]; });
+  }
+
+  var pending = 0; var approved = 0; var rejected = 0; var totalAmt = 0;
+  records.forEach(function(r) {
+    var status = (r.status || '').toLowerCase();
+    if(status === 'pending') pending++;
+    else if(status === 'approved') approved++;
+    else if(status === 'rejected' || status === 'denied') rejected++;
+    totalAmt += parseFloat(r.amount || r.total || 0);
+  });
+
+  var html = '<div class="cmc-detail-summary">';
+  html += '<div class="cmc-detail-stat"><div class="stat-label">Total Requests</div><div class="stat-value">' + records.length + '</div></div>';
+  html += '<div class="cmc-detail-stat"><div class="stat-label">Pending</div><div class="stat-value" style="color:var(--orange)">' + pending + '</div></div>';
+  html += '<div class="cmc-detail-stat"><div class="stat-label">Approved</div><div class="stat-value" style="color:var(--green)">' + approved + '</div></div>';
+  html += '<div class="cmc-detail-stat"><div class="stat-label">Total Amount</div><div class="stat-value">D' + totalAmt.toLocaleString() + '</div></div>';
+  html += '</div>';
+
+  if(records.length > 0) {
+    html += '<table class="cmc-table"><thead><tr><th>#</th><th>Date</th><th>From</th><th>To</th><th>Amount</th><th>Status</th></tr></thead><tbody>';
+    records.slice(0, 50).forEach(function(r, i) {
+      var date = r.date || r.request_date || r.timestamp || '--';
+      var from = r.from || r.from_budget || r.source || r.from_account || '--';
+      var to = r.to || r.to_budget || r.destination || r.to_account || '--';
+      var amt = parseFloat(r.amount || r.total || 0);
+      var status = r.status || 'Pending';
+      var statusCls = status.toLowerCase() === 'approved' ? 'good' : status.toLowerCase() === 'rejected' ? 'critical' : 'warning';
+      html += '<tr><td>' + (i+1) + '</td><td>' + date + '</td><td>' + from + '</td><td>' + to + '</td><td>D' + amt.toLocaleString() + '</td><td><span class="cmc-status ' + statusCls + '">' + status + '</span></td></tr>';
+    });
+    html += '</tbody></table>';
+  }
+  return html;
+}
+
+function cmcBuildAttendanceDetail() {
+  var html = '<div class="cmc-detail-summary">';
+  var totalStudents = students.length;
+  var avgAtt = 0;
+  if(totalStudents > 0) {
+    var sum = 0;
+    students.forEach(function(s){ sum += (parseFloat(s.attendance)||0); });
+    avgAtt = Math.round(sum / totalStudents);
+  }
+  var above80 = students.filter(function(s){ return parseFloat(s.attendance||0) >= 80; }).length;
+  var below60 = students.filter(function(s){ return parseFloat(s.attendance||0) < 60; }).length;
+
+  html += '<div class="cmc-detail-stat"><div class="stat-label">Total Students</div><div class="stat-value">' + totalStudents + '</div></div>';
+  html += '<div class="cmc-detail-stat"><div class="stat-label">Average Attendance</div><div class="stat-value">' + avgAtt + '%</div></div>';
+  html += '<div class="cmc-detail-stat"><div class="stat-label">Above 80%</div><div class="stat-value" style="color:var(--green)">' + above80 + '</div></div>';
+  html += '<div class="cmc-detail-stat"><div class="stat-label">Below 60%</div><div class="stat-value" style="color:var(--red)">' + below60 + '</div></div>';
+  html += '</div>';
+
+  // Show students sorted by attendance (lowest first to highlight issues)
+  var sorted = students.slice().sort(function(a,b){ return parseFloat(a.attendance||0) - parseFloat(b.attendance||0); });
+  html += '<table class="cmc-table"><thead><tr><th>#</th><th>Name</th><th>Course</th><th>Attendance</th><th>Stage</th></tr></thead><tbody>';
+  sorted.slice(0, 50).forEach(function(s, i) {
+    var att = parseFloat(s.attendance || 0);
+    var attCls = att >= 80 ? 'good' : att >= 60 ? 'warning' : 'critical';
+    html += '<tr><td>' + (i+1) + '</td><td>' + (s.name||'--') + '</td><td>' + (s.course||'--') + '</td>';
+    html += '<td><span class="cmc-status ' + attCls + '">' + att + '%</span></td>';
+    html += '<td>' + (s.stage||'--') + '</td></tr>';
+  });
+  html += '</tbody></table>';
+  if(students.length > 50) html += '<div style="text-align:center;color:var(--text-muted);padding:10px;font-size:12px;">Showing first 50 of ' + students.length + ' students</div>';
+  return html;
+}
+
+function cmcBuildFeesDetail() {
+  var totalStudents = students.length;
+  var certified = students.filter(function(s){ return s.stage === 'certified' || s.stage === 'collected'; }).length;
+  var inTraining = students.filter(function(s){ var st = (s.stage||'').toLowerCase().replace(/\s+/g,''); return st === 'intraining' || st === 'in training'; }).length;
+  var testing = students.filter(function(s){ return (s.stage||'').toLowerCase() === 'testing'; }).length;
+
+  var html = '<div class="cmc-detail-summary">';
+  html += '<div class="cmc-detail-stat"><div class="stat-label">Total Enrolled</div><div class="stat-value">' + totalStudents + '</div></div>';
+  html += '<div class="cmc-detail-stat"><div class="stat-label">In Training</div><div class="stat-value" style="color:var(--blue)">' + inTraining + '</div></div>';
+  html += '<div class="cmc-detail-stat"><div class="stat-label">Certified</div><div class="stat-value" style="color:var(--green)">' + certified + '</div></div>';
+  html += '<div class="cmc-detail-stat"><div class="stat-label">Testing</div><div class="stat-value" style="color:var(--orange)">' + testing + '</div></div>';
+  html += '</div>';
+
+  // Show fee-related student data
+  html += '<table class="cmc-table"><thead><tr><th>#</th><th>Name</th><th>Course</th><th>Stage</th><th>GPA</th></tr></thead><tbody>';
+  students.slice(0, 50).forEach(function(s, i) {
+    html += '<tr><td>' + (i+1) + '</td><td>' + (s.name||'--') + '</td><td>' + (s.course||'--') + '</td>';
+    html += '<td>' + (s.stage||'--') + '</td>';
+    html += '<td>' + (s.gpa||'--') + '</td></tr>';
+  });
+  html += '</tbody></table>';
+  if(students.length > 50) html += '<div style="text-align:center;color:var(--text-muted);padding:10px;font-size:12px;">Showing first 50 of ' + students.length + ' students</div>';
+  return html;
+}
+
+// ---- Cashbook Checks Table (Financial Overview) ----
+function cmcRenderChecksTable(records) {
+  var body = document.getElementById('cmcChecksBody');
+  if(!body) return;
+
+  if(!records || records.length === 0) {
+    body.innerHTML = '<tr><td colspan="6" style="text-align:center;color:var(--text-muted);padding:20px;">No transaction records found. Ensure cashbook data exists in Google Drive.</td></tr>';
+    return;
+  }
+
+  var runningBalance = 0;
+  var html = '';
+  records.forEach(function(t, i) {
+    var date = t.date || t.transaction_date || t.timestamp || '--';
+    var desc = t.description || t.memo || t.details || t.narration || t.particular || '--';
+    var amt = parseFloat(t.amount || t.total || 0);
+    var tp = (t.type || t.transaction_type || t.category || '').toLowerCase();
+    var isIncome = tp === 'income' || tp === 'credit' || tp === 'receipt' || amt > 0;
+    var checkNum = t.check_number || t.checkNumber || t.cheque_no || t.check_no || t.chequeNumber || '';
+    var isCheck = checkNum || tp === 'check' || tp === 'cheque';
+
+    if(isIncome) runningBalance += Math.abs(amt);
+    else runningBalance -= Math.abs(amt);
+
+    var typeLabel = isCheck ? 'Check' : (isIncome ? 'Income' : 'Expense');
+    var typeCls = isCheck ? 'info' : (isIncome ? 'good' : 'critical');
+
+    html += '<tr data-type="' + (isCheck ? 'check' : (isIncome ? 'income' : 'expense')) + '" data-search="' + (date + ' ' + desc + ' ' + checkNum).toLowerCase() + '">';
+    html += '<td>' + date + '</td>';
+    html += '<td>' + desc + '</td>';
+    html += '<td><span class="cmc-status ' + typeCls + '">' + typeLabel + '</span></td>';
+    html += '<td>' + (checkNum || '--') + '</td>';
+    html += '<td style="color:' + (isIncome ? 'var(--green)' : 'var(--red)') + ';font-weight:600;">' + (isIncome ? '+' : '-') + 'D' + Math.abs(amt).toLocaleString() + '</td>';
+    html += '<td style="font-weight:600;color:' + (runningBalance >= 0 ? 'var(--text-primary)' : 'var(--red)') + '">D' + runningBalance.toLocaleString() + '</td>';
+    html += '</tr>';
+  });
+
+  body.innerHTML = html;
+}
+
+function cmcFilterChecks() {
+  var searchVal = (document.getElementById('cmcCheckSearch') || {}).value || '';
+  var filterVal = (document.getElementById('cmcCheckFilter') || {}).value || 'all';
+  var body = document.getElementById('cmcChecksBody');
+  if(!body) return;
+  var rows = body.querySelectorAll('tr[data-type]');
+  var search = searchVal.toLowerCase();
+  rows.forEach(function(row) {
+    var matchType = filterVal === 'all' || row.getAttribute('data-type') === filterVal;
+    var matchSearch = !search || (row.getAttribute('data-search') || '').indexOf(search) > -1;
+    row.style.display = (matchType && matchSearch) ? '' : 'none';
+  });
 }
 
 async function cmcSaveSnapshot() {
