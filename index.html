@@ -17319,14 +17319,32 @@ function buildCmcPages() {
   var totalCertified = students.filter(function(s){ return s.stage==='certified'||s.stage==='collected'; }).length;
   var totalInstructors = Object.keys(instructorProfiles || {}).length || instructorData.length;
   var totalStaff = userAccounts.filter(function(u){ return u.role === 'adminstaff'; }).length;
+  // Compute avg attendance from attendanceRecords if available
   var avgAttendance = 0;
-  if(students.length > 0) {
+  if(attendanceRecords && attendanceRecords.length > 0) {
     var totalAtt = 0;
-    students.forEach(function(s){ totalAtt += (parseFloat(s.attendance)||0); });
-    avgAttendance = Math.round(totalAtt / students.length);
+    attendanceRecords.forEach(function(r) {
+      var days = r.days || {};
+      var total = 0, present = 0;
+      ['Mon','Tue','Wed','Thu','Fri'].forEach(function(d) {
+        if(days[d]) { total++; if(days[d] === 'present' || days[d] === 'late') present++; }
+      });
+      totalAtt += (total > 0 ? (present / total * 100) : 0);
+    });
+    avgAttendance = Math.round(totalAtt / attendanceRecords.length);
+  } else if(students.length > 0) {
+    var totalAtt2 = 0;
+    students.forEach(function(s){ totalAtt2 += (parseFloat(s.attendance)||0); });
+    avgAttendance = Math.round(totalAtt2 / students.length);
   }
+  // Compute avg GPA from examResults if available
   var avgGpa = 0;
-  if(students.length > 0) {
+  if(examResults && examResults.length > 0) {
+    var totalScore = 0;
+    examResults.forEach(function(r){ totalScore += (parseFloat(r.score)||0); });
+    var avgScore = totalScore / examResults.length;
+    avgGpa = (avgScore >= 90 ? 4.0 : avgScore >= 80 ? 3.5 : avgScore >= 70 ? 3.0 : avgScore >= 60 ? 2.5 : (avgScore / 100 * 4).toFixed(2));
+  } else if(students.length > 0) {
     var totalGpa = 0;
     students.forEach(function(s){ totalGpa += (parseFloat(s.gpa)||0); });
     avgGpa = (totalGpa / students.length).toFixed(2);
@@ -17553,13 +17571,13 @@ function cmcRenderCharts() {
     }
   };
 
-  // Student Pipeline Chart
+  // Student Pipeline Chart — stage values are lowercase: testing, interview, training, certified, collected, incomplete
   var stages = {Testing:0,Interview:0,'In Training':0,Certified:0,Collected:0,Incomplete:0};
   students.forEach(function(s) {
     var st = (s.stage||'').toLowerCase();
     if(st === 'testing') stages.Testing++;
     else if(st === 'interview') stages.Interview++;
-    else if(st === 'in training' || st === 'intraining') stages['In Training']++;
+    else if(st === 'training' || st === 'in training' || st === 'intraining') stages['In Training']++;
     else if(st === 'certified') stages.Certified++;
     else if(st === 'collected') stages.Collected++;
     else if(st === 'incomplete') stages.Incomplete++;
@@ -17582,16 +17600,32 @@ function cmcRenderCharts() {
     });
   }
 
-  // Attendance Overview Chart
+  // Attendance Overview Chart — compute from attendanceRecords (days: {Mon:'present',...})
   var attBuckets = {'90-100%':0,'80-89%':0,'70-79%':0,'60-69%':0,'Below 60%':0};
-  students.forEach(function(s) {
-    var a = parseFloat(s.attendance)||0;
-    if(a >= 90) attBuckets['90-100%']++;
-    else if(a >= 80) attBuckets['80-89%']++;
-    else if(a >= 70) attBuckets['70-79%']++;
-    else if(a >= 60) attBuckets['60-69%']++;
-    else attBuckets['Below 60%']++;
-  });
+  if(attendanceRecords && attendanceRecords.length > 0) {
+    attendanceRecords.forEach(function(r) {
+      var days = r.days || {};
+      var total = 0, present = 0;
+      ['Mon','Tue','Wed','Thu','Fri'].forEach(function(d) {
+        if(days[d]) { total++; if(days[d] === 'present' || days[d] === 'late') present++; }
+      });
+      var pct = total > 0 ? (present / total * 100) : 0;
+      if(pct >= 90) attBuckets['90-100%']++;
+      else if(pct >= 80) attBuckets['80-89%']++;
+      else if(pct >= 70) attBuckets['70-79%']++;
+      else if(pct >= 60) attBuckets['60-69%']++;
+      else attBuckets['Below 60%']++;
+    });
+  } else {
+    students.forEach(function(s) {
+      var a = parseFloat(s.attendance)||0;
+      if(a >= 90) attBuckets['90-100%']++;
+      else if(a >= 80) attBuckets['80-89%']++;
+      else if(a >= 70) attBuckets['70-79%']++;
+      else if(a >= 60) attBuckets['60-69%']++;
+      else attBuckets['Below 60%']++;
+    });
+  }
 
   var attEl = document.getElementById('cmcChartAttendance');
   if(attEl) {
@@ -17605,9 +17639,9 @@ function cmcRenderCharts() {
     });
   }
 
-  // Staff Distribution Chart
+  // Staff Distribution Chart — instructors are in instructorData, not userAccounts
   var adminCount = userAccounts.filter(function(u){ return u.role === 'admin'; }).length;
-  var instrCount = userAccounts.filter(function(u){ return u.role === 'instructor'; }).length;
+  var instrCount = (instructorData && instructorData.length) || Object.keys(instructorProfiles || {}).length || 0;
   var staffCount = userAccounts.filter(function(u){ return u.role === 'adminstaff'; }).length;
   var cmcCount = userAccounts.filter(function(u){ return u.role === 'cmc'; }).length;
 
@@ -17623,16 +17657,38 @@ function cmcRenderCharts() {
     });
   }
 
-  // GPA Distribution Chart
+  // GPA Distribution Chart — compute from examResults scores (score% → 4.0 scale)
   var gpaBuckets = {'4.0+':0,'3.5-3.9':0,'3.0-3.4':0,'2.5-2.9':0,'Below 2.5':0};
-  students.forEach(function(s) {
-    var g = parseFloat(s.gpa)||0;
-    if(g >= 4.0) gpaBuckets['4.0+']++;
-    else if(g >= 3.5) gpaBuckets['3.5-3.9']++;
-    else if(g >= 3.0) gpaBuckets['3.0-3.4']++;
-    else if(g >= 2.5) gpaBuckets['2.5-2.9']++;
-    else gpaBuckets['Below 2.5']++;
-  });
+  if(examResults && examResults.length > 0) {
+    // Group exam results by student and compute average score → GPA
+    var studentScores = {};
+    examResults.forEach(function(r) {
+      var sid = r.studentId || r.student_id;
+      if(!sid) return;
+      if(!studentScores[sid]) studentScores[sid] = [];
+      studentScores[sid].push(parseFloat(r.score)||0);
+    });
+    Object.keys(studentScores).forEach(function(sid) {
+      var scores = studentScores[sid];
+      var avg = scores.reduce(function(a,b){return a+b;},0) / scores.length;
+      // Convert percentage to 4.0 GPA scale: 90+=4.0, 80-89=3.5, 70-79=3.0, 60-69=2.5, <60=below
+      var gpa = avg >= 90 ? 4.0 : avg >= 80 ? 3.5 : avg >= 70 ? 3.0 : avg >= 60 ? 2.5 : 1.0;
+      if(gpa >= 4.0) gpaBuckets['4.0+']++;
+      else if(gpa >= 3.5) gpaBuckets['3.5-3.9']++;
+      else if(gpa >= 3.0) gpaBuckets['3.0-3.4']++;
+      else if(gpa >= 2.5) gpaBuckets['2.5-2.9']++;
+      else gpaBuckets['Below 2.5']++;
+    });
+  } else {
+    students.forEach(function(s) {
+      var g = parseFloat(s.gpa)||0;
+      if(g >= 4.0) gpaBuckets['4.0+']++;
+      else if(g >= 3.5) gpaBuckets['3.5-3.9']++;
+      else if(g >= 3.0) gpaBuckets['3.0-3.4']++;
+      else if(g >= 2.5) gpaBuckets['2.5-2.9']++;
+      else gpaBuckets['Below 2.5']++;
+    });
+  }
 
   var gpaEl = document.getElementById('cmcChartGpa');
   if(gpaEl) {
@@ -17750,12 +17806,22 @@ function cmcLoadAllData() {
 }
 
 function cmcUpdateLocalKpis() {
-  var totalStudents = students.length;
   var avgAtt = 0;
-  if(totalStudents > 0) {
+  if(attendanceRecords && attendanceRecords.length > 0) {
     var sum = 0;
-    students.forEach(function(s){ sum += (parseFloat(s.attendance)||0); });
-    avgAtt = Math.round(sum / totalStudents);
+    attendanceRecords.forEach(function(r) {
+      var days = r.days || {};
+      var total = 0, present = 0;
+      ['Mon','Tue','Wed','Thu','Fri'].forEach(function(d) {
+        if(days[d]) { total++; if(days[d] === 'present' || days[d] === 'late') present++; }
+      });
+      sum += (total > 0 ? (present / total * 100) : 0);
+    });
+    avgAtt = Math.round(sum / attendanceRecords.length);
+  } else if(students.length > 0) {
+    var sum2 = 0;
+    students.forEach(function(s){ sum2 += (parseFloat(s.attendance)||0); });
+    avgAtt = Math.round(sum2 / students.length);
   }
   var el = document.getElementById('cmcKpiAttendance');
   if(el) el.textContent = avgAtt + '%';
@@ -18439,41 +18505,83 @@ function cmcBuildVirementDetail() {
 
 function cmcBuildAttendanceDetail() {
   var html = '<div class="cmc-detail-summary">';
-  var totalStudents = students.length;
-  var avgAtt = 0;
-  if(totalStudents > 0) {
-    var sum = 0;
-    students.forEach(function(s){ sum += (parseFloat(s.attendance)||0); });
-    avgAtt = Math.round(sum / totalStudents);
-  }
-  var above80 = students.filter(function(s){ return parseFloat(s.attendance||0) >= 80; }).length;
-  var below60 = students.filter(function(s){ return parseFloat(s.attendance||0) < 60; }).length;
 
-  html += '<div class="cmc-detail-stat"><div class="stat-label">Total Students</div><div class="stat-value">' + totalStudents + '</div></div>';
+  // Build per-student attendance from attendanceRecords
+  var studentAttMap = {};
+  if(attendanceRecords && attendanceRecords.length > 0) {
+    attendanceRecords.forEach(function(r) {
+      var days = r.days || {};
+      var total = 0, present = 0;
+      ['Mon','Tue','Wed','Thu','Fri'].forEach(function(d) {
+        if(days[d]) { total++; if(days[d] === 'present' || days[d] === 'late') present++; }
+      });
+      studentAttMap[r.studentId] = total > 0 ? Math.round(present / total * 100) : 0;
+    });
+  }
+
+  var totalRecords = attendanceRecords.length || students.length;
+  var avgAtt = 0;
+  var above80 = 0, below60 = 0;
+
+  if(Object.keys(studentAttMap).length > 0) {
+    var vals = Object.values(studentAttMap);
+    var sum = vals.reduce(function(a,b){return a+b;},0);
+    avgAtt = Math.round(sum / vals.length);
+    above80 = vals.filter(function(v){return v >= 80;}).length;
+    below60 = vals.filter(function(v){return v < 60;}).length;
+  } else if(students.length > 0) {
+    var sum2 = 0;
+    students.forEach(function(s){ sum2 += (parseFloat(s.attendance)||0); });
+    avgAtt = Math.round(sum2 / students.length);
+    above80 = students.filter(function(s){ return parseFloat(s.attendance||0) >= 80; }).length;
+    below60 = students.filter(function(s){ return parseFloat(s.attendance||0) < 60; }).length;
+  }
+
+  html += '<div class="cmc-detail-stat"><div class="stat-label">Total Students</div><div class="stat-value">' + totalRecords + '</div></div>';
   html += '<div class="cmc-detail-stat"><div class="stat-label">Average Attendance</div><div class="stat-value">' + avgAtt + '%</div></div>';
   html += '<div class="cmc-detail-stat"><div class="stat-label">Above 80%</div><div class="stat-value" style="color:var(--green)">' + above80 + '</div></div>';
   html += '<div class="cmc-detail-stat"><div class="stat-label">Below 60%</div><div class="stat-value" style="color:var(--red)">' + below60 + '</div></div>';
   html += '</div>';
 
-  // Show students sorted by attendance (lowest first to highlight issues)
-  var sorted = students.slice().sort(function(a,b){ return parseFloat(a.attendance||0) - parseFloat(b.attendance||0); });
-  html += '<table class="cmc-table"><thead><tr><th>#</th><th>Name</th><th>Course</th><th>Attendance</th><th>Stage</th></tr></thead><tbody>';
-  sorted.slice(0, 50).forEach(function(s, i) {
-    var att = parseFloat(s.attendance || 0);
-    var attCls = att >= 80 ? 'good' : att >= 60 ? 'warning' : 'critical';
-    html += '<tr><td>' + (i+1) + '</td><td>' + (s.name||'--') + '</td><td>' + (s.course||'--') + '</td>';
-    html += '<td><span class="cmc-status ' + attCls + '">' + att + '%</span></td>';
-    html += '<td>' + (s.stage||'--') + '</td></tr>';
-  });
-  html += '</tbody></table>';
-  if(students.length > 50) html += '<div style="text-align:center;color:var(--text-muted);padding:10px;font-size:12px;">Showing first 50 of ' + students.length + ' students</div>';
+  // Show attendance records sorted by percentage (lowest first)
+  if(attendanceRecords && attendanceRecords.length > 0) {
+    var sorted = attendanceRecords.slice().sort(function(a,b){ return (studentAttMap[a.studentId]||0) - (studentAttMap[b.studentId]||0); });
+    html += '<table class="cmc-table"><thead><tr><th>#</th><th>Name</th><th>Course</th><th>Attendance</th><th>Mon</th><th>Tue</th><th>Wed</th><th>Thu</th><th>Fri</th></tr></thead><tbody>';
+    sorted.slice(0, 50).forEach(function(r, i) {
+      var att = studentAttMap[r.studentId] || 0;
+      var attCls = att >= 80 ? 'good' : att >= 60 ? 'warning' : 'critical';
+      var days = r.days || {};
+      html += '<tr><td>' + (i+1) + '</td><td>' + (r.studentName||'--') + '</td><td>' + (r.course||'--') + '</td>';
+      html += '<td><span class="cmc-status ' + attCls + '">' + att + '%</span></td>';
+      ['Mon','Tue','Wed','Thu','Fri'].forEach(function(d) {
+        var st = days[d] || '--';
+        var cls = st === 'present' ? 'good' : st === 'late' ? 'warning' : st === 'absent' ? 'critical' : 'info';
+        html += '<td><span class="cmc-status ' + cls + '">' + st + '</span></td>';
+      });
+      html += '</tr>';
+    });
+    html += '</tbody></table>';
+    if(attendanceRecords.length > 50) html += '<div style="text-align:center;color:var(--text-muted);padding:10px;font-size:12px;">Showing first 50 of ' + attendanceRecords.length + ' records</div>';
+  } else {
+    var sorted2 = students.slice().sort(function(a,b){ return parseFloat(a.attendance||0) - parseFloat(b.attendance||0); });
+    html += '<table class="cmc-table"><thead><tr><th>#</th><th>Name</th><th>Course</th><th>Attendance</th><th>Stage</th></tr></thead><tbody>';
+    sorted2.slice(0, 50).forEach(function(s, i) {
+      var att = parseFloat(s.attendance || 0);
+      var attCls = att >= 80 ? 'good' : att >= 60 ? 'warning' : 'critical';
+      html += '<tr><td>' + (i+1) + '</td><td>' + (s.name||'--') + '</td><td>' + (s.course||'--') + '</td>';
+      html += '<td><span class="cmc-status ' + attCls + '">' + att + '%</span></td>';
+      html += '<td>' + (s.stage||'--') + '</td></tr>';
+    });
+    html += '</tbody></table>';
+    if(students.length > 50) html += '<div style="text-align:center;color:var(--text-muted);padding:10px;font-size:12px;">Showing first 50 of ' + students.length + ' students</div>';
+  }
   return html;
 }
 
 function cmcBuildFeesDetail() {
   var totalStudents = students.length;
   var certified = students.filter(function(s){ return s.stage === 'certified' || s.stage === 'collected'; }).length;
-  var inTraining = students.filter(function(s){ var st = (s.stage||'').toLowerCase().replace(/\s+/g,''); return st === 'intraining' || st === 'in training'; }).length;
+  var inTraining = students.filter(function(s){ var st = (s.stage||'').toLowerCase(); return st === 'training' || st === 'in training' || st === 'intraining'; }).length;
   var testing = students.filter(function(s){ return (s.stage||'').toLowerCase() === 'testing'; }).length;
 
   var html = '<div class="cmc-detail-summary">';
