@@ -19614,6 +19614,9 @@ function openCertTemplateEditor() {
   }
 
   openModal('certTemplateEditorModal');
+  // Scroll modal to top so image upload section is visible
+  var modalDiv = document.querySelector('#certTemplateEditorModal .modal');
+  if(modalDiv) modalDiv.scrollTop = 0;
 }
 
 var _certModuleIdx = 0;
