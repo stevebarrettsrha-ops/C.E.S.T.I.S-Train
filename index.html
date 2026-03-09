@@ -6141,6 +6141,42 @@ function buildAdminPages() {
         </div>
       </div>
 
+      <h4 style="font-size:14px;margin-bottom:8px;color:var(--accent);">Page 2 — Text Positions (% from top)</h4>
+      <p style="font-size:12px;color:var(--text-muted);margin-bottom:8px;">Adjust where sections are placed on your Page 2 background. The live preview below updates as you change values.</p>
+      <div style="display:grid;grid-template-columns:1fr 1fr 1fr 1fr 1fr;gap:12px;margin-bottom:12px;">
+        <div class="form-group"><label style="font-size:11px;">Title Y%</label><input type="number" id="ctplP2TitleY" value="5" step="1" min="0" max="100" style="font-size:12px;" oninput="updateCertLivePreviewP2()"></div>
+        <div class="form-group"><label style="font-size:11px;">Header Y%</label><input type="number" id="ctplP2HeaderY" value="18" step="1" min="0" max="100" style="font-size:12px;" oninput="updateCertLivePreviewP2()"></div>
+        <div class="form-group"><label style="font-size:11px;">Content Y%</label><input type="number" id="ctplP2ContentY" value="25" step="1" min="0" max="100" style="font-size:12px;" oninput="updateCertLivePreviewP2()"></div>
+        <div class="form-group"><label style="font-size:11px;">Specs Y%</label><input type="number" id="ctplP2SpecsY" value="78" step="1" min="0" max="100" style="font-size:12px;" oninput="updateCertLivePreviewP2()"></div>
+        <div class="form-group"><label style="font-size:11px;">Footer Y%</label><input type="number" id="ctplP2FooterY" value="90" step="1" min="0" max="100" style="font-size:12px;" oninput="updateCertLivePreviewP2()"></div>
+      </div>
+
+      <!-- Page 2 Live Preview -->
+      <div id="certLivePreviewContainerP2" style="margin-bottom:20px;border:2px solid var(--accent);border-radius:var(--radius-sm);overflow:hidden;position:relative;background:#1a1a2e;display:none;">
+        <div style="background:var(--accent);color:#fff;padding:4px 12px;font-size:11px;font-weight:600;display:flex;align-items:center;justify-content:space-between;">
+          <span>LIVE PREVIEW — Page 2 Position Preview</span>
+          <span style="font-size:10px;opacity:0.8;">Drag guide lines or change values above</span>
+        </div>
+        <div style="position:relative;width:100%;overflow:hidden;">
+          <canvas id="certLivePreviewCanvasP2" style="width:100%;display:block;cursor:crosshair;"></canvas>
+          <div id="certGuideP2TitleLine" class="cert-guide-line" style="position:absolute;left:0;right:0;height:2px;background:rgba(255,80,80,0.8);cursor:ns-resize;pointer-events:auto;z-index:10;" title="Title position">
+            <span style="position:absolute;right:4px;top:-16px;font-size:10px;color:#ff5050;background:rgba(0,0,0,0.7);padding:1px 5px;border-radius:3px;white-space:nowrap;">Title</span>
+          </div>
+          <div id="certGuideP2HeaderLine" class="cert-guide-line" style="position:absolute;left:0;right:0;height:2px;background:rgba(255,180,50,0.8);cursor:ns-resize;pointer-events:auto;z-index:10;" title="Header position">
+            <span style="position:absolute;right:4px;top:-16px;font-size:10px;color:#ffb432;background:rgba(0,0,0,0.7);padding:1px 5px;border-radius:3px;white-space:nowrap;">Header</span>
+          </div>
+          <div id="certGuideP2ContentLine" class="cert-guide-line" style="position:absolute;left:0;right:0;height:2px;background:rgba(80,200,80,0.8);cursor:ns-resize;pointer-events:auto;z-index:10;" title="Content position">
+            <span style="position:absolute;right:4px;top:-16px;font-size:10px;color:#50c850;background:rgba(0,0,0,0.7);padding:1px 5px;border-radius:3px;white-space:nowrap;">Content</span>
+          </div>
+          <div id="certGuideP2SpecsLine" class="cert-guide-line" style="position:absolute;left:0;right:0;height:2px;background:rgba(200,80,255,0.8);cursor:ns-resize;pointer-events:auto;z-index:10;" title="Specs position">
+            <span style="position:absolute;right:4px;top:-16px;font-size:10px;color:#c850ff;background:rgba(0,0,0,0.7);padding:1px 5px;border-radius:3px;white-space:nowrap;">Specs</span>
+          </div>
+          <div id="certGuideP2FooterLine" class="cert-guide-line" style="position:absolute;left:0;right:0;height:2px;background:rgba(80,150,255,0.8);cursor:ns-resize;pointer-events:auto;z-index:10;" title="Footer position">
+            <span style="position:absolute;right:4px;top:-16px;font-size:10px;color:#5096ff;background:rgba(0,0,0,0.7);padding:1px 5px;border-radius:3px;white-space:nowrap;">Footer</span>
+          </div>
+        </div>
+      </div>
+
       <h4 style="font-size:14px;margin-bottom:8px;color:var(--accent);">Certificate Details</h4>
       <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:16px;">
         <div class="form-group">
@@ -19834,9 +19870,11 @@ function previewCertBgUpload(input, previewId) {
     preview.innerHTML = '<img src="' + e.target.result + '" style="max-width:100%;max-height:200px;border-radius:4px;">';
     // Store in a temp attribute for later save
     preview.setAttribute('data-base64', e.target.result);
-    // Update live preview when Page 1 background changes
+    // Update live preview when background changes
     if(previewId === 'ctplBgPage1Preview') {
       updateCertLivePreview();
+    } else if(previewId === 'ctplBgPage2Preview') {
+      updateCertLivePreviewP2();
     }
   };
   reader.readAsDataURL(input.files[0]);
@@ -20022,8 +20060,193 @@ function _renderCertLivePreview() {
 // Also update preview when Course Full Name changes
 document.addEventListener('DOMContentLoaded', function() {
   var cfn = document.getElementById('ctplCourseFullName');
-  if(cfn) cfn.addEventListener('input', updateCertLivePreview);
+  if(cfn) {
+    cfn.addEventListener('input', function() { updateCertLivePreview(); updateCertLivePreviewP2(); });
+  }
 });
+
+// ---- Page 2 Live Certificate Text Position Preview ----
+var _certLivePreviewImgP2 = null;
+
+function updateCertLivePreviewP2() {
+  var container = document.getElementById('certLivePreviewContainerP2');
+  var canvas = document.getElementById('certLivePreviewCanvasP2');
+  if(!container || !canvas) return;
+
+  // Get the Page 2 background image
+  var bgSrc = '';
+  var p2Preview = document.getElementById('ctplBgPage2Preview');
+  if(p2Preview) bgSrc = p2Preview.getAttribute('data-base64') || '';
+  if(!bgSrc && _certTplEditingCourse && certTemplates[_certTplEditingCourse]) {
+    bgSrc = certTemplates[_certTplEditingCourse].bgPage2 || '';
+  }
+
+  if(!bgSrc) {
+    container.style.display = 'none';
+    return;
+  }
+  container.style.display = 'block';
+
+  var img = new Image();
+  img.onload = function() {
+    _certLivePreviewImgP2 = img;
+    _renderCertLivePreviewP2();
+  };
+  if(_certLivePreviewImgP2 && _certLivePreviewImgP2.src === bgSrc) {
+    _renderCertLivePreviewP2();
+  } else {
+    img.src = bgSrc;
+  }
+}
+
+function _renderCertLivePreviewP2() {
+  var canvas = document.getElementById('certLivePreviewCanvasP2');
+  if(!canvas || !_certLivePreviewImgP2) return;
+
+  var img = _certLivePreviewImgP2;
+  var w = img.naturalWidth;
+  var h = img.naturalHeight;
+  canvas.width = w;
+  canvas.height = h;
+  var ctx = canvas.getContext('2d');
+
+  // Draw background
+  ctx.drawImage(img, 0, 0, w, h);
+  ctx.fillStyle = 'rgba(0,0,0,0.05)';
+  ctx.fillRect(0, 0, w, h);
+
+  // Read current values
+  var titleY = (parseInt(document.getElementById('ctplP2TitleY').value) || 5) / 100 * h;
+  var headerY = (parseInt(document.getElementById('ctplP2HeaderY').value) || 18) / 100 * h;
+  var contentY = (parseInt(document.getElementById('ctplP2ContentY').value) || 25) / 100 * h;
+  var specsY = (parseInt(document.getElementById('ctplP2SpecsY').value) || 78) / 100 * h;
+  var footerY = (parseInt(document.getElementById('ctplP2FooterY').value) || 90) / 100 * h;
+
+  var courseFullName = (document.getElementById('ctplCourseFullName').value || (_certTplEditingCourse || 'COURSE NAME')).toUpperCase();
+  var progCode = document.getElementById('ctplProgrammeCode')?.value || 'CESTIS-XXX-01';
+  var version = document.getElementById('ctplVersion')?.value || '1.0';
+  var devDate = document.getElementById('ctplDevelopedDate')?.value || 'May 2024';
+
+  // --- Title (red) ---
+  ctx.textAlign = 'center';
+  ctx.font = 'bold 26px Georgia, serif';
+  ctx.fillStyle = 'rgba(255,80,80,0.85)';
+  ctx.fillText(courseFullName, w / 2, titleY);
+  ctx.strokeStyle = 'rgba(255,80,80,0.5)'; ctx.lineWidth = 2; ctx.setLineDash([8,4]);
+  ctx.beginPath(); ctx.moveTo(0, titleY); ctx.lineTo(w, titleY); ctx.stroke(); ctx.setLineDash([]);
+
+  // --- Header (orange) ---
+  ctx.font = 'bold 16px Georgia, serif';
+  ctx.fillStyle = 'rgba(255,180,50,0.85)';
+  ctx.fillText('Community Educational and Skills Training Institute and Services Limited', w / 2, headerY);
+  ctx.font = 'bold 13px Georgia, serif';
+  ctx.fillText('Programme Code: ' + progCode + ' | Version ' + version + ' | Developed: ' + devDate, w / 2, headerY + 22);
+  ctx.strokeStyle = 'rgba(255,180,50,0.5)'; ctx.lineWidth = 2; ctx.setLineDash([8,4]);
+  ctx.beginPath(); ctx.moveTo(0, headerY); ctx.lineTo(w, headerY); ctx.stroke(); ctx.setLineDash([]);
+
+  // --- Content area (green) ---
+  var colLeft = w * 0.04;
+  var colMid = w * 0.52;
+  ctx.textAlign = 'left';
+  ctx.font = 'bold 13px Arial, sans-serif';
+  ctx.fillStyle = 'rgba(80,200,80,0.85)';
+  ctx.fillText('MODULES COMPLETED', colLeft + 10, contentY);
+  ctx.fillText('\u2611 Sample Module — 20 Contact Hours', colLeft + 10, contentY + 22);
+  ctx.font = '10px Arial, sans-serif';
+  ctx.fillText('  \u2022  Sample topic 1', colLeft + 20, contentY + 38);
+  ctx.fillText('  \u2022  Sample topic 2', colLeft + 20, contentY + 52);
+
+  ctx.font = 'bold 13px Arial, sans-serif';
+  ctx.fillText('TECHNICAL COMPETENCIES ACHIEVED', colMid + 10, contentY);
+  ctx.fillText('Sample Category:', colMid + 10, contentY + 22);
+  ctx.font = '10px Arial, sans-serif';
+  ctx.fillText('  \u2022  Sample competency item', colMid + 20, contentY + 38);
+
+  ctx.strokeStyle = 'rgba(80,200,80,0.5)'; ctx.lineWidth = 2; ctx.setLineDash([8,4]);
+  ctx.beginPath(); ctx.moveTo(0, contentY); ctx.lineTo(w, contentY); ctx.stroke(); ctx.setLineDash([]);
+
+  // Draw column separator
+  ctx.strokeStyle = 'rgba(80,200,80,0.3)'; ctx.lineWidth = 1; ctx.setLineDash([4,4]);
+  ctx.beginPath(); ctx.moveTo(w * 0.50, contentY - 5); ctx.lineTo(w * 0.50, specsY - 10); ctx.stroke(); ctx.setLineDash([]);
+
+  // --- Specs (purple) ---
+  ctx.textAlign = 'center';
+  ctx.font = 'bold 13px Arial, sans-serif';
+  ctx.fillStyle = 'rgba(200,80,255,0.85)';
+  ctx.fillText('PROGRAMME SPECIFICATIONS', w / 2, specsY);
+  ctx.font = '11px Arial, sans-serif';
+  ctx.fillText('Duration: 40 Contact Hours | Industry: Sample Industry', w / 2, specsY + 16);
+  ctx.fillText('Sub-Sector: Sample | Entry Requirements: Grade 9', w / 2, specsY + 30);
+  ctx.strokeStyle = 'rgba(200,80,255,0.5)'; ctx.lineWidth = 2; ctx.setLineDash([8,4]);
+  ctx.beginPath(); ctx.moveTo(0, specsY); ctx.lineTo(w, specsY); ctx.stroke(); ctx.setLineDash([]);
+
+  // --- Footer (blue) ---
+  ctx.font = 'italic 10px Arial, sans-serif';
+  ctx.fillStyle = 'rgba(80,150,255,0.85)';
+  ctx.fillText('This certificate confirms that the holder has successfully completed all requirements of the ' + courseFullName, w / 2, footerY);
+  ctx.fillText('Short Course. For transcript requests or verification, contact: cestisadmn@gmail.com | +(876) 679-0111', w / 2, footerY + 14);
+  ctx.font = 'bold 18px Georgia, serif';
+  ctx.fillText('Certificate No. WE-2026-0001', w / 2, footerY + 42);
+  ctx.strokeStyle = 'rgba(80,150,255,0.5)'; ctx.lineWidth = 2; ctx.setLineDash([8,4]);
+  ctx.beginPath(); ctx.moveTo(0, footerY); ctx.lineTo(w, footerY); ctx.stroke(); ctx.setLineDash([]);
+
+  // Position draggable guide overlays
+  var displayH = canvas.getBoundingClientRect().height;
+  var scale = displayH / h;
+  var el;
+  el = document.getElementById('certGuideP2TitleLine'); if(el) el.style.top = (titleY * scale) + 'px';
+  el = document.getElementById('certGuideP2HeaderLine'); if(el) el.style.top = (headerY * scale) + 'px';
+  el = document.getElementById('certGuideP2ContentLine'); if(el) el.style.top = (contentY * scale) + 'px';
+  el = document.getElementById('certGuideP2SpecsLine'); if(el) el.style.top = (specsY * scale) + 'px';
+  el = document.getElementById('certGuideP2FooterLine'); if(el) el.style.top = (footerY * scale) + 'px';
+}
+
+// ---- Page 2 Drag guide lines ----
+(function() {
+  function initCertGuideDragP2() {
+    var lines = {
+      'certGuideP2TitleLine': 'ctplP2TitleY',
+      'certGuideP2HeaderLine': 'ctplP2HeaderY',
+      'certGuideP2ContentLine': 'ctplP2ContentY',
+      'certGuideP2SpecsLine': 'ctplP2SpecsY',
+      'certGuideP2FooterLine': 'ctplP2FooterY'
+    };
+
+    Object.keys(lines).forEach(function(lineId) {
+      var lineEl = document.getElementById(lineId);
+      if(!lineEl) return;
+      var inputId = lines[lineId];
+      var dragging = false;
+
+      function onStart(e) { e.preventDefault(); dragging = true; document.body.style.cursor = 'ns-resize'; document.body.style.userSelect = 'none'; }
+      function onMove(e) {
+        if(!dragging) return;
+        e.preventDefault();
+        var canvas = document.getElementById('certLivePreviewCanvasP2');
+        if(!canvas) return;
+        var rect = canvas.getBoundingClientRect();
+        var clientY = e.touches ? e.touches[0].clientY : e.clientY;
+        var relY = clientY - rect.top;
+        var pct = Math.round(Math.max(0, Math.min(100, (relY / rect.height) * 100)));
+        document.getElementById(inputId).value = pct;
+        updateCertLivePreviewP2();
+      }
+      function onEnd() { if(!dragging) return; dragging = false; document.body.style.cursor = ''; document.body.style.userSelect = ''; }
+
+      lineEl.addEventListener('mousedown', onStart);
+      lineEl.addEventListener('touchstart', onStart, { passive: false });
+      document.addEventListener('mousemove', onMove);
+      document.addEventListener('touchmove', onMove, { passive: false });
+      document.addEventListener('mouseup', onEnd);
+      document.addEventListener('touchend', onEnd);
+    });
+  }
+  if(document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', initCertGuideDragP2);
+  } else {
+    setTimeout(initCertGuideDragP2, 150);
+  }
+})();
 
 
 // ============================== CERTIFICATE TEMPLATE MANAGEMENT ==============================
@@ -20134,6 +20357,13 @@ function openCertTemplateEditor() {
   document.getElementById('ctplP1CertNoY').value = pos.p1CertNoY || 95;
   document.getElementById('ctplP1NameSize').value = pos.p1NameSize || 48;
 
+  // Page 2 positions
+  document.getElementById('ctplP2TitleY').value = pos.p2TitleY || 5;
+  document.getElementById('ctplP2HeaderY').value = pos.p2HeaderY || 18;
+  document.getElementById('ctplP2ContentY').value = pos.p2ContentY || 25;
+  document.getElementById('ctplP2SpecsY').value = pos.p2SpecsY || 78;
+  document.getElementById('ctplP2FooterY').value = pos.p2FooterY || 90;
+
   // Rebuild modules
   var mc = document.getElementById('ctplModulesContainer');
   mc.innerHTML = '';
@@ -20153,9 +20383,10 @@ function openCertTemplateEditor() {
   var modalDiv = document.querySelector('#certTemplateEditorModal .modal');
   if(modalDiv) modalDiv.scrollTop = 0;
 
-  // Initialize live preview after modal is visible
+  // Initialize live previews after modal is visible
   _certLivePreviewImg = null;
-  setTimeout(function() { updateCertLivePreview(); }, 150);
+  _certLivePreviewImgP2 = null;
+  setTimeout(function() { updateCertLivePreview(); updateCertLivePreviewP2(); }, 150);
 }
 
 var _certModuleIdx = 0;
@@ -20233,7 +20464,12 @@ function saveCertTemplate() {
       p1NameY: parseInt(document.getElementById('ctplP1NameY').value) || 48,
       p1BodyY: parseInt(document.getElementById('ctplP1BodyY').value) || 62,
       p1CertNoY: parseInt(document.getElementById('ctplP1CertNoY').value) || 95,
-      p1NameSize: parseInt(document.getElementById('ctplP1NameSize').value) || 48
+      p1NameSize: parseInt(document.getElementById('ctplP1NameSize').value) || 48,
+      p2TitleY: parseInt(document.getElementById('ctplP2TitleY').value) || 5,
+      p2HeaderY: parseInt(document.getElementById('ctplP2HeaderY').value) || 18,
+      p2ContentY: parseInt(document.getElementById('ctplP2ContentY').value) || 25,
+      p2SpecsY: parseInt(document.getElementById('ctplP2SpecsY').value) || 78,
+      p2FooterY: parseInt(document.getElementById('ctplP2FooterY').value) || 90
     },
     programmeSpecs: {
       duration: document.getElementById('ctplSpecDuration').value.trim(),
