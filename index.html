@@ -19316,12 +19316,31 @@ function generateCertificatePDF(studentId) {
     return;
   }
 
-  // Ensure cert template images are loaded from IndexedDB before generating
-  if(!_certImagesLoaded) {
-    showToast('Loading certificate template...');
-    ensureCertImagesLoaded().then(function() { generateCertificatePDF(studentId); });
+  // Always try to load cert images from IndexedDB if bgPage1 is missing
+  var tpl = certTemplates[student.course] || {};
+  if(!tpl.bgPage1) {
+    // Try loading from IndexedDB before falling back to generic certificate
+    certImageLoadAll().then(function(images) {
+      images.forEach(function(img) {
+        var parts = img.id.split('___');
+        var course = parts[0]; var page = parts[1];
+        if(certTemplates[course]) {
+          certTemplates[course][page] = img.data;
+        }
+      });
+      _certImagesLoaded = true;
+      _generateCertPDFInner(studentId);
+    }).catch(function() {
+      _generateCertPDFInner(studentId);
+    });
     return;
   }
+  _generateCertPDFInner(studentId);
+}
+
+function _generateCertPDFInner(studentId) {
+  var student = students.find(function(s){ return s.id === studentId; });
+  if(!student) return;
 
   // Track download
   var approval = certDownloadApprovals.find(function(d){ return d.studentId === studentId; });
