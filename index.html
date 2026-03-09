@@ -2914,6 +2914,105 @@ textarea.form-control { resize:vertical; min-height:80px; }
 .as-duty-stat:hover { border-color:var(--purple); }
 .as-duty-stat .as-ds-val { font-size:32px; font-weight:700; font-family:'Playfair Display',serif; }
 .as-duty-stat .as-ds-label { font-size:12px; color:var(--text-muted); margin-top:4px; }
+
+/* ====== Certificate Check & Download ====== */
+.cert-check-btn {
+  display:inline-flex; align-items:center; gap:8px; padding:10px 22px;
+  background:linear-gradient(135deg,rgba(240,165,0,0.15),rgba(240,165,0,0.05));
+  border:1px solid rgba(240,165,0,0.3); border-radius:var(--radius-sm);
+  color:var(--accent); font-size:13px; font-weight:600; cursor:pointer;
+  transition:var(--transition); margin-top:12px;
+}
+.cert-check-btn:hover { background:rgba(240,165,0,0.2); border-color:var(--accent); transform:translateY(-1px); }
+.cert-check-btn svg { width:16px; height:16px; }
+
+/* Public certificate check overlay */
+.cert-check-overlay {
+  position:fixed; top:0; left:0; width:100%; height:100%; z-index:2000;
+  background:rgba(0,0,0,0.85); backdrop-filter:blur(8px);
+  display:none; align-items:center; justify-content:center;
+  animation:fadeIn 0.3s ease;
+}
+.cert-check-overlay.active { display:flex; }
+.cert-check-panel {
+  background:var(--bg-card); border:1px solid var(--border-light);
+  border-radius:var(--radius-lg); padding:40px; max-width:520px; width:90%;
+  position:relative; box-shadow:0 24px 80px rgba(0,0,0,0.5);
+}
+.cert-check-panel .close-btn {
+  position:absolute; top:16px; right:16px; background:none; border:none;
+  color:var(--text-muted); font-size:20px; cursor:pointer; transition:var(--transition);
+}
+.cert-check-panel .close-btn:hover { color:var(--text-primary); }
+.cert-check-panel h2 { font-size:22px; font-family:'Playfair Display',serif; margin-bottom:6px; }
+.cert-check-panel .subtitle { font-size:13px; color:var(--text-muted); margin-bottom:24px; }
+.cert-check-input-group {
+  display:flex; gap:10px; margin-bottom:20px;
+}
+.cert-check-input-group input {
+  flex:1; padding:12px 16px; background:var(--bg-input); border:1px solid var(--border);
+  border-radius:var(--radius-sm); color:var(--text-primary); font-size:14px;
+  outline:none; transition:var(--transition);
+}
+.cert-check-input-group input:focus { border-color:var(--accent); }
+.cert-check-input-group button {
+  padding:12px 24px; background:var(--accent); color:#000; border:none;
+  border-radius:var(--radius-sm); font-weight:700; font-size:14px;
+  cursor:pointer; transition:var(--transition); white-space:nowrap;
+}
+.cert-check-input-group button:hover { background:#ffb820; transform:translateY(-1px); }
+.cert-result-card {
+  background:var(--bg-secondary); border:1px solid var(--border);
+  border-radius:var(--radius); padding:24px; margin-top:16px;
+  animation:slideDown 0.3s ease;
+}
+.cert-result-card.success { border-color:rgba(46,204,113,0.3); }
+.cert-result-card.not-found { border-color:rgba(231,76,60,0.3); }
+.cert-result-card.pending { border-color:rgba(240,165,0,0.3); }
+.cert-result-header {
+  display:flex; align-items:center; gap:12px; margin-bottom:16px;
+}
+.cert-result-icon {
+  width:48px; height:48px; border-radius:50%; display:flex;
+  align-items:center; justify-content:center; font-size:24px; flex-shrink:0;
+}
+.cert-result-details { display:grid; grid-template-columns:1fr 1fr; gap:10px; margin-bottom:16px; }
+.cert-detail-item { font-size:13px; }
+.cert-detail-item .label { color:var(--text-muted); font-size:11px; text-transform:uppercase; letter-spacing:0.5px; }
+.cert-detail-item .value { color:var(--text-primary); font-weight:600; margin-top:2px; }
+.cert-download-btn {
+  display:inline-flex; align-items:center; gap:8px; padding:10px 24px;
+  background:var(--green); color:#fff; border:none; border-radius:var(--radius-sm);
+  font-weight:700; font-size:13px; cursor:pointer; transition:var(--transition);
+}
+.cert-download-btn:hover { background:#27ae60; transform:translateY(-1px); }
+.cert-download-btn:disabled { opacity:0.5; cursor:not-allowed; transform:none; }
+
+/* Admin Cert Download Management */
+.cert-mgmt-toolbar {
+  display:flex; gap:12px; margin-bottom:20px; flex-wrap:wrap; align-items:center;
+}
+.cert-mgmt-toolbar input, .cert-mgmt-toolbar select {
+  padding:10px 14px; background:var(--bg-input); border:1px solid var(--border);
+  border-radius:var(--radius-sm); color:var(--text-primary); font-size:13px; outline:none;
+}
+.cert-mgmt-toolbar input:focus, .cert-mgmt-toolbar select:focus { border-color:var(--accent); }
+.cert-approve-row {
+  display:flex; align-items:center; justify-content:space-between;
+  padding:14px 16px; background:var(--bg-secondary); border:1px solid var(--border);
+  border-radius:var(--radius-sm); margin-bottom:8px; transition:var(--transition);
+}
+.cert-approve-row:hover { border-color:var(--accent); }
+.cert-approve-info { display:flex; align-items:center; gap:14px; }
+.cert-approve-avatar {
+  width:36px; height:36px; border-radius:50%; display:flex;
+  align-items:center; justify-content:center; font-size:13px; font-weight:700;
+  background:var(--accent-dim); color:var(--accent);
+}
+.cert-approve-name { font-size:14px; font-weight:600; }
+.cert-approve-meta { font-size:12px; color:var(--text-muted); margin-top:2px; }
+.cert-approve-actions { display:flex; gap:8px; align-items:center; }
+.cert-approve-actions .badge { font-size:11px; }
 </style>
 <script src="https://unpkg.com/peerjs@1.5.4/dist/peerjs.min.js"></script>
 <!-- Google Identity Services for OAuth -->
@@ -3064,8 +3163,31 @@ textarea.form-control { resize:vertical; min-height:80px; }
     </div>
   </div>
 
+  <!-- Certificate Check Button -->
+  <div style="text-align:center;margin-top:8px;">
+    <button class="cert-check-btn" onclick="openCertCheckOverlay()">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="8" r="7"/><polyline points="8.21 13.89 7 23 12 20 17 23 15.79 13.88"/></svg>
+      Check &amp; Download Certificate
+    </button>
+  </div>
+
   <div class="landing-footer">
     © 2026 C.E.S.T.I.S - LMS v2.0 &nbsp;|&nbsp; <a href="#" onclick="event.preventDefault();openModal('privacyPolicyModal')">Privacy Policy</a> &nbsp;|&nbsp; <a href="#" onclick="event.preventDefault();openModal('supportContactModal')">Support</a>
+  </div>
+
+  <!-- Public Certificate Check Overlay -->
+  <div class="cert-check-overlay" id="certCheckOverlay">
+    <div class="cert-check-panel">
+      <button class="close-btn" onclick="closeCertCheckOverlay()">&times;</button>
+      <div style="text-align:center;margin-bottom:8px;font-size:40px;">🎓</div>
+      <h2 style="text-align:center;">Certificate Verification</h2>
+      <p class="subtitle" style="text-align:center;">Enter your Student Number (TRN) or Certificate Number to check your certificate status and download.</p>
+      <div class="cert-check-input-group">
+        <input type="text" id="certCheckInput" placeholder="e.g. STU-2026001 or WE-2026-1234" onkeydown="if(event.key==='Enter')checkCertificatePublic()">
+        <button onclick="checkCertificatePublic()">Search</button>
+      </div>
+      <div id="certCheckResult"></div>
+    </div>
   </div>
 
   <!-- PRIVACY POLICY MODAL -->
@@ -3579,6 +3701,7 @@ const stageIcons = {testing:'\uD83D\uDCDD',interview:'\uD83D\uDDE3\uFE0F',traini
 const courses = ['Welding','Electrical Installation','Cosmetology','Business Administration','Auto Mechanics','Plumbing','Carpentry','Hospitality & Tourism'];
 
 let students = [];
+let certDownloadApprovals = []; // {studentId, name, course, certNo, certDate, approved, approvedDate, approvedBy, downloadCount, lastDownloaded}
 
 let exams = [];
 
@@ -3911,6 +4034,7 @@ function saveState() {
     localStorage.setItem('voctrain_adrStaffMeta', JSON.stringify(adrStaffMeta));
     localStorage.setItem('voctrain_adminStaffAccess', JSON.stringify(adminStaffAccessSettings));
     localStorage.setItem('voctrain_instructorData', JSON.stringify(instructorData));
+    localStorage.setItem('voctrain_certDownloadApprovals', JSON.stringify(certDownloadApprovals));
     saveLmsChatData();
   } catch(e) { console.warn('saveState: storage quota exceeded or unavailable'); }
   // Push changes to Google Drive immediately (debounced)
@@ -3955,6 +4079,8 @@ function loadState() {
     if(asAccess) adminStaffAccessSettings = JSON.parse(asAccess);
     var idData = localStorage.getItem('voctrain_instructorData');
     if(idData) instructorData = JSON.parse(idData);
+    var cda = localStorage.getItem('voctrain_certDownloadApprovals');
+    if(cda) certDownloadApprovals = JSON.parse(cda);
   } catch(e) { /* parse error, use defaults */ }
   updateSkillAreaCounts();
 }
@@ -5185,6 +5311,8 @@ function buildAdminSidebar() {
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M16 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="8.5" cy="7" r="4"/><path d="M20 8v6"/><path d="M23 11h-6"/></svg>Verify Users<span class="nav-badge" id="pendingUsersBadge" style="display:none;background:var(--red);">0</span></div>
     <div class="nav-item" data-page="certificates" onclick="showPage('certificates')">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="8" r="7"/><polyline points="8.21 13.89 7 23 12 20 17 23 15.79 13.88"/></svg>Certificates</div>
+    <div class="nav-item" data-page="cert-downloads" onclick="showPage('cert-downloads')">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>Cert Downloads</div>
     <div class="nav-item" data-page="reports" onclick="showPage('reports')">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/></svg>Reports</div>
     <div class="nav-item" data-page="support-messages" onclick="showPage('support-messages')">
@@ -5306,7 +5434,7 @@ function showPage(pageId) {
   if(navItem) navItem.classList.add('active');
   const titles = {
     dashboard:'Dashboard',video:'Video Conference',students:'Student Progress',
-    training:'Training Centres','a-resources':'Resource Manager',exams:'Online Exams','import-exam':'Import Exam',certificates:'Certificate Tracking',
+    training:'Training Centres','a-resources':'Resource Manager',exams:'Online Exams','import-exam':'Import Exam',certificates:'Certificate Tracking','cert-downloads':'Certificate Downloads',
     reports:'Reports & Analytics','verify-users':'Verify Users',settings:'Settings',
     attendance:'Attendance Management',announcements:'Announcements',calendar:'Calendar & Schedule',
     's-dashboard':'My Dashboard','s-video':'My Classes','s-progress':'My Progress',
@@ -5677,6 +5805,58 @@ function buildAdminPages() {
     <div style="display:flex;gap:12px;margin-bottom:20px;"><select class="form-control" style="width:200px;" id="certFilter" onchange="filterCerts()"><option value="all">All Certificates</option><option value="collected">Collected</option><option value="pending">Awaiting Collection</option></select><input type="text" class="form-control" style="width:260px;" placeholder="Search by name or cert number..." id="certSearch" onkeyup="filterCerts()"></div>
     <div class="card"><div class="card-header"><h3>Certificate Registry</h3><button class="btn-export" onclick="exportCertsCSV()">\uD83D\uDCC4 Export CSV</button></div><div class="table-wrapper"><table><thead><tr><th>Student</th><th>Certificate No.</th><th>Programme</th><th>Level</th><th>Date Certified</th><th>Collection Status</th><th>Actions</th></tr></thead><tbody id="certTableBody"></tbody></table></div></div>
   </section>
+
+  <!-- ADMIN CERTIFICATE DOWNLOAD MANAGEMENT -->
+  <section class="page" id="page-cert-downloads">
+    <div class="stats-grid stats-grid-4" id="certDlStats"></div>
+    <div class="card" style="margin-bottom:20px;">
+      <div class="card-header">
+        <h3>Approve Students for Certificate Download</h3>
+        <button class="btn btn-primary btn-sm" onclick="openBulkCertApproveModal()">+ Bulk Approve</button>
+      </div>
+      <p style="font-size:13px;color:var(--text-muted);margin-bottom:16px;">Select certified students and approve them to check status and download their certificates using their Student Number (TRN).</p>
+      <div class="cert-mgmt-toolbar">
+        <input type="text" id="certDlSearch" placeholder="Search by name, ID, or cert number..." style="width:280px;" oninput="renderCertDownloadMgmt()">
+        <select id="certDlFilter" onchange="renderCertDownloadMgmt()">
+          <option value="all">All Certified</option>
+          <option value="approved">Approved for Download</option>
+          <option value="not-approved">Not Yet Approved</option>
+        </select>
+        <select id="certDlCourseFilter" onchange="renderCertDownloadMgmt()">
+          <option value="all">All Programmes</option>
+        </select>
+      </div>
+      <div id="certDlStudentList"></div>
+    </div>
+    <div class="card">
+      <div class="card-header"><h3>Download Activity Log</h3></div>
+      <div class="table-wrapper">
+        <table>
+          <thead><tr><th>Student</th><th>Certificate No.</th><th>Programme</th><th>Downloads</th><th>Last Downloaded</th><th>Approved By</th></tr></thead>
+          <tbody id="certDlLogBody"><tr><td colspan="6" style="text-align:center;color:var(--text-muted);padding:20px;">No download activity yet</td></tr></tbody>
+        </table>
+      </div>
+    </div>
+  </section>
+
+  <!-- Bulk Cert Approve Modal -->
+  <div class="modal-overlay" id="bulkCertApproveModal">
+    <div class="modal" style="max-width:600px;">
+      <div class="modal-header"><h3>Bulk Approve Certificate Downloads</h3><button class="modal-close" onclick="closeModal('bulkCertApproveModal')">✕</button></div>
+      <p style="font-size:13px;color:var(--text-muted);margin-bottom:16px;">Select all certified students you want to approve for certificate download.</p>
+      <div style="margin-bottom:12px;">
+        <label style="font-size:12px;color:var(--text-muted);display:flex;align-items:center;gap:8px;cursor:pointer;">
+          <input type="checkbox" id="bulkCertSelectAll" onchange="toggleBulkCertSelectAll()" style="accent-color:var(--accent);">
+          Select all unapproved certified students
+        </label>
+      </div>
+      <div id="bulkCertList" style="max-height:360px;overflow-y:auto;margin-bottom:16px;"></div>
+      <div style="display:flex;gap:12px;justify-content:flex-end;">
+        <button class="btn btn-secondary" onclick="closeModal('bulkCertApproveModal')">Cancel</button>
+        <button class="btn btn-primary" onclick="bulkApproveCertDownloads()">Approve Selected</button>
+      </div>
+    </div>
+  </div>
 
   <section class="page" id="page-reports">
     <div class="stats-grid" id="reportStats"></div>
@@ -6338,11 +6518,21 @@ function buildStudentPages() {
           <div style="font-size:22px;font-family:'Playfair Display',serif;font-weight:700;color:var(--accent);">${s.certNo}</div>
           <div style="font-size:12px;color:var(--text-muted);margin-top:8px;">Issued: ${s.certDate}</div>
         </div>
-        <div>
+        <div style="margin-bottom:24px;">
           <div style="font-size:13px;margin-bottom:8px;">Collection Status:</div>
           ${s.certCollected
             ? '<span class="badge badge-green" style="font-size:14px;padding:8px 20px;"><span class="badge-dot"></span>Certificate Collected ✓</span>'
             : '<span class="badge badge-amber" style="font-size:14px;padding:8px 20px;"><span class="badge-dot"></span>Awaiting Collection — Visit your centre</span>'}
+        </div>
+        <div style="margin-top:8px;">
+          ${(function(){
+            const dl = (typeof certDownloadApprovals !== 'undefined' ? certDownloadApprovals : []).find(function(d){ return d.studentId === s.id; });
+            if(dl && dl.approved) {
+              return "<button class=\"cert-download-btn\" onclick=\"generateCertificatePDF('" + s.id + "')\"><svg viewBox=\"0 0 24 24\" width=\"16\" height=\"16\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\"><path d=\"M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4\"/><polyline points=\"7 10 12 15 17 10\"/><line x1=\"12\" y1=\"15\" x2=\"12\" y2=\"3\"/></svg> Download Certificate</button>";
+            } else {
+              return '<p style="font-size:13px;color:var(--text-muted);margin-top:8px;">Certificate download not yet approved. Contact administration.</p>';
+            }
+          })()}
         </div>
       </div>
     ` : `
@@ -18847,6 +19037,444 @@ async function cmcSaveSnapshot() {
     });
   }
 }
+
+// ============================== CERTIFICATE CHECK & DOWNLOAD ==============================
+
+// --- Public Certificate Check (from landing page) ---
+function openCertCheckOverlay() {
+  document.getElementById('certCheckOverlay').classList.add('active');
+  document.getElementById('certCheckInput').value = '';
+  document.getElementById('certCheckResult').innerHTML = '';
+  setTimeout(function(){ document.getElementById('certCheckInput').focus(); }, 100);
+}
+function closeCertCheckOverlay() {
+  document.getElementById('certCheckOverlay').classList.remove('active');
+}
+
+function checkCertificatePublic() {
+  var query = (document.getElementById('certCheckInput').value || '').trim();
+  var resultDiv = document.getElementById('certCheckResult');
+  if(!query) { resultDiv.innerHTML = '<p style="color:var(--red);font-size:13px;margin-top:8px;">Please enter a Student Number or Certificate Number.</p>'; return; }
+
+  var queryLower = query.toLowerCase();
+  var student = students.find(function(s) {
+    return s.id.toLowerCase() === queryLower || (s.certNo && s.certNo.toLowerCase() === queryLower);
+  });
+
+  if(!student) {
+    resultDiv.innerHTML = '<div class="cert-result-card not-found">' +
+      '<div class="cert-result-header"><div class="cert-result-icon" style="background:rgba(231,76,60,0.15);color:var(--red);">✕</div>' +
+      '<div><div style="font-size:16px;font-weight:700;color:var(--red);">No Record Found</div>' +
+      '<div style="font-size:12px;color:var(--text-muted);">No student or certificate matches "' + query + '"</div></div></div>' +
+      '<p style="font-size:13px;color:var(--text-muted);">Please double-check your Student Number (e.g. STU-2026001) or Certificate Number and try again.</p></div>';
+    return;
+  }
+
+  if(!student.certNo) {
+    var stageLabel = {testing:'Assessment Stage',interview:'Interview Stage',training:'In Training',incomplete:'Incomplete'}[student.stage] || student.stage;
+    resultDiv.innerHTML = '<div class="cert-result-card pending">' +
+      '<div class="cert-result-header"><div class="cert-result-icon" style="background:rgba(240,165,0,0.15);color:var(--accent);">⏳</div>' +
+      '<div><div style="font-size:16px;font-weight:700;color:var(--accent);">Certificate Not Yet Issued</div>' +
+      '<div style="font-size:12px;color:var(--text-muted);">' + student.name + '</div></div></div>' +
+      '<div class="cert-result-details">' +
+      '<div class="cert-detail-item"><div class="label">Student ID</div><div class="value">' + student.id + '</div></div>' +
+      '<div class="cert-detail-item"><div class="label">Programme</div><div class="value">' + student.course + '</div></div>' +
+      '<div class="cert-detail-item"><div class="label">Current Stage</div><div class="value">' + stageLabel + '</div></div>' +
+      '<div class="cert-detail-item"><div class="label">Progress</div><div class="value">' + student.progress + '%</div></div>' +
+      '</div><p style="font-size:13px;color:var(--text-muted);">Complete all training modules and pass certification to receive your certificate.</p></div>';
+    return;
+  }
+
+  // Student is certified — check if approved for download
+  var approval = certDownloadApprovals.find(function(d){ return d.studentId === student.id; });
+  var canDownload = approval && approval.approved;
+
+  resultDiv.innerHTML = '<div class="cert-result-card success">' +
+    '<div class="cert-result-header"><div class="cert-result-icon" style="background:rgba(46,204,113,0.15);color:var(--green);">✓</div>' +
+    '<div><div style="font-size:16px;font-weight:700;color:var(--green);">Certificate Verified</div>' +
+    '<div style="font-size:12px;color:var(--text-muted);">' + student.name + '</div></div></div>' +
+    '<div class="cert-result-details">' +
+    '<div class="cert-detail-item"><div class="label">Student ID</div><div class="value">' + student.id + '</div></div>' +
+    '<div class="cert-detail-item"><div class="label">Certificate No.</div><div class="value" style="font-family:monospace;">' + student.certNo + '</div></div>' +
+    '<div class="cert-detail-item"><div class="label">Programme</div><div class="value">' + student.course + '</div></div>' +
+    '<div class="cert-detail-item"><div class="label">Date Certified</div><div class="value">' + student.certDate + '</div></div>' +
+    '<div class="cert-detail-item"><div class="label">Collection Status</div><div class="value">' + (student.certCollected ? 'Collected' : 'Awaiting Collection') + '</div></div>' +
+    '<div class="cert-detail-item"><div class="label">Download</div><div class="value">' + (canDownload ? 'Approved' : 'Not yet approved') + '</div></div>' +
+    '</div>' +
+    (canDownload
+      ? '<button class="cert-download-btn" onclick="generateCertificatePDF(\'' + student.id + '\')"><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg> Download Certificate PDF</button>'
+      : '<p style="font-size:13px;color:var(--text-muted);margin-top:4px;">Certificate download has not been approved yet. Please contact the administration office.</p>') +
+    '</div>';
+}
+
+// --- Certificate PDF Generation (Canvas-based) ---
+function generateCertificatePDF(studentId) {
+  var student = students.find(function(s){ return s.id === studentId; });
+  if(!student || !student.certNo) { showToast('Certificate not found'); return; }
+
+  // Track download
+  var approval = certDownloadApprovals.find(function(d){ return d.studentId === studentId; });
+  if(approval) {
+    approval.downloadCount = (approval.downloadCount || 0) + 1;
+    approval.lastDownloaded = new Date().toISOString();
+    saveState();
+  }
+
+  // Create canvas-based certificate
+  var canvas = document.createElement('canvas');
+  var w = 1122; // A4 landscape-ish
+  var h = 794;
+  canvas.width = w;
+  canvas.height = h;
+  var ctx = canvas.getContext('2d');
+
+  // Background
+  ctx.fillStyle = '#FFFFFF';
+  ctx.fillRect(0, 0, w, h);
+
+  // Decorative gold border (outer)
+  ctx.strokeStyle = '#C5960C';
+  ctx.lineWidth = 6;
+  ctx.strokeRect(20, 20, w - 40, h - 40);
+
+  // Inner border
+  ctx.strokeStyle = '#DAA520';
+  ctx.lineWidth = 2;
+  ctx.strokeRect(32, 32, w - 64, h - 64);
+
+  // Corner ornaments
+  drawCornerOrnament(ctx, 40, 40, 1, 1);
+  drawCornerOrnament(ctx, w - 40, 40, -1, 1);
+  drawCornerOrnament(ctx, 40, h - 40, 1, -1);
+  drawCornerOrnament(ctx, w - 40, h - 40, -1, -1);
+
+  // Top decorative line
+  ctx.beginPath();
+  ctx.moveTo(200, 90);
+  ctx.lineTo(w - 200, 90);
+  ctx.strokeStyle = '#DAA520';
+  ctx.lineWidth = 1;
+  ctx.stroke();
+
+  // Institution name
+  ctx.fillStyle = '#1a1a2e';
+  ctx.font = '600 16px "DM Sans", Arial, sans-serif';
+  ctx.textAlign = 'center';
+  ctx.fillText('C.E.S.T.I.S', w / 2, 130);
+
+  ctx.fillStyle = '#333';
+  ctx.font = '13px "DM Sans", Arial, sans-serif';
+  ctx.fillText('Community Education, Skills Training & Intervention System', w / 2, 150);
+
+  // Certificate title
+  ctx.fillStyle = '#C5960C';
+  ctx.font = 'bold 42px "Georgia", "Playfair Display", serif';
+  ctx.fillText('CERTIFICATE', w / 2, 215);
+
+  ctx.fillStyle = '#555';
+  ctx.font = '16px "DM Sans", Arial, sans-serif';
+  ctx.fillText('OF COMPLETION', w / 2, 242);
+
+  // Decorative line under title
+  ctx.beginPath();
+  ctx.moveTo(380, 260);
+  ctx.lineTo(w - 380, 260);
+  ctx.strokeStyle = '#DAA520';
+  ctx.lineWidth = 1;
+  ctx.stroke();
+
+  // "This is to certify that"
+  ctx.fillStyle = '#555';
+  ctx.font = 'italic 15px "Georgia", serif';
+  ctx.fillText('This is to certify that', w / 2, 300);
+
+  // Student name
+  ctx.fillStyle = '#1a1a2e';
+  ctx.font = 'bold 36px "Georgia", "Playfair Display", serif';
+  ctx.fillText(student.name, w / 2, 350);
+
+  // Name underline
+  var nameWidth = ctx.measureText(student.name).width;
+  ctx.beginPath();
+  ctx.moveTo((w - nameWidth) / 2 - 20, 360);
+  ctx.lineTo((w + nameWidth) / 2 + 20, 360);
+  ctx.strokeStyle = '#DAA520';
+  ctx.lineWidth = 1.5;
+  ctx.stroke();
+
+  // "has successfully completed the"
+  ctx.fillStyle = '#555';
+  ctx.font = 'italic 15px "Georgia", serif';
+  ctx.fillText('has successfully completed the vocational training programme in', w / 2, 400);
+
+  // Course name
+  ctx.fillStyle = '#C5960C';
+  ctx.font = 'bold 28px "Georgia", "Playfair Display", serif';
+  ctx.fillText(student.course, w / 2, 445);
+
+  // Additional text
+  ctx.fillStyle = '#666';
+  ctx.font = '13px "DM Sans", Arial, sans-serif';
+  ctx.fillText('and has met all requirements for certification as prescribed by C.E.S.T.I.S', w / 2, 480);
+
+  // Certificate details
+  ctx.fillStyle = '#888';
+  ctx.font = '12px "DM Sans", Arial, sans-serif';
+  ctx.fillText('Certificate No: ' + student.certNo + '   |   Date Issued: ' + student.certDate + '   |   Student ID: ' + student.id, w / 2, 520);
+
+  // Bottom decorative line
+  ctx.beginPath();
+  ctx.moveTo(200, 555);
+  ctx.lineTo(w - 200, 555);
+  ctx.strokeStyle = '#DAA520';
+  ctx.lineWidth = 1;
+  ctx.stroke();
+
+  // Signature lines
+  // Left signature
+  ctx.beginPath();
+  ctx.moveTo(160, 650);
+  ctx.lineTo(380, 650);
+  ctx.strokeStyle = '#999';
+  ctx.lineWidth = 1;
+  ctx.stroke();
+  ctx.fillStyle = '#555';
+  ctx.font = '12px "DM Sans", Arial, sans-serif';
+  ctx.fillText('Programme Director', 270, 670);
+
+  // Center seal area
+  ctx.beginPath();
+  ctx.arc(w / 2, 630, 35, 0, 2 * Math.PI);
+  ctx.strokeStyle = '#DAA520';
+  ctx.lineWidth = 2;
+  ctx.stroke();
+  ctx.fillStyle = '#C5960C';
+  ctx.font = 'bold 10px "DM Sans", Arial, sans-serif';
+  ctx.fillText('C.E.S.T.I.S', w / 2, 627);
+  ctx.font = '8px "DM Sans", Arial, sans-serif';
+  ctx.fillText('OFFICIAL SEAL', w / 2, 640);
+
+  // Right signature
+  ctx.beginPath();
+  ctx.moveTo(w - 380, 650);
+  ctx.lineTo(w - 160, 650);
+  ctx.strokeStyle = '#999';
+  ctx.lineWidth = 1;
+  ctx.stroke();
+  ctx.fillStyle = '#555';
+  ctx.font = '12px "DM Sans", Arial, sans-serif';
+  ctx.fillText('Centre Manager', w - 270, 670);
+
+  // Bottom decorative line
+  ctx.beginPath();
+  ctx.moveTo(200, h - 55);
+  ctx.lineTo(w - 200, h - 55);
+  ctx.strokeStyle = '#DAA520';
+  ctx.lineWidth = 1;
+  ctx.stroke();
+
+  // Footer
+  ctx.fillStyle = '#aaa';
+  ctx.font = '10px "DM Sans", Arial, sans-serif';
+  ctx.fillText('This certificate is digitally generated by C.E.S.T.I.S Learning Management System', w / 2, h - 35);
+
+  // Download as image (PNG) — widely compatible
+  var dataUrl = canvas.toDataURL('image/png');
+  var link = document.createElement('a');
+  link.download = 'Certificate_' + student.name.replace(/\s+/g, '_') + '_' + student.certNo + '.png';
+  link.href = dataUrl;
+  link.click();
+
+  showToast('Certificate downloaded for ' + student.name);
+}
+
+function drawCornerOrnament(ctx, x, y, dx, dy) {
+  ctx.save();
+  ctx.translate(x, y);
+  ctx.strokeStyle = '#DAA520';
+  ctx.lineWidth = 2;
+  ctx.beginPath();
+  ctx.moveTo(0, 0);
+  ctx.lineTo(dx * 30, 0);
+  ctx.moveTo(0, 0);
+  ctx.lineTo(0, dy * 30);
+  ctx.stroke();
+  // Small diamond
+  ctx.beginPath();
+  ctx.moveTo(dx * 8, dy * 8);
+  ctx.lineTo(dx * 12, dy * 4);
+  ctx.lineTo(dx * 16, dy * 8);
+  ctx.lineTo(dx * 12, dy * 12);
+  ctx.closePath();
+  ctx.fillStyle = '#DAA520';
+  ctx.fill();
+  ctx.restore();
+}
+
+// --- Admin Certificate Download Management ---
+function renderCertDownloadMgmt() {
+  var search = (document.getElementById('certDlSearch')?.value || '').toLowerCase();
+  var filter = document.getElementById('certDlFilter')?.value || 'all';
+  var courseFilter = document.getElementById('certDlCourseFilter')?.value || 'all';
+
+  // Populate course filter dropdown
+  var courseSelect = document.getElementById('certDlCourseFilter');
+  if(courseSelect && courseSelect.options.length <= 1) {
+    var coursesUsed = [];
+    students.forEach(function(s){ if(s.certNo && coursesUsed.indexOf(s.course) === -1) coursesUsed.push(s.course); });
+    coursesUsed.sort().forEach(function(c){ courseSelect.innerHTML += '<option value="' + c + '">' + c + '</option>'; });
+  }
+
+  // Filter certified students
+  var certified = students.filter(function(s){ return s.certNo; });
+  if(courseFilter !== 'all') certified = certified.filter(function(s){ return s.course === courseFilter; });
+  if(search) certified = certified.filter(function(s){
+    return s.name.toLowerCase().indexOf(search) !== -1 || s.id.toLowerCase().indexOf(search) !== -1 || (s.certNo || '').toLowerCase().indexOf(search) !== -1;
+  });
+
+  if(filter === 'approved') certified = certified.filter(function(s){
+    return certDownloadApprovals.some(function(d){ return d.studentId === s.id && d.approved; });
+  });
+  if(filter === 'not-approved') certified = certified.filter(function(s){
+    return !certDownloadApprovals.some(function(d){ return d.studentId === s.id && d.approved; });
+  });
+
+  var listDiv = document.getElementById('certDlStudentList');
+  if(!listDiv) return;
+
+  if(certified.length === 0) {
+    listDiv.innerHTML = '<p style="color:var(--text-muted);text-align:center;padding:24px;">No certified students found.</p>';
+  } else {
+    listDiv.innerHTML = certified.map(function(s) {
+      var approval = certDownloadApprovals.find(function(d){ return d.studentId === s.id; });
+      var isApproved = approval && approval.approved;
+      var initials = s.name.split(' ').map(function(n){ return n[0]; }).join('');
+      return '<div class="cert-approve-row">' +
+        '<div class="cert-approve-info">' +
+        '<div class="cert-approve-avatar">' + initials + '</div>' +
+        '<div><div class="cert-approve-name">' + s.name + '</div>' +
+        '<div class="cert-approve-meta">' + s.id + ' &bull; ' + s.course + ' &bull; ' + s.certNo + ' &bull; ' + s.certDate + '</div></div></div>' +
+        '<div class="cert-approve-actions">' +
+        (isApproved
+          ? '<span class="badge badge-green"><span class="badge-dot"></span>Approved</span>' +
+            '<span style="font-size:11px;color:var(--text-muted);margin-left:4px;">Downloads: ' + (approval.downloadCount || 0) + '</span>' +
+            '<button class="btn btn-sm btn-secondary" style="margin-left:8px;" onclick="revokeCertDownload(\'' + s.id + '\')">Revoke</button>'
+          : '<button class="btn btn-sm btn-success" onclick="approveCertDownload(\'' + s.id + '\')">Approve Download</button>') +
+        '</div></div>';
+    }).join('');
+  }
+
+  // Update stats
+  renderCertDlStats();
+  renderCertDlLog();
+}
+
+function renderCertDlStats() {
+  var el = document.getElementById('certDlStats');
+  if(!el) return;
+  var totalCert = students.filter(function(s){ return s.certNo; }).length;
+  var approved = certDownloadApprovals.filter(function(d){ return d.approved; }).length;
+  var totalDownloads = certDownloadApprovals.reduce(function(sum, d){ return sum + (d.downloadCount || 0); }, 0);
+  var pending = totalCert - approved;
+  el.innerHTML =
+    '<div class="stat-card"><div class="stat-icon" style="background:var(--green-dim);color:var(--green);">🎓</div><div class="stat-value">' + totalCert + '</div><div class="stat-label">Total Certified</div></div>' +
+    '<div class="stat-card"><div class="stat-icon" style="background:var(--accent-dim);color:var(--accent);">✓</div><div class="stat-value">' + approved + '</div><div class="stat-label">Approved for Download</div></div>' +
+    '<div class="stat-card"><div class="stat-icon" style="background:var(--red-dim);color:var(--red);">⏳</div><div class="stat-value">' + pending + '</div><div class="stat-label">Not Yet Approved</div></div>' +
+    '<div class="stat-card"><div class="stat-icon" style="background:var(--blue-dim);color:var(--blue);">↓</div><div class="stat-value">' + totalDownloads + '</div><div class="stat-label">Total Downloads</div></div>';
+}
+
+function renderCertDlLog() {
+  var tbody = document.getElementById('certDlLogBody');
+  if(!tbody) return;
+  var downloaded = certDownloadApprovals.filter(function(d){ return d.downloadCount > 0; });
+  if(downloaded.length === 0) {
+    tbody.innerHTML = '<tr><td colspan="6" style="text-align:center;color:var(--text-muted);padding:20px;">No download activity yet</td></tr>';
+    return;
+  }
+  downloaded.sort(function(a, b){ return (b.lastDownloaded || '').localeCompare(a.lastDownloaded || ''); });
+  tbody.innerHTML = downloaded.map(function(d) {
+    var lastDl = d.lastDownloaded ? new Date(d.lastDownloaded).toLocaleString() : 'N/A';
+    return '<tr><td><strong>' + d.name + '</strong></td><td style="font-family:monospace;font-size:12px;">' + d.certNo + '</td>' +
+      '<td>' + d.course + '</td><td>' + d.downloadCount + '</td><td>' + lastDl + '</td><td>' + (d.approvedBy || 'Admin') + '</td></tr>';
+  }).join('');
+}
+
+function approveCertDownload(studentId) {
+  var student = students.find(function(s){ return s.id === studentId; });
+  if(!student) return;
+  var existing = certDownloadApprovals.find(function(d){ return d.studentId === studentId; });
+  if(existing) {
+    existing.approved = true;
+    existing.approvedDate = new Date().toISOString();
+    existing.approvedBy = 'Admin';
+  } else {
+    certDownloadApprovals.push({
+      studentId: student.id, name: student.name, course: student.course,
+      certNo: student.certNo, certDate: student.certDate,
+      approved: true, approvedDate: new Date().toISOString(), approvedBy: 'Admin',
+      downloadCount: 0, lastDownloaded: null
+    });
+  }
+  saveState();
+  renderCertDownloadMgmt();
+  showToast('Download approved for ' + student.name);
+}
+
+function revokeCertDownload(studentId) {
+  var approval = certDownloadApprovals.find(function(d){ return d.studentId === studentId; });
+  if(approval) {
+    approval.approved = false;
+    saveState();
+    renderCertDownloadMgmt();
+    showToast('Download access revoked');
+  }
+}
+
+// Bulk approve
+function openBulkCertApproveModal() {
+  var list = document.getElementById('bulkCertList');
+  var unapproved = students.filter(function(s) {
+    return s.certNo && !certDownloadApprovals.some(function(d){ return d.studentId === s.id && d.approved; });
+  });
+  if(unapproved.length === 0) {
+    list.innerHTML = '<p style="color:var(--text-muted);text-align:center;padding:20px;">All certified students are already approved.</p>';
+  } else {
+    list.innerHTML = unapproved.map(function(s) {
+      return '<label style="display:flex;align-items:center;gap:10px;padding:10px 12px;border-bottom:1px solid var(--border);cursor:pointer;">' +
+        '<input type="checkbox" class="bulk-cert-cb" value="' + s.id + '" style="accent-color:var(--accent);">' +
+        '<div><div style="font-size:13px;font-weight:600;">' + s.name + '</div>' +
+        '<div style="font-size:11px;color:var(--text-muted);">' + s.id + ' &bull; ' + s.course + ' &bull; ' + s.certNo + '</div></div></label>';
+    }).join('');
+  }
+  document.getElementById('bulkCertSelectAll').checked = false;
+  openModal('bulkCertApproveModal');
+}
+
+function toggleBulkCertSelectAll() {
+  var checked = document.getElementById('bulkCertSelectAll').checked;
+  document.querySelectorAll('.bulk-cert-cb').forEach(function(cb){ cb.checked = checked; });
+}
+
+function bulkApproveCertDownloads() {
+  var selected = [];
+  document.querySelectorAll('.bulk-cert-cb:checked').forEach(function(cb){ selected.push(cb.value); });
+  if(selected.length === 0) { showToast('No students selected'); return; }
+  selected.forEach(function(sid){ approveCertDownload(sid); });
+  closeModal('bulkCertApproveModal');
+  showToast(selected.length + ' student(s) approved for download');
+}
+
+// Hook into showPage to render cert download management when navigating
+var _originalShowPage = typeof showPage === 'function' ? showPage : null;
+(function() {
+  var origShowPage = showPage;
+  showPage = function(pageId) {
+    origShowPage(pageId);
+    if(pageId === 'cert-downloads') {
+      renderCertDownloadMgmt();
+    }
+  };
+})();
 
 </script>
 </body>
