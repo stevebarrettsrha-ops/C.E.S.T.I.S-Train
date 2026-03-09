@@ -6209,12 +6209,33 @@ function buildAdminPages() {
       </div>
 
       <h4 style="font-size:14px;margin-bottom:8px;color:var(--accent);">Page 1 — Text Positions (% from top-left)</h4>
-      <p style="font-size:12px;color:var(--text-muted);margin-bottom:8px;">Adjust where dynamic text is placed on your Page 1 background. Values are percentages of the image dimensions.</p>
-      <div style="display:grid;grid-template-columns:1fr 1fr 1fr 1fr;gap:12px;margin-bottom:20px;">
-        <div class="form-group"><label style="font-size:11px;">Student Name Y%</label><input type="number" id="ctplP1NameY" value="48" step="1" min="0" max="100" style="font-size:12px;"></div>
-        <div class="form-group"><label style="font-size:11px;">Body Text Y%</label><input type="number" id="ctplP1BodyY" value="62" step="1" min="0" max="100" style="font-size:12px;"></div>
-        <div class="form-group"><label style="font-size:11px;">Cert No. Y%</label><input type="number" id="ctplP1CertNoY" value="95" step="1" min="0" max="100" style="font-size:12px;"></div>
-        <div class="form-group"><label style="font-size:11px;">Name Font Size</label><input type="number" id="ctplP1NameSize" value="48" step="1" min="16" max="100" style="font-size:12px;"></div>
+      <p style="font-size:12px;color:var(--text-muted);margin-bottom:8px;">Adjust where dynamic text is placed on your Page 1 background. Values are percentages of the image dimensions. The live preview below updates as you change values.</p>
+      <div style="display:grid;grid-template-columns:1fr 1fr 1fr 1fr;gap:12px;margin-bottom:12px;">
+        <div class="form-group"><label style="font-size:11px;">Student Name Y%</label><input type="number" id="ctplP1NameY" value="48" step="1" min="0" max="100" style="font-size:12px;" oninput="updateCertLivePreview()"></div>
+        <div class="form-group"><label style="font-size:11px;">Body Text Y%</label><input type="number" id="ctplP1BodyY" value="62" step="1" min="0" max="100" style="font-size:12px;" oninput="updateCertLivePreview()"></div>
+        <div class="form-group"><label style="font-size:11px;">Cert No. Y%</label><input type="number" id="ctplP1CertNoY" value="95" step="1" min="0" max="100" style="font-size:12px;" oninput="updateCertLivePreview()"></div>
+        <div class="form-group"><label style="font-size:11px;">Name Font Size</label><input type="number" id="ctplP1NameSize" value="48" step="1" min="16" max="100" style="font-size:12px;" oninput="updateCertLivePreview()"></div>
+      </div>
+
+      <!-- Live Preview -->
+      <div id="certLivePreviewContainer" style="margin-bottom:20px;border:2px solid var(--accent);border-radius:var(--radius-sm);overflow:hidden;position:relative;background:#1a1a2e;display:none;">
+        <div style="background:var(--accent);color:#fff;padding:4px 12px;font-size:11px;font-weight:600;display:flex;align-items:center;justify-content:space-between;">
+          <span>LIVE PREVIEW — Text Position Preview</span>
+          <span style="font-size:10px;opacity:0.8;">Drag guide lines or change values above</span>
+        </div>
+        <div style="position:relative;width:100%;overflow:hidden;">
+          <canvas id="certLivePreviewCanvas" style="width:100%;display:block;cursor:crosshair;"></canvas>
+          <!-- Horizontal guide lines (draggable) -->
+          <div id="certGuideNameLine" class="cert-guide-line" style="position:absolute;left:0;right:0;height:2px;background:rgba(255,80,80,0.8);cursor:ns-resize;pointer-events:auto;z-index:10;" title="Student Name position">
+            <span style="position:absolute;right:4px;top:-16px;font-size:10px;color:#ff5050;background:rgba(0,0,0,0.7);padding:1px 5px;border-radius:3px;white-space:nowrap;">Name</span>
+          </div>
+          <div id="certGuideBodyLine" class="cert-guide-line" style="position:absolute;left:0;right:0;height:2px;background:rgba(80,200,80,0.8);cursor:ns-resize;pointer-events:auto;z-index:10;" title="Body Text position">
+            <span style="position:absolute;right:4px;top:-16px;font-size:10px;color:#50c850;background:rgba(0,0,0,0.7);padding:1px 5px;border-radius:3px;white-space:nowrap;">Body</span>
+          </div>
+          <div id="certGuideCertNoLine" class="cert-guide-line" style="position:absolute;left:0;right:0;height:2px;background:rgba(80,150,255,0.8);cursor:ns-resize;pointer-events:auto;z-index:10;" title="Cert No. position">
+            <span style="position:absolute;right:4px;top:-16px;font-size:10px;color:#5096ff;background:rgba(0,0,0,0.7);padding:1px 5px;border-radius:3px;white-space:nowrap;">Cert No</span>
+          </div>
+        </div>
       </div>
 
       <h4 style="font-size:14px;margin-bottom:8px;color:var(--accent);">Certificate Details</h4>
@@ -20644,9 +20665,196 @@ function previewCertBgUpload(input, previewId) {
     preview.innerHTML = '<img src="' + e.target.result + '" style="max-width:100%;max-height:200px;border-radius:4px;">';
     // Store in a temp attribute for later save
     preview.setAttribute('data-base64', e.target.result);
+    // Update live preview when Page 1 background changes
+    if(previewId === 'ctplBgPage1Preview') {
+      updateCertLivePreview();
+    }
   };
   reader.readAsDataURL(input.files[0]);
 }
+
+// ---- Live Certificate Text Position Preview ----
+var _certLivePreviewImg = null;
+var _certLivePreviewDragging = null; // 'name', 'body', or 'certno'
+
+function updateCertLivePreview() {
+  var container = document.getElementById('certLivePreviewContainer');
+  var canvas = document.getElementById('certLivePreviewCanvas');
+  if(!container || !canvas) return;
+
+  // Get the background image (from preview data-base64 or existing template)
+  var bgSrc = '';
+  var p1Preview = document.getElementById('ctplBgPage1Preview');
+  if(p1Preview) bgSrc = p1Preview.getAttribute('data-base64') || '';
+  if(!bgSrc && _certTplEditingCourse && certTemplates[_certTplEditingCourse]) {
+    bgSrc = certTemplates[_certTplEditingCourse].bgPage1 || '';
+  }
+
+  if(!bgSrc) {
+    container.style.display = 'none';
+    return;
+  }
+  container.style.display = 'block';
+
+  // Load image and render
+  var img = new Image();
+  img.onload = function() {
+    _certLivePreviewImg = img;
+    _renderCertLivePreview();
+  };
+  if(_certLivePreviewImg && _certLivePreviewImg.src === bgSrc) {
+    _renderCertLivePreview();
+  } else {
+    img.src = bgSrc;
+  }
+}
+
+function _renderCertLivePreview() {
+  var canvas = document.getElementById('certLivePreviewCanvas');
+  if(!canvas || !_certLivePreviewImg) return;
+
+  var img = _certLivePreviewImg;
+  var w = img.naturalWidth;
+  var h = img.naturalHeight;
+  canvas.width = w;
+  canvas.height = h;
+  var ctx = canvas.getContext('2d');
+
+  // Draw background
+  ctx.drawImage(img, 0, 0, w, h);
+
+  // Semi-transparent overlay to make guide lines more visible
+  ctx.fillStyle = 'rgba(0,0,0,0.05)';
+  ctx.fillRect(0, 0, w, h);
+
+  // Read current values
+  var nameY = (parseInt(document.getElementById('ctplP1NameY').value) || 48) / 100 * h;
+  var bodyY = (parseInt(document.getElementById('ctplP1BodyY').value) || 62) / 100 * h;
+  var certNoY = (parseInt(document.getElementById('ctplP1CertNoY').value) || 95) / 100 * h;
+  var nameSize = parseInt(document.getElementById('ctplP1NameSize').value) || 48;
+  var courseFullName = document.getElementById('ctplCourseFullName').value || (_certTplEditingCourse || 'Course Name');
+
+  // Scale font size relative to image
+  var scaledNameSize = nameSize * (w / 1400);
+  var bodyFontSize = Math.round(scaledNameSize * 0.38);
+
+  // Draw student name (red guide)
+  ctx.textAlign = 'center';
+  ctx.font = 'bold ' + Math.round(scaledNameSize) + 'px Georgia, "Times New Roman", serif';
+  ctx.fillStyle = 'rgba(255,80,80,0.85)';
+  ctx.fillText('SAMPLE STUDENT NAME', w / 2, nameY);
+  // Underline
+  var nameW = ctx.measureText('SAMPLE STUDENT NAME').width;
+  ctx.strokeStyle = 'rgba(255,80,80,0.5)';
+  ctx.lineWidth = 2;
+  ctx.setLineDash([8, 4]);
+  ctx.beginPath(); ctx.moveTo(0, nameY); ctx.lineTo(w, nameY); ctx.stroke();
+  ctx.setLineDash([]);
+
+  // Draw body text (green guide)
+  ctx.font = 'italic ' + bodyFontSize + 'px Georgia, serif';
+  ctx.fillStyle = 'rgba(80,200,80,0.85)';
+  ctx.fillText('has successfully completed their vocational training in the short course', w / 2, bodyY);
+  ctx.font = 'bold italic ' + Math.round(bodyFontSize * 1.15) + 'px Georgia, serif';
+  ctx.fillText(courseFullName, w / 2, bodyY + bodyFontSize * 1.5);
+  ctx.font = 'italic ' + bodyFontSize + 'px Georgia, serif';
+  ctx.fillText('on this day, the March 09, 2026, at the Community Educational and Skills', w / 2, bodyY + bodyFontSize * 3);
+  ctx.font = 'bold italic ' + bodyFontSize + 'px Georgia, serif';
+  ctx.fillText('Training Institute and Services Ltd.', w / 2, bodyY + bodyFontSize * 4.3);
+  // Guide line
+  ctx.strokeStyle = 'rgba(80,200,80,0.5)';
+  ctx.lineWidth = 2;
+  ctx.setLineDash([8, 4]);
+  ctx.beginPath(); ctx.moveTo(0, bodyY); ctx.lineTo(w, bodyY); ctx.stroke();
+  ctx.setLineDash([]);
+
+  // Draw cert number (blue guide)
+  ctx.font = 'bold ' + Math.round(bodyFontSize * 0.9) + 'px Georgia, serif';
+  ctx.fillStyle = 'rgba(80,150,255,0.85)';
+  ctx.fillText('Certificate No. WE-2026-0001', w / 2, certNoY);
+  ctx.strokeStyle = 'rgba(80,150,255,0.5)';
+  ctx.lineWidth = 2;
+  ctx.setLineDash([8, 4]);
+  ctx.beginPath(); ctx.moveTo(0, certNoY); ctx.lineTo(w, certNoY); ctx.stroke();
+  ctx.setLineDash([]);
+
+  // Position the draggable guide line overlays
+  var canvasEl = canvas;
+  var displayH = canvasEl.getBoundingClientRect().height;
+  var scale = displayH / h;
+  var nameLineEl = document.getElementById('certGuideNameLine');
+  var bodyLineEl = document.getElementById('certGuideBodyLine');
+  var certNoLineEl = document.getElementById('certGuideCertNoLine');
+  if(nameLineEl) nameLineEl.style.top = (nameY * scale) + 'px';
+  if(bodyLineEl) bodyLineEl.style.top = (bodyY * scale) + 'px';
+  if(certNoLineEl) certNoLineEl.style.top = (certNoY * scale) + 'px';
+}
+
+// ---- Drag guide lines to adjust positions ----
+(function() {
+  function initCertGuideDrag() {
+    var lines = {
+      'certGuideNameLine': 'ctplP1NameY',
+      'certGuideBodyLine': 'ctplP1BodyY',
+      'certGuideCertNoLine': 'ctplP1CertNoY'
+    };
+
+    Object.keys(lines).forEach(function(lineId) {
+      var lineEl = document.getElementById(lineId);
+      if(!lineEl) return;
+
+      var inputId = lines[lineId];
+      var dragging = false;
+
+      function onStart(e) {
+        e.preventDefault();
+        dragging = true;
+        document.body.style.cursor = 'ns-resize';
+        document.body.style.userSelect = 'none';
+      }
+
+      function onMove(e) {
+        if(!dragging) return;
+        e.preventDefault();
+        var canvas = document.getElementById('certLivePreviewCanvas');
+        if(!canvas) return;
+        var rect = canvas.getBoundingClientRect();
+        var clientY = e.touches ? e.touches[0].clientY : e.clientY;
+        var relY = clientY - rect.top;
+        var pct = Math.round(Math.max(0, Math.min(100, (relY / rect.height) * 100)));
+        document.getElementById(inputId).value = pct;
+        updateCertLivePreview();
+      }
+
+      function onEnd() {
+        if(!dragging) return;
+        dragging = false;
+        document.body.style.cursor = '';
+        document.body.style.userSelect = '';
+      }
+
+      lineEl.addEventListener('mousedown', onStart);
+      lineEl.addEventListener('touchstart', onStart, { passive: false });
+      document.addEventListener('mousemove', onMove);
+      document.addEventListener('touchmove', onMove, { passive: false });
+      document.addEventListener('mouseup', onEnd);
+      document.addEventListener('touchend', onEnd);
+    });
+  }
+
+  // Initialize when DOM is ready
+  if(document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', initCertGuideDrag);
+  } else {
+    setTimeout(initCertGuideDrag, 100);
+  }
+})();
+
+// Also update preview when Course Full Name changes
+document.addEventListener('DOMContentLoaded', function() {
+  var cfn = document.getElementById('ctplCourseFullName');
+  if(cfn) cfn.addEventListener('input', updateCertLivePreview);
+});
 
 
 // ============================== CERTIFICATE TEMPLATE MANAGEMENT ==============================
@@ -20775,6 +20983,10 @@ function openCertTemplateEditor() {
   // Scroll modal to top so image upload section is visible
   var modalDiv = document.querySelector('#certTemplateEditorModal .modal');
   if(modalDiv) modalDiv.scrollTop = 0;
+
+  // Initialize live preview after modal is visible
+  _certLivePreviewImg = null;
+  setTimeout(function() { updateCertLivePreview(); }, 150);
 }
 
 var _certModuleIdx = 0;
