@@ -19283,6 +19283,17 @@ function generateCertificatePDF(studentId) {
   var student = students.find(function(s){ return s.id === studentId; });
   if(!student || !student.certNo) { showToast('Certificate not found'); return; }
 
+  // Ensure jsPDF is loaded
+  if(!window.jspdf || !window.jspdf.jsPDF) {
+    showToast('Loading PDF library, please wait...');
+    var script = document.createElement('script');
+    script.src = 'https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js';
+    script.onload = function() { generateCertificatePDF(studentId); };
+    script.onerror = function() { showToast('Failed to load PDF library. Check your internet connection.'); };
+    document.head.appendChild(script);
+    return;
+  }
+
   // Track download
   var approval = certDownloadApprovals.find(function(d){ return d.studentId === studentId; });
   if(approval) {
@@ -19293,6 +19304,7 @@ function generateCertificatePDF(studentId) {
 
   var tpl = certTemplates[student.course] || {};
 
+  try {
   if(!tpl.bgPage1) {
     // FALLBACK: Use canvas-drawn certificate when no background image uploaded
     var courseFullName = tpl.courseFullName || student.course;
@@ -19341,6 +19353,10 @@ function generateCertificatePDF(studentId) {
     }
   };
   img1.src = tpl.bgPage1;
+  } catch(e) {
+    console.error('Certificate PDF generation error:', e);
+    showToast('Error generating certificate: ' + e.message);
+  }
 }
 
 // ---- PAGE 1: Overlay student data on background template ----
