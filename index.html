@@ -3944,8 +3944,9 @@ function certImageLoadAll() {
     });
   }).catch(function() { return []; });
 }
+var _certImagesLoaded = false;
 function initCertTemplateImages() {
-  certImageLoadAll().then(function(images) {
+  return certImageLoadAll().then(function(images) {
     images.forEach(function(img) {
       var parts = img.id.split('___');
       var course = parts[0]; var page = parts[1];
@@ -3953,7 +3954,12 @@ function initCertTemplateImages() {
         certTemplates[course][page] = img.data;
       }
     });
+    _certImagesLoaded = true;
   });
+}
+function ensureCertImagesLoaded() {
+  if(_certImagesLoaded) return Promise.resolve();
+  return initCertTemplateImages();
 }
 
 function initLmsChatData() {
@@ -4135,6 +4141,22 @@ function loadState() {
     var ct = localStorage.getItem('voctrain_certTemplates');
     if(ct) certTemplates = JSON.parse(ct);
   } catch(e) { /* parse error, use defaults */ }
+  // Migrate any cert template images from localStorage to IndexedDB, then load from IndexedDB
+  var needsMigration = false;
+  Object.keys(certTemplates).forEach(function(course) {
+    var t = certTemplates[course];
+    if(t.bgPage1 && t.bgPage1.length > 100) { certImageSave(course, 'bgPage1', t.bgPage1); needsMigration = true; }
+    if(t.bgPage2 && t.bgPage2.length > 100) { certImageSave(course, 'bgPage2', t.bgPage2); needsMigration = true; }
+  });
+  if(needsMigration) {
+    // Re-save localStorage without the images now that they're in IndexedDB
+    var cleaned = {};
+    Object.keys(certTemplates).forEach(function(k) {
+      cleaned[k] = Object.assign({}, certTemplates[k]);
+      delete cleaned[k].bgPage1; delete cleaned[k].bgPage2;
+    });
+    try { localStorage.setItem('voctrain_certTemplates', JSON.stringify(cleaned)); } catch(e) {}
+  }
   // Load cert template background images from IndexedDB
   initCertTemplateImages();
   updateSkillAreaCounts();
@@ -19291,6 +19313,13 @@ function generateCertificatePDF(studentId) {
     script.onload = function() { generateCertificatePDF(studentId); };
     script.onerror = function() { showToast('Failed to load PDF library. Check your internet connection.'); };
     document.head.appendChild(script);
+    return;
+  }
+
+  // Ensure cert template images are loaded from IndexedDB before generating
+  if(!_certImagesLoaded) {
+    showToast('Loading certificate template...');
+    ensureCertImagesLoaded().then(function() { generateCertificatePDF(studentId); });
     return;
   }
 
