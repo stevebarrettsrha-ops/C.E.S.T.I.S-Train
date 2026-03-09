@@ -3706,6 +3706,47 @@ let students = [];
 let certDownloadApprovals = []; // {studentId, name, course, certNo, certDate, approved, approvedDate, approvedBy, downloadCount, lastDownloaded}
 let certTemplates = {}; // keyed by course name: {courseFullName, programmeCode, version, developedDate, gender, modules:[], competencies:[], programmeSpecs:{}, signatureLeft, signatureRight, contactEmail, contactPhone}
 
+// Map short student course names to full cert template course names
+var certTemplateCourseMap = {
+  'Welding': 'Welding & Fabrication',
+  'Hospitality & Tourism': 'Hospitality & Tourism',
+  'Electrical Installation': 'Electrical Installation',
+  'Cosmetology': 'Cosmetology',
+  'Business Administration': 'Business Administration',
+  'Auto Mechanics': 'Auto Mechanics',
+  'Plumbing': 'Plumbing',
+  'Carpentry': 'Carpentry',
+  'Information Technology': 'Information Technology',
+  'Garment Construction': 'Garment Construction',
+  'Refrigeration & AC': 'Refrigeration & AC',
+  'Heavy Equipment Ops': 'Heavy Equipment Ops',
+  'Commercial Cooking': 'Commercial Cooking',
+  'Beauty Therapy': 'Beauty Therapy',
+  'Data Operations': 'Data Operations',
+  'Agriculture': 'Agriculture',
+  'Masonry': 'Masonry',
+  'Solar Energy Tech': 'Solar Energy Tech',
+  'Early Childhood Ed': 'Early Childhood Ed',
+  'Customer Service': 'Customer Service'
+};
+
+function getCertTemplateKey(studentCourse) {
+  // Try exact match first, then mapped name, then partial match
+  if (certTemplates[studentCourse]) return studentCourse;
+  var mapped = certTemplateCourseMap[studentCourse];
+  if (mapped && certTemplates[mapped]) return mapped;
+  // Try partial match: find a template key that starts with or contains the student course
+  var keys = Object.keys(certTemplates);
+  for (var i = 0; i < keys.length; i++) {
+    if (keys[i].toLowerCase().indexOf(studentCourse.toLowerCase()) > -1 ||
+        studentCourse.toLowerCase().indexOf(keys[i].toLowerCase()) > -1) {
+      return keys[i];
+    }
+  }
+  // Return mapped name even if template doesn't exist yet (for Drive lookups)
+  return mapped || studentCourse;
+}
+
 let exams = [];
 
 let announcements = [];
@@ -3966,7 +4007,7 @@ function ensureCertImagesLoaded() {
 var CERT_TEMPLATE_DRIVE_FOLDER = '1iLju3l6nBG3oLdiOGuDqtRuwkZjDWsIQ'; // Certificate Templates folder
 
 function certImageSaveToDrive(course, page, base64Data) {
-  if (!window.googleAccessToken) return Promise.resolve();
+  if (!googleAccessToken) return Promise.resolve();
   var fileName = 'cert_template_' + course.replace(/[^a-zA-Z0-9]/g, '_') + '_' + page + '.txt';
   // Check if file already exists, update it; otherwise create new
   var query = encodeURIComponent("name='" + fileName + "' and '" + CERT_TEMPLATE_DRIVE_FOLDER + "' in parents and trashed=false");
@@ -3999,7 +4040,7 @@ function certImageSaveToDrive(course, page, base64Data) {
 }
 
 function certImageLoadFromDrive(course, page) {
-  if (!window.googleAccessToken) return Promise.resolve(null);
+  if (!googleAccessToken) return Promise.resolve(null);
   var fileName = 'cert_template_' + course.replace(/[^a-zA-Z0-9]/g, '_') + '_' + page + '.txt';
   var query = encodeURIComponent("name='" + fileName + "' and '" + CERT_TEMPLATE_DRIVE_FOLDER + "' in parents and trashed=false");
   return fetch('https://www.googleapis.com/drive/v3/files?q=' + query + '&fields=files(id)', {
@@ -4021,7 +4062,7 @@ function certImageLoadFromDrive(course, page) {
 }
 
 function certImageLoadAllFromDrive() {
-  if (!window.googleAccessToken) return Promise.resolve([]);
+  if (!googleAccessToken) return Promise.resolve([]);
   var query = encodeURIComponent("name contains 'cert_template_' and '" + CERT_TEMPLATE_DRIVE_FOLDER + "' in parents and trashed=false");
   return fetch('https://www.googleapis.com/drive/v3/files?q=' + query + '&fields=files(id,name)&pageSize=100', {
     headers: { 'Authorization': 'Bearer ' + googleAccessToken }
@@ -19463,8 +19504,11 @@ function generateCertificatePDF(studentId) {
     return;
   }
 
+  // Resolve the cert template key (handles "Welding" → "Welding & Fabrication" etc.)
+  var certKey = getCertTemplateKey(student.course);
+  var tpl = certTemplates[certKey] || {};
+
   // Always try to load cert images from IndexedDB if bgPage1 is missing
-  var tpl = certTemplates[student.course] || {};
   if(!tpl.bgPage1) {
     showToast('Loading certificate template...');
     // Step 1: Try IndexedDB
@@ -19477,17 +19521,17 @@ function generateCertificatePDF(studentId) {
         }
       });
       _certImagesLoaded = true;
-      var tpl2 = certTemplates[student.course] || {};
+      var tpl2 = certTemplates[certKey] || {};
       if(tpl2.bgPage1) {
         _generateCertPDFInner(studentId);
       } else {
         // Step 2: Try Google Drive
-        if(window.googleAccessToken) {
+        if(googleAccessToken) {
           showToast('Template not found locally. Checking Google Drive...');
-          certImageLoadFromDrive(student.course, 'bgPage1').then(function(data) {
+          certImageLoadFromDrive(certKey, 'bgPage1').then(function(data) {
             if(data) {
               // Also try page 2
-              certImageLoadFromDrive(student.course, 'bgPage2').then(function() {
+              certImageLoadFromDrive(certKey, 'bgPage2').then(function() {
                 _generateCertPDFInner(studentId);
               });
             } else {
@@ -19518,7 +19562,8 @@ function _generateCertPDFInner(studentId) {
     saveState();
   }
 
-  var tpl = certTemplates[student.course] || {};
+  var certKey = getCertTemplateKey(student.course);
+  var tpl = certTemplates[certKey] || {};
 
   try {
   if(!tpl.bgPage1) {
