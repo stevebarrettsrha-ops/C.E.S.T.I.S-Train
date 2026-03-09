@@ -3702,6 +3702,7 @@ const courses = ['Welding','Electrical Installation','Cosmetology','Business Adm
 
 let students = [];
 let certDownloadApprovals = []; // {studentId, name, course, certNo, certDate, approved, approvedDate, approvedBy, downloadCount, lastDownloaded}
+let certTemplates = {}; // keyed by course name: {courseFullName, programmeCode, version, developedDate, gender, modules:[], competencies:[], programmeSpecs:{}, signatureLeft, signatureRight, contactEmail, contactPhone}
 
 let exams = [];
 
@@ -4035,6 +4036,7 @@ function saveState() {
     localStorage.setItem('voctrain_adminStaffAccess', JSON.stringify(adminStaffAccessSettings));
     localStorage.setItem('voctrain_instructorData', JSON.stringify(instructorData));
     localStorage.setItem('voctrain_certDownloadApprovals', JSON.stringify(certDownloadApprovals));
+    localStorage.setItem('voctrain_certTemplates', JSON.stringify(certTemplates));
     saveLmsChatData();
   } catch(e) { console.warn('saveState: storage quota exceeded or unavailable'); }
   // Push changes to Google Drive immediately (debounced)
@@ -4081,6 +4083,8 @@ function loadState() {
     if(idData) instructorData = JSON.parse(idData);
     var cda = localStorage.getItem('voctrain_certDownloadApprovals');
     if(cda) certDownloadApprovals = JSON.parse(cda);
+    var ct = localStorage.getItem('voctrain_certTemplates');
+    if(ct) certTemplates = JSON.parse(ct);
   } catch(e) { /* parse error, use defaults */ }
   updateSkillAreaCounts();
 }
@@ -5809,6 +5813,25 @@ function buildAdminPages() {
   <!-- ADMIN CERTIFICATE DOWNLOAD MANAGEMENT -->
   <section class="page" id="page-cert-downloads">
     <div class="stats-grid stats-grid-4" id="certDlStats"></div>
+
+    <!-- Certificate Template Management -->
+    <div class="card" style="margin-bottom:20px;">
+      <div class="card-header">
+        <h3>Certificate Templates by Skill Area</h3>
+        <div style="display:flex;gap:8px;">
+          <select id="certTemplateSkillSelect" onchange="loadCertTemplateForEdit()" style="padding:8px 12px;background:var(--bg-input);border:1px solid var(--border);border-radius:var(--radius-sm);color:var(--text-primary);font-size:13px;">
+            <option value="">-- Select Skill Area --</option>
+          </select>
+          <button class="btn btn-primary btn-sm" onclick="openCertTemplateEditor()">Edit Template</button>
+        </div>
+      </div>
+      <p style="font-size:13px;color:var(--text-muted);margin-bottom:16px;">Configure certificate details (modules, competencies, programme specs) for each skill area. This data appears on Page 2 of the downloaded certificate.</p>
+      <div id="certTemplatePreview" style="padding:16px;background:var(--bg-secondary);border:1px solid var(--border);border-radius:var(--radius-sm);">
+        <p style="color:var(--text-muted);text-align:center;">Select a skill area above to view or edit its certificate template.</p>
+      </div>
+    </div>
+
+    <!-- Approve Students -->
     <div class="card" style="margin-bottom:20px;">
       <div class="card-header">
         <h3>Approve Students for Certificate Download</h3>
@@ -5854,6 +5877,72 @@ function buildAdminPages() {
       <div style="display:flex;gap:12px;justify-content:flex-end;">
         <button class="btn btn-secondary" onclick="closeModal('bulkCertApproveModal')">Cancel</button>
         <button class="btn btn-primary" onclick="bulkApproveCertDownloads()">Approve Selected</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Certificate Template Editor Modal -->
+  <div class="modal-overlay" id="certTemplateEditorModal">
+    <div class="modal" style="max-width:860px;max-height:90vh;overflow-y:auto;">
+      <div class="modal-header"><h3 id="certTplEditorTitle">Edit Certificate Template</h3><button class="modal-close" onclick="closeModal('certTemplateEditorModal')">✕</button></div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:16px;">
+        <div class="form-group">
+          <label>Course Full Name (appears on certificate)</label>
+          <input type="text" id="ctplCourseFullName" placeholder="e.g. Fundamentals of Solar Photovoltaics">
+        </div>
+        <div class="form-group">
+          <label>Programme Code</label>
+          <input type="text" id="ctplProgrammeCode" placeholder="e.g. CESTIS-SOLAR-01">
+        </div>
+        <div class="form-group">
+          <label>Version</label>
+          <input type="text" id="ctplVersion" placeholder="e.g. 1.0">
+        </div>
+        <div class="form-group">
+          <label>Developed Date</label>
+          <input type="text" id="ctplDevelopedDate" placeholder="e.g. May 2023">
+        </div>
+        <div class="form-group">
+          <label>Left Signature Title</label>
+          <input type="text" id="ctplSignatureLeft" placeholder="Programme Coordinator/ Principal" value="Programme Coordinator/ Principal">
+        </div>
+        <div class="form-group">
+          <label>Right Signature Title</label>
+          <input type="text" id="ctplSignatureRight" placeholder="Chairman of CMC Board" value="Chairman of CMC Board">
+        </div>
+        <div class="form-group">
+          <label>Contact Email</label>
+          <input type="text" id="ctplContactEmail" placeholder="cestisadmn@gmail.com" value="cestisadmn@gmail.com">
+        </div>
+        <div class="form-group">
+          <label>Contact Phone</label>
+          <input type="text" id="ctplContactPhone" placeholder="+(876) 679-0111" value="+(876) 679-0111">
+        </div>
+      </div>
+
+      <h4 style="font-size:14px;margin-bottom:8px;color:var(--accent);">Programme Specifications</h4>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:16px;">
+        <div class="form-group"><label>Duration</label><input type="text" id="ctplSpecDuration" placeholder="e.g. 40 Contact Hours"></div>
+        <div class="form-group"><label>Industry</label><input type="text" id="ctplSpecIndustry" placeholder="e.g. Electro Technology"></div>
+        <div class="form-group"><label>Sub-Sector</label><input type="text" id="ctplSpecSubSector" placeholder="e.g. Renewable Energy"></div>
+        <div class="form-group"><label>Entry Requirements</label><input type="text" id="ctplSpecEntry" placeholder="e.g. Grade 9 Numeracy & Literacy"></div>
+        <div class="form-group"><label>Assessment</label><input type="text" id="ctplSpecAssessment" placeholder="e.g. Industry Psychometric Assessment: Pass"></div>
+        <div class="form-group"><label>Alignment</label><input type="text" id="ctplSpecAlignment" placeholder="e.g. Jamaica Vision 2030 - Energy Conservation & Efficiency Goals"></div>
+      </div>
+
+      <h4 style="font-size:14px;margin-bottom:8px;color:var(--accent);">Modules Completed</h4>
+      <p style="font-size:12px;color:var(--text-muted);margin-bottom:8px;">Add modules with their contact hours and sub-topics (one topic per line).</p>
+      <div id="ctplModulesContainer"></div>
+      <button class="btn btn-sm btn-secondary" onclick="addCertTemplateModule()" style="margin-bottom:16px;">+ Add Module</button>
+
+      <h4 style="font-size:14px;margin-bottom:8px;color:var(--accent);">Technical Competencies Achieved</h4>
+      <p style="font-size:12px;color:var(--text-muted);margin-bottom:8px;">Add competency categories with their items (one per line).</p>
+      <div id="ctplCompetenciesContainer"></div>
+      <button class="btn btn-sm btn-secondary" onclick="addCertTemplateCompetency()" style="margin-bottom:16px;">+ Add Competency Category</button>
+
+      <div style="display:flex;gap:12px;justify-content:flex-end;margin-top:16px;border-top:1px solid var(--border);padding-top:16px;">
+        <button class="btn btn-secondary" onclick="closeModal('certTemplateEditorModal')">Cancel</button>
+        <button class="btn btn-primary" onclick="saveCertTemplate()">Save Template</button>
       </div>
     </div>
   </div>
@@ -19063,9 +19152,9 @@ function checkCertificatePublic() {
 
   if(!student) {
     resultDiv.innerHTML = '<div class="cert-result-card not-found">' +
-      '<div class="cert-result-header"><div class="cert-result-icon" style="background:rgba(231,76,60,0.15);color:var(--red);">✕</div>' +
+      '<div class="cert-result-header"><div class="cert-result-icon" style="background:rgba(231,76,60,0.15);color:var(--red);">&#10005;</div>' +
       '<div><div style="font-size:16px;font-weight:700;color:var(--red);">No Record Found</div>' +
-      '<div style="font-size:12px;color:var(--text-muted);">No student or certificate matches "' + query + '"</div></div></div>' +
+      '<div style="font-size:12px;color:var(--text-muted);">No student or certificate matches &quot;' + query + '&quot;</div></div></div>' +
       '<p style="font-size:13px;color:var(--text-muted);">Please double-check your Student Number (e.g. STU-2026001) or Certificate Number and try again.</p></div>';
     return;
   }
@@ -19073,7 +19162,7 @@ function checkCertificatePublic() {
   if(!student.certNo) {
     var stageLabel = {testing:'Assessment Stage',interview:'Interview Stage',training:'In Training',incomplete:'Incomplete'}[student.stage] || student.stage;
     resultDiv.innerHTML = '<div class="cert-result-card pending">' +
-      '<div class="cert-result-header"><div class="cert-result-icon" style="background:rgba(240,165,0,0.15);color:var(--accent);">⏳</div>' +
+      '<div class="cert-result-header"><div class="cert-result-icon" style="background:rgba(240,165,0,0.15);color:var(--accent);">&#9203;</div>' +
       '<div><div style="font-size:16px;font-weight:700;color:var(--accent);">Certificate Not Yet Issued</div>' +
       '<div style="font-size:12px;color:var(--text-muted);">' + student.name + '</div></div></div>' +
       '<div class="cert-result-details">' +
@@ -19085,12 +19174,11 @@ function checkCertificatePublic() {
     return;
   }
 
-  // Student is certified — check if approved for download
   var approval = certDownloadApprovals.find(function(d){ return d.studentId === student.id; });
   var canDownload = approval && approval.approved;
 
   resultDiv.innerHTML = '<div class="cert-result-card success">' +
-    '<div class="cert-result-header"><div class="cert-result-icon" style="background:rgba(46,204,113,0.15);color:var(--green);">✓</div>' +
+    '<div class="cert-result-header"><div class="cert-result-icon" style="background:rgba(46,204,113,0.15);color:var(--green);">&#10003;</div>' +
     '<div><div style="font-size:16px;font-weight:700;color:var(--green);">Certificate Verified</div>' +
     '<div style="font-size:12px;color:var(--text-muted);">' + student.name + '</div></div></div>' +
     '<div class="cert-result-details">' +
@@ -19102,12 +19190,14 @@ function checkCertificatePublic() {
     '<div class="cert-detail-item"><div class="label">Download</div><div class="value">' + (canDownload ? 'Approved' : 'Not yet approved') + '</div></div>' +
     '</div>' +
     (canDownload
-      ? '<button class="cert-download-btn" onclick="generateCertificatePDF(\'' + student.id + '\')"><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg> Download Certificate PDF</button>'
+      ? '<button class="cert-download-btn" onclick="generateCertificatePDF(\'' + student.id + '\')"><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg> Download Certificate</button>'
       : '<p style="font-size:13px;color:var(--text-muted);margin-top:4px;">Certificate download has not been approved yet. Please contact the administration office.</p>') +
     '</div>';
 }
 
-// --- Certificate PDF Generation (Canvas-based) ---
+// ============================== CERTIFICATE PDF GENERATION ==============================
+// Matching the official C.E.S.T.I.S certificate design (2-page: front + details)
+
 function generateCertificatePDF(studentId) {
   var student = students.find(function(s){ return s.id === studentId; });
   if(!student || !student.certNo) { showToast('Certificate not found'); return; }
@@ -19120,199 +19210,761 @@ function generateCertificatePDF(studentId) {
     saveState();
   }
 
-  // Create canvas-based certificate
-  var canvas = document.createElement('canvas');
-  var w = 1122; // A4 landscape-ish
-  var h = 794;
-  canvas.width = w;
-  canvas.height = h;
-  var ctx = canvas.getContext('2d');
+  var tpl = certTemplates[student.course] || {};
+  var courseFullName = tpl.courseFullName || student.course;
+  var sigLeft = tpl.signatureLeft || 'Programme Coordinator/ Principal';
+  var sigRight = tpl.signatureRight || 'Chairman of CMC Board';
 
-  // Background
-  ctx.fillStyle = '#FFFFFF';
-  ctx.fillRect(0, 0, w, h);
+  // Download Page 1
+  generateCertPage1(student, courseFullName, sigLeft, sigRight);
 
-  // Decorative gold border (outer)
-  ctx.strokeStyle = '#C5960C';
-  ctx.lineWidth = 6;
-  ctx.strokeRect(20, 20, w - 40, h - 40);
-
-  // Inner border
-  ctx.strokeStyle = '#DAA520';
-  ctx.lineWidth = 2;
-  ctx.strokeRect(32, 32, w - 64, h - 64);
-
-  // Corner ornaments
-  drawCornerOrnament(ctx, 40, 40, 1, 1);
-  drawCornerOrnament(ctx, w - 40, 40, -1, 1);
-  drawCornerOrnament(ctx, 40, h - 40, 1, -1);
-  drawCornerOrnament(ctx, w - 40, h - 40, -1, -1);
-
-  // Top decorative line
-  ctx.beginPath();
-  ctx.moveTo(200, 90);
-  ctx.lineTo(w - 200, 90);
-  ctx.strokeStyle = '#DAA520';
-  ctx.lineWidth = 1;
-  ctx.stroke();
-
-  // Institution name
-  ctx.fillStyle = '#1a1a2e';
-  ctx.font = '600 16px "DM Sans", Arial, sans-serif';
-  ctx.textAlign = 'center';
-  ctx.fillText('C.E.S.T.I.S', w / 2, 130);
-
-  ctx.fillStyle = '#333';
-  ctx.font = '13px "DM Sans", Arial, sans-serif';
-  ctx.fillText('Community Education, Skills Training & Intervention System', w / 2, 150);
-
-  // Certificate title
-  ctx.fillStyle = '#C5960C';
-  ctx.font = 'bold 42px "Georgia", "Playfair Display", serif';
-  ctx.fillText('CERTIFICATE', w / 2, 215);
-
-  ctx.fillStyle = '#555';
-  ctx.font = '16px "DM Sans", Arial, sans-serif';
-  ctx.fillText('OF COMPLETION', w / 2, 242);
-
-  // Decorative line under title
-  ctx.beginPath();
-  ctx.moveTo(380, 260);
-  ctx.lineTo(w - 380, 260);
-  ctx.strokeStyle = '#DAA520';
-  ctx.lineWidth = 1;
-  ctx.stroke();
-
-  // "This is to certify that"
-  ctx.fillStyle = '#555';
-  ctx.font = 'italic 15px "Georgia", serif';
-  ctx.fillText('This is to certify that', w / 2, 300);
-
-  // Student name
-  ctx.fillStyle = '#1a1a2e';
-  ctx.font = 'bold 36px "Georgia", "Playfair Display", serif';
-  ctx.fillText(student.name, w / 2, 350);
-
-  // Name underline
-  var nameWidth = ctx.measureText(student.name).width;
-  ctx.beginPath();
-  ctx.moveTo((w - nameWidth) / 2 - 20, 360);
-  ctx.lineTo((w + nameWidth) / 2 + 20, 360);
-  ctx.strokeStyle = '#DAA520';
-  ctx.lineWidth = 1.5;
-  ctx.stroke();
-
-  // "has successfully completed the"
-  ctx.fillStyle = '#555';
-  ctx.font = 'italic 15px "Georgia", serif';
-  ctx.fillText('has successfully completed the vocational training programme in', w / 2, 400);
-
-  // Course name
-  ctx.fillStyle = '#C5960C';
-  ctx.font = 'bold 28px "Georgia", "Playfair Display", serif';
-  ctx.fillText(student.course, w / 2, 445);
-
-  // Additional text
-  ctx.fillStyle = '#666';
-  ctx.font = '13px "DM Sans", Arial, sans-serif';
-  ctx.fillText('and has met all requirements for certification as prescribed by C.E.S.T.I.S', w / 2, 480);
-
-  // Certificate details
-  ctx.fillStyle = '#888';
-  ctx.font = '12px "DM Sans", Arial, sans-serif';
-  ctx.fillText('Certificate No: ' + student.certNo + '   |   Date Issued: ' + student.certDate + '   |   Student ID: ' + student.id, w / 2, 520);
-
-  // Bottom decorative line
-  ctx.beginPath();
-  ctx.moveTo(200, 555);
-  ctx.lineTo(w - 200, 555);
-  ctx.strokeStyle = '#DAA520';
-  ctx.lineWidth = 1;
-  ctx.stroke();
-
-  // Signature lines
-  // Left signature
-  ctx.beginPath();
-  ctx.moveTo(160, 650);
-  ctx.lineTo(380, 650);
-  ctx.strokeStyle = '#999';
-  ctx.lineWidth = 1;
-  ctx.stroke();
-  ctx.fillStyle = '#555';
-  ctx.font = '12px "DM Sans", Arial, sans-serif';
-  ctx.fillText('Programme Director', 270, 670);
-
-  // Center seal area
-  ctx.beginPath();
-  ctx.arc(w / 2, 630, 35, 0, 2 * Math.PI);
-  ctx.strokeStyle = '#DAA520';
-  ctx.lineWidth = 2;
-  ctx.stroke();
-  ctx.fillStyle = '#C5960C';
-  ctx.font = 'bold 10px "DM Sans", Arial, sans-serif';
-  ctx.fillText('C.E.S.T.I.S', w / 2, 627);
-  ctx.font = '8px "DM Sans", Arial, sans-serif';
-  ctx.fillText('OFFICIAL SEAL', w / 2, 640);
-
-  // Right signature
-  ctx.beginPath();
-  ctx.moveTo(w - 380, 650);
-  ctx.lineTo(w - 160, 650);
-  ctx.strokeStyle = '#999';
-  ctx.lineWidth = 1;
-  ctx.stroke();
-  ctx.fillStyle = '#555';
-  ctx.font = '12px "DM Sans", Arial, sans-serif';
-  ctx.fillText('Centre Manager', w - 270, 670);
-
-  // Bottom decorative line
-  ctx.beginPath();
-  ctx.moveTo(200, h - 55);
-  ctx.lineTo(w - 200, h - 55);
-  ctx.strokeStyle = '#DAA520';
-  ctx.lineWidth = 1;
-  ctx.stroke();
-
-  // Footer
-  ctx.fillStyle = '#aaa';
-  ctx.font = '10px "DM Sans", Arial, sans-serif';
-  ctx.fillText('This certificate is digitally generated by C.E.S.T.I.S Learning Management System', w / 2, h - 35);
-
-  // Download as image (PNG) — widely compatible
-  var dataUrl = canvas.toDataURL('image/png');
-  var link = document.createElement('a');
-  link.download = 'Certificate_' + student.name.replace(/\s+/g, '_') + '_' + student.certNo + '.png';
-  link.href = dataUrl;
-  link.click();
+  // If template has detail data, download Page 2 after small delay
+  if(tpl.modules && tpl.modules.length > 0) {
+    setTimeout(function(){
+      generateCertPage2(student, tpl);
+    }, 500);
+  }
 
   showToast('Certificate downloaded for ' + student.name);
 }
 
-function drawCornerOrnament(ctx, x, y, dx, dy) {
+// ---- PAGE 1: Formal Certificate of Completion ----
+function generateCertPage1(student, courseFullName, sigLeft, sigRight) {
+  var canvas = document.createElement('canvas');
+  var w = 1400;
+  var h = 990;
+  canvas.width = w;
+  canvas.height = h;
+  var ctx = canvas.getContext('2d');
+
+  // Cream/beige background
+  ctx.fillStyle = '#FBF5E6';
+  ctx.fillRect(0, 0, w, h);
+
+  // Dark navy outer border
+  ctx.strokeStyle = '#1B2A4A';
+  ctx.lineWidth = 8;
+  ctx.strokeRect(10, 10, w - 20, h - 20);
+
+  // Gold inner border
+  ctx.strokeStyle = '#C5960C';
+  ctx.lineWidth = 3;
+  ctx.strokeRect(22, 22, w - 44, h - 44);
+
+  // Gold ornamental corner swirls
+  drawGoldSwirl(ctx, 30, 30, 1, 1);
+  drawGoldSwirl(ctx, w - 30, 30, -1, 1);
+  drawGoldSwirl(ctx, 30, h - 30, 1, -1);
+  drawGoldSwirl(ctx, w - 30, h - 30, -1, -1);
+
+  // Watermark - faded crest in center background
+  drawWatermarkCrest(ctx, w / 2, 380, 0.08);
+
+  // "CERTIFICATE" title - large navy serif
+  ctx.textAlign = 'center';
+  ctx.fillStyle = '#1B2A4A';
+  ctx.font = 'bold 72px Georgia, "Times New Roman", serif';
+  ctx.fillText('CERTIFICATE', w / 2, 140);
+
+  // "OF COMPLETION"
+  ctx.font = '600 32px Georgia, "Times New Roman", serif';
+  ctx.fillStyle = '#1B2A4A';
+  ctx.fillText('OF COMPLETION', w / 2, 185);
+
+  // "This certificate certifies that"
+  ctx.font = 'italic 22px Georgia, serif';
+  ctx.fillStyle = '#333';
+  ctx.fillText('This certificate certifies that', w / 2, 280);
+
+  // Student name - large, with underline
+  ctx.font = 'bold 48px Georgia, "Times New Roman", serif';
+  ctx.fillStyle = '#1B2A4A';
+  ctx.fillText(student.name, w / 2, 400);
+
+  // Underline below name
+  var nameW = ctx.measureText(student.name).width;
+  ctx.beginPath();
+  ctx.moveTo((w - nameW) / 2 - 40, 420);
+  ctx.lineTo((w + nameW) / 2 + 40, 420);
+  ctx.strokeStyle = '#333';
+  ctx.lineWidth = 1.5;
+  ctx.stroke();
+
+  // Body text - italic
+  var tpl = certTemplates[student.course] || {};
+  var gender = tpl.gender || 'their';
+  var pronoun = gender === 'his' ? 'his' : gender === 'her' ? 'her' : 'their';
+
+  var bodyLine1 = 'has successfully completed ' + pronoun + ' vocational training in the short course';
+  var bodyLine2 = courseFullName;
+  var bodyLine3 = 'on this day, the ' + student.certDate + ', at the Community Educational and Skills';
+  var bodyLine4 = 'Training Institute and Services Ltd.';
+
+  ctx.font = 'italic 18px Georgia, serif';
+  ctx.fillStyle = '#333';
+  ctx.fillText(bodyLine1, w / 2, 485);
+
+  ctx.font = 'bold italic 20px Georgia, serif';
+  ctx.fillStyle = '#1B2A4A';
+  ctx.fillText(bodyLine2, w / 2, 515);
+
+  ctx.font = 'italic 18px Georgia, serif';
+  ctx.fillStyle = '#333';
+  ctx.fillText(bodyLine3, w / 2, 545);
+
+  ctx.font = 'bold italic 18px Georgia, serif';
+  ctx.fillText(bodyLine4, w / 2, 575);
+
+  // Center seal/crest
+  drawCertSeal(ctx, w / 2, 720, 60);
+
+  // Left signature
+  drawSignatureScribble(ctx, 280, 710);
+  ctx.beginPath();
+  ctx.moveTo(180, 730);
+  ctx.lineTo(380, 730);
+  ctx.strokeStyle = '#666';
+  ctx.lineWidth = 1;
+  ctx.stroke();
+  ctx.font = '16px Georgia, serif';
+  ctx.fillStyle = '#333';
+  ctx.textAlign = 'center';
+  ctx.fillText(sigLeft, 280, 755);
+
+  // Right signature
+  drawSignatureScribble(ctx, w - 280, 710);
+  ctx.beginPath();
+  ctx.moveTo(w - 380, 730);
+  ctx.lineTo(w - 180, 730);
+  ctx.strokeStyle = '#666';
+  ctx.lineWidth = 1;
+  ctx.stroke();
+  ctx.font = '16px Georgia, serif';
+  ctx.fillStyle = '#333';
+  ctx.textAlign = 'center';
+  ctx.fillText(sigRight, w - 280, 755);
+
+  // Certificate number at bottom
+  ctx.font = 'bold 16px Georgia, serif';
+  ctx.fillStyle = '#1B2A4A';
+  ctx.textAlign = 'center';
+  ctx.fillText('Certificate No. ' + student.certNo, w / 2, h - 50);
+
+  // Download
+  var dataUrl = canvas.toDataURL('image/png');
+  var link = document.createElement('a');
+  link.download = 'Certificate_Page1_' + student.name.replace(/\s+/g, '_') + '_' + student.certNo + '.png';
+  link.href = dataUrl;
+  link.click();
+}
+
+// ---- PAGE 2: Programme Details ----
+function generateCertPage2(student, tpl) {
+  var canvas = document.createElement('canvas');
+  var w = 1400;
+  var baseH = 990;
+  canvas.width = w;
+  // We'll calculate height dynamically, start with a temporary large canvas
+  canvas.height = 2000;
+  var ctx = canvas.getContext('2d');
+
+  var courseFullName = (tpl.courseFullName || student.course).toUpperCase();
+  var progCode = tpl.programmeCode || '';
+  var version = tpl.version || '1.0';
+  var devDate = tpl.developedDate || '';
+  var modules = tpl.modules || [];
+  var competencies = tpl.competencies || [];
+  var specs = tpl.programmeSpecs || {};
+  var contactEmail = tpl.contactEmail || 'cestisadmn@gmail.com';
+  var contactPhone = tpl.contactPhone || '+(876) 679-0111';
+
+  // White background
+  ctx.fillStyle = '#FFFFFF';
+  ctx.fillRect(0, 0, w, 2000);
+
+  // Left teal accent border
+  ctx.fillStyle = '#2A7B88';
+  ctx.fillRect(0, 0, 8, 2000);
+
+  var yPos = 40;
+
+  // Course title
+  ctx.textAlign = 'center';
+  ctx.font = 'bold 28px Georgia, "Times New Roman", serif';
+  ctx.fillStyle = '#1B2A4A';
+  ctx.fillText(courseFullName, w / 2, yPos);
+  yPos += 30;
+
+  // Small crest
+  drawCertSeal(ctx, w / 2, yPos + 30, 35);
+  yPos += 80;
+
+  // Institution name
+  ctx.font = 'bold 18px Georgia, serif';
+  ctx.fillStyle = '#333';
+  ctx.fillText('Community Educational and Skills Training Institute and Services Limited', w / 2, yPos);
+  yPos += 25;
+
+  // Programme code line
+  ctx.font = 'bold 14px Georgia, serif';
+  ctx.fillStyle = '#333';
+  var codeLine = 'Programme Code: ' + progCode + ' | Version ' + version + ' | Developed: ' + devDate;
+  ctx.fillText(codeLine, w / 2, yPos);
+  yPos += 35;
+
+  // Two-column content area
+  var colLeft = 50;
+  var colMid = w / 2 + 10;
+  var colRight = w - 50;
+  var colWidth = (w - 120) / 2;
+  var contentStartY = yPos;
+
+  // Draw column box borders
+  ctx.strokeStyle = '#CCC';
+  ctx.lineWidth = 1;
+
+  // Calculate module content height
+  var moduleY = contentStartY + 10;
+  ctx.textAlign = 'left';
+
+  // MODULES COMPLETED header
+  ctx.font = 'bold 14px Arial, sans-serif';
+  ctx.fillStyle = '#1B2A4A';
+  ctx.fillText('MODULES COMPLETED', colLeft + 15, moduleY + 20);
+  moduleY += 38;
+
+  // Render modules
+  modules.forEach(function(mod) {
+    ctx.font = 'bold 12px Arial, sans-serif';
+    ctx.fillStyle = '#2A7B88';
+    ctx.fillText('\u2611 ' + mod.name + ' ' + (mod.contactHours || '') + ' Contact Hours', colLeft + 15, moduleY);
+    moduleY += 18;
+    (mod.topics || []).forEach(function(topic) {
+      ctx.font = '11px Arial, sans-serif';
+      ctx.fillStyle = '#333';
+      ctx.fillText('  \u2022  ' + topic, colLeft + 25, moduleY);
+      moduleY += 16;
+    });
+    moduleY += 6;
+  });
+
+  // COMPETENCIES column
+  var compY = contentStartY + 10;
+  ctx.font = 'bold 14px Arial, sans-serif';
+  ctx.fillStyle = '#1B2A4A';
+  ctx.fillText('TECHNICAL COMPETENCIES ACHIEVED', colMid + 15, compY + 20);
+  compY += 38;
+
+  competencies.forEach(function(cat) {
+    ctx.font = 'bold 12px Arial, sans-serif';
+    ctx.fillStyle = '#1B2A4A';
+    ctx.fillText(cat.category + ':', colMid + 15, compY);
+    compY += 18;
+    (cat.items || []).forEach(function(item) {
+      ctx.font = '11px Arial, sans-serif';
+      ctx.fillStyle = '#333';
+      // Wrap long text
+      var lines = wrapText(ctx, item, colWidth - 40);
+      lines.forEach(function(line) {
+        ctx.fillText('  \u2022  ' + line, colMid + 25, compY);
+        compY += 15;
+      });
+    });
+    compY += 8;
+  });
+
+  var boxBottom = Math.max(moduleY, compY) + 10;
+
+  // Draw the column boxes
+  ctx.strokeStyle = '#CCC';
+  ctx.lineWidth = 1;
+  ctx.strokeRect(colLeft, contentStartY, colWidth, boxBottom - contentStartY);
+  ctx.strokeRect(colMid - 10, contentStartY, colWidth + 20, boxBottom - contentStartY);
+
+  yPos = boxBottom + 20;
+
+  // PROGRAMME SPECIFICATIONS
+  ctx.textAlign = 'center';
+  ctx.font = 'bold 14px Arial, sans-serif';
+  ctx.fillStyle = '#1B2A4A';
+  ctx.fillText('PROGRAMME SPECIFICATIONS', w / 2, yPos);
+  yPos += 20;
+
+  ctx.font = '12px Arial, sans-serif';
+  ctx.fillStyle = '#333';
+  var specLine1 = 'Duration: ' + (specs.duration || 'N/A') + ' | Industry: ' + (specs.industry || 'N/A');
+  ctx.fillText(specLine1, w / 2, yPos);
+  yPos += 17;
+  var specLine2 = '| Sub-Sector: ' + (specs.subSector || 'N/A') + ' | Entry Requirements: ' + (specs.entryRequirements || 'N/A');
+  ctx.fillText(specLine2, w / 2, yPos);
+  yPos += 17;
+  var specLine3 = '| ' + (specs.assessment || 'Industry Psychometric Assessment: Pass');
+  ctx.fillText(specLine3, w / 2, yPos);
+  yPos += 17;
+  var specLine4 = 'Alignment: ' + (specs.alignment || 'N/A');
+  ctx.fillText(specLine4, w / 2, yPos);
+  yPos += 30;
+
+  // Validation text
+  ctx.font = 'italic 11px Arial, sans-serif';
+  ctx.fillStyle = '#555';
+  var valLine1 = 'This certificate confirms that the holder has successfully completed all requirements of the ' + (tpl.courseFullName || student.course).toUpperCase();
+  var valLine2 = ' Short Course. For transcript requests or verification, contact: ' + contactEmail + ' | ' + contactPhone;
+  ctx.fillText(valLine1, w / 2, yPos);
+  yPos += 16;
+  ctx.fillText(valLine2, w / 2, yPos);
+  yPos += 25;
+
+  // QR Code area (bottom left) - placeholder box
+  ctx.textAlign = 'left';
+  ctx.font = 'bold 9px Arial, sans-serif';
+  ctx.fillStyle = '#333';
+  ctx.fillText('PLEASE VALIDATE', 50, yPos - 45);
+  ctx.fillText('CERTIFICATE HERE:', 50, yPos - 34);
+  ctx.strokeStyle = '#333';
+  ctx.lineWidth = 1;
+  ctx.strokeRect(50, yPos - 30, 60, 60);
+  // QR pattern placeholder
+  ctx.fillStyle = '#333';
+  for(var qx = 0; qx < 6; qx++) {
+    for(var qy = 0; qy < 6; qy++) {
+      if((qx + qy) % 2 === 0) ctx.fillRect(53 + qx * 9, yPos - 27 + qy * 9, 7, 7);
+    }
+  }
+
+  // Certificate No at bottom
+  ctx.textAlign = 'center';
+  ctx.font = 'bold 20px Georgia, serif';
+  ctx.fillStyle = '#1B2A4A';
+  yPos += 50;
+  ctx.fillText('Certificate No. ' + student.certNo, w / 2, yPos);
+  yPos += 20;
+
+  // Final height
+  var finalH = Math.max(yPos + 20, baseH);
+
+  // Create properly sized canvas
+  var finalCanvas = document.createElement('canvas');
+  finalCanvas.width = w;
+  finalCanvas.height = finalH;
+  var fctx = finalCanvas.getContext('2d');
+  fctx.fillStyle = '#FFFFFF';
+  fctx.fillRect(0, 0, w, finalH);
+  fctx.drawImage(canvas, 0, 0);
+
+  // Bottom teal border
+  fctx.fillStyle = '#2A7B88';
+  fctx.fillRect(0, finalH - 4, w, 4);
+  // Left teal border on final
+  fctx.fillStyle = '#2A7B88';
+  fctx.fillRect(0, 0, 8, finalH);
+
+  var dataUrl = finalCanvas.toDataURL('image/png');
+  var link = document.createElement('a');
+  link.download = 'Certificate_Page2_' + student.name.replace(/\s+/g, '_') + '_' + student.certNo + '.png';
+  link.href = dataUrl;
+  link.click();
+}
+
+function wrapText(ctx, text, maxWidth) {
+  var words = text.split(' ');
+  var lines = [];
+  var currentLine = '';
+  words.forEach(function(word) {
+    var test = currentLine ? currentLine + ' ' + word : word;
+    if(ctx.measureText('  \u2022  ' + test).width > maxWidth && currentLine) {
+      lines.push(currentLine);
+      currentLine = word;
+    } else {
+      currentLine = test;
+    }
+  });
+  if(currentLine) lines.push(currentLine);
+  return lines.length ? lines : [text];
+}
+
+// ---- Drawing helpers for certificate design ----
+
+function drawGoldSwirl(ctx, x, y, dx, dy) {
   ctx.save();
   ctx.translate(x, y);
-  ctx.strokeStyle = '#DAA520';
+  ctx.scale(dx, dy);
+
+  // Ornamental gold swirl curves
+  var gradient = ctx.createLinearGradient(0, 0, 80, 80);
+  gradient.addColorStop(0, '#DAA520');
+  gradient.addColorStop(0.5, '#C5960C');
+  gradient.addColorStop(1, '#8B6914');
+
+  ctx.strokeStyle = gradient;
+  ctx.lineWidth = 3;
+  ctx.lineCap = 'round';
+
+  // Main spiral
+  ctx.beginPath();
+  ctx.moveTo(5, 5);
+  ctx.bezierCurveTo(5, 40, 40, 60, 70, 55);
+  ctx.stroke();
+
+  ctx.beginPath();
+  ctx.moveTo(5, 5);
+  ctx.bezierCurveTo(40, 5, 60, 40, 55, 70);
+  ctx.stroke();
+
+  // Inner curl top
+  ctx.lineWidth = 2.5;
+  ctx.beginPath();
+  ctx.moveTo(70, 55);
+  ctx.bezierCurveTo(80, 50, 85, 35, 65, 30);
+  ctx.bezierCurveTo(50, 26, 45, 38, 55, 42);
+  ctx.stroke();
+
+  // Inner curl left
+  ctx.beginPath();
+  ctx.moveTo(55, 70);
+  ctx.bezierCurveTo(50, 80, 35, 85, 30, 65);
+  ctx.bezierCurveTo(26, 50, 38, 45, 42, 55);
+  ctx.stroke();
+
+  // Small decorative elements
   ctx.lineWidth = 2;
   ctx.beginPath();
-  ctx.moveTo(0, 0);
-  ctx.lineTo(dx * 30, 0);
-  ctx.moveTo(0, 0);
-  ctx.lineTo(0, dy * 30);
+  ctx.moveTo(20, 15);
+  ctx.bezierCurveTo(25, 8, 35, 10, 38, 18);
   ctx.stroke();
-  // Small diamond
+
   ctx.beginPath();
-  ctx.moveTo(dx * 8, dy * 8);
-  ctx.lineTo(dx * 12, dy * 4);
-  ctx.lineTo(dx * 16, dy * 8);
-  ctx.lineTo(dx * 12, dy * 12);
+  ctx.moveTo(15, 20);
+  ctx.bezierCurveTo(8, 25, 10, 35, 18, 38);
+  ctx.stroke();
+
+  // Small gold dot at center of swirl
+  ctx.beginPath();
+  ctx.arc(40, 40, 3, 0, Math.PI * 2);
+  ctx.fillStyle = '#DAA520';
+  ctx.fill();
+
+  ctx.restore();
+}
+
+function drawWatermarkCrest(ctx, cx, cy, alpha) {
+  ctx.save();
+  ctx.globalAlpha = alpha;
+
+  // Shield shape
+  ctx.beginPath();
+  ctx.moveTo(cx - 100, cy - 120);
+  ctx.lineTo(cx + 100, cy - 120);
+  ctx.lineTo(cx + 100, cy + 40);
+  ctx.quadraticCurveTo(cx, cy + 130, cx - 100, cy + 40);
+  ctx.closePath();
+  ctx.strokeStyle = '#8B8B6E';
+  ctx.lineWidth = 4;
+  ctx.stroke();
+
+  // Laurel wreath - left
+  for(var i = 0; i < 8; i++) {
+    var angle = -Math.PI * 0.7 + (i * Math.PI * 0.18);
+    var lx = cx - 130 + Math.cos(angle) * 20;
+    var ly = cy - 50 + i * 30;
+    ctx.beginPath();
+    ctx.ellipse(lx, ly, 15, 6, angle + 0.3, 0, Math.PI * 2);
+    ctx.strokeStyle = '#8B8B6E';
+    ctx.lineWidth = 1.5;
+    ctx.stroke();
+  }
+  // Right
+  for(var i = 0; i < 8; i++) {
+    var angle = -Math.PI * 0.3 + (i * Math.PI * 0.18);
+    var lx = cx + 130 - Math.cos(angle) * 20;
+    var ly = cy - 50 + i * 30;
+    ctx.beginPath();
+    ctx.ellipse(lx, ly, 15, 6, -angle - 0.3, 0, Math.PI * 2);
+    ctx.strokeStyle = '#8B8B6E';
+    ctx.lineWidth = 1.5;
+    ctx.stroke();
+  }
+
+  // Cross lines inside shield
+  ctx.beginPath();
+  ctx.moveTo(cx, cy - 120);
+  ctx.lineTo(cx, cy + 80);
+  ctx.moveTo(cx - 100, cy - 30);
+  ctx.lineTo(cx + 100, cy - 30);
+  ctx.strokeStyle = '#8B8B6E';
+  ctx.lineWidth = 2;
+  ctx.stroke();
+
+  ctx.restore();
+}
+
+function drawCertSeal(ctx, cx, cy, r) {
+  ctx.save();
+  // Outer golden circle with laurel
+  var gradient = ctx.createRadialGradient(cx, cy, r * 0.3, cx, cy, r);
+  gradient.addColorStop(0, '#DAA520');
+  gradient.addColorStop(0.7, '#C5960C');
+  gradient.addColorStop(1, '#8B6914');
+
+  // Laurel wreath ring
+  for(var i = 0; i < 16; i++) {
+    var angle = (i / 16) * Math.PI * 2;
+    var lx = cx + Math.cos(angle) * (r + 8);
+    var ly = cy + Math.sin(angle) * (r + 8);
+    ctx.beginPath();
+    ctx.ellipse(lx, ly, 10, 5, angle + Math.PI / 2, 0, Math.PI * 2);
+    ctx.fillStyle = '#C5960C';
+    ctx.fill();
+    ctx.strokeStyle = '#8B6914';
+    ctx.lineWidth = 0.5;
+    ctx.stroke();
+  }
+
+  // Main circle
+  ctx.beginPath();
+  ctx.arc(cx, cy, r, 0, Math.PI * 2);
+  ctx.fillStyle = gradient;
+  ctx.fill();
+
+  // Inner shield
+  ctx.beginPath();
+  ctx.moveTo(cx - r * 0.45, cy - r * 0.5);
+  ctx.lineTo(cx + r * 0.45, cy - r * 0.5);
+  ctx.lineTo(cx + r * 0.45, cy + r * 0.1);
+  ctx.quadraticCurveTo(cx, cy + r * 0.6, cx - r * 0.45, cy + r * 0.1);
+  ctx.closePath();
+  ctx.fillStyle = '#1B4B82';
+  ctx.fill();
+  ctx.strokeStyle = '#DAA520';
+  ctx.lineWidth = 1.5;
+  ctx.stroke();
+
+  // Cross inside shield
+  ctx.strokeStyle = '#FFF';
+  ctx.lineWidth = 1;
+  ctx.beginPath();
+  ctx.moveTo(cx, cy - r * 0.5);
+  ctx.lineTo(cx, cy + r * 0.35);
+  ctx.moveTo(cx - r * 0.45, cy - r * 0.15);
+  ctx.lineTo(cx + r * 0.45, cy - r * 0.15);
+  ctx.stroke();
+
+  // Banner below
+  ctx.beginPath();
+  ctx.moveTo(cx - r * 0.8, cy + r * 0.55);
+  ctx.lineTo(cx + r * 0.8, cy + r * 0.55);
+  ctx.lineTo(cx + r * 0.7, cy + r * 0.75);
+  ctx.lineTo(cx - r * 0.7, cy + r * 0.75);
   ctx.closePath();
   ctx.fillStyle = '#DAA520';
   ctx.fill();
+
+  // Banner text
+  ctx.textAlign = 'center';
+  ctx.font = 'bold ' + Math.round(r * 0.18) + 'px Arial, sans-serif';
+  ctx.fillStyle = '#1B2A4A';
+  ctx.fillText('EMPOWERING COMMUNITIES', cx, cy + r * 0.7);
+
   ctx.restore();
+}
+
+function drawSignatureScribble(ctx, cx, baseY) {
+  ctx.save();
+  ctx.strokeStyle = '#444';
+  ctx.lineWidth = 1.5;
+  ctx.lineCap = 'round';
+  ctx.beginPath();
+  ctx.moveTo(cx - 40, baseY);
+  ctx.bezierCurveTo(cx - 30, baseY - 15, cx - 10, baseY - 20, cx, baseY - 5);
+  ctx.bezierCurveTo(cx + 10, baseY + 10, cx + 20, baseY - 15, cx + 40, baseY - 10);
+  ctx.stroke();
+  // Small flourish
+  ctx.beginPath();
+  ctx.moveTo(cx + 40, baseY - 10);
+  ctx.bezierCurveTo(cx + 50, baseY - 18, cx + 55, baseY - 5, cx + 45, baseY);
+  ctx.stroke();
+  ctx.restore();
+}
+
+// ============================== CERTIFICATE TEMPLATE MANAGEMENT ==============================
+
+var _certTplEditingCourse = '';
+
+function populateCertTemplateSkillSelect() {
+  var sel = document.getElementById('certTemplateSkillSelect');
+  if(!sel) return;
+  var current = sel.value;
+  sel.innerHTML = '<option value="">-- Select Skill Area --</option>';
+  var courses = ['Welding & Fabrication','Electrical Installation','Cosmetology','Business Administration',
+    'Auto Mechanics','Plumbing','Carpentry','Hospitality & Tourism','Information Technology',
+    'Garment Construction','Refrigeration & AC','Heavy Equipment Ops','Commercial Cooking',
+    'Beauty Therapy','Data Operations','Agriculture','Masonry','Solar Energy Tech',
+    'Early Childhood Ed','Customer Service'];
+  courses.forEach(function(c) {
+    var hasTemplate = certTemplates[c] ? ' \u2713' : '';
+    sel.innerHTML += '<option value="' + c + '"' + (c === current ? ' selected' : '') + '>' + c + hasTemplate + '</option>';
+  });
+}
+
+function loadCertTemplateForEdit() {
+  var course = document.getElementById('certTemplateSkillSelect')?.value;
+  var preview = document.getElementById('certTemplatePreview');
+  if(!course || !preview) return;
+
+  var tpl = certTemplates[course];
+  if(!tpl) {
+    preview.innerHTML = '<p style="color:var(--text-muted);text-align:center;">No template configured for <strong>' + course + '</strong> yet. Click "Edit Template" to create one.</p>';
+    return;
+  }
+
+  var html = '<div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;">';
+  html += '<div><strong style="color:var(--accent);">Course Full Name:</strong> ' + (tpl.courseFullName || 'N/A') + '</div>';
+  html += '<div><strong style="color:var(--accent);">Programme Code:</strong> ' + (tpl.programmeCode || 'N/A') + '</div>';
+  html += '<div><strong style="color:var(--accent);">Version:</strong> ' + (tpl.version || 'N/A') + '</div>';
+  html += '<div><strong style="color:var(--accent);">Developed:</strong> ' + (tpl.developedDate || 'N/A') + '</div>';
+  html += '</div>';
+
+  if(tpl.modules && tpl.modules.length) {
+    html += '<h4 style="margin-top:12px;font-size:13px;color:var(--accent);">Modules (' + tpl.modules.length + ')</h4><ul style="font-size:12px;color:var(--text-secondary);margin:4px 0 0 16px;">';
+    tpl.modules.forEach(function(m) { html += '<li>' + m.name + ' (' + (m.contactHours || '?') + ' hrs) — ' + (m.topics || []).length + ' topics</li>'; });
+    html += '</ul>';
+  }
+  if(tpl.competencies && tpl.competencies.length) {
+    html += '<h4 style="margin-top:12px;font-size:13px;color:var(--accent);">Competency Categories (' + tpl.competencies.length + ')</h4><ul style="font-size:12px;color:var(--text-secondary);margin:4px 0 0 16px;">';
+    tpl.competencies.forEach(function(c) { html += '<li>' + c.category + ' — ' + (c.items || []).length + ' items</li>'; });
+    html += '</ul>';
+  }
+
+  preview.innerHTML = html;
+}
+
+function openCertTemplateEditor() {
+  var course = document.getElementById('certTemplateSkillSelect')?.value;
+  if(!course) { showToast('Please select a skill area first'); return; }
+
+  _certTplEditingCourse = course;
+  document.getElementById('certTplEditorTitle').textContent = 'Edit Template: ' + course;
+
+  var tpl = certTemplates[course] || {};
+
+  // Fill fields
+  document.getElementById('ctplCourseFullName').value = tpl.courseFullName || '';
+  document.getElementById('ctplProgrammeCode').value = tpl.programmeCode || '';
+  document.getElementById('ctplVersion').value = tpl.version || '1.0';
+  document.getElementById('ctplDevelopedDate').value = tpl.developedDate || '';
+  document.getElementById('ctplSignatureLeft').value = tpl.signatureLeft || 'Programme Coordinator/ Principal';
+  document.getElementById('ctplSignatureRight').value = tpl.signatureRight || 'Chairman of CMC Board';
+  document.getElementById('ctplContactEmail').value = tpl.contactEmail || 'cestisadmn@gmail.com';
+  document.getElementById('ctplContactPhone').value = tpl.contactPhone || '+(876) 679-0111';
+
+  var specs = tpl.programmeSpecs || {};
+  document.getElementById('ctplSpecDuration').value = specs.duration || '';
+  document.getElementById('ctplSpecIndustry').value = specs.industry || '';
+  document.getElementById('ctplSpecSubSector').value = specs.subSector || '';
+  document.getElementById('ctplSpecEntry').value = specs.entryRequirements || '';
+  document.getElementById('ctplSpecAssessment').value = specs.assessment || '';
+  document.getElementById('ctplSpecAlignment').value = specs.alignment || '';
+
+  // Rebuild modules
+  var mc = document.getElementById('ctplModulesContainer');
+  mc.innerHTML = '';
+  if(tpl.modules && tpl.modules.length) {
+    tpl.modules.forEach(function(mod) { addCertTemplateModule(mod); });
+  }
+
+  // Rebuild competencies
+  var cc = document.getElementById('ctplCompetenciesContainer');
+  cc.innerHTML = '';
+  if(tpl.competencies && tpl.competencies.length) {
+    tpl.competencies.forEach(function(comp) { addCertTemplateCompetency(comp); });
+  }
+
+  openModal('certTemplateEditorModal');
+}
+
+var _certModuleIdx = 0;
+function addCertTemplateModule(data) {
+  var idx = _certModuleIdx++;
+  var container = document.getElementById('ctplModulesContainer');
+  var div = document.createElement('div');
+  div.className = 'cert-tpl-module';
+  div.id = 'ctplMod_' + idx;
+  div.style.cssText = 'background:var(--bg-input);border:1px solid var(--border);border-radius:var(--radius-sm);padding:12px;margin-bottom:8px;';
+  div.innerHTML = '<div style="display:flex;gap:12px;margin-bottom:8px;">' +
+    '<input type="text" class="ctpl-mod-name" placeholder="Module name" value="' + (data ? (data.name || '').replace(/"/g, '&quot;') : '') + '" style="flex:1;padding:8px;background:var(--bg-secondary);border:1px solid var(--border);border-radius:var(--radius-sm);color:var(--text-primary);font-size:13px;">' +
+    '<input type="number" class="ctpl-mod-hours" placeholder="Hours" value="' + (data ? data.contactHours || '' : '') + '" style="width:80px;padding:8px;background:var(--bg-secondary);border:1px solid var(--border);border-radius:var(--radius-sm);color:var(--text-primary);font-size:13px;">' +
+    '<button class="btn btn-sm" style="background:var(--red);color:#fff;" onclick="document.getElementById(\'ctplMod_' + idx + '\').remove()">X</button></div>' +
+    '<textarea class="ctpl-mod-topics" placeholder="Topics (one per line)" rows="3" style="width:100%;padding:8px;background:var(--bg-secondary);border:1px solid var(--border);border-radius:var(--radius-sm);color:var(--text-primary);font-size:12px;resize:vertical;">' + (data && data.topics ? data.topics.join('\n') : '') + '</textarea>';
+  container.appendChild(div);
+}
+
+var _certCompIdx = 0;
+function addCertTemplateCompetency(data) {
+  var idx = _certCompIdx++;
+  var container = document.getElementById('ctplCompetenciesContainer');
+  var div = document.createElement('div');
+  div.className = 'cert-tpl-comp';
+  div.id = 'ctplComp_' + idx;
+  div.style.cssText = 'background:var(--bg-input);border:1px solid var(--border);border-radius:var(--radius-sm);padding:12px;margin-bottom:8px;';
+  div.innerHTML = '<div style="display:flex;gap:12px;margin-bottom:8px;">' +
+    '<input type="text" class="ctpl-comp-cat" placeholder="Category name (e.g. System Knowledge)" value="' + (data ? (data.category || '').replace(/"/g, '&quot;') : '') + '" style="flex:1;padding:8px;background:var(--bg-secondary);border:1px solid var(--border);border-radius:var(--radius-sm);color:var(--text-primary);font-size:13px;">' +
+    '<button class="btn btn-sm" style="background:var(--red);color:#fff;" onclick="document.getElementById(\'ctplComp_' + idx + '\').remove()">X</button></div>' +
+    '<textarea class="ctpl-comp-items" placeholder="Competency items (one per line)" rows="3" style="width:100%;padding:8px;background:var(--bg-secondary);border:1px solid var(--border);border-radius:var(--radius-sm);color:var(--text-primary);font-size:12px;resize:vertical;">' + (data && data.items ? data.items.join('\n') : '') + '</textarea>';
+  container.appendChild(div);
+}
+
+function saveCertTemplate() {
+  if(!_certTplEditingCourse) return;
+
+  var modules = [];
+  document.querySelectorAll('.cert-tpl-module').forEach(function(div) {
+    var name = div.querySelector('.ctpl-mod-name')?.value?.trim();
+    var hours = parseInt(div.querySelector('.ctpl-mod-hours')?.value) || 0;
+    var topicsStr = div.querySelector('.ctpl-mod-topics')?.value || '';
+    var topics = topicsStr.split('\n').map(function(t){ return t.trim(); }).filter(Boolean);
+    if(name) modules.push({ name: name, contactHours: hours, topics: topics });
+  });
+
+  var competencies = [];
+  document.querySelectorAll('.cert-tpl-comp').forEach(function(div) {
+    var cat = div.querySelector('.ctpl-comp-cat')?.value?.trim();
+    var itemsStr = div.querySelector('.ctpl-comp-items')?.value || '';
+    var items = itemsStr.split('\n').map(function(t){ return t.trim(); }).filter(Boolean);
+    if(cat) competencies.push({ category: cat, items: items });
+  });
+
+  certTemplates[_certTplEditingCourse] = {
+    courseFullName: document.getElementById('ctplCourseFullName').value.trim(),
+    programmeCode: document.getElementById('ctplProgrammeCode').value.trim(),
+    version: document.getElementById('ctplVersion').value.trim(),
+    developedDate: document.getElementById('ctplDevelopedDate').value.trim(),
+    signatureLeft: document.getElementById('ctplSignatureLeft').value.trim(),
+    signatureRight: document.getElementById('ctplSignatureRight').value.trim(),
+    contactEmail: document.getElementById('ctplContactEmail').value.trim(),
+    contactPhone: document.getElementById('ctplContactPhone').value.trim(),
+    programmeSpecs: {
+      duration: document.getElementById('ctplSpecDuration').value.trim(),
+      industry: document.getElementById('ctplSpecIndustry').value.trim(),
+      subSector: document.getElementById('ctplSpecSubSector').value.trim(),
+      entryRequirements: document.getElementById('ctplSpecEntry').value.trim(),
+      assessment: document.getElementById('ctplSpecAssessment').value.trim(),
+      alignment: document.getElementById('ctplSpecAlignment').value.trim()
+    },
+    modules: modules,
+    competencies: competencies
+  };
+
+  saveState();
+  closeModal('certTemplateEditorModal');
+  populateCertTemplateSkillSelect();
+  loadCertTemplateForEdit();
+  showToast('Certificate template saved for ' + _certTplEditingCourse);
 }
 
 // --- Admin Certificate Download Management ---
 function renderCertDownloadMgmt() {
+  populateCertTemplateSkillSelect();
+
   var search = (document.getElementById('certDlSearch')?.value || '').toLowerCase();
   var filter = document.getElementById('certDlFilter')?.value || 'all';
   var courseFilter = document.getElementById('certDlCourseFilter')?.value || 'all';
@@ -19325,7 +19977,6 @@ function renderCertDownloadMgmt() {
     coursesUsed.sort().forEach(function(c){ courseSelect.innerHTML += '<option value="' + c + '">' + c + '</option>'; });
   }
 
-  // Filter certified students
   var certified = students.filter(function(s){ return s.certNo; });
   if(courseFilter !== 'all') certified = certified.filter(function(s){ return s.course === courseFilter; });
   if(search) certified = certified.filter(function(s){
@@ -19364,7 +20015,6 @@ function renderCertDownloadMgmt() {
     }).join('');
   }
 
-  // Update stats
   renderCertDlStats();
   renderCertDlLog();
 }
@@ -19377,10 +20027,10 @@ function renderCertDlStats() {
   var totalDownloads = certDownloadApprovals.reduce(function(sum, d){ return sum + (d.downloadCount || 0); }, 0);
   var pending = totalCert - approved;
   el.innerHTML =
-    '<div class="stat-card"><div class="stat-icon" style="background:var(--green-dim);color:var(--green);">🎓</div><div class="stat-value">' + totalCert + '</div><div class="stat-label">Total Certified</div></div>' +
-    '<div class="stat-card"><div class="stat-icon" style="background:var(--accent-dim);color:var(--accent);">✓</div><div class="stat-value">' + approved + '</div><div class="stat-label">Approved for Download</div></div>' +
-    '<div class="stat-card"><div class="stat-icon" style="background:var(--red-dim);color:var(--red);">⏳</div><div class="stat-value">' + pending + '</div><div class="stat-label">Not Yet Approved</div></div>' +
-    '<div class="stat-card"><div class="stat-icon" style="background:var(--blue-dim);color:var(--blue);">↓</div><div class="stat-value">' + totalDownloads + '</div><div class="stat-label">Total Downloads</div></div>';
+    '<div class="stat-card"><div class="stat-icon" style="background:var(--green-dim);color:var(--green);">&#127891;</div><div class="stat-value">' + totalCert + '</div><div class="stat-label">Total Certified</div></div>' +
+    '<div class="stat-card"><div class="stat-icon" style="background:var(--accent-dim);color:var(--accent);">&#10003;</div><div class="stat-value">' + approved + '</div><div class="stat-label">Approved for Download</div></div>' +
+    '<div class="stat-card"><div class="stat-icon" style="background:var(--red-dim);color:var(--red);">&#9203;</div><div class="stat-value">' + pending + '</div><div class="stat-label">Not Yet Approved</div></div>' +
+    '<div class="stat-card"><div class="stat-icon" style="background:var(--blue-dim);color:var(--blue);">&#8595;</div><div class="stat-value">' + totalDownloads + '</div><div class="stat-label">Total Downloads</div></div>';
 }
 
 function renderCertDlLog() {
@@ -19430,7 +20080,6 @@ function revokeCertDownload(studentId) {
   }
 }
 
-// Bulk approve
 function openBulkCertApproveModal() {
   var list = document.getElementById('bulkCertList');
   var unapproved = students.filter(function(s) {
@@ -19464,8 +20113,7 @@ function bulkApproveCertDownloads() {
   showToast(selected.length + ' student(s) approved for download');
 }
 
-// Hook into showPage to render cert download management when navigating
-var _originalShowPage = typeof showPage === 'function' ? showPage : null;
+// Hook into showPage
 (function() {
   var origShowPage = showPage;
   showPage = function(pageId) {
@@ -19475,6 +20123,7 @@ var _originalShowPage = typeof showPage === 'function' ? showPage : null;
     }
   };
 })();
+
 
 </script>
 </body>
