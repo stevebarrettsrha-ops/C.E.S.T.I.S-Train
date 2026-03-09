@@ -5887,6 +5887,36 @@ function buildAdminPages() {
   <div class="modal-overlay" id="certTemplateEditorModal">
     <div class="modal" style="max-width:860px;max-height:90vh;overflow-y:auto;">
       <div class="modal-header"><h3 id="certTplEditorTitle">Edit Certificate Template</h3><button class="modal-close" onclick="closeModal('certTemplateEditorModal')">✕</button></div>
+
+      <h4 style="font-size:14px;margin-bottom:8px;color:var(--accent);">Background Template Images</h4>
+      <p style="font-size:12px;color:var(--text-muted);margin-bottom:12px;">Upload your actual certificate designs as blank background images. The system will overlay student data (name, course, date, cert number) on top. Use high-resolution PNG or JPG.</p>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:20px;">
+        <div class="form-group">
+          <label>Page 1 Background (Formal Certificate)</label>
+          <input type="file" id="ctplBgPage1" accept="image/*" onchange="previewCertBgUpload(this,'ctplBgPage1Preview')" style="font-size:12px;">
+          <div id="ctplBgPage1Preview" style="margin-top:8px;border:1px dashed var(--border);border-radius:var(--radius-sm);min-height:80px;display:flex;align-items:center;justify-content:center;overflow:hidden;background:var(--bg-secondary);">
+            <span style="font-size:12px;color:var(--text-muted);">No image uploaded</span>
+          </div>
+        </div>
+        <div class="form-group">
+          <label>Page 2 Background (Programme Details)</label>
+          <input type="file" id="ctplBgPage2" accept="image/*" onchange="previewCertBgUpload(this,'ctplBgPage2Preview')" style="font-size:12px;">
+          <div id="ctplBgPage2Preview" style="margin-top:8px;border:1px dashed var(--border);border-radius:var(--radius-sm);min-height:80px;display:flex;align-items:center;justify-content:center;overflow:hidden;background:var(--bg-secondary);">
+            <span style="font-size:12px;color:var(--text-muted);">No image uploaded</span>
+          </div>
+        </div>
+      </div>
+
+      <h4 style="font-size:14px;margin-bottom:8px;color:var(--accent);">Page 1 — Text Positions (% from top-left)</h4>
+      <p style="font-size:12px;color:var(--text-muted);margin-bottom:8px;">Adjust where dynamic text is placed on your Page 1 background. Values are percentages of the image dimensions.</p>
+      <div style="display:grid;grid-template-columns:1fr 1fr 1fr 1fr;gap:12px;margin-bottom:20px;">
+        <div class="form-group"><label style="font-size:11px;">Student Name Y%</label><input type="number" id="ctplP1NameY" value="48" step="1" min="0" max="100" style="font-size:12px;"></div>
+        <div class="form-group"><label style="font-size:11px;">Body Text Y%</label><input type="number" id="ctplP1BodyY" value="62" step="1" min="0" max="100" style="font-size:12px;"></div>
+        <div class="form-group"><label style="font-size:11px;">Cert No. Y%</label><input type="number" id="ctplP1CertNoY" value="95" step="1" min="0" max="100" style="font-size:12px;"></div>
+        <div class="form-group"><label style="font-size:11px;">Name Font Size</label><input type="number" id="ctplP1NameSize" value="48" step="1" min="16" max="100" style="font-size:12px;"></div>
+      </div>
+
+      <h4 style="font-size:14px;margin-bottom:8px;color:var(--accent);">Certificate Details</h4>
       <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:16px;">
         <div class="form-group">
           <label>Course Full Name (appears on certificate)</label>
@@ -19213,169 +19243,111 @@ function generateCertificatePDF(studentId) {
   }
 
   var tpl = certTemplates[student.course] || {};
-  var courseFullName = tpl.courseFullName || student.course;
-  var sigLeft = tpl.signatureLeft || 'Programme Coordinator/ Principal';
-  var sigRight = tpl.signatureRight || 'Chairman of CMC Board';
 
-  // Generate canvas for Page 1
-  var canvas1 = generateCertPage1(student, courseFullName, sigLeft, sigRight);
-
-  // Create PDF with jsPDF (landscape for page 1)
-  var jsPDF = window.jspdf.jsPDF;
-  var pdf = new jsPDF({ orientation: 'landscape', unit: 'px', format: [canvas1.width, canvas1.height], compress: true });
-
-  // Add Page 1
-  var img1 = canvas1.toDataURL('image/jpeg', 0.95);
-  pdf.addImage(img1, 'JPEG', 0, 0, canvas1.width, canvas1.height);
-
-  // Add Page 2 if template data exists
-  if(tpl.modules && tpl.modules.length > 0) {
-    var canvas2 = generateCertPage2(student, tpl);
-    pdf.addPage([canvas2.width, canvas2.height], canvas2.width > canvas2.height ? 'landscape' : 'portrait');
-    var img2 = canvas2.toDataURL('image/jpeg', 0.95);
-    pdf.addImage(img2, 'JPEG', 0, 0, canvas2.width, canvas2.height);
+  if(!tpl.bgPage1) {
+    showToast('No certificate background image uploaded for ' + student.course + '. Admin must upload template images first.');
+    return;
   }
 
-  // Save as single PDF file
-  pdf.save('Certificate_' + student.name.replace(/\s+/g, '_') + '_' + student.certNo + '.pdf');
-  showToast('Certificate PDF downloaded for ' + student.name);
+  showToast('Generating certificate PDF...');
+
+  // Load Page 1 background image
+  var img1 = new Image();
+  img1.onload = function() {
+    var canvas1 = renderCertPage1OnBg(img1, student, tpl);
+
+    var jsPDF = window.jspdf.jsPDF;
+    var pdf = new jsPDF({ orientation: 'landscape', unit: 'px', format: [canvas1.width, canvas1.height], compress: true });
+    pdf.addImage(canvas1.toDataURL('image/jpeg', 0.95), 'JPEG', 0, 0, canvas1.width, canvas1.height);
+
+    // Load Page 2 if background exists
+    if(tpl.bgPage2 && tpl.modules && tpl.modules.length > 0) {
+      var img2 = new Image();
+      img2.onload = function() {
+        var canvas2 = renderCertPage2OnBg(img2, student, tpl);
+        pdf.addPage([canvas2.width, canvas2.height], canvas2.width > canvas2.height ? 'landscape' : 'portrait');
+        pdf.addImage(canvas2.toDataURL('image/jpeg', 0.95), 'JPEG', 0, 0, canvas2.width, canvas2.height);
+        pdf.save('Certificate_' + student.name.replace(/\s+/g, '_') + '_' + student.certNo + '.pdf');
+        showToast('Certificate PDF downloaded for ' + student.name);
+      };
+      img2.src = tpl.bgPage2;
+    } else {
+      // Just page 1
+      pdf.save('Certificate_' + student.name.replace(/\s+/g, '_') + '_' + student.certNo + '.pdf');
+      showToast('Certificate PDF downloaded for ' + student.name);
+    }
+  };
+  img1.src = tpl.bgPage1;
 }
 
-// ---- PAGE 1: Formal Certificate of Completion ----
-function generateCertPage1(student, courseFullName, sigLeft, sigRight) {
+// ---- PAGE 1: Overlay student data on background template ----
+function renderCertPage1OnBg(bgImg, student, tpl) {
   var canvas = document.createElement('canvas');
-  var w = 1400;
-  var h = 990;
-  canvas.width = w;
-  canvas.height = h;
+  canvas.width = bgImg.naturalWidth;
+  canvas.height = bgImg.naturalHeight;
   var ctx = canvas.getContext('2d');
+  var w = canvas.width;
+  var h = canvas.height;
 
-  // Cream/beige background
-  ctx.fillStyle = '#FBF5E6';
-  ctx.fillRect(0, 0, w, h);
+  // Draw background image
+  ctx.drawImage(bgImg, 0, 0, w, h);
 
-  // Dark navy outer border
-  ctx.strokeStyle = '#1B2A4A';
-  ctx.lineWidth = 8;
-  ctx.strokeRect(10, 10, w - 20, h - 20);
+  // Get position settings (percentages)
+  var pos = tpl.textPositions || {};
+  var nameY = (pos.p1NameY || 48) / 100 * h;
+  var bodyY = (pos.p1BodyY || 62) / 100 * h;
+  var certNoY = (pos.p1CertNoY || 95) / 100 * h;
+  var nameSize = pos.p1NameSize || 48;
 
-  // Gold inner border
-  ctx.strokeStyle = '#C5960C';
-  ctx.lineWidth = 3;
-  ctx.strokeRect(22, 22, w - 44, h - 44);
-
-  // Gold ornamental corner swirls
-  drawGoldSwirl(ctx, 30, 30, 1, 1);
-  drawGoldSwirl(ctx, w - 30, 30, -1, 1);
-  drawGoldSwirl(ctx, 30, h - 30, 1, -1);
-  drawGoldSwirl(ctx, w - 30, h - 30, -1, -1);
-
-  // Watermark - faded crest in center background
-  drawWatermarkCrest(ctx, w / 2, 380, 0.08);
-
-  // "CERTIFICATE" title - large navy serif
-  ctx.textAlign = 'center';
-  ctx.fillStyle = '#1B2A4A';
-  ctx.font = 'bold 72px Georgia, "Times New Roman", serif';
-  ctx.fillText('CERTIFICATE', w / 2, 140);
-
-  // "OF COMPLETION"
-  ctx.font = '600 32px Georgia, "Times New Roman", serif';
-  ctx.fillStyle = '#1B2A4A';
-  ctx.fillText('OF COMPLETION', w / 2, 185);
-
-  // "This certificate certifies that"
-  ctx.font = 'italic 22px Georgia, serif';
-  ctx.fillStyle = '#333';
-  ctx.fillText('This certificate certifies that', w / 2, 280);
-
-  // Student name - large, with underline
-  ctx.font = 'bold 48px Georgia, "Times New Roman", serif';
-  ctx.fillStyle = '#1B2A4A';
-  ctx.fillText(student.name, w / 2, 400);
-
-  // Underline below name
-  var nameW = ctx.measureText(student.name).width;
-  ctx.beginPath();
-  ctx.moveTo((w - nameW) / 2 - 40, 420);
-  ctx.lineTo((w + nameW) / 2 + 40, 420);
-  ctx.strokeStyle = '#333';
-  ctx.lineWidth = 1.5;
-  ctx.stroke();
-
-  // Body text - italic
-  var tpl = certTemplates[student.course] || {};
+  var courseFullName = tpl.courseFullName || student.course;
   var gender = tpl.gender || 'their';
   var pronoun = gender === 'his' ? 'his' : gender === 'her' ? 'her' : 'their';
 
-  var bodyLine1 = 'has successfully completed ' + pronoun + ' vocational training in the short course';
-  var bodyLine2 = courseFullName;
-  var bodyLine3 = 'on this day, the ' + student.certDate + ', at the Community Educational and Skills';
-  var bodyLine4 = 'Training Institute and Services Ltd.';
+  ctx.textAlign = 'center';
 
-  ctx.font = 'italic 18px Georgia, serif';
-  ctx.fillStyle = '#333';
-  ctx.fillText(bodyLine1, w / 2, 485);
-
-  ctx.font = 'bold italic 20px Georgia, serif';
+  // Student name
+  ctx.font = 'bold ' + nameSize + 'px Georgia, "Times New Roman", serif';
   ctx.fillStyle = '#1B2A4A';
-  ctx.fillText(bodyLine2, w / 2, 515);
+  ctx.fillText(student.name, w / 2, nameY);
 
-  ctx.font = 'italic 18px Georgia, serif';
-  ctx.fillStyle = '#333';
-  ctx.fillText(bodyLine3, w / 2, 545);
+  // Body text — "has successfully completed..." paragraph
+  var bodyFontSize = Math.round(nameSize * 0.38);
+  ctx.font = 'italic ' + bodyFontSize + 'px Georgia, serif';
+  ctx.fillStyle = '#222';
 
-  ctx.font = 'bold italic 18px Georgia, serif';
-  ctx.fillText(bodyLine4, w / 2, 575);
+  var line1 = 'has successfully completed ' + pronoun + ' vocational training in the short course';
+  ctx.fillText(line1, w / 2, bodyY);
 
-  // Center seal/crest
-  drawCertSeal(ctx, w / 2, 720, 60);
+  // Course name (bold)
+  ctx.font = 'bold italic ' + Math.round(bodyFontSize * 1.15) + 'px Georgia, serif';
+  ctx.fillText(courseFullName, w / 2, bodyY + bodyFontSize * 1.5);
 
-  // Left signature
-  drawSignatureScribble(ctx, 280, 710);
-  ctx.beginPath();
-  ctx.moveTo(180, 730);
-  ctx.lineTo(380, 730);
-  ctx.strokeStyle = '#666';
-  ctx.lineWidth = 1;
-  ctx.stroke();
-  ctx.font = '16px Georgia, serif';
-  ctx.fillStyle = '#333';
-  ctx.textAlign = 'center';
-  ctx.fillText(sigLeft, 280, 755);
+  // Date and institution
+  ctx.font = 'italic ' + bodyFontSize + 'px Georgia, serif';
+  ctx.fillText('on this day, the ' + student.certDate + ', at the Community Educational and Skills', w / 2, bodyY + bodyFontSize * 3);
 
-  // Right signature
-  drawSignatureScribble(ctx, w - 280, 710);
-  ctx.beginPath();
-  ctx.moveTo(w - 380, 730);
-  ctx.lineTo(w - 180, 730);
-  ctx.strokeStyle = '#666';
-  ctx.lineWidth = 1;
-  ctx.stroke();
-  ctx.font = '16px Georgia, serif';
-  ctx.fillStyle = '#333';
-  ctx.textAlign = 'center';
-  ctx.fillText(sigRight, w - 280, 755);
+  ctx.font = 'bold italic ' + bodyFontSize + 'px Georgia, serif';
+  ctx.fillText('Training Institute and Services Ltd.', w / 2, bodyY + bodyFontSize * 4.3);
 
   // Certificate number at bottom
-  ctx.font = 'bold 16px Georgia, serif';
+  ctx.font = 'bold ' + Math.round(bodyFontSize * 0.9) + 'px Georgia, serif';
   ctx.fillStyle = '#1B2A4A';
-  ctx.textAlign = 'center';
-  ctx.fillText('Certificate No. ' + student.certNo, w / 2, h - 50);
+  ctx.fillText('Certificate No. ' + student.certNo, w / 2, certNoY);
 
-  // Return canvas for PDF composition
   return canvas;
 }
 
-// ---- PAGE 2: Programme Details ----
-function generateCertPage2(student, tpl) {
+// ---- PAGE 2: Overlay programme details on background template ----
+function renderCertPage2OnBg(bgImg, student, tpl) {
   var canvas = document.createElement('canvas');
-  var w = 1400;
-  var baseH = 990;
-  canvas.width = w;
-  // We'll calculate height dynamically, start with a temporary large canvas
-  canvas.height = 2000;
+  canvas.width = bgImg.naturalWidth;
+  canvas.height = bgImg.naturalHeight;
   var ctx = canvas.getContext('2d');
+  var w = canvas.width;
+  var h = canvas.height;
+
+  // Draw background image
+  ctx.drawImage(bgImg, 0, 0, w, h);
 
   var courseFullName = (tpl.courseFullName || student.course).toUpperCase();
   var progCode = tpl.programmeCode || '';
@@ -19387,189 +19359,105 @@ function generateCertPage2(student, tpl) {
   var contactEmail = tpl.contactEmail || 'cestisadmn@gmail.com';
   var contactPhone = tpl.contactPhone || '+(876) 679-0111';
 
-  // White background
-  ctx.fillStyle = '#FFFFFF';
-  ctx.fillRect(0, 0, w, 2000);
+  // Page 2 text positions (percentages)
+  var pos = tpl.textPositions || {};
+  var titleY = (pos.p2TitleY || 5) / 100 * h;
+  var headerY = (pos.p2HeaderY || 18) / 100 * h;
+  var contentY = (pos.p2ContentY || 25) / 100 * h;
+  var specsY = (pos.p2SpecsY || 78) / 100 * h;
+  var footerY = (pos.p2FooterY || 90) / 100 * h;
 
-  // Left teal accent border
-  ctx.fillStyle = '#2A7B88';
-  ctx.fillRect(0, 0, 8, 2000);
-
-  var yPos = 40;
-
-  // Course title
   ctx.textAlign = 'center';
-  ctx.font = 'bold 28px Georgia, "Times New Roman", serif';
+
+  // Course title at top
+  ctx.font = 'bold 26px Georgia, serif';
   ctx.fillStyle = '#1B2A4A';
-  ctx.fillText(courseFullName, w / 2, yPos);
-  yPos += 30;
+  ctx.fillText(courseFullName, w / 2, titleY);
 
-  // Small crest
-  drawCertSeal(ctx, w / 2, yPos + 30, 35);
-  yPos += 80;
-
-  // Institution name
-  ctx.font = 'bold 18px Georgia, serif';
+  // Institution name and programme code
+  ctx.font = 'bold 16px Georgia, serif';
   ctx.fillStyle = '#333';
-  ctx.fillText('Community Educational and Skills Training Institute and Services Limited', w / 2, yPos);
-  yPos += 25;
+  ctx.fillText('Community Educational and Skills Training Institute and Services Limited', w / 2, headerY);
+  ctx.font = 'bold 13px Georgia, serif';
+  ctx.fillText('Programme Code: ' + progCode + ' | Version ' + version + ' | Developed: ' + devDate, w / 2, headerY + 22);
 
-  // Programme code line
-  ctx.font = 'bold 14px Georgia, serif';
-  ctx.fillStyle = '#333';
-  var codeLine = 'Programme Code: ' + progCode + ' | Version ' + version + ' | Developed: ' + devDate;
-  ctx.fillText(codeLine, w / 2, yPos);
-  yPos += 35;
+  // Two-column content: modules (left) and competencies (right)
+  var colLeft = w * 0.04;
+  var colMid = w * 0.52;
+  var colWidth = w * 0.44;
+  var yMod = contentY;
+  var yComp = contentY;
 
-  // Two-column content area
-  var colLeft = 50;
-  var colMid = w / 2 + 10;
-  var colRight = w - 50;
-  var colWidth = (w - 120) / 2;
-  var contentStartY = yPos;
-
-  // Draw column box borders
-  ctx.strokeStyle = '#CCC';
-  ctx.lineWidth = 1;
-
-  // Calculate module content height
-  var moduleY = contentStartY + 10;
   ctx.textAlign = 'left';
 
-  // MODULES COMPLETED header
-  ctx.font = 'bold 14px Arial, sans-serif';
+  // MODULES COMPLETED
+  ctx.font = 'bold 13px Arial, sans-serif';
   ctx.fillStyle = '#1B2A4A';
-  ctx.fillText('MODULES COMPLETED', colLeft + 15, moduleY + 20);
-  moduleY += 38;
+  ctx.fillText('MODULES COMPLETED', colLeft + 10, yMod);
+  yMod += 22;
 
-  // Render modules
   modules.forEach(function(mod) {
-    ctx.font = 'bold 12px Arial, sans-serif';
+    ctx.font = 'bold 11px Arial, sans-serif';
     ctx.fillStyle = '#2A7B88';
-    ctx.fillText('\u2611 ' + mod.name + ' ' + (mod.contactHours || '') + ' Contact Hours', colLeft + 15, moduleY);
-    moduleY += 18;
+    ctx.fillText('\u2611 ' + mod.name + ' ' + (mod.contactHours || '') + ' Contact Hours', colLeft + 10, yMod);
+    yMod += 16;
     (mod.topics || []).forEach(function(topic) {
-      ctx.font = '11px Arial, sans-serif';
+      ctx.font = '10px Arial, sans-serif';
       ctx.fillStyle = '#333';
-      ctx.fillText('  \u2022  ' + topic, colLeft + 25, moduleY);
-      moduleY += 16;
+      ctx.fillText('  \u2022  ' + topic, colLeft + 20, yMod);
+      yMod += 14;
     });
-    moduleY += 6;
+    yMod += 4;
   });
 
-  // COMPETENCIES column
-  var compY = contentStartY + 10;
-  ctx.font = 'bold 14px Arial, sans-serif';
+  // COMPETENCIES
+  ctx.font = 'bold 13px Arial, sans-serif';
   ctx.fillStyle = '#1B2A4A';
-  ctx.fillText('TECHNICAL COMPETENCIES ACHIEVED', colMid + 15, compY + 20);
-  compY += 38;
+  ctx.fillText('TECHNICAL COMPETENCIES ACHIEVED', colMid + 10, yComp);
+  yComp += 22;
 
   competencies.forEach(function(cat) {
-    ctx.font = 'bold 12px Arial, sans-serif';
+    ctx.font = 'bold 11px Arial, sans-serif';
     ctx.fillStyle = '#1B2A4A';
-    ctx.fillText(cat.category + ':', colMid + 15, compY);
-    compY += 18;
+    ctx.fillText(cat.category + ':', colMid + 10, yComp);
+    yComp += 16;
     (cat.items || []).forEach(function(item) {
-      ctx.font = '11px Arial, sans-serif';
+      ctx.font = '10px Arial, sans-serif';
       ctx.fillStyle = '#333';
-      // Wrap long text
-      var lines = wrapText(ctx, item, colWidth - 40);
+      var lines = wrapText(ctx, item, colWidth - 30);
       lines.forEach(function(line) {
-        ctx.fillText('  \u2022  ' + line, colMid + 25, compY);
-        compY += 15;
+        ctx.fillText('  \u2022  ' + line, colMid + 20, yComp);
+        yComp += 13;
       });
     });
-    compY += 8;
+    yComp += 6;
   });
-
-  var boxBottom = Math.max(moduleY, compY) + 10;
-
-  // Draw the column boxes
-  ctx.strokeStyle = '#CCC';
-  ctx.lineWidth = 1;
-  ctx.strokeRect(colLeft, contentStartY, colWidth, boxBottom - contentStartY);
-  ctx.strokeRect(colMid - 10, contentStartY, colWidth + 20, boxBottom - contentStartY);
-
-  yPos = boxBottom + 20;
 
   // PROGRAMME SPECIFICATIONS
   ctx.textAlign = 'center';
-  ctx.font = 'bold 14px Arial, sans-serif';
+  ctx.font = 'bold 13px Arial, sans-serif';
   ctx.fillStyle = '#1B2A4A';
-  ctx.fillText('PROGRAMME SPECIFICATIONS', w / 2, yPos);
-  yPos += 20;
+  ctx.fillText('PROGRAMME SPECIFICATIONS', w / 2, specsY);
 
-  ctx.font = '12px Arial, sans-serif';
+  ctx.font = '11px Arial, sans-serif';
   ctx.fillStyle = '#333';
-  var specLine1 = 'Duration: ' + (specs.duration || 'N/A') + ' | Industry: ' + (specs.industry || 'N/A');
-  ctx.fillText(specLine1, w / 2, yPos);
-  yPos += 17;
-  var specLine2 = '| Sub-Sector: ' + (specs.subSector || 'N/A') + ' | Entry Requirements: ' + (specs.entryRequirements || 'N/A');
-  ctx.fillText(specLine2, w / 2, yPos);
-  yPos += 17;
-  var specLine3 = '| ' + (specs.assessment || 'Industry Psychometric Assessment: Pass');
-  ctx.fillText(specLine3, w / 2, yPos);
-  yPos += 17;
-  var specLine4 = 'Alignment: ' + (specs.alignment || 'N/A');
-  ctx.fillText(specLine4, w / 2, yPos);
-  yPos += 30;
+  ctx.fillText('Duration: ' + (specs.duration || 'N/A') + ' | Industry: ' + (specs.industry || 'N/A'), w / 2, specsY + 16);
+  ctx.fillText('| Sub-Sector: ' + (specs.subSector || 'N/A') + ' | Entry Requirements: ' + (specs.entryRequirements || 'N/A'), w / 2, specsY + 30);
+  ctx.fillText('| ' + (specs.assessment || 'Industry Psychometric Assessment: Pass'), w / 2, specsY + 44);
+  ctx.fillText('Alignment: ' + (specs.alignment || 'N/A'), w / 2, specsY + 58);
 
-  // Validation text
-  ctx.font = 'italic 11px Arial, sans-serif';
-  ctx.fillStyle = '#555';
-  var valLine1 = 'This certificate confirms that the holder has successfully completed all requirements of the ' + (tpl.courseFullName || student.course).toUpperCase();
-  var valLine2 = ' Short Course. For transcript requests or verification, contact: ' + contactEmail + ' | ' + contactPhone;
-  ctx.fillText(valLine1, w / 2, yPos);
-  yPos += 16;
-  ctx.fillText(valLine2, w / 2, yPos);
-  yPos += 25;
-
-  // QR Code area (bottom left) - placeholder box
-  ctx.textAlign = 'left';
-  ctx.font = 'bold 9px Arial, sans-serif';
-  ctx.fillStyle = '#333';
-  ctx.fillText('PLEASE VALIDATE', 50, yPos - 45);
-  ctx.fillText('CERTIFICATE HERE:', 50, yPos - 34);
-  ctx.strokeStyle = '#333';
-  ctx.lineWidth = 1;
-  ctx.strokeRect(50, yPos - 30, 60, 60);
-  // QR pattern placeholder
-  ctx.fillStyle = '#333';
-  for(var qx = 0; qx < 6; qx++) {
-    for(var qy = 0; qy < 6; qy++) {
-      if((qx + qy) % 2 === 0) ctx.fillRect(53 + qx * 9, yPos - 27 + qy * 9, 7, 7);
-    }
-  }
+  // Footer validation text
+  ctx.font = 'italic 10px Arial, sans-serif';
+  ctx.fillStyle = '#444';
+  ctx.fillText('This certificate confirms that the holder has successfully completed all requirements of the ' + courseFullName, w / 2, footerY);
+  ctx.fillText('Short Course. For transcript requests or verification, contact: ' + contactEmail + ' | ' + contactPhone, w / 2, footerY + 14);
 
   // Certificate No at bottom
-  ctx.textAlign = 'center';
-  ctx.font = 'bold 20px Georgia, serif';
+  ctx.font = 'bold 18px Georgia, serif';
   ctx.fillStyle = '#1B2A4A';
-  yPos += 50;
-  ctx.fillText('Certificate No. ' + student.certNo, w / 2, yPos);
-  yPos += 20;
+  ctx.fillText('Certificate No. ' + student.certNo, w / 2, footerY + 42);
 
-  // Final height
-  var finalH = Math.max(yPos + 20, baseH);
-
-  // Create properly sized canvas
-  var finalCanvas = document.createElement('canvas');
-  finalCanvas.width = w;
-  finalCanvas.height = finalH;
-  var fctx = finalCanvas.getContext('2d');
-  fctx.fillStyle = '#FFFFFF';
-  fctx.fillRect(0, 0, w, finalH);
-  fctx.drawImage(canvas, 0, 0);
-
-  // Bottom teal border
-  fctx.fillStyle = '#2A7B88';
-  fctx.fillRect(0, finalH - 4, w, 4);
-  // Left teal border on final
-  fctx.fillStyle = '#2A7B88';
-  fctx.fillRect(0, 0, 8, finalH);
-
-  // Return final canvas for PDF composition
-  return finalCanvas;
+  return canvas;
 }
 
 function wrapText(ctx, text, maxWidth) {
@@ -19589,208 +19477,19 @@ function wrapText(ctx, text, maxWidth) {
   return lines.length ? lines : [text];
 }
 
-// ---- Drawing helpers for certificate design ----
-
-function drawGoldSwirl(ctx, x, y, dx, dy) {
-  ctx.save();
-  ctx.translate(x, y);
-  ctx.scale(dx, dy);
-
-  // Ornamental gold swirl curves
-  var gradient = ctx.createLinearGradient(0, 0, 80, 80);
-  gradient.addColorStop(0, '#DAA520');
-  gradient.addColorStop(0.5, '#C5960C');
-  gradient.addColorStop(1, '#8B6914');
-
-  ctx.strokeStyle = gradient;
-  ctx.lineWidth = 3;
-  ctx.lineCap = 'round';
-
-  // Main spiral
-  ctx.beginPath();
-  ctx.moveTo(5, 5);
-  ctx.bezierCurveTo(5, 40, 40, 60, 70, 55);
-  ctx.stroke();
-
-  ctx.beginPath();
-  ctx.moveTo(5, 5);
-  ctx.bezierCurveTo(40, 5, 60, 40, 55, 70);
-  ctx.stroke();
-
-  // Inner curl top
-  ctx.lineWidth = 2.5;
-  ctx.beginPath();
-  ctx.moveTo(70, 55);
-  ctx.bezierCurveTo(80, 50, 85, 35, 65, 30);
-  ctx.bezierCurveTo(50, 26, 45, 38, 55, 42);
-  ctx.stroke();
-
-  // Inner curl left
-  ctx.beginPath();
-  ctx.moveTo(55, 70);
-  ctx.bezierCurveTo(50, 80, 35, 85, 30, 65);
-  ctx.bezierCurveTo(26, 50, 38, 45, 42, 55);
-  ctx.stroke();
-
-  // Small decorative elements
-  ctx.lineWidth = 2;
-  ctx.beginPath();
-  ctx.moveTo(20, 15);
-  ctx.bezierCurveTo(25, 8, 35, 10, 38, 18);
-  ctx.stroke();
-
-  ctx.beginPath();
-  ctx.moveTo(15, 20);
-  ctx.bezierCurveTo(8, 25, 10, 35, 18, 38);
-  ctx.stroke();
-
-  // Small gold dot at center of swirl
-  ctx.beginPath();
-  ctx.arc(40, 40, 3, 0, Math.PI * 2);
-  ctx.fillStyle = '#DAA520';
-  ctx.fill();
-
-  ctx.restore();
+// ---- Image upload preview helper ----
+function previewCertBgUpload(input, previewId) {
+  var preview = document.getElementById(previewId);
+  if(!input.files || !input.files[0]) return;
+  var reader = new FileReader();
+  reader.onload = function(e) {
+    preview.innerHTML = '<img src="' + e.target.result + '" style="max-width:100%;max-height:200px;border-radius:4px;">';
+    // Store in a temp attribute for later save
+    preview.setAttribute('data-base64', e.target.result);
+  };
+  reader.readAsDataURL(input.files[0]);
 }
 
-function drawWatermarkCrest(ctx, cx, cy, alpha) {
-  ctx.save();
-  ctx.globalAlpha = alpha;
-
-  // Shield shape
-  ctx.beginPath();
-  ctx.moveTo(cx - 100, cy - 120);
-  ctx.lineTo(cx + 100, cy - 120);
-  ctx.lineTo(cx + 100, cy + 40);
-  ctx.quadraticCurveTo(cx, cy + 130, cx - 100, cy + 40);
-  ctx.closePath();
-  ctx.strokeStyle = '#8B8B6E';
-  ctx.lineWidth = 4;
-  ctx.stroke();
-
-  // Laurel wreath - left
-  for(var i = 0; i < 8; i++) {
-    var angle = -Math.PI * 0.7 + (i * Math.PI * 0.18);
-    var lx = cx - 130 + Math.cos(angle) * 20;
-    var ly = cy - 50 + i * 30;
-    ctx.beginPath();
-    ctx.ellipse(lx, ly, 15, 6, angle + 0.3, 0, Math.PI * 2);
-    ctx.strokeStyle = '#8B8B6E';
-    ctx.lineWidth = 1.5;
-    ctx.stroke();
-  }
-  // Right
-  for(var i = 0; i < 8; i++) {
-    var angle = -Math.PI * 0.3 + (i * Math.PI * 0.18);
-    var lx = cx + 130 - Math.cos(angle) * 20;
-    var ly = cy - 50 + i * 30;
-    ctx.beginPath();
-    ctx.ellipse(lx, ly, 15, 6, -angle - 0.3, 0, Math.PI * 2);
-    ctx.strokeStyle = '#8B8B6E';
-    ctx.lineWidth = 1.5;
-    ctx.stroke();
-  }
-
-  // Cross lines inside shield
-  ctx.beginPath();
-  ctx.moveTo(cx, cy - 120);
-  ctx.lineTo(cx, cy + 80);
-  ctx.moveTo(cx - 100, cy - 30);
-  ctx.lineTo(cx + 100, cy - 30);
-  ctx.strokeStyle = '#8B8B6E';
-  ctx.lineWidth = 2;
-  ctx.stroke();
-
-  ctx.restore();
-}
-
-function drawCertSeal(ctx, cx, cy, r) {
-  ctx.save();
-  // Outer golden circle with laurel
-  var gradient = ctx.createRadialGradient(cx, cy, r * 0.3, cx, cy, r);
-  gradient.addColorStop(0, '#DAA520');
-  gradient.addColorStop(0.7, '#C5960C');
-  gradient.addColorStop(1, '#8B6914');
-
-  // Laurel wreath ring
-  for(var i = 0; i < 16; i++) {
-    var angle = (i / 16) * Math.PI * 2;
-    var lx = cx + Math.cos(angle) * (r + 8);
-    var ly = cy + Math.sin(angle) * (r + 8);
-    ctx.beginPath();
-    ctx.ellipse(lx, ly, 10, 5, angle + Math.PI / 2, 0, Math.PI * 2);
-    ctx.fillStyle = '#C5960C';
-    ctx.fill();
-    ctx.strokeStyle = '#8B6914';
-    ctx.lineWidth = 0.5;
-    ctx.stroke();
-  }
-
-  // Main circle
-  ctx.beginPath();
-  ctx.arc(cx, cy, r, 0, Math.PI * 2);
-  ctx.fillStyle = gradient;
-  ctx.fill();
-
-  // Inner shield
-  ctx.beginPath();
-  ctx.moveTo(cx - r * 0.45, cy - r * 0.5);
-  ctx.lineTo(cx + r * 0.45, cy - r * 0.5);
-  ctx.lineTo(cx + r * 0.45, cy + r * 0.1);
-  ctx.quadraticCurveTo(cx, cy + r * 0.6, cx - r * 0.45, cy + r * 0.1);
-  ctx.closePath();
-  ctx.fillStyle = '#1B4B82';
-  ctx.fill();
-  ctx.strokeStyle = '#DAA520';
-  ctx.lineWidth = 1.5;
-  ctx.stroke();
-
-  // Cross inside shield
-  ctx.strokeStyle = '#FFF';
-  ctx.lineWidth = 1;
-  ctx.beginPath();
-  ctx.moveTo(cx, cy - r * 0.5);
-  ctx.lineTo(cx, cy + r * 0.35);
-  ctx.moveTo(cx - r * 0.45, cy - r * 0.15);
-  ctx.lineTo(cx + r * 0.45, cy - r * 0.15);
-  ctx.stroke();
-
-  // Banner below
-  ctx.beginPath();
-  ctx.moveTo(cx - r * 0.8, cy + r * 0.55);
-  ctx.lineTo(cx + r * 0.8, cy + r * 0.55);
-  ctx.lineTo(cx + r * 0.7, cy + r * 0.75);
-  ctx.lineTo(cx - r * 0.7, cy + r * 0.75);
-  ctx.closePath();
-  ctx.fillStyle = '#DAA520';
-  ctx.fill();
-
-  // Banner text
-  ctx.textAlign = 'center';
-  ctx.font = 'bold ' + Math.round(r * 0.18) + 'px Arial, sans-serif';
-  ctx.fillStyle = '#1B2A4A';
-  ctx.fillText('EMPOWERING COMMUNITIES', cx, cy + r * 0.7);
-
-  ctx.restore();
-}
-
-function drawSignatureScribble(ctx, cx, baseY) {
-  ctx.save();
-  ctx.strokeStyle = '#444';
-  ctx.lineWidth = 1.5;
-  ctx.lineCap = 'round';
-  ctx.beginPath();
-  ctx.moveTo(cx - 40, baseY);
-  ctx.bezierCurveTo(cx - 30, baseY - 15, cx - 10, baseY - 20, cx, baseY - 5);
-  ctx.bezierCurveTo(cx + 10, baseY + 10, cx + 20, baseY - 15, cx + 40, baseY - 10);
-  ctx.stroke();
-  // Small flourish
-  ctx.beginPath();
-  ctx.moveTo(cx + 40, baseY - 10);
-  ctx.bezierCurveTo(cx + 50, baseY - 18, cx + 55, baseY - 5, cx + 45, baseY);
-  ctx.stroke();
-  ctx.restore();
-}
 
 // ============================== CERTIFICATE TEMPLATE MANAGEMENT ==============================
 
@@ -19828,6 +19527,8 @@ function loadCertTemplateForEdit() {
   html += '<div><strong style="color:var(--accent);">Programme Code:</strong> ' + (tpl.programmeCode || 'N/A') + '</div>';
   html += '<div><strong style="color:var(--accent);">Version:</strong> ' + (tpl.version || 'N/A') + '</div>';
   html += '<div><strong style="color:var(--accent);">Developed:</strong> ' + (tpl.developedDate || 'N/A') + '</div>';
+  html += '<div><strong style="color:var(--accent);">Page 1 Background:</strong> ' + (tpl.bgPage1 ? '<span style="color:var(--green);">Uploaded</span>' : '<span style="color:var(--red);">Not uploaded</span>') + '</div>';
+  html += '<div><strong style="color:var(--accent);">Page 2 Background:</strong> ' + (tpl.bgPage2 ? '<span style="color:var(--green);">Uploaded</span>' : '<span style="color:var(--red);">Not uploaded</span>') + '</div>';
   html += '</div>';
 
   if(tpl.modules && tpl.modules.length) {
@@ -19870,6 +19571,33 @@ function openCertTemplateEditor() {
   document.getElementById('ctplSpecEntry').value = specs.entryRequirements || '';
   document.getElementById('ctplSpecAssessment').value = specs.assessment || '';
   document.getElementById('ctplSpecAlignment').value = specs.alignment || '';
+
+  // Load background image previews
+  var p1Preview = document.getElementById('ctplBgPage1Preview');
+  var p2Preview = document.getElementById('ctplBgPage2Preview');
+  document.getElementById('ctplBgPage1').value = '';
+  document.getElementById('ctplBgPage2').value = '';
+  if(tpl.bgPage1) {
+    p1Preview.innerHTML = '<img src="' + tpl.bgPage1 + '" style="max-width:100%;max-height:200px;border-radius:4px;">';
+    p1Preview.setAttribute('data-base64', tpl.bgPage1);
+  } else {
+    p1Preview.innerHTML = '<span style="font-size:12px;color:var(--text-muted);">No image uploaded</span>';
+    p1Preview.removeAttribute('data-base64');
+  }
+  if(tpl.bgPage2) {
+    p2Preview.innerHTML = '<img src="' + tpl.bgPage2 + '" style="max-width:100%;max-height:200px;border-radius:4px;">';
+    p2Preview.setAttribute('data-base64', tpl.bgPage2);
+  } else {
+    p2Preview.innerHTML = '<span style="font-size:12px;color:var(--text-muted);">No image uploaded</span>';
+    p2Preview.removeAttribute('data-base64');
+  }
+
+  // Load text position settings
+  var pos = tpl.textPositions || {};
+  document.getElementById('ctplP1NameY').value = pos.p1NameY || 48;
+  document.getElementById('ctplP1BodyY').value = pos.p1BodyY || 62;
+  document.getElementById('ctplP1CertNoY').value = pos.p1CertNoY || 95;
+  document.getElementById('ctplP1NameSize').value = pos.p1NameSize || 48;
 
   // Rebuild modules
   var mc = document.getElementById('ctplModulesContainer');
@@ -19939,6 +19667,11 @@ function saveCertTemplate() {
     if(cat) competencies.push({ category: cat, items: items });
   });
 
+  // Get background images (from preview data-base64 or keep existing)
+  var existing = certTemplates[_certTplEditingCourse] || {};
+  var bgPage1 = document.getElementById('ctplBgPage1Preview').getAttribute('data-base64') || existing.bgPage1 || '';
+  var bgPage2 = document.getElementById('ctplBgPage2Preview').getAttribute('data-base64') || existing.bgPage2 || '';
+
   certTemplates[_certTplEditingCourse] = {
     courseFullName: document.getElementById('ctplCourseFullName').value.trim(),
     programmeCode: document.getElementById('ctplProgrammeCode').value.trim(),
@@ -19948,6 +19681,14 @@ function saveCertTemplate() {
     signatureRight: document.getElementById('ctplSignatureRight').value.trim(),
     contactEmail: document.getElementById('ctplContactEmail').value.trim(),
     contactPhone: document.getElementById('ctplContactPhone').value.trim(),
+    bgPage1: bgPage1,
+    bgPage2: bgPage2,
+    textPositions: {
+      p1NameY: parseInt(document.getElementById('ctplP1NameY').value) || 48,
+      p1BodyY: parseInt(document.getElementById('ctplP1BodyY').value) || 62,
+      p1CertNoY: parseInt(document.getElementById('ctplP1CertNoY').value) || 95,
+      p1NameSize: parseInt(document.getElementById('ctplP1NameSize').value) || 48
+    },
     programmeSpecs: {
       duration: document.getElementById('ctplSpecDuration').value.trim(),
       industry: document.getElementById('ctplSpecIndustry').value.trim(),
