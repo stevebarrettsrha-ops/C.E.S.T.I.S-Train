@@ -3916,6 +3916,46 @@ function lmsChatLoadImagesFromDB() {
   }).catch(function() { return []; });
 }
 
+// ---- IndexedDB for certificate template background images ----
+var _certImageDB = null;
+function certImageOpenDB() {
+  return new Promise(function(resolve, reject) {
+    if(_certImageDB) { resolve(_certImageDB); return; }
+    var req = indexedDB.open('CESTIS_CertImages', 1);
+    req.onupgradeneeded = function(e) { e.target.result.createObjectStore('images', {keyPath:'id'}); };
+    req.onsuccess = function(e) { _certImageDB = e.target.result; resolve(_certImageDB); };
+    req.onerror = function() { reject(req.error); };
+  });
+}
+function certImageSave(course, page, base64Data) {
+  var key = course + '___' + page;
+  certImageOpenDB().then(function(db) {
+    var tx = db.transaction('images', 'readwrite');
+    tx.objectStore('images').put({id: key, data: base64Data});
+  }).catch(function(e) { console.warn('CertImage DB save error:', e); });
+}
+function certImageLoadAll() {
+  return certImageOpenDB().then(function(db) {
+    return new Promise(function(resolve) {
+      var tx = db.transaction('images', 'readonly');
+      var req = tx.objectStore('images').getAll();
+      req.onsuccess = function() { resolve(req.result || []); };
+      req.onerror = function() { resolve([]); };
+    });
+  }).catch(function() { return []; });
+}
+function initCertTemplateImages() {
+  certImageLoadAll().then(function(images) {
+    images.forEach(function(img) {
+      var parts = img.id.split('___');
+      var course = parts[0]; var page = parts[1];
+      if(certTemplates[course]) {
+        certTemplates[course][page] = img.data;
+      }
+    });
+  });
+}
+
 function initLmsChatData() {
   try {
     var cr = localStorage.getItem('voctrain_chatRooms');
@@ -4038,7 +4078,14 @@ function saveState() {
     localStorage.setItem('voctrain_adminStaffAccess', JSON.stringify(adminStaffAccessSettings));
     localStorage.setItem('voctrain_instructorData', JSON.stringify(instructorData));
     localStorage.setItem('voctrain_certDownloadApprovals', JSON.stringify(certDownloadApprovals));
-    localStorage.setItem('voctrain_certTemplates', JSON.stringify(certTemplates));
+    // Strip large base64 images before saving to localStorage (images are in IndexedDB)
+    var certTplsClean = {};
+    Object.keys(certTemplates).forEach(function(k) {
+      certTplsClean[k] = Object.assign({}, certTemplates[k]);
+      delete certTplsClean[k].bgPage1;
+      delete certTplsClean[k].bgPage2;
+    });
+    localStorage.setItem('voctrain_certTemplates', JSON.stringify(certTplsClean));
     saveLmsChatData();
   } catch(e) { console.warn('saveState: storage quota exceeded or unavailable'); }
   // Push changes to Google Drive immediately (debounced)
@@ -4088,6 +4135,8 @@ function loadState() {
     var ct = localStorage.getItem('voctrain_certTemplates');
     if(ct) certTemplates = JSON.parse(ct);
   } catch(e) { /* parse error, use defaults */ }
+  // Load cert template background images from IndexedDB
+  initCertTemplateImages();
   updateSkillAreaCounts();
 }
 
@@ -19881,6 +19930,10 @@ function saveCertTemplate() {
   var bgPage1 = document.getElementById('ctplBgPage1Preview').getAttribute('data-base64') || existing.bgPage1 || '';
   var bgPage2 = document.getElementById('ctplBgPage2Preview').getAttribute('data-base64') || existing.bgPage2 || '';
 
+  // Save images to IndexedDB (too large for localStorage)
+  if(bgPage1) certImageSave(_certTplEditingCourse, 'bgPage1', bgPage1);
+  if(bgPage2) certImageSave(_certTplEditingCourse, 'bgPage2', bgPage2);
+
   certTemplates[_certTplEditingCourse] = {
     courseFullName: document.getElementById('ctplCourseFullName').value.trim(),
     programmeCode: document.getElementById('ctplProgrammeCode').value.trim(),
@@ -19909,6 +19962,18 @@ function saveCertTemplate() {
     modules: modules,
     competencies: competencies
   };
+
+  // Save to localStorage WITHOUT the large base64 images (they're in IndexedDB)
+  var tplForStorage = JSON.parse(JSON.stringify(certTemplates[_certTplEditingCourse]));
+  delete tplForStorage.bgPage1;
+  delete tplForStorage.bgPage2;
+  var allTplsForStorage = {};
+  Object.keys(certTemplates).forEach(function(key) {
+    allTplsForStorage[key] = JSON.parse(JSON.stringify(certTemplates[key]));
+    delete allTplsForStorage[key].bgPage1;
+    delete allTplsForStorage[key].bgPage2;
+  });
+  try { localStorage.setItem('voctrain_certTemplates', JSON.stringify(allTplsForStorage)); } catch(e) { console.warn('certTemplates save error:', e); }
 
   saveState();
   closeModal('certTemplateEditorModal');
