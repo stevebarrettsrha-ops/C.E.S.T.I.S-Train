@@ -3017,6 +3017,8 @@ textarea.form-control { resize:vertical; min-height:80px; }
 <script src="https://unpkg.com/peerjs@1.5.4/dist/peerjs.min.js"></script>
 <!-- Google Identity Services for OAuth -->
 <script src="https://accounts.google.com/gsi/client" async defer></script>
+<!-- jsPDF for certificate PDF generation -->
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
 </head>
 <body>
 
@@ -19215,17 +19217,28 @@ function generateCertificatePDF(studentId) {
   var sigLeft = tpl.signatureLeft || 'Programme Coordinator/ Principal';
   var sigRight = tpl.signatureRight || 'Chairman of CMC Board';
 
-  // Download Page 1
-  generateCertPage1(student, courseFullName, sigLeft, sigRight);
+  // Generate canvas for Page 1
+  var canvas1 = generateCertPage1(student, courseFullName, sigLeft, sigRight);
 
-  // If template has detail data, download Page 2 after small delay
+  // Create PDF with jsPDF (landscape for page 1)
+  var jsPDF = window.jspdf.jsPDF;
+  var pdf = new jsPDF({ orientation: 'landscape', unit: 'px', format: [canvas1.width, canvas1.height], compress: true });
+
+  // Add Page 1
+  var img1 = canvas1.toDataURL('image/jpeg', 0.95);
+  pdf.addImage(img1, 'JPEG', 0, 0, canvas1.width, canvas1.height);
+
+  // Add Page 2 if template data exists
   if(tpl.modules && tpl.modules.length > 0) {
-    setTimeout(function(){
-      generateCertPage2(student, tpl);
-    }, 500);
+    var canvas2 = generateCertPage2(student, tpl);
+    pdf.addPage([canvas2.width, canvas2.height], canvas2.width > canvas2.height ? 'landscape' : 'portrait');
+    var img2 = canvas2.toDataURL('image/jpeg', 0.95);
+    pdf.addImage(img2, 'JPEG', 0, 0, canvas2.width, canvas2.height);
   }
 
-  showToast('Certificate downloaded for ' + student.name);
+  // Save as single PDF file
+  pdf.save('Certificate_' + student.name.replace(/\s+/g, '_') + '_' + student.certNo + '.pdf');
+  showToast('Certificate PDF downloaded for ' + student.name);
 }
 
 // ---- PAGE 1: Formal Certificate of Completion ----
@@ -19350,12 +19363,8 @@ function generateCertPage1(student, courseFullName, sigLeft, sigRight) {
   ctx.textAlign = 'center';
   ctx.fillText('Certificate No. ' + student.certNo, w / 2, h - 50);
 
-  // Download
-  var dataUrl = canvas.toDataURL('image/png');
-  var link = document.createElement('a');
-  link.download = 'Certificate_Page1_' + student.name.replace(/\s+/g, '_') + '_' + student.certNo + '.png';
-  link.href = dataUrl;
-  link.click();
+  // Return canvas for PDF composition
+  return canvas;
 }
 
 // ---- PAGE 2: Programme Details ----
@@ -19559,11 +19568,8 @@ function generateCertPage2(student, tpl) {
   fctx.fillStyle = '#2A7B88';
   fctx.fillRect(0, 0, 8, finalH);
 
-  var dataUrl = finalCanvas.toDataURL('image/png');
-  var link = document.createElement('a');
-  link.download = 'Certificate_Page2_' + student.name.replace(/\s+/g, '_') + '_' + student.certNo + '.png';
-  link.href = dataUrl;
-  link.click();
+  // Return final canvas for PDF composition
+  return finalCanvas;
 }
 
 function wrapText(ctx, text, maxWidth) {
