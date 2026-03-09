@@ -3962,6 +3962,98 @@ function ensureCertImagesLoaded() {
   return initCertTemplateImages();
 }
 
+// ---- Google Drive storage for certificate template background images ----
+var CERT_TEMPLATE_DRIVE_FOLDER = '1iLju3l6nBG3oLdiOGuDqtRuwkZjDWsIQ'; // Certificate Templates folder
+
+function certImageSaveToDrive(course, page, base64Data) {
+  if (!window.googleAccessToken) return Promise.resolve();
+  var fileName = 'cert_template_' + course.replace(/[^a-zA-Z0-9]/g, '_') + '_' + page + '.txt';
+  // Check if file already exists, update it; otherwise create new
+  var query = encodeURIComponent("name='" + fileName + "' and '" + CERT_TEMPLATE_DRIVE_FOLDER + "' in parents and trashed=false");
+  return fetch('https://www.googleapis.com/drive/v3/files?q=' + query + '&fields=files(id)', {
+    headers: { 'Authorization': 'Bearer ' + googleAccessToken }
+  }).then(function(resp) { return resp.json(); }).then(function(data) {
+    var existingId = (data.files && data.files.length > 0) ? data.files[0].id : null;
+    if (existingId) {
+      // Update existing file
+      return fetch('https://www.googleapis.com/upload/drive/v3/files/' + existingId + '?uploadType=media', {
+        method: 'PATCH',
+        headers: { 'Authorization': 'Bearer ' + googleAccessToken, 'Content-Type': 'text/plain' },
+        body: base64Data
+      });
+    } else {
+      // Create new file
+      var metadata = { name: fileName, parents: [CERT_TEMPLATE_DRIVE_FOLDER] };
+      var form = new FormData();
+      form.append('metadata', new Blob([JSON.stringify(metadata)], { type: 'application/json' }));
+      form.append('file', new Blob([base64Data], { type: 'text/plain' }));
+      return fetch('https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart', {
+        method: 'POST',
+        headers: { 'Authorization': 'Bearer ' + googleAccessToken },
+        body: form
+      });
+    }
+  }).then(function() {
+    console.log('[CertDrive] Saved ' + course + '/' + page + ' to Google Drive');
+  }).catch(function(e) { console.warn('[CertDrive] Save error:', e); });
+}
+
+function certImageLoadFromDrive(course, page) {
+  if (!window.googleAccessToken) return Promise.resolve(null);
+  var fileName = 'cert_template_' + course.replace(/[^a-zA-Z0-9]/g, '_') + '_' + page + '.txt';
+  var query = encodeURIComponent("name='" + fileName + "' and '" + CERT_TEMPLATE_DRIVE_FOLDER + "' in parents and trashed=false");
+  return fetch('https://www.googleapis.com/drive/v3/files?q=' + query + '&fields=files(id)', {
+    headers: { 'Authorization': 'Bearer ' + googleAccessToken }
+  }).then(function(resp) { return resp.json(); }).then(function(data) {
+    if (!data.files || data.files.length === 0) return null;
+    return fetch('https://www.googleapis.com/drive/v3/files/' + data.files[0].id + '?alt=media', {
+      headers: { 'Authorization': 'Bearer ' + googleAccessToken }
+    }).then(function(resp) { return resp.text(); });
+  }).then(function(base64Data) {
+    if (base64Data) {
+      // Cache in IndexedDB for offline use
+      certImageSave(course, page, base64Data);
+      if (certTemplates[course]) certTemplates[course][page] = base64Data;
+      console.log('[CertDrive] Loaded ' + course + '/' + page + ' from Google Drive');
+    }
+    return base64Data;
+  }).catch(function(e) { console.warn('[CertDrive] Load error:', e); return null; });
+}
+
+function certImageLoadAllFromDrive() {
+  if (!window.googleAccessToken) return Promise.resolve([]);
+  var query = encodeURIComponent("name contains 'cert_template_' and '" + CERT_TEMPLATE_DRIVE_FOLDER + "' in parents and trashed=false");
+  return fetch('https://www.googleapis.com/drive/v3/files?q=' + query + '&fields=files(id,name)&pageSize=100', {
+    headers: { 'Authorization': 'Bearer ' + googleAccessToken }
+  }).then(function(resp) { return resp.json(); }).then(function(data) {
+    if (!data.files || data.files.length === 0) return [];
+    return Promise.all(data.files.map(function(file) {
+      // Parse course and page from filename: cert_template_COURSE_bgPageN.txt
+      var match = file.name.match(/^cert_template_(.+)_(bgPage[12])\.txt$/);
+      if (!match) return null;
+      var course = match[1].replace(/_/g, ' ');
+      var page = match[2];
+      // Try exact course name match first, then try case-insensitive match
+      var matchedCourse = null;
+      Object.keys(certTemplates).forEach(function(k) {
+        if (k.replace(/[^a-zA-Z0-9]/g, '_') === match[1]) matchedCourse = k;
+      });
+      if (!matchedCourse) return null;
+      return fetch('https://www.googleapis.com/drive/v3/files/' + file.id + '?alt=media', {
+        headers: { 'Authorization': 'Bearer ' + googleAccessToken }
+      }).then(function(resp) { return resp.text(); }).then(function(base64Data) {
+        if (base64Data && certTemplates[matchedCourse]) {
+          certTemplates[matchedCourse][page] = base64Data;
+          certImageSave(matchedCourse, page, base64Data); // Cache in IndexedDB
+        }
+        return { course: matchedCourse, page: page };
+      });
+    }));
+  }).then(function(results) {
+    return results.filter(function(r) { return r; });
+  }).catch(function(e) { console.warn('[CertDrive] Load all error:', e); return []; });
+}
+
 function initLmsChatData() {
   try {
     var cr = localStorage.getItem('voctrain_chatRooms');
@@ -13822,6 +13914,41 @@ async function silentMergeFromBackup(fileId) {
       } catch(e) { console.warn('[Merge] notifications error:', e); }
     }
 
+    // Merge certTemplates (metadata only, no images)
+    if (backupData.data.certTemplates) {
+      try {
+        var cloudCT = backupData.data.certTemplates;
+        Object.keys(cloudCT).forEach(function(course) {
+          if (!certTemplates[course]) {
+            certTemplates[course] = cloudCT[course];
+            changed = true;
+          } else {
+            // Merge fields that are missing locally
+            var local = certTemplates[course];
+            var cloud = cloudCT[course];
+            Object.keys(cloud).forEach(function(key) {
+              if (key !== 'bgPage1' && key !== 'bgPage2' && !local[key] && cloud[key]) {
+                local[key] = cloud[key];
+                changed = true;
+              }
+            });
+          }
+        });
+      } catch(e) { console.warn('[Merge] certTemplates error:', e); }
+    }
+
+    // Merge certDownloadApprovals
+    if (backupData.data.certDownloadApprovals) {
+      try {
+        backupData.data.certDownloadApprovals.forEach(function(ca) {
+          if (ca && ca.studentId && !certDownloadApprovals.some(function(l) { return l.studentId === ca.studentId; })) {
+            certDownloadApprovals.push(ca);
+            changed = true;
+          }
+        });
+      } catch(e) { console.warn('[Merge] certDownloadApprovals error:', e); }
+    }
+
     if (changed) {
       saveState();
     }
@@ -13882,6 +14009,17 @@ async function autoSyncOnLogin() {
       if (feeChanged) anyChanged = true;
     } catch (e) {
       console.warn('[AutoSync] Fee system student sync error:', e);
+    }
+
+    // 2c. Sync certificate template images from Google Drive
+    try {
+      var certImgResults = await certImageLoadAllFromDrive();
+      if (certImgResults.length > 0) {
+        console.log('[AutoSync] Loaded ' + certImgResults.length + ' certificate template images from Drive');
+        anyChanged = true;
+      }
+    } catch (e) {
+      console.warn('[AutoSync] Cert template image sync error:', e);
     }
 
     // 3. Update sync timestamp
@@ -14026,7 +14164,16 @@ async function autoSaveToAllFolders() {
         adrStaffMeta: adrStaffMeta,
         adminStaffAccessSettings: adminStaffAccessSettings,
         supportMessages: supportMessages,
-        notifications: notifications
+        notifications: notifications,
+        certTemplates: (function() {
+          var clean = {};
+          Object.keys(certTemplates).forEach(function(k) {
+            clean[k] = Object.assign({}, certTemplates[k]);
+            delete clean[k].bgPage1; delete clean[k].bgPage2;
+          });
+          return clean;
+        })(),
+        certDownloadApprovals: certDownloadApprovals
       }
     };
 
@@ -19319,7 +19466,8 @@ function generateCertificatePDF(studentId) {
   // Always try to load cert images from IndexedDB if bgPage1 is missing
   var tpl = certTemplates[student.course] || {};
   if(!tpl.bgPage1) {
-    // Try loading from IndexedDB before falling back to generic certificate
+    showToast('Loading certificate template...');
+    // Step 1: Try IndexedDB
     certImageLoadAll().then(function(images) {
       images.forEach(function(img) {
         var parts = img.id.split('___');
@@ -19329,9 +19477,29 @@ function generateCertificatePDF(studentId) {
         }
       });
       _certImagesLoaded = true;
-      _generateCertPDFInner(studentId);
+      var tpl2 = certTemplates[student.course] || {};
+      if(tpl2.bgPage1) {
+        _generateCertPDFInner(studentId);
+      } else {
+        // Step 2: Try Google Drive
+        if(window.googleAccessToken) {
+          showToast('Template not found locally. Checking Google Drive...');
+          certImageLoadFromDrive(student.course, 'bgPage1').then(function(data) {
+            if(data) {
+              // Also try page 2
+              certImageLoadFromDrive(student.course, 'bgPage2').then(function() {
+                _generateCertPDFInner(studentId);
+              });
+            } else {
+              showToast('No certificate template background image found for ' + (student.course || 'this course') + '. Please upload a certificate template first.', 5000);
+            }
+          });
+        } else {
+          showToast('No certificate template background image found for ' + (student.course || 'this course') + '. Please upload a certificate template first.', 5000);
+        }
+      }
     }).catch(function() {
-      _generateCertPDFInner(studentId);
+      showToast('Error loading certificate template. Please try again.', 5000);
     });
     return;
   }
@@ -19354,21 +19522,7 @@ function _generateCertPDFInner(studentId) {
 
   try {
   if(!tpl.bgPage1) {
-    // FALLBACK: Use canvas-drawn certificate when no background image uploaded
-    var courseFullName = tpl.courseFullName || student.course;
-    var sigLeft = tpl.signatureLeft || 'Programme Coordinator/ Principal';
-    var sigRight = tpl.signatureRight || 'Chairman of CMC Board';
-    var canvas1 = generateCertPage1Fallback(student, courseFullName, sigLeft, sigRight);
-    var jsPDF = window.jspdf.jsPDF;
-    var pdf = new jsPDF({ orientation: 'landscape', unit: 'px', format: [canvas1.width, canvas1.height], compress: true });
-    pdf.addImage(canvas1.toDataURL('image/jpeg', 0.95), 'JPEG', 0, 0, canvas1.width, canvas1.height);
-    if(tpl.modules && tpl.modules.length > 0) {
-      var canvas2 = generateCertPage2Fallback(student, tpl);
-      pdf.addPage([canvas2.width, canvas2.height], canvas2.width > canvas2.height ? 'landscape' : 'portrait');
-      pdf.addImage(canvas2.toDataURL('image/jpeg', 0.95), 'JPEG', 0, 0, canvas2.width, canvas2.height);
-    }
-    pdf.save('Certificate_' + student.name.replace(/\s+/g, '_') + '_' + student.certNo + '.pdf');
-    showToast('Certificate PDF downloaded for ' + student.name);
+    showToast('No certificate template background image uploaded for ' + (student.course || 'this course') + '. Please upload a certificate template first.', 5000);
     return;
   }
 
@@ -19605,197 +19759,6 @@ function wrapText(ctx, text, maxWidth) {
 }
 
 // ---- Image upload preview helper ----
-// ---- FALLBACK: Canvas-drawn certificate when no background image uploaded ----
-function generateCertPage1Fallback(student, courseFullName, sigLeft, sigRight) {
-  var canvas = document.createElement('canvas');
-  var w = 1400; var h = 990;
-  canvas.width = w; canvas.height = h;
-  var ctx = canvas.getContext('2d');
-
-  ctx.fillStyle = '#FBF5E6'; ctx.fillRect(0, 0, w, h);
-  ctx.strokeStyle = '#1B2A4A'; ctx.lineWidth = 8; ctx.strokeRect(10, 10, w - 20, h - 20);
-  ctx.strokeStyle = '#C5960C'; ctx.lineWidth = 3; ctx.strokeRect(22, 22, w - 44, h - 44);
-
-  drawGoldSwirl(ctx, 30, 30, 1, 1); drawGoldSwirl(ctx, w - 30, 30, -1, 1);
-  drawGoldSwirl(ctx, 30, h - 30, 1, -1); drawGoldSwirl(ctx, w - 30, h - 30, -1, -1);
-  drawWatermarkCrest(ctx, w / 2, 380, 0.08);
-
-  ctx.textAlign = 'center';
-  ctx.fillStyle = '#1B2A4A'; ctx.font = 'bold 72px Georgia, "Times New Roman", serif';
-  ctx.fillText('CERTIFICATE', w / 2, 140);
-  ctx.font = '600 32px Georgia, "Times New Roman", serif'; ctx.fillText('OF COMPLETION', w / 2, 185);
-
-  ctx.font = 'italic 22px Georgia, serif'; ctx.fillStyle = '#333';
-  ctx.fillText('This certificate certifies that', w / 2, 280);
-
-  ctx.font = 'bold 48px Georgia, "Times New Roman", serif'; ctx.fillStyle = '#1B2A4A';
-  ctx.fillText(student.name, w / 2, 400);
-  var nameW = ctx.measureText(student.name).width;
-  ctx.beginPath(); ctx.moveTo((w - nameW) / 2 - 40, 420); ctx.lineTo((w + nameW) / 2 + 40, 420);
-  ctx.strokeStyle = '#333'; ctx.lineWidth = 1.5; ctx.stroke();
-
-  var tpl = certTemplates[student.course] || {};
-  var gender = tpl.gender || 'their';
-  var pronoun = gender === 'his' ? 'his' : gender === 'her' ? 'her' : 'their';
-
-  ctx.font = 'italic 18px Georgia, serif'; ctx.fillStyle = '#333';
-  ctx.fillText('has successfully completed ' + pronoun + ' vocational training in the short course', w / 2, 485);
-  ctx.font = 'bold italic 20px Georgia, serif'; ctx.fillStyle = '#1B2A4A';
-  ctx.fillText(courseFullName, w / 2, 515);
-  ctx.font = 'italic 18px Georgia, serif'; ctx.fillStyle = '#333';
-  ctx.fillText('on this day, the ' + student.certDate + ', at the Community Educational and Skills', w / 2, 545);
-  ctx.font = 'bold italic 18px Georgia, serif';
-  ctx.fillText('Training Institute and Services Ltd.', w / 2, 575);
-
-  drawCertSeal(ctx, w / 2, 720, 60);
-
-  drawSignatureScribble(ctx, 280, 710);
-  ctx.beginPath(); ctx.moveTo(180, 730); ctx.lineTo(380, 730); ctx.strokeStyle = '#666'; ctx.lineWidth = 1; ctx.stroke();
-  ctx.font = '16px Georgia, serif'; ctx.fillStyle = '#333'; ctx.textAlign = 'center';
-  ctx.fillText(sigLeft, 280, 755);
-
-  drawSignatureScribble(ctx, w - 280, 710);
-  ctx.beginPath(); ctx.moveTo(w - 380, 730); ctx.lineTo(w - 180, 730); ctx.strokeStyle = '#666'; ctx.lineWidth = 1; ctx.stroke();
-  ctx.font = '16px Georgia, serif'; ctx.fillStyle = '#333'; ctx.textAlign = 'center';
-  ctx.fillText(sigRight, w - 280, 755);
-
-  ctx.font = 'bold 16px Georgia, serif'; ctx.fillStyle = '#1B2A4A'; ctx.textAlign = 'center';
-  ctx.fillText('Certificate No. ' + student.certNo, w / 2, h - 50);
-  return canvas;
-}
-
-function generateCertPage2Fallback(student, tpl) {
-  var canvas = document.createElement('canvas');
-  var w = 1400; canvas.width = w; canvas.height = 2000;
-  var ctx = canvas.getContext('2d');
-  var courseFullName = (tpl.courseFullName || student.course).toUpperCase();
-  var progCode = tpl.programmeCode || ''; var version = tpl.version || '1.0'; var devDate = tpl.developedDate || '';
-  var modules = tpl.modules || []; var competencies = tpl.competencies || [];
-  var specs = tpl.programmeSpecs || {};
-  var contactEmail = tpl.contactEmail || 'cestisadmn@gmail.com';
-  var contactPhone = tpl.contactPhone || '+(876) 679-0111';
-
-  ctx.fillStyle = '#FFFFFF'; ctx.fillRect(0, 0, w, 2000);
-  ctx.fillStyle = '#2A7B88'; ctx.fillRect(0, 0, 8, 2000);
-
-  var yPos = 40;
-  ctx.textAlign = 'center'; ctx.font = 'bold 28px Georgia, "Times New Roman", serif'; ctx.fillStyle = '#1B2A4A';
-  ctx.fillText(courseFullName, w / 2, yPos); yPos += 30;
-  drawCertSeal(ctx, w / 2, yPos + 30, 35); yPos += 80;
-  ctx.font = 'bold 18px Georgia, serif'; ctx.fillStyle = '#333';
-  ctx.fillText('Community Educational and Skills Training Institute and Services Limited', w / 2, yPos); yPos += 25;
-  ctx.font = 'bold 14px Georgia, serif';
-  ctx.fillText('Programme Code: ' + progCode + ' | Version ' + version + ' | Developed: ' + devDate, w / 2, yPos); yPos += 35;
-
-  var colLeft = 50; var colMid = w / 2 + 10; var colWidth = (w - 120) / 2;
-  var contentStartY = yPos; var moduleY = contentStartY + 10;
-  ctx.textAlign = 'left'; ctx.font = 'bold 14px Arial, sans-serif'; ctx.fillStyle = '#1B2A4A';
-  ctx.fillText('MODULES COMPLETED', colLeft + 15, moduleY + 20); moduleY += 38;
-  modules.forEach(function(mod) {
-    ctx.font = 'bold 12px Arial, sans-serif'; ctx.fillStyle = '#2A7B88';
-    ctx.fillText('\u2611 ' + mod.name + ' ' + (mod.contactHours || '') + ' Contact Hours', colLeft + 15, moduleY); moduleY += 18;
-    (mod.topics || []).forEach(function(topic) {
-      ctx.font = '11px Arial, sans-serif'; ctx.fillStyle = '#333';
-      ctx.fillText('  \u2022  ' + topic, colLeft + 25, moduleY); moduleY += 16;
-    }); moduleY += 6;
-  });
-
-  var compY = contentStartY + 10;
-  ctx.font = 'bold 14px Arial, sans-serif'; ctx.fillStyle = '#1B2A4A';
-  ctx.fillText('TECHNICAL COMPETENCIES ACHIEVED', colMid + 15, compY + 20); compY += 38;
-  competencies.forEach(function(cat) {
-    ctx.font = 'bold 12px Arial, sans-serif'; ctx.fillStyle = '#1B2A4A';
-    ctx.fillText(cat.category + ':', colMid + 15, compY); compY += 18;
-    (cat.items || []).forEach(function(item) {
-      ctx.font = '11px Arial, sans-serif'; ctx.fillStyle = '#333';
-      var lines = wrapText(ctx, item, colWidth - 40);
-      lines.forEach(function(line) { ctx.fillText('  \u2022  ' + line, colMid + 25, compY); compY += 15; });
-    }); compY += 8;
-  });
-
-  var boxBottom = Math.max(moduleY, compY) + 10;
-  ctx.strokeStyle = '#CCC'; ctx.lineWidth = 1;
-  ctx.strokeRect(colLeft, contentStartY, colWidth, boxBottom - contentStartY);
-  ctx.strokeRect(colMid - 10, contentStartY, colWidth + 20, boxBottom - contentStartY);
-  yPos = boxBottom + 20;
-
-  ctx.textAlign = 'center'; ctx.font = 'bold 14px Arial, sans-serif'; ctx.fillStyle = '#1B2A4A';
-  ctx.fillText('PROGRAMME SPECIFICATIONS', w / 2, yPos); yPos += 20;
-  ctx.font = '12px Arial, sans-serif'; ctx.fillStyle = '#333';
-  ctx.fillText('Duration: ' + (specs.duration || 'N/A') + ' | Industry: ' + (specs.industry || 'N/A'), w / 2, yPos); yPos += 17;
-  ctx.fillText('| Sub-Sector: ' + (specs.subSector || 'N/A') + ' | Entry Requirements: ' + (specs.entryRequirements || 'N/A'), w / 2, yPos); yPos += 17;
-  ctx.fillText('| ' + (specs.assessment || 'Industry Psychometric Assessment: Pass'), w / 2, yPos); yPos += 17;
-  ctx.fillText('Alignment: ' + (specs.alignment || 'N/A'), w / 2, yPos); yPos += 30;
-
-  ctx.font = 'italic 11px Arial, sans-serif'; ctx.fillStyle = '#555';
-  ctx.fillText('This certificate confirms that the holder has successfully completed all requirements of the ' + (tpl.courseFullName || student.course).toUpperCase(), w / 2, yPos); yPos += 16;
-  ctx.fillText(' Short Course. For transcript requests or verification, contact: ' + contactEmail + ' | ' + contactPhone, w / 2, yPos); yPos += 25;
-
-  ctx.textAlign = 'left'; ctx.font = 'bold 9px Arial, sans-serif'; ctx.fillStyle = '#333';
-  ctx.fillText('PLEASE VALIDATE', 50, yPos - 45); ctx.fillText('CERTIFICATE HERE:', 50, yPos - 34);
-  ctx.strokeStyle = '#333'; ctx.lineWidth = 1; ctx.strokeRect(50, yPos - 30, 60, 60);
-  ctx.fillStyle = '#333';
-  for(var qx = 0; qx < 6; qx++) { for(var qy = 0; qy < 6; qy++) { if((qx + qy) % 2 === 0) ctx.fillRect(53 + qx * 9, yPos - 27 + qy * 9, 7, 7); } }
-
-  ctx.textAlign = 'center'; ctx.font = 'bold 20px Georgia, serif'; ctx.fillStyle = '#1B2A4A';
-  yPos += 50; ctx.fillText('Certificate No. ' + student.certNo, w / 2, yPos); yPos += 20;
-
-  var finalH = Math.max(yPos + 20, 990);
-  var finalCanvas = document.createElement('canvas'); finalCanvas.width = w; finalCanvas.height = finalH;
-  var fctx = finalCanvas.getContext('2d');
-  fctx.fillStyle = '#FFFFFF'; fctx.fillRect(0, 0, w, finalH); fctx.drawImage(canvas, 0, 0);
-  fctx.fillStyle = '#2A7B88'; fctx.fillRect(0, finalH - 4, w, 4); fctx.fillRect(0, 0, 8, finalH);
-  return finalCanvas;
-}
-
-// ---- Drawing helpers for fallback certificate design ----
-function drawGoldSwirl(ctx, x, y, dx, dy) {
-  ctx.save(); ctx.translate(x, y); ctx.scale(dx, dy);
-  var gradient = ctx.createLinearGradient(0, 0, 80, 80);
-  gradient.addColorStop(0, '#DAA520'); gradient.addColorStop(0.5, '#C5960C'); gradient.addColorStop(1, '#8B6914');
-  ctx.strokeStyle = gradient; ctx.lineWidth = 3; ctx.lineCap = 'round';
-  ctx.beginPath(); ctx.moveTo(5, 5); ctx.bezierCurveTo(5, 40, 40, 60, 70, 55); ctx.stroke();
-  ctx.beginPath(); ctx.moveTo(5, 5); ctx.bezierCurveTo(40, 5, 60, 40, 55, 70); ctx.stroke();
-  ctx.lineWidth = 2.5;
-  ctx.beginPath(); ctx.moveTo(70, 55); ctx.bezierCurveTo(80, 50, 85, 35, 65, 30); ctx.bezierCurveTo(50, 26, 45, 38, 55, 42); ctx.stroke();
-  ctx.beginPath(); ctx.moveTo(55, 70); ctx.bezierCurveTo(50, 80, 35, 85, 30, 65); ctx.bezierCurveTo(26, 50, 38, 45, 42, 55); ctx.stroke();
-  ctx.lineWidth = 2;
-  ctx.beginPath(); ctx.moveTo(20, 15); ctx.bezierCurveTo(25, 8, 35, 10, 38, 18); ctx.stroke();
-  ctx.beginPath(); ctx.moveTo(15, 20); ctx.bezierCurveTo(8, 25, 10, 35, 18, 38); ctx.stroke();
-  ctx.beginPath(); ctx.arc(40, 40, 3, 0, Math.PI * 2); ctx.fillStyle = '#DAA520'; ctx.fill();
-  ctx.restore();
-}
-
-function drawWatermarkCrest(ctx, cx, cy, alpha) {
-  ctx.save(); ctx.globalAlpha = alpha;
-  ctx.beginPath(); ctx.moveTo(cx - 100, cy - 120); ctx.lineTo(cx + 100, cy - 120);
-  ctx.lineTo(cx + 100, cy + 40); ctx.quadraticCurveTo(cx, cy + 130, cx - 100, cy + 40); ctx.closePath();
-  ctx.strokeStyle = '#8B8B6E'; ctx.lineWidth = 4; ctx.stroke();
-  for(var i = 0; i < 8; i++) { var angle = -Math.PI * 0.7 + (i * Math.PI * 0.18); var lx = cx - 130 + Math.cos(angle) * 20; var ly = cy - 50 + i * 30; ctx.beginPath(); ctx.ellipse(lx, ly, 15, 6, angle + 0.3, 0, Math.PI * 2); ctx.strokeStyle = '#8B8B6E'; ctx.lineWidth = 1.5; ctx.stroke(); }
-  for(var i = 0; i < 8; i++) { var angle = -Math.PI * 0.3 + (i * Math.PI * 0.18); var lx = cx + 130 - Math.cos(angle) * 20; var ly = cy - 50 + i * 30; ctx.beginPath(); ctx.ellipse(lx, ly, 15, 6, -angle - 0.3, 0, Math.PI * 2); ctx.strokeStyle = '#8B8B6E'; ctx.lineWidth = 1.5; ctx.stroke(); }
-  ctx.beginPath(); ctx.moveTo(cx, cy - 120); ctx.lineTo(cx, cy + 80); ctx.moveTo(cx - 100, cy - 30); ctx.lineTo(cx + 100, cy - 30);
-  ctx.strokeStyle = '#8B8B6E'; ctx.lineWidth = 2; ctx.stroke(); ctx.restore();
-}
-
-function drawCertSeal(ctx, cx, cy, r) {
-  ctx.save();
-  var gradient = ctx.createRadialGradient(cx, cy, r * 0.3, cx, cy, r);
-  gradient.addColorStop(0, '#DAA520'); gradient.addColorStop(0.7, '#C5960C'); gradient.addColorStop(1, '#8B6914');
-  for(var i = 0; i < 16; i++) { var angle = (i / 16) * Math.PI * 2; var lx = cx + Math.cos(angle) * (r + 8); var ly = cy + Math.sin(angle) * (r + 8); ctx.beginPath(); ctx.ellipse(lx, ly, 10, 5, angle + Math.PI / 2, 0, Math.PI * 2); ctx.fillStyle = '#C5960C'; ctx.fill(); ctx.strokeStyle = '#8B6914'; ctx.lineWidth = 0.5; ctx.stroke(); }
-  ctx.beginPath(); ctx.arc(cx, cy, r, 0, Math.PI * 2); ctx.fillStyle = gradient; ctx.fill();
-  ctx.beginPath(); ctx.moveTo(cx - r * 0.45, cy - r * 0.5); ctx.lineTo(cx + r * 0.45, cy - r * 0.5); ctx.lineTo(cx + r * 0.45, cy + r * 0.1); ctx.quadraticCurveTo(cx, cy + r * 0.6, cx - r * 0.45, cy + r * 0.1); ctx.closePath(); ctx.fillStyle = '#1B4B82'; ctx.fill(); ctx.strokeStyle = '#DAA520'; ctx.lineWidth = 1.5; ctx.stroke();
-  ctx.strokeStyle = '#FFF'; ctx.lineWidth = 1; ctx.beginPath(); ctx.moveTo(cx, cy - r * 0.5); ctx.lineTo(cx, cy + r * 0.35); ctx.moveTo(cx - r * 0.45, cy - r * 0.15); ctx.lineTo(cx + r * 0.45, cy - r * 0.15); ctx.stroke();
-  ctx.beginPath(); ctx.moveTo(cx - r * 0.8, cy + r * 0.55); ctx.lineTo(cx + r * 0.8, cy + r * 0.55); ctx.lineTo(cx + r * 0.7, cy + r * 0.75); ctx.lineTo(cx - r * 0.7, cy + r * 0.75); ctx.closePath(); ctx.fillStyle = '#DAA520'; ctx.fill();
-  ctx.textAlign = 'center'; ctx.font = 'bold ' + Math.round(r * 0.18) + 'px Arial, sans-serif'; ctx.fillStyle = '#1B2A4A'; ctx.fillText('EMPOWERING COMMUNITIES', cx, cy + r * 0.7);
-  ctx.restore();
-}
-
-function drawSignatureScribble(ctx, cx, baseY) {
-  ctx.save(); ctx.strokeStyle = '#444'; ctx.lineWidth = 1.5; ctx.lineCap = 'round';
-  ctx.beginPath(); ctx.moveTo(cx - 40, baseY); ctx.bezierCurveTo(cx - 30, baseY - 15, cx - 10, baseY - 20, cx, baseY - 5); ctx.bezierCurveTo(cx + 10, baseY + 10, cx + 20, baseY - 15, cx + 40, baseY - 10); ctx.stroke();
-  ctx.beginPath(); ctx.moveTo(cx + 40, baseY - 10); ctx.bezierCurveTo(cx + 50, baseY - 18, cx + 55, baseY - 5, cx + 45, baseY); ctx.stroke();
-  ctx.restore();
-}
 
 function previewCertBgUpload(input, previewId) {
   var preview = document.getElementById(previewId);
@@ -19994,9 +19957,9 @@ function saveCertTemplate() {
   var bgPage1 = document.getElementById('ctplBgPage1Preview').getAttribute('data-base64') || existing.bgPage1 || '';
   var bgPage2 = document.getElementById('ctplBgPage2Preview').getAttribute('data-base64') || existing.bgPage2 || '';
 
-  // Save images to IndexedDB (too large for localStorage)
-  if(bgPage1) certImageSave(_certTplEditingCourse, 'bgPage1', bgPage1);
-  if(bgPage2) certImageSave(_certTplEditingCourse, 'bgPage2', bgPage2);
+  // Save images to IndexedDB (too large for localStorage) and Google Drive
+  if(bgPage1) { certImageSave(_certTplEditingCourse, 'bgPage1', bgPage1); certImageSaveToDrive(_certTplEditingCourse, 'bgPage1', bgPage1); }
+  if(bgPage2) { certImageSave(_certTplEditingCourse, 'bgPage2', bgPage2); certImageSaveToDrive(_certTplEditingCourse, 'bgPage2', bgPage2); }
 
   certTemplates[_certTplEditingCourse] = {
     courseFullName: document.getElementById('ctplCourseFullName').value.trim(),
