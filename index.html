@@ -6188,6 +6188,13 @@ function buildAdminPages() {
           <input type="text" id="ctplProgrammeCode" placeholder="e.g. CESTIS-SOLAR-01">
         </div>
         <div class="form-group">
+          <label>Course Type</label>
+          <select id="ctplCourseType" style="font-size:12px;" onchange="updateCertLivePreview(); updateCertLivePreviewP2();">
+            <option value="Short Course">Short Course</option>
+            <option value="Fulltime Course">Fulltime Course</option>
+          </select>
+        </div>
+        <div class="form-group">
           <label>Version</label>
           <input type="text" id="ctplVersion" placeholder="e.g. 1.0">
         </div>
@@ -19698,7 +19705,8 @@ function renderCertPage1OnBg(bgImg, student, tpl) {
   ctx.font = 'italic ' + bodyFontSize + 'px Georgia, serif';
   ctx.fillStyle = '#222';
 
-  var line1 = 'has successfully completed ' + pronoun + ' vocational training in the short course';
+  var courseType = (tpl.courseType || 'Short Course').toLowerCase();
+  var line1 = 'has successfully completed ' + pronoun + ' vocational training in the ' + courseType;
   ctx.fillText(line1, w / 2, bodyY);
 
   // Course name (bold)
@@ -19832,8 +19840,9 @@ function renderCertPage2OnBg(bgImg, student, tpl) {
   // Footer validation text
   ctx.font = 'italic 10px Arial, sans-serif';
   ctx.fillStyle = '#444';
+  var p2CourseType = tpl.courseType || 'Short Course';
   ctx.fillText('This certificate confirms that the holder has successfully completed all requirements of the ' + courseFullName, w / 2, footerY);
-  ctx.fillText('Short Course. For transcript requests or verification, contact: ' + contactEmail + ' | ' + contactPhone, w / 2, footerY + 14);
+  ctx.fillText(p2CourseType + '. For transcript requests or verification, contact: ' + contactEmail + ' | ' + contactPhone, w / 2, footerY + 14);
 
   // Certificate No at bottom
   ctx.font = 'bold 18px Georgia, serif';
@@ -19961,7 +19970,8 @@ function _renderCertLivePreview() {
   // Draw body text (green guide)
   ctx.font = 'italic ' + bodyFontSize + 'px Georgia, serif';
   ctx.fillStyle = 'rgba(80,200,80,0.85)';
-  ctx.fillText('has successfully completed their vocational training in the short course', w / 2, bodyY);
+  var previewCourseType = (document.getElementById('ctplCourseType')?.value || 'Short Course').toLowerCase();
+  ctx.fillText('has successfully completed their vocational training in the ' + previewCourseType, w / 2, bodyY);
   ctx.font = 'bold italic ' + Math.round(bodyFontSize * 1.15) + 'px Georgia, serif';
   ctx.fillText(courseFullName, w / 2, bodyY + bodyFontSize * 1.5);
   ctx.font = 'italic ' + bodyFontSize + 'px Georgia, serif';
@@ -20183,8 +20193,9 @@ function _renderCertLivePreviewP2() {
   // --- Footer (blue) ---
   ctx.font = 'italic 10px Arial, sans-serif';
   ctx.fillStyle = 'rgba(80,150,255,0.85)';
+  var p2PreviewCourseType = document.getElementById('ctplCourseType')?.value || 'Short Course';
   ctx.fillText('This certificate confirms that the holder has successfully completed all requirements of the ' + courseFullName, w / 2, footerY);
-  ctx.fillText('Short Course. For transcript requests or verification, contact: cestisadmn@gmail.com | +(876) 679-0111', w / 2, footerY + 14);
+  ctx.fillText(p2PreviewCourseType + '. For transcript requests or verification, contact: cestisadmn@gmail.com | +(876) 679-0111', w / 2, footerY + 14);
   ctx.font = 'bold 18px Georgia, serif';
   ctx.fillText('Certificate No. WE-2026-0001', w / 2, footerY + 42);
   ctx.strokeStyle = 'rgba(80,150,255,0.5)'; ctx.lineWidth = 2; ctx.setLineDash([8,4]);
@@ -20315,6 +20326,7 @@ function openCertTemplateEditor() {
   // Fill fields
   document.getElementById('ctplCourseFullName').value = tpl.courseFullName || '';
   document.getElementById('ctplProgrammeCode').value = tpl.programmeCode || '';
+  document.getElementById('ctplCourseType').value = tpl.courseType || 'Short Course';
   document.getElementById('ctplVersion').value = tpl.version || '1.0';
   document.getElementById('ctplDevelopedDate').value = tpl.developedDate || '';
   document.getElementById('ctplSignatureLeft').value = tpl.signatureLeft || 'Programme Coordinator/ Principal';
@@ -20451,6 +20463,7 @@ function saveCertTemplate() {
 
   certTemplates[_certTplEditingCourse] = {
     courseFullName: document.getElementById('ctplCourseFullName').value.trim(),
+    courseType: document.getElementById('ctplCourseType').value || 'Short Course',
     programmeCode: document.getElementById('ctplProgrammeCode').value.trim(),
     version: document.getElementById('ctplVersion').value.trim(),
     developedDate: document.getElementById('ctplDevelopedDate').value.trim(),
