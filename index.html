@@ -10289,7 +10289,7 @@ function addStudent() {
   if(!name){alert('Please enter a name');return;}
   var selectedCourse = document.getElementById('newStudentCourse').value;
   var assignedInstructor = (instructorData.find(function(ins){return ins.course === selectedCourse;})||{}).name || '';
-  students.unshift({id:'STU-'+String(2026000+students.length),name,stage:document.getElementById('newStudentStage').value,course:selectedCourse,score:'',progress:10,certNo:null,certDate:null,certCollected:false,attendance:0,assignments:0,assignmentsTotal:8,gpa:'0.0',instructor:assignedInstructor});
+  students.unshift({id:'STU-'+Date.now().toString(36).toUpperCase()+Math.random().toString(36).substring(2,6).toUpperCase(),name,stage:document.getElementById('newStudentStage').value,course:selectedCourse,score:'',progress:10,certNo:null,certDate:null,certCollected:false,attendance:0,assignments:0,assignmentsTotal:8,gpa:'0.0',instructor:assignedInstructor});
   closeModal('addStudentModal');filterStudents();updatePipelineCounts();showToast(`${name} added!`);document.getElementById('newStudentName').value='';
   addNotification('New student enrolled: ' + name + ' — ' + document.getElementById('newStudentCourse').value, 'student', null, ['admin','instructor']);
   saveState();
