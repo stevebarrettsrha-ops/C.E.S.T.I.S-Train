@@ -5343,7 +5343,7 @@ function openRegistrationModal(role, prefillName, prefillEmail) {
   // Remove any existing modal
   closeRegistrationModal();
   var roleLabel = role === 'student' ? 'Student' : 'Instructor';
-  var programmes = ['Welding','Electrical Installation','Cosmetology','Business Administration','Auto Mechanics','Plumbing','Carpentry','Hospitality & Tourism','Information Technology'];
+  var programmes = getCourseList();
   var programmeOptions = programmes.map(function(p){ return '<option value="'+p+'">'+p+'</option>'; }).join('');
 
   var html = '<div class="reg-modal-overlay" id="regModalOverlay" onclick="if(event.target===this)closeRegistrationModal()">' +
@@ -5880,7 +5880,7 @@ function buildAdminPages() {
       <div class="stat-card"><div class="stat-icon" style="background:var(--purple-dim);color:var(--purple);">\uD83D\uDCF9</div><div class="stat-value" data-count="${classSessions.length}">0</div><div class="stat-label">Class Sessions</div><div class="stat-change" style="color:var(--text-muted);">Total scheduled</div></div>
     </div>
     <div class="quick-actions">
-      <div class="quick-action-btn" onclick="openModal('addStudentModal')"><div class="qa-icon">\uD83D\uDC64</div><div class="qa-label">Add Student</div></div>
+      <div class="quick-action-btn" onclick="showPage('students');openModal('addStudentModal')"><div class="qa-icon">\uD83D\uDC64</div><div class="qa-label">Add Student</div></div>
       <div class="quick-action-btn" onclick="openModal('createExamModal')"><div class="qa-icon">\uD83D\uDCDD</div><div class="qa-label">Create Exam</div></div>
       <div class="quick-action-btn" onclick="showPage('announcements')"><div class="qa-icon">\uD83D\uDCE2</div><div class="qa-label">New Announcement</div></div>
       <div class="quick-action-btn" onclick="exportReportCSV()"><div class="qa-icon">\uD83D\uDCC4</div><div class="qa-label">Export Report</div></div>
@@ -10405,6 +10405,8 @@ function populateCourseDropdowns() {
     filterCourse.innerHTML = '<option value="all">All Courses</option>' + courses.map(function(c) { return '<option>' + c + '</option>'; }).join('');
     if(prevFilter) filterCourse.value = prevFilter;
   }
+  // Also refresh the cert template skill area dropdown
+  if(typeof populateCertTemplateSkillSelect === 'function') populateCertTemplateSkillSelect();
 }
 
 function initTrainingAdminControls() {
@@ -19079,7 +19081,7 @@ function buildCmcPages() {
 
   // ---- Financial Overview Page ----
   // Compute fee/programme data locally
-  var programmes = ['Welding','Electrical Installation','Cosmetology','Business Administration','Auto Mechanics','Plumbing','Carpentry','Hospitality & Tourism','Information Technology'];
+  var programmes = getCourseList();
   var progData = programmes.map(function(p) {
     var enrolled = students.filter(function(s){return s.course===p;}).length;
     var cert = students.filter(function(s){return s.course===p&&(s.stage==='certified'||s.stage==='collected');}).length;
@@ -19585,7 +19587,7 @@ function cmcRenderCharts() {
 
   // Enrolment by Programme chart
   var progLabels = []; var progCounts = [];
-  var progs = ['Welding','Electrical Installation','Cosmetology','Business Administration','Auto Mechanics','Plumbing','Carpentry','Hospitality & Tourism','Information Technology'];
+  var progs = getCourseList();
   progs.forEach(function(p) {
     var count = students.filter(function(s){return s.course===p;}).length;
     if(count > 0) { progLabels.push(p); progCounts.push(count); }
@@ -21342,12 +21344,8 @@ function populateCertTemplateSkillSelect() {
   if(!sel) return;
   var current = sel.value;
   sel.innerHTML = '<option value="">-- Select Skill Area --</option>';
-  var courses = ['Welding & Fabrication','Electrical Installation','Cosmetology','Business Administration',
-    'Auto Mechanics','Plumbing','Carpentry','Hospitality & Tourism','Information Technology',
-    'Garment Construction','Refrigeration & AC','Heavy Equipment Ops','Commercial Cooking',
-    'Beauty Therapy','Data Operations','Agriculture','Masonry','Solar Energy Tech',
-    'Early Childhood Ed','Customer Service'];
-  courses.forEach(function(c) {
+  var courseList = getCourseList();
+  courseList.forEach(function(c) {
     var hasTemplate = certTemplates[c] ? ' \u2713' : '';
     sel.innerHTML += '<option value="' + c + '"' + (c === current ? ' selected' : '') + '>' + c + hasTemplate + '</option>';
   });
