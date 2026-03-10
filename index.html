@@ -4724,6 +4724,7 @@ function updateSkillAreaCounts() {
   });
 }
 loadState();
+applyGoogleVerificationMeta();
 
 // Check for expired session on page load (e.g. user returns to stale tab)
 (function() {
@@ -5277,8 +5278,10 @@ function switchSettingsTab(tab, which) {
   document.getElementById('settingsTabSystem').style.display = which==='system' ? '' : 'none';
   document.getElementById('settingsTabUsers').style.display = which==='users' ? '' : 'none';
   document.getElementById('settingsTabStaffAccess').style.display = which==='staffaccess' ? '' : 'none';
+  document.getElementById('settingsTabGoogleVerification').style.display = which==='googleverification' ? '' : 'none';
   if(which === 'users') renderUserAccountsTable();
   if(which === 'staffaccess') renderAdminStaffAccessGrid();
+  if(which === 'googleverification') loadGoogleVerificationUI();
 }
 
 let adminLoginShown = false, studentLoginShown = false, instructorLoginShown = false, adminStaffLoginShown = false, cmcLoginShown = false;
@@ -6851,6 +6854,7 @@ function buildAdminPages() {
       <div class="tab active" onclick="switchSettingsTab(this,'system')">System Settings</div>
       <div class="tab" onclick="switchSettingsTab(this,'users')">User Accounts</div>
       <div class="tab" onclick="switchSettingsTab(this,'staffaccess')">Admin Staff Access</div>
+      <div class="tab" onclick="switchSettingsTab(this,'googleverification')">Google Verification</div>
     </div>
 
     <div id="settingsTabSystem">
@@ -6916,6 +6920,28 @@ function buildAdminPages() {
         <div class="as-access-grid" id="asAccessGrid"></div>
         <div style="margin-top:20px;">
           <button class="btn btn-primary" onclick="saveAdminStaffAccess()">Save Access Settings</button>
+        </div>
+      </div>
+    </div>
+
+    <div id="settingsTabGoogleVerification" style="display:none;">
+      <div class="card" style="max-width:700px;">
+        <div class="card-header"><h3>Google Site Verification</h3></div>
+        <p style="font-size:13px;color:var(--text-secondary);margin-bottom:16px;line-height:1.6;">
+          Add your Google site verification meta tag to verify ownership of this site with Google Search Console.
+          Paste the full meta tag provided by Google (e.g. <code style="background:var(--bg-input);padding:2px 6px;border-radius:4px;">&lt;meta name="google-site-verification" content="..." /&gt;</code>).
+        </p>
+        <div class="form-group">
+          <label>Google Verification Meta Tag</label>
+          <textarea class="form-control" id="settGoogleVerificationHtml" rows="4" placeholder='<meta name="google-site-verification" content="your-verification-code" />' style="font-family:monospace;font-size:13px;resize:vertical;"></textarea>
+        </div>
+        <div id="gvPreview" style="display:none;margin-bottom:16px;padding:12px;border-radius:8px;background:var(--bg-input);border:1px solid var(--accent-dim);">
+          <div style="font-size:12px;color:var(--accent);font-weight:600;margin-bottom:6px;">ACTIVE VERIFICATION TAG</div>
+          <code id="gvPreviewCode" style="font-size:12px;color:var(--text-secondary);word-break:break-all;"></code>
+        </div>
+        <div style="display:flex;gap:10px;">
+          <button class="btn btn-primary" onclick="saveGoogleVerification()">Save & Apply</button>
+          <button class="btn btn-secondary" onclick="clearGoogleVerification()">Remove Tag</button>
         </div>
       </div>
     </div>
@@ -10534,6 +10560,85 @@ function saveSystemSettings() {
 
   saveState();
   showToast('Settings saved successfully');
+}
+
+// ============================== GOOGLE SITE VERIFICATION ==============================
+function loadGoogleVerificationUI() {
+  var textarea = document.getElementById('settGoogleVerificationHtml');
+  var preview = document.getElementById('gvPreview');
+  var previewCode = document.getElementById('gvPreviewCode');
+  var saved = systemSettings.googleVerificationHtml || '';
+  if(textarea) textarea.value = saved;
+  if(saved.trim()) {
+    preview.style.display = '';
+    previewCode.textContent = saved.trim();
+  } else {
+    preview.style.display = 'none';
+    previewCode.textContent = '';
+  }
+}
+
+function sanitizeGoogleVerificationHtml(html) {
+  var trimmed = html.trim();
+  if(!trimmed) return '';
+  // Only allow meta tags with name="google-site-verification"
+  var parser = new DOMParser();
+  var doc = parser.parseFromString(trimmed, 'text/html');
+  var metas = doc.querySelectorAll('meta[name="google-site-verification"]');
+  if(metas.length === 0) return null;
+  var result = '';
+  metas.forEach(function(m) {
+    result += '<meta name="google-site-verification" content="' + (m.getAttribute('content') || '').replace(/[^a-zA-Z0-9_\-]/g, '') + '" />\n';
+  });
+  return result.trim();
+}
+
+function applyGoogleVerificationMeta() {
+  // Remove any previously injected google verification meta tags
+  document.querySelectorAll('meta[name="google-site-verification"][data-voctrain]').forEach(function(el) { el.remove(); });
+  var html = systemSettings.googleVerificationHtml || '';
+  if(!html.trim()) return;
+  var parser = new DOMParser();
+  var doc = parser.parseFromString(html, 'text/html');
+  var metas = doc.querySelectorAll('meta[name="google-site-verification"]');
+  metas.forEach(function(m) {
+    var content = m.getAttribute('content');
+    if(content) {
+      var tag = document.createElement('meta');
+      tag.setAttribute('name', 'google-site-verification');
+      tag.setAttribute('content', content);
+      tag.setAttribute('data-voctrain', 'true');
+      document.head.appendChild(tag);
+    }
+  });
+}
+
+function saveGoogleVerification() {
+  var textarea = document.getElementById('settGoogleVerificationHtml');
+  var raw = textarea ? textarea.value : '';
+  if(raw.trim()) {
+    var sanitized = sanitizeGoogleVerificationHtml(raw);
+    if(sanitized === null) {
+      showToast('Invalid input: please paste a valid Google verification meta tag');
+      return;
+    }
+    systemSettings.googleVerificationHtml = sanitized;
+    textarea.value = sanitized;
+  } else {
+    systemSettings.googleVerificationHtml = '';
+  }
+  applyGoogleVerificationMeta();
+  saveState();
+  loadGoogleVerificationUI();
+  showToast('Google verification tag saved and applied');
+}
+
+function clearGoogleVerification() {
+  systemSettings.googleVerificationHtml = '';
+  applyGoogleVerificationMeta();
+  saveState();
+  loadGoogleVerificationUI();
+  showToast('Google verification tag removed');
 }
 
 // ============================== EXPORT FUNCTIONS ==============================
