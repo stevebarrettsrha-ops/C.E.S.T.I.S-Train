@@ -3490,6 +3490,7 @@ textarea.form-control { resize:vertical; min-height:80px; }
   <div class="modal">
     <div class="modal-header"><h3>Edit Student</h3><button class="modal-close" onclick="closeModal('editStudentModal')">✕</button></div>
     <input type="hidden" id="editStudentIdx">
+    <div class="form-group"><label>Student ID</label><div style="display:flex;gap:8px;align-items:center;"><input type="text" class="form-control" id="editStudentId" readonly style="flex:1;background:var(--bg-secondary);cursor:default;"><button class="btn btn-sm btn-secondary" id="regenerateIdBtn" onclick="regenerateStudentId()" style="white-space:nowrap;">↻ Regenerate</button></div></div>
     <div class="form-group"><label>Full Name</label><input type="text" class="form-control" id="editStudentName"></div>
     <div class="form-group"><label>Email</label><input type="email" class="form-control" id="editStudentEmail" placeholder="e.g. john@email.com"></div>
     <div class="form-group"><label>Programme</label><select class="form-control" id="editStudentCourse"></select></div>
@@ -10226,22 +10227,43 @@ function updateStudentStage(idx) {
 function openEditStudent(idx) {
   var s = students[idx];
   document.getElementById('editStudentIdx').value = idx;
+  document.getElementById('editStudentId').value = s.id;
   document.getElementById('editStudentName').value = s.name;
   var profile = studentProfiles[s.id] || {};
   document.getElementById('editStudentEmail').value = profile.email || '';
   document.getElementById('editStudentInstructor').value = s.instructor || '';
   document.getElementById('editStudentAttendance').value = s.attendance || 0;
   document.getElementById('editStudentGPA').value = s.gpa || '0.0';
+  var regenBtn = document.getElementById('regenerateIdBtn');
+  if(regenBtn) regenBtn.style.display = (currentRole === 'admin') ? '' : 'none';
   populateCourseDropdowns();
   var courseSel = document.getElementById('editStudentCourse');
   if(courseSel) courseSel.value = s.course;
   openModal('editStudentModal');
+}
+function generateStudentId() {
+  return 'STU-'+Date.now().toString(36).toUpperCase()+Math.random().toString(36).substring(2,6).toUpperCase();
+}
+function regenerateStudentId() {
+  if(currentRole !== 'admin'){showToast('Only administrators can regenerate student IDs');return;}
+  var newId = generateStudentId();
+  document.getElementById('editStudentId').value = newId;
+  showToast('New ID generated — save to apply');
 }
 function saveEditStudent() {
   var idx = parseInt(document.getElementById('editStudentIdx').value);
   var name = document.getElementById('editStudentName').value.trim();
   if(!name){alert('Please enter a name');return;}
   var s = students[idx];
+  var newId = document.getElementById('editStudentId').value;
+  if(newId && newId !== s.id) {
+    var oldId = s.id;
+    if(studentProfiles[oldId]) {
+      studentProfiles[newId] = studentProfiles[oldId];
+      delete studentProfiles[oldId];
+    }
+    s.id = newId;
+  }
   s.name = name;
   s.course = document.getElementById('editStudentCourse').value;
   s.instructor = document.getElementById('editStudentInstructor').value.trim();
@@ -10289,7 +10311,7 @@ function addStudent() {
   if(!name){alert('Please enter a name');return;}
   var selectedCourse = document.getElementById('newStudentCourse').value;
   var assignedInstructor = (instructorData.find(function(ins){return ins.course === selectedCourse;})||{}).name || '';
-  students.unshift({id:'STU-'+Date.now().toString(36).toUpperCase()+Math.random().toString(36).substring(2,6).toUpperCase(),name,stage:document.getElementById('newStudentStage').value,course:selectedCourse,score:'',progress:10,certNo:null,certDate:null,certCollected:false,attendance:0,assignments:0,assignmentsTotal:8,gpa:'0.0',instructor:assignedInstructor});
+  students.unshift({id:generateStudentId(),name,stage:document.getElementById('newStudentStage').value,course:selectedCourse,score:'',progress:10,certNo:null,certDate:null,certCollected:false,attendance:0,assignments:0,assignmentsTotal:8,gpa:'0.0',instructor:assignedInstructor});
   closeModal('addStudentModal');filterStudents();updatePipelineCounts();showToast(`${name} added!`);document.getElementById('newStudentName').value='';
   addNotification('New student enrolled: ' + name + ' — ' + document.getElementById('newStudentCourse').value, 'student', null, ['admin','instructor']);
   saveState();
