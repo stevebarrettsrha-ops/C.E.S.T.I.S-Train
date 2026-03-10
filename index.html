@@ -5451,10 +5451,17 @@ function submitRegistration() {
   userAccounts.push(newUser);
   saveState();
 
-  // Auto-merge from cloud to pick up accounts from other devices, then push new registration
-  if (isCloudConnected && googleAccessToken) {
-    autoSyncOnLogin();
-  }
+  // Push the new registration to cloud so admin can see it
+  // This works even without full admin sync — uses lightweight Google auth
+  studentPushRegistration(newUser).then(function(pushed) {
+    if (pushed) {
+      console.log('[Registration] Account pushed to cloud successfully');
+    } else {
+      console.log('[Registration] Account saved locally — will sync to cloud when admin syncs');
+    }
+  }).catch(function(err) {
+    console.warn('[Registration] Cloud push failed (account saved locally):', err);
+  });
 
   closeRegistrationModal();
   showPendingApprovalScreen(newUser);
@@ -15319,6 +15326,154 @@ async function studentLightSync(uname, pw) {
     alert('Could not fetch your account from the cloud. Please try the Sync button or register a new account.\n\nError: ' + err.message);
     studentCloudLoginAttempted = false;
   }
+}
+
+// ============================================
+// STUDENT PUSH REGISTRATION — Push new student account to cloud
+// So admin can see newly registered students without needing the student's device
+// ============================================
+
+async function studentPushRegistration(newUserAccount) {
+  var token = googleAccessToken;
+  if (!token) {
+    var savedToken = localStorage.getItem('schoolDashboardGoogleAccessToken');
+    var savedExpiry = localStorage.getItem('schoolDashboardGoogleTokenExpiry');
+    if (savedToken && savedExpiry && new Date(savedExpiry) > new Date()) {
+      token = savedToken;
+    } else {
+      // Request Google auth to push registration to cloud
+      try { token = await loginPageGoogleAuth(); } catch(e) { token = null; }
+    }
+  }
+
+  if (!token) {
+    console.warn('[StudentPushReg] No Google token available — registration saved locally only');
+    return false;
+  }
+
+  try {
+    // Step 1: Find existing backup file on Google Drive
+    var folderId = GOOGLE_DRIVE_CONFIG.FOLDER_ID;
+    var backupFileName = GOOGLE_DRIVE_CONFIG.BACKUP_FILE_NAME || 'CESTIS_LMS_BACKUP.json';
+
+    var searchUrl = 'https://www.googleapis.com/drive/v3/files?q=' +
+      encodeURIComponent("'" + folderId + "' in parents and name='" + backupFileName + "' and trashed=false") +
+      '&fields=files(id,name)&orderBy=modifiedTime desc&pageSize=1';
+
+    var searchResp = await fetch(searchUrl, { headers: { Authorization: 'Bearer ' + token } });
+    if (!searchResp.ok) {
+      console.warn('[StudentPushReg] Could not search Drive for backup file');
+      return false;
+    }
+
+    var searchData = await searchResp.json();
+    if (!searchData.files || searchData.files.length === 0) {
+      console.warn('[StudentPushReg] No cloud backup file found — registration saved locally only');
+      return false;
+    }
+
+    // Step 2: Download the existing backup
+    var fileId = searchData.files[0].id;
+    var downloadResp = await fetch('https://www.googleapis.com/drive/v3/files/' + fileId + '?alt=media', {
+      headers: { Authorization: 'Bearer ' + token }
+    });
+    if (!downloadResp.ok) {
+      console.warn('[StudentPushReg] Could not download backup file');
+      return false;
+    }
+
+    var backupData = await downloadResp.json();
+
+    // Step 3: Merge the new account into the cloud backup data
+    var cloudAccounts = backupData.userAccounts || backupData.data && backupData.data.userAccounts || [];
+    var isWrapped = !!backupData.data; // backup may be wrapped in { data: {...} }
+    var accountList = isWrapped ? backupData.data.userAccounts : backupData.userAccounts;
+    if (!accountList) accountList = [];
+
+    // Check for duplicate
+    var alreadyExists = accountList.find(function(u) { return u.id === newUserAccount.id || u.email === newUserAccount.email; });
+    if (alreadyExists) {
+      console.log('[StudentPushReg] Account already exists in cloud — skipping');
+      return true;
+    }
+
+    // Add the new account
+    accountList.push(newUserAccount);
+    if (isWrapped) {
+      backupData.data.userAccounts = accountList;
+    } else {
+      backupData.userAccounts = accountList;
+    }
+
+    // Update timestamp
+    if (isWrapped) {
+      backupData.timestamp = new Date().toISOString();
+    }
+
+    // Step 4: Upload the updated backup back to ALL Drive folders
+    var jsonContent = JSON.stringify(backupData);
+    var blob = new Blob([jsonContent], { type: 'application/json' });
+
+    // Upload to main folder
+    var uploadResp = await fetch(
+      'https://www.googleapis.com/upload/drive/v3/files/' + fileId + '?uploadType=media',
+      {
+        method: 'PATCH',
+        headers: {
+          'Authorization': 'Bearer ' + token,
+          'Content-Type': 'application/json'
+        },
+        body: blob
+      }
+    );
+
+    if (!uploadResp.ok) {
+      var errData = await uploadResp.json().catch(function() { return {}; });
+      console.warn('[StudentPushReg] Upload failed:', errData);
+      return false;
+    }
+
+    // Also push to other backup folders (best effort)
+    for (var i = 0; i < ALL_DRIVE_FOLDERS.length; i++) {
+      var folder = ALL_DRIVE_FOLDERS[i];
+      if (folder.id === folderId) continue; // already saved to main
+      try {
+        var otherFileId = await findBackupFileInFolderWithToken(folder.id, token);
+        if (otherFileId) {
+          await fetch(
+            'https://www.googleapis.com/upload/drive/v3/files/' + otherFileId + '?uploadType=media',
+            {
+              method: 'PATCH',
+              headers: { 'Authorization': 'Bearer ' + token, 'Content-Type': 'application/json' },
+              body: blob
+            }
+          );
+        }
+      } catch(e) {
+        console.warn('[StudentPushReg] Could not save to ' + folder.label + ':', e);
+      }
+    }
+
+    console.log('[StudentPushReg] Successfully pushed new registration to cloud: ' + newUserAccount.email);
+    return true;
+
+  } catch (err) {
+    console.error('[StudentPushReg] Error pushing registration:', err);
+    return false;
+  }
+}
+
+// Helper: find backup file in a folder using a specific token (for student push)
+async function findBackupFileInFolderWithToken(folderId, token) {
+  var backupFileName = GOOGLE_DRIVE_CONFIG.BACKUP_FILE_NAME || 'CESTIS_LMS_BACKUP.json';
+  var searchUrl = 'https://www.googleapis.com/drive/v3/files?q=' +
+    encodeURIComponent("'" + folderId + "' in parents and name='" + backupFileName + "' and trashed=false") +
+    '&fields=files(id)&orderBy=modifiedTime desc&pageSize=1';
+
+  var resp = await fetch(searchUrl, { headers: { Authorization: 'Bearer ' + token } });
+  if (!resp.ok) return null;
+  var data = await resp.json();
+  return (data.files && data.files.length > 0) ? data.files[0].id : null;
 }
 
 // ============================================
