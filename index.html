@@ -3287,6 +3287,7 @@ textarea.form-control { resize:vertical; min-height:80px; }
       <div style="text-align:center;margin-bottom:8px;font-size:40px;">🎓</div>
       <h2 style="text-align:center;">Certificate Verification</h2>
       <p class="subtitle" style="text-align:center;">Enter your <strong>Student ID Number</strong> to download your certificate, or your <strong>Certificate Number</strong> to verify a certificate.</p>
+      <div id="certCheckDriveStatus" style="display:none;text-align:center;margin-bottom:12px;padding:10px 16px;border-radius:8px;font-size:12px;"></div>
       <div class="cert-check-input-group">
         <input type="text" id="certCheckInput" placeholder="e.g. STU-2026001 or WE-2026-1234" onkeydown="if(event.key==='Enter')checkCertificatePublic()">
         <button onclick="checkCertificatePublic()">Search</button>
@@ -20770,14 +20771,138 @@ async function cmcSaveSnapshot() {
 // ============================== CERTIFICATE CHECK & DOWNLOAD ==============================
 
 // --- Public Certificate Check (from landing page) ---
+var _certDriveFetchInProgress = false;
+var _certDriveLastFetched = null;
+var CERT_DRIVE_CACHE_MS = 60000; // Re-fetch from Drive at most once per minute
+
 function openCertCheckOverlay() {
   document.getElementById('certCheckOverlay').classList.add('active');
   document.getElementById('certCheckInput').value = '';
   document.getElementById('certCheckResult').innerHTML = '';
   setTimeout(function(){ document.getElementById('certCheckInput').focus(); }, 100);
+
+  // Auto-fetch latest certificate data from Google Drive (lightweight, no login required)
+  fetchCertDataFromDrive();
 }
 function closeCertCheckOverlay() {
   document.getElementById('certCheckOverlay').classList.remove('active');
+}
+
+// Lightweight on-demand fetch: pulls only students + certDownloadApprovals from Google Drive backup
+// No LMS account required — uses cached Google OAuth token if available
+async function fetchCertDataFromDrive() {
+  // Skip if already fetching or recently fetched
+  if (_certDriveFetchInProgress) return;
+  if (_certDriveLastFetched && (Date.now() - _certDriveLastFetched < CERT_DRIVE_CACHE_MS)) return;
+
+  var statusDiv = document.getElementById('certCheckDriveStatus');
+
+  // Try to get a Google access token from localStorage (no popup, no login)
+  var token = googleAccessToken;
+  if (!token) {
+    var savedToken = localStorage.getItem('schoolDashboardGoogleAccessToken');
+    var savedExpiry = localStorage.getItem('schoolDashboardGoogleTokenExpiry');
+    if (savedToken && savedExpiry && new Date(savedExpiry) > new Date()) {
+      token = savedToken;
+    }
+  }
+  if (!token) {
+    // No token available — silently use whatever local data exists
+    return;
+  }
+
+  _certDriveFetchInProgress = true;
+  statusDiv.style.display = 'block';
+  statusDiv.style.background = 'rgba(240,165,0,0.1)';
+  statusDiv.style.color = 'var(--accent)';
+  statusDiv.textContent = 'Loading latest certificate records from cloud...';
+
+  try {
+    // Find the backup file in the Main Backup folder
+    var folderId = GOOGLE_DRIVE_CONFIG.FOLDER_ID;
+    var fileName = GOOGLE_DRIVE_CONFIG.BACKUP_FILE_NAME;
+    var query = encodeURIComponent("name='" + fileName + "' and '" + folderId + "' in parents and trashed=false");
+    var listResp = await fetch('https://www.googleapis.com/drive/v3/files?q=' + query + '&fields=files(id)', {
+      headers: { 'Authorization': 'Bearer ' + token }
+    });
+    if (!listResp.ok) throw new Error('Drive API error');
+    var listData = await listResp.json();
+    if (!listData.files || listData.files.length === 0) throw new Error('No backup found');
+
+    var fileId = listData.files[0].id;
+
+    // Download the backup file
+    var fileResp = await fetch('https://www.googleapis.com/drive/v3/files/' + fileId + '?alt=media', {
+      headers: { 'Authorization': 'Bearer ' + token }
+    });
+    if (!fileResp.ok) throw new Error('Failed to download backup');
+    var backupData = await fileResp.json();
+    if (!backupData.data) throw new Error('Invalid backup format');
+
+    // Merge students — update existing and add new ones
+    var merged = 0;
+    if (backupData.data.students && Array.isArray(backupData.data.students)) {
+      backupData.data.students.forEach(function(cloudStudent) {
+        if (!cloudStudent || !cloudStudent.id) return;
+        var existing = students.find(function(s) { return s.id === cloudStudent.id; });
+        if (existing) {
+          // Update cert-relevant fields from cloud
+          if (cloudStudent.certNo !== undefined) existing.certNo = cloudStudent.certNo;
+          if (cloudStudent.certDate !== undefined) existing.certDate = cloudStudent.certDate;
+          if (cloudStudent.certCollected !== undefined) existing.certCollected = cloudStudent.certCollected;
+          if (cloudStudent.stage !== undefined) existing.stage = cloudStudent.stage;
+          if (cloudStudent.progress !== undefined) existing.progress = cloudStudent.progress;
+          if (cloudStudent.name) existing.name = cloudStudent.name;
+          if (cloudStudent.course) existing.course = cloudStudent.course;
+        } else {
+          students.push(cloudStudent);
+          merged++;
+        }
+      });
+    }
+
+    // Merge certDownloadApprovals — update existing and add new
+    if (backupData.data.certDownloadApprovals && Array.isArray(backupData.data.certDownloadApprovals)) {
+      backupData.data.certDownloadApprovals.forEach(function(ca) {
+        if (!ca || !ca.studentId) return;
+        var existing = certDownloadApprovals.find(function(l) { return l.studentId === ca.studentId; });
+        if (existing) {
+          // Update approval status from cloud (admin controls this)
+          existing.approved = ca.approved;
+          existing.approvedDate = ca.approvedDate;
+          existing.approvedBy = ca.approvedBy;
+        } else {
+          certDownloadApprovals.push(ca);
+        }
+      });
+    }
+
+    // Also merge certTemplates metadata (without background images)
+    if (backupData.data.certTemplates) {
+      Object.keys(backupData.data.certTemplates).forEach(function(k) {
+        if (!certTemplates[k]) {
+          certTemplates[k] = backupData.data.certTemplates[k];
+        }
+      });
+    }
+
+    _certDriveLastFetched = Date.now();
+
+    // Show success briefly then hide
+    statusDiv.style.background = 'rgba(46,204,113,0.1)';
+    statusDiv.style.color = 'var(--green)';
+    statusDiv.textContent = 'Certificate records updated from cloud.';
+    setTimeout(function() { statusDiv.style.display = 'none'; }, 2500);
+
+  } catch (err) {
+    console.warn('[CertFetch] Error fetching certificate data from Drive:', err);
+    statusDiv.style.background = 'rgba(231,76,60,0.1)';
+    statusDiv.style.color = 'var(--red)';
+    statusDiv.textContent = 'Using cached data. Cloud sync unavailable.';
+    setTimeout(function() { statusDiv.style.display = 'none'; }, 3000);
+  } finally {
+    _certDriveFetchInProgress = false;
+  }
 }
 
 function checkCertificatePublic() {
