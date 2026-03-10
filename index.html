@@ -20128,34 +20128,53 @@ function renderCertPage2OnBg(bgImg, student, tpl) {
 
   ctx.textAlign = 'left';
 
-  // MODULES COMPLETED
+  // MODULES COMPLETED (two sub-columns within the left column)
   ctx.font = 'bold ' + contentSize + 'px Arial, sans-serif';
   ctx.fillStyle = '#1B2A4A';
   ctx.fillText('MODULES COMPLETED', colLeft + 10, yMod);
   yMod += lineH + 6;
 
   var bulletPrefix = '  \u2022  ';
-  modules.forEach(function(mod) {
-    ctx.font = 'bold ' + Math.round(contentSize*0.85) + 'px Arial, sans-serif';
-    ctx.fillStyle = '#2A7B88';
-    var modTitle = '\u2611 ' + mod.name + ' ' + (mod.contactHours || '') + ' Contact Hours';
-    var modLines = wrapText(ctx, modTitle, colMid - colLeft - 20);
-    modLines.forEach(function(line) {
-      ctx.fillText(line, colLeft + 10, yMod);
-      yMod += lineH;
-    });
-    (mod.topics || []).forEach(function(topic) {
-      ctx.font = Math.round(contentSize*0.77) + 'px Arial, sans-serif';
-      ctx.fillStyle = '#333';
-      var bulletW = ctx.measureText(bulletPrefix).width;
-      var topicLines = wrapText(ctx, topic, colMid - colLeft - 30 - bulletW);
-      topicLines.forEach(function(line) {
-        ctx.fillText(bulletPrefix + line, colLeft + 20, yMod);
-        yMod += subLineH;
+
+  // Split modules into two sub-columns for better space usage
+  var modSubColGap = 10;
+  var modSubColWidth = Math.floor((colMid - colLeft - modSubColGap) / 2);
+  var modCol1X = colLeft;
+  var modCol2X = colLeft + modSubColWidth + modSubColGap;
+  var modHalf = Math.ceil(modules.length / 2);
+  var modCol1 = modules.slice(0, modHalf);
+  var modCol2 = modules.slice(modHalf);
+
+  // Render a sub-column of modules and return the final Y position
+  function renderModSubCol(mods, startX, startY, maxW) {
+    var y = startY;
+    mods.forEach(function(mod) {
+      ctx.font = 'bold ' + Math.round(contentSize*0.85) + 'px Arial, sans-serif';
+      ctx.fillStyle = '#2A7B88';
+      var modTitle = '\u2611 ' + mod.name + ' ' + (mod.contactHours || '') + ' Contact Hours';
+      var modLines = wrapText(ctx, modTitle, maxW - 20);
+      modLines.forEach(function(line) {
+        ctx.fillText(line, startX + 10, y);
+        y += lineH;
       });
+      (mod.topics || []).forEach(function(topic) {
+        ctx.font = Math.round(contentSize*0.77) + 'px Arial, sans-serif';
+        ctx.fillStyle = '#333';
+        var bulletW = ctx.measureText(bulletPrefix).width;
+        var topicLines = wrapText(ctx, topic, maxW - 30 - bulletW);
+        topicLines.forEach(function(line) {
+          ctx.fillText(bulletPrefix + line, startX + 20, y);
+          y += subLineH;
+        });
+      });
+      y += 4;
     });
-    yMod += 4;
-  });
+    return y;
+  }
+
+  var yModCol1 = renderModSubCol(modCol1, modCol1X, yMod, modSubColWidth);
+  var yModCol2 = renderModSubCol(modCol2, modCol2X, yMod, modSubColWidth);
+  yMod = Math.max(yModCol1, yModCol2);
 
   // COMPETENCIES
   ctx.font = 'bold ' + contentSize + 'px Arial, sans-serif';
