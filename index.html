@@ -6208,70 +6208,90 @@ function buildAdminPages() {
         </div>
       </div>
 
-      <h4 style="font-size:14px;margin-bottom:8px;color:var(--accent);">Page 1 — Text Positions (% from top-left)</h4>
-      <p style="font-size:12px;color:var(--text-muted);margin-bottom:8px;">Adjust where dynamic text is placed on your Page 1 background. Values are percentages of the image dimensions. The live preview below updates as you change values.</p>
-      <div style="display:grid;grid-template-columns:1fr 1fr 1fr 1fr;gap:12px;margin-bottom:12px;">
-        <div class="form-group"><label style="font-size:11px;">Student Name Y%</label><input type="number" id="ctplP1NameY" value="48" step="1" min="0" max="100" style="font-size:12px;" oninput="updateCertLivePreview()"></div>
-        <div class="form-group"><label style="font-size:11px;">Body Text Y%</label><input type="number" id="ctplP1BodyY" value="62" step="1" min="0" max="100" style="font-size:12px;" oninput="updateCertLivePreview()"></div>
-        <div class="form-group"><label style="font-size:11px;">Cert No. Y%</label><input type="number" id="ctplP1CertNoY" value="95" step="1" min="0" max="100" style="font-size:12px;" oninput="updateCertLivePreview()"></div>
-        <div class="form-group"><label style="font-size:11px;">Name Font Size</label><input type="number" id="ctplP1NameSize" value="48" step="1" min="16" max="100" style="font-size:12px;" oninput="updateCertLivePreview()"></div>
-      </div>
+      <h4 style="font-size:14px;margin-bottom:8px;color:var(--accent);">Page 1 — Text Positions & Sizes</h4>
+      <p style="font-size:12px;color:var(--text-muted);margin-bottom:8px;">X% = horizontal (0=left, 50=center, 100=right). Y% = vertical (0=top, 100=bottom). Click and drag text directly on the preview to reposition.</p>
+      <table style="width:100%;font-size:11px;margin-bottom:12px;border-collapse:collapse;">
+        <thead><tr style="color:var(--accent);border-bottom:1px solid var(--border);">
+          <th style="text-align:left;padding:4px 6px;">Section</th><th style="padding:4px 6px;">X%</th><th style="padding:4px 6px;">Y%</th><th style="padding:4px 6px;">Font Size</th>
+        </tr></thead>
+        <tbody>
+          <tr style="border-bottom:1px solid var(--border-light);">
+            <td style="padding:4px 6px;color:#ff5050;font-weight:600;">Student Name</td>
+            <td style="padding:2px 4px;"><input type="number" id="ctplP1NameX" value="50" step="1" min="0" max="100" style="width:52px;font-size:11px;" oninput="updateCertLivePreview()"></td>
+            <td style="padding:2px 4px;"><input type="number" id="ctplP1NameY" value="48" step="1" min="0" max="100" style="width:52px;font-size:11px;" oninput="updateCertLivePreview()"></td>
+            <td style="padding:2px 4px;"><input type="number" id="ctplP1NameSize" value="48" step="1" min="10" max="120" style="width:52px;font-size:11px;" oninput="updateCertLivePreview()"></td>
+          </tr>
+          <tr style="border-bottom:1px solid var(--border-light);">
+            <td style="padding:4px 6px;color:#50c850;font-weight:600;">Body Text</td>
+            <td style="padding:2px 4px;"><input type="number" id="ctplP1BodyX" value="50" step="1" min="0" max="100" style="width:52px;font-size:11px;" oninput="updateCertLivePreview()"></td>
+            <td style="padding:2px 4px;"><input type="number" id="ctplP1BodyY" value="62" step="1" min="0" max="100" style="width:52px;font-size:11px;" oninput="updateCertLivePreview()"></td>
+            <td style="padding:2px 4px;"><input type="number" id="ctplP1BodySize" value="18" step="1" min="6" max="60" style="width:52px;font-size:11px;" oninput="updateCertLivePreview()"></td>
+          </tr>
+          <tr>
+            <td style="padding:4px 6px;color:#5096ff;font-weight:600;">Cert Number</td>
+            <td style="padding:2px 4px;"><input type="number" id="ctplP1CertNoX" value="50" step="1" min="0" max="100" style="width:52px;font-size:11px;" oninput="updateCertLivePreview()"></td>
+            <td style="padding:2px 4px;"><input type="number" id="ctplP1CertNoY" value="95" step="1" min="0" max="100" style="width:52px;font-size:11px;" oninput="updateCertLivePreview()"></td>
+            <td style="padding:2px 4px;"><input type="number" id="ctplP1CertNoSize" value="16" step="1" min="6" max="60" style="width:52px;font-size:11px;" oninput="updateCertLivePreview()"></td>
+          </tr>
+        </tbody>
+      </table>
 
-      <!-- Live Preview -->
-      <div id="certLivePreviewContainer" style="margin-bottom:20px;border:2px solid var(--accent);border-radius:var(--radius-sm);overflow:hidden;position:relative;background:#1a1a2e;display:none;">
+      <!-- Page 1 Live Preview -->
+      <div id="certLivePreviewContainer" style="margin-bottom:20px;border:2px solid var(--accent);border-radius:var(--radius-sm);overflow:hidden;background:#1a1a2e;display:none;">
         <div style="background:var(--accent);color:#fff;padding:4px 12px;font-size:11px;font-weight:600;display:flex;align-items:center;justify-content:space-between;">
-          <span>LIVE PREVIEW — Text Position Preview</span>
-          <span style="font-size:10px;opacity:0.8;">Drag guide lines or change values above</span>
+          <span>LIVE PREVIEW — Page 1</span>
+          <span id="certP1DragStatus" style="font-size:10px;opacity:0.8;">Click and drag text to reposition</span>
         </div>
-        <div style="position:relative;width:100%;overflow:hidden;">
-          <canvas id="certLivePreviewCanvas" style="width:100%;display:block;cursor:crosshair;"></canvas>
-          <!-- Horizontal guide lines (draggable) -->
-          <div id="certGuideNameLine" class="cert-guide-line" style="position:absolute;left:0;right:0;height:2px;background:rgba(255,80,80,0.8);cursor:ns-resize;pointer-events:auto;z-index:10;" title="Student Name position">
-            <span style="position:absolute;right:4px;top:-16px;font-size:10px;color:#ff5050;background:rgba(0,0,0,0.7);padding:1px 5px;border-radius:3px;white-space:nowrap;">Name</span>
-          </div>
-          <div id="certGuideBodyLine" class="cert-guide-line" style="position:absolute;left:0;right:0;height:2px;background:rgba(80,200,80,0.8);cursor:ns-resize;pointer-events:auto;z-index:10;" title="Body Text position">
-            <span style="position:absolute;right:4px;top:-16px;font-size:10px;color:#50c850;background:rgba(0,0,0,0.7);padding:1px 5px;border-radius:3px;white-space:nowrap;">Body</span>
-          </div>
-          <div id="certGuideCertNoLine" class="cert-guide-line" style="position:absolute;left:0;right:0;height:2px;background:rgba(80,150,255,0.8);cursor:ns-resize;pointer-events:auto;z-index:10;" title="Cert No. position">
-            <span style="position:absolute;right:4px;top:-16px;font-size:10px;color:#5096ff;background:rgba(0,0,0,0.7);padding:1px 5px;border-radius:3px;white-space:nowrap;">Cert No</span>
-          </div>
-        </div>
+        <canvas id="certLivePreviewCanvas" style="width:100%;display:block;cursor:crosshair;"></canvas>
       </div>
 
-      <h4 style="font-size:14px;margin-bottom:8px;color:var(--accent);">Page 2 — Text Positions (% from top)</h4>
-      <p style="font-size:12px;color:var(--text-muted);margin-bottom:8px;">Adjust where sections are placed on your Page 2 background. The live preview below updates as you change values.</p>
-      <div style="display:grid;grid-template-columns:1fr 1fr 1fr 1fr 1fr;gap:12px;margin-bottom:12px;">
-        <div class="form-group"><label style="font-size:11px;">Title Y%</label><input type="number" id="ctplP2TitleY" value="5" step="1" min="0" max="100" style="font-size:12px;" oninput="updateCertLivePreviewP2()"></div>
-        <div class="form-group"><label style="font-size:11px;">Header Y%</label><input type="number" id="ctplP2HeaderY" value="18" step="1" min="0" max="100" style="font-size:12px;" oninput="updateCertLivePreviewP2()"></div>
-        <div class="form-group"><label style="font-size:11px;">Content Y%</label><input type="number" id="ctplP2ContentY" value="25" step="1" min="0" max="100" style="font-size:12px;" oninput="updateCertLivePreviewP2()"></div>
-        <div class="form-group"><label style="font-size:11px;">Specs Y%</label><input type="number" id="ctplP2SpecsY" value="78" step="1" min="0" max="100" style="font-size:12px;" oninput="updateCertLivePreviewP2()"></div>
-        <div class="form-group"><label style="font-size:11px;">Footer Y%</label><input type="number" id="ctplP2FooterY" value="90" step="1" min="0" max="100" style="font-size:12px;" oninput="updateCertLivePreviewP2()"></div>
-      </div>
+      <h4 style="font-size:14px;margin-bottom:8px;color:var(--accent);">Page 2 — Text Positions & Sizes</h4>
+      <p style="font-size:12px;color:var(--text-muted);margin-bottom:8px;">Click and drag text on the preview to reposition. Adjust font sizes per section.</p>
+      <table style="width:100%;font-size:11px;margin-bottom:12px;border-collapse:collapse;">
+        <thead><tr style="color:var(--accent);border-bottom:1px solid var(--border);">
+          <th style="text-align:left;padding:4px 6px;">Section</th><th style="padding:4px 6px;">X%</th><th style="padding:4px 6px;">Y%</th><th style="padding:4px 6px;">Font Size</th>
+        </tr></thead>
+        <tbody>
+          <tr style="border-bottom:1px solid var(--border-light);">
+            <td style="padding:4px 6px;color:#ff5050;font-weight:600;">Title</td>
+            <td style="padding:2px 4px;"><input type="number" id="ctplP2TitleX" value="50" step="1" min="0" max="100" style="width:52px;font-size:11px;" oninput="updateCertLivePreviewP2()"></td>
+            <td style="padding:2px 4px;"><input type="number" id="ctplP2TitleY" value="5" step="1" min="0" max="100" style="width:52px;font-size:11px;" oninput="updateCertLivePreviewP2()"></td>
+            <td style="padding:2px 4px;"><input type="number" id="ctplP2TitleSize" value="26" step="1" min="8" max="60" style="width:52px;font-size:11px;" oninput="updateCertLivePreviewP2()"></td>
+          </tr>
+          <tr style="border-bottom:1px solid var(--border-light);">
+            <td style="padding:4px 6px;color:#ffb432;font-weight:600;">Header</td>
+            <td style="padding:2px 4px;"><input type="number" id="ctplP2HeaderX" value="50" step="1" min="0" max="100" style="width:52px;font-size:11px;" oninput="updateCertLivePreviewP2()"></td>
+            <td style="padding:2px 4px;"><input type="number" id="ctplP2HeaderY" value="18" step="1" min="0" max="100" style="width:52px;font-size:11px;" oninput="updateCertLivePreviewP2()"></td>
+            <td style="padding:2px 4px;"><input type="number" id="ctplP2HeaderSize" value="16" step="1" min="6" max="40" style="width:52px;font-size:11px;" oninput="updateCertLivePreviewP2()"></td>
+          </tr>
+          <tr style="border-bottom:1px solid var(--border-light);">
+            <td style="padding:4px 6px;color:#50c850;font-weight:600;">Content</td>
+            <td style="padding:2px 4px;"><input type="number" id="ctplP2ContentX" value="4" step="1" min="0" max="100" style="width:52px;font-size:11px;" oninput="updateCertLivePreviewP2()"></td>
+            <td style="padding:2px 4px;"><input type="number" id="ctplP2ContentY" value="25" step="1" min="0" max="100" style="width:52px;font-size:11px;" oninput="updateCertLivePreviewP2()"></td>
+            <td style="padding:2px 4px;"><input type="number" id="ctplP2ContentSize" value="13" step="1" min="6" max="30" style="width:52px;font-size:11px;" oninput="updateCertLivePreviewP2()"></td>
+          </tr>
+          <tr style="border-bottom:1px solid var(--border-light);">
+            <td style="padding:4px 6px;color:#c850ff;font-weight:600;">Specs</td>
+            <td style="padding:2px 4px;"><input type="number" id="ctplP2SpecsX" value="50" step="1" min="0" max="100" style="width:52px;font-size:11px;" oninput="updateCertLivePreviewP2()"></td>
+            <td style="padding:2px 4px;"><input type="number" id="ctplP2SpecsY" value="78" step="1" min="0" max="100" style="width:52px;font-size:11px;" oninput="updateCertLivePreviewP2()"></td>
+            <td style="padding:2px 4px;"><input type="number" id="ctplP2SpecsSize" value="13" step="1" min="6" max="30" style="width:52px;font-size:11px;" oninput="updateCertLivePreviewP2()"></td>
+          </tr>
+          <tr>
+            <td style="padding:4px 6px;color:#5096ff;font-weight:600;">Footer</td>
+            <td style="padding:2px 4px;"><input type="number" id="ctplP2FooterX" value="50" step="1" min="0" max="100" style="width:52px;font-size:11px;" oninput="updateCertLivePreviewP2()"></td>
+            <td style="padding:2px 4px;"><input type="number" id="ctplP2FooterY" value="90" step="1" min="0" max="100" style="width:52px;font-size:11px;" oninput="updateCertLivePreviewP2()"></td>
+            <td style="padding:2px 4px;"><input type="number" id="ctplP2FooterSize" value="10" step="1" min="6" max="30" style="width:52px;font-size:11px;" oninput="updateCertLivePreviewP2()"></td>
+          </tr>
+        </tbody>
+      </table>
 
       <!-- Page 2 Live Preview -->
-      <div id="certLivePreviewContainerP2" style="margin-bottom:20px;border:2px solid var(--accent);border-radius:var(--radius-sm);overflow:hidden;position:relative;background:#1a1a2e;display:none;">
+      <div id="certLivePreviewContainerP2" style="margin-bottom:20px;border:2px solid var(--accent);border-radius:var(--radius-sm);overflow:hidden;background:#1a1a2e;display:none;">
         <div style="background:var(--accent);color:#fff;padding:4px 12px;font-size:11px;font-weight:600;display:flex;align-items:center;justify-content:space-between;">
-          <span>LIVE PREVIEW — Page 2 Position Preview</span>
-          <span style="font-size:10px;opacity:0.8;">Drag guide lines or change values above</span>
+          <span>LIVE PREVIEW — Page 2</span>
+          <span id="certP2DragStatus" style="font-size:10px;opacity:0.8;">Click and drag text to reposition</span>
         </div>
-        <div style="position:relative;width:100%;overflow:hidden;">
-          <canvas id="certLivePreviewCanvasP2" style="width:100%;display:block;cursor:crosshair;"></canvas>
-          <div id="certGuideP2TitleLine" class="cert-guide-line" style="position:absolute;left:0;right:0;height:2px;background:rgba(255,80,80,0.8);cursor:ns-resize;pointer-events:auto;z-index:10;" title="Title position">
-            <span style="position:absolute;right:4px;top:-16px;font-size:10px;color:#ff5050;background:rgba(0,0,0,0.7);padding:1px 5px;border-radius:3px;white-space:nowrap;">Title</span>
-          </div>
-          <div id="certGuideP2HeaderLine" class="cert-guide-line" style="position:absolute;left:0;right:0;height:2px;background:rgba(255,180,50,0.8);cursor:ns-resize;pointer-events:auto;z-index:10;" title="Header position">
-            <span style="position:absolute;right:4px;top:-16px;font-size:10px;color:#ffb432;background:rgba(0,0,0,0.7);padding:1px 5px;border-radius:3px;white-space:nowrap;">Header</span>
-          </div>
-          <div id="certGuideP2ContentLine" class="cert-guide-line" style="position:absolute;left:0;right:0;height:2px;background:rgba(80,200,80,0.8);cursor:ns-resize;pointer-events:auto;z-index:10;" title="Content position">
-            <span style="position:absolute;right:4px;top:-16px;font-size:10px;color:#50c850;background:rgba(0,0,0,0.7);padding:1px 5px;border-radius:3px;white-space:nowrap;">Content</span>
-          </div>
-          <div id="certGuideP2SpecsLine" class="cert-guide-line" style="position:absolute;left:0;right:0;height:2px;background:rgba(200,80,255,0.8);cursor:ns-resize;pointer-events:auto;z-index:10;" title="Specs position">
-            <span style="position:absolute;right:4px;top:-16px;font-size:10px;color:#c850ff;background:rgba(0,0,0,0.7);padding:1px 5px;border-radius:3px;white-space:nowrap;">Specs</span>
-          </div>
-          <div id="certGuideP2FooterLine" class="cert-guide-line" style="position:absolute;left:0;right:0;height:2px;background:rgba(80,150,255,0.8);cursor:ns-resize;pointer-events:auto;z-index:10;" title="Footer position">
-            <span style="position:absolute;right:4px;top:-16px;font-size:10px;color:#5096ff;background:rgba(0,0,0,0.7);padding:1px 5px;border-radius:3px;white-space:nowrap;">Footer</span>
-          </div>
-        </div>
+        <canvas id="certLivePreviewCanvasP2" style="width:100%;display:block;cursor:crosshair;"></canvas>
       </div>
 
       <h4 style="font-size:14px;margin-bottom:8px;color:var(--accent);">Certificate Details</h4>
@@ -20513,12 +20533,17 @@ function renderCertPage1OnBg(bgImg, student, tpl) {
   // Draw background image
   ctx.drawImage(bgImg, 0, 0, w, h);
 
-  // Get position settings (percentages)
+  // Get position settings (percentages) with X and Y
   var pos = tpl.textPositions || {};
+  var nameX = (pos.p1NameX || 50) / 100 * w;
   var nameY = (pos.p1NameY || 48) / 100 * h;
-  var bodyY = (pos.p1BodyY || 62) / 100 * h;
-  var certNoY = (pos.p1CertNoY || 95) / 100 * h;
   var nameSize = pos.p1NameSize || 48;
+  var bodyX = (pos.p1BodyX || 50) / 100 * w;
+  var bodyY = (pos.p1BodyY || 62) / 100 * h;
+  var bodySize = pos.p1BodySize || 18;
+  var certNoX = (pos.p1CertNoX || 50) / 100 * w;
+  var certNoY = (pos.p1CertNoY || 95) / 100 * h;
+  var certNoSize = pos.p1CertNoSize || 16;
 
   var courseFullName = tpl.courseFullName || student.course;
   var gender = tpl.gender || 'their';
@@ -20529,32 +20554,29 @@ function renderCertPage1OnBg(bgImg, student, tpl) {
   // Student name
   ctx.font = 'bold ' + nameSize + 'px Georgia, "Times New Roman", serif';
   ctx.fillStyle = '#1B2A4A';
-  ctx.fillText(student.name, w / 2, nameY);
+  ctx.fillText(student.name, nameX, nameY);
 
-  // Body text — "has successfully completed..." paragraph
-  var bodyFontSize = Math.round(nameSize * 0.38);
-  ctx.font = 'italic ' + bodyFontSize + 'px Georgia, serif';
+  // Body text
+  ctx.font = 'italic ' + bodySize + 'px Georgia, serif';
   ctx.fillStyle = '#222';
 
   var courseType = (tpl.courseType || 'Short Course').toLowerCase();
   var line1 = 'has successfully completed ' + pronoun + ' vocational training in the ' + courseType;
-  ctx.fillText(line1, w / 2, bodyY);
+  ctx.fillText(line1, bodyX, bodyY);
 
-  // Course name (bold)
-  ctx.font = 'bold italic ' + Math.round(bodyFontSize * 1.15) + 'px Georgia, serif';
-  ctx.fillText(courseFullName, w / 2, bodyY + bodyFontSize * 1.5);
+  ctx.font = 'bold italic ' + Math.round(bodySize * 1.15) + 'px Georgia, serif';
+  ctx.fillText(courseFullName, bodyX, bodyY + bodySize * 1.5);
 
-  // Date and institution
-  ctx.font = 'italic ' + bodyFontSize + 'px Georgia, serif';
-  ctx.fillText('on this day, the ' + student.certDate + ', at the Community Educational and Skills', w / 2, bodyY + bodyFontSize * 3);
+  ctx.font = 'italic ' + bodySize + 'px Georgia, serif';
+  ctx.fillText('on this day, the ' + student.certDate + ', at the Community Educational and Skills', bodyX, bodyY + bodySize * 3);
 
-  ctx.font = 'bold italic ' + bodyFontSize + 'px Georgia, serif';
-  ctx.fillText('Training Institute and Services Ltd.', w / 2, bodyY + bodyFontSize * 4.3);
+  ctx.font = 'bold italic ' + bodySize + 'px Georgia, serif';
+  ctx.fillText('Training Institute and Services Ltd.', bodyX, bodyY + bodySize * 4.3);
 
-  // Certificate number at bottom
-  ctx.font = 'bold ' + Math.round(bodyFontSize * 0.9) + 'px Georgia, serif';
+  // Certificate number
+  ctx.font = 'bold ' + certNoSize + 'px Georgia, serif';
   ctx.fillStyle = '#1B2A4A';
-  ctx.fillText('Certificate No. ' + student.certNo, w / 2, certNoY);
+  ctx.fillText('Certificate No. ' + student.certNo, certNoX, certNoY);
 
   return canvas;
 }
@@ -20581,75 +20603,77 @@ function renderCertPage2OnBg(bgImg, student, tpl) {
   var contactEmail = tpl.contactEmail || 'cestisadmn@gmail.com';
   var contactPhone = tpl.contactPhone || '+(876) 679-0111';
 
-  // Page 2 text positions (percentages)
+  // Page 2 text positions (percentages) with X, Y, and font sizes
   var pos = tpl.textPositions || {};
-  var titleY = (pos.p2TitleY || 5) / 100 * h;
-  var headerY = (pos.p2HeaderY || 18) / 100 * h;
-  var contentY = (pos.p2ContentY || 25) / 100 * h;
-  var specsY = (pos.p2SpecsY || 78) / 100 * h;
-  var footerY = (pos.p2FooterY || 90) / 100 * h;
+  var titleX = (pos.p2TitleX || 50) / 100 * w, titleY = (pos.p2TitleY || 5) / 100 * h, titleSize = pos.p2TitleSize || 26;
+  var headerX = (pos.p2HeaderX || 50) / 100 * w, headerY = (pos.p2HeaderY || 18) / 100 * h, headerSize = pos.p2HeaderSize || 16;
+  var contentX = (pos.p2ContentX || 4) / 100 * w, contentY = (pos.p2ContentY || 25) / 100 * h, contentSize = pos.p2ContentSize || 13;
+  var specsX = (pos.p2SpecsX || 50) / 100 * w, specsY = (pos.p2SpecsY || 78) / 100 * h, specsSize = pos.p2SpecsSize || 13;
+  var footerX = (pos.p2FooterX || 50) / 100 * w, footerY = (pos.p2FooterY || 90) / 100 * h, footerSize = pos.p2FooterSize || 10;
 
   ctx.textAlign = 'center';
 
   // Course title at top
-  ctx.font = 'bold 26px Georgia, serif';
+  ctx.font = 'bold ' + titleSize + 'px Georgia, serif';
   ctx.fillStyle = '#1B2A4A';
-  ctx.fillText(courseFullName, w / 2, titleY);
+  ctx.fillText(courseFullName, titleX, titleY);
 
   // Institution name and programme code
-  ctx.font = 'bold 16px Georgia, serif';
+  ctx.font = 'bold ' + headerSize + 'px Georgia, serif';
   ctx.fillStyle = '#333';
-  ctx.fillText('Community Educational and Skills Training Institute and Services Limited', w / 2, headerY);
-  ctx.font = 'bold 13px Georgia, serif';
-  ctx.fillText('Programme Code: ' + progCode + ' | Version ' + version + ' | Developed: ' + devDate, w / 2, headerY + 22);
+  ctx.fillText('Community Educational and Skills Training Institute and Services Limited', headerX, headerY);
+  ctx.font = 'bold ' + Math.round(headerSize*0.8) + 'px Georgia, serif';
+  ctx.fillText('Programme Code: ' + progCode + ' | Version ' + version + ' | Developed: ' + devDate, headerX, headerY + headerSize*1.4);
 
   // Two-column content: modules (left) and competencies (right)
-  var colLeft = w * 0.04;
+  var colLeft = contentX;
   var colMid = w * 0.52;
   var colWidth = w * 0.44;
   var yMod = contentY;
   var yComp = contentY;
+  var lineH = Math.round(contentSize * 1.3);
+  var subLineH = Math.round(contentSize * 1.1);
 
   ctx.textAlign = 'left';
 
   // MODULES COMPLETED
-  ctx.font = 'bold 13px Arial, sans-serif';
+  ctx.font = 'bold ' + contentSize + 'px Arial, sans-serif';
   ctx.fillStyle = '#1B2A4A';
   ctx.fillText('MODULES COMPLETED', colLeft + 10, yMod);
-  yMod += 22;
+  yMod += lineH + 6;
 
   modules.forEach(function(mod) {
-    ctx.font = 'bold 11px Arial, sans-serif';
+    ctx.font = 'bold ' + Math.round(contentSize*0.85) + 'px Arial, sans-serif';
     ctx.fillStyle = '#2A7B88';
     ctx.fillText('\u2611 ' + mod.name + ' ' + (mod.contactHours || '') + ' Contact Hours', colLeft + 10, yMod);
-    yMod += 16;
+    yMod += lineH;
     (mod.topics || []).forEach(function(topic) {
-      ctx.font = '10px Arial, sans-serif';
+      ctx.font = Math.round(contentSize*0.77) + 'px Arial, sans-serif';
       ctx.fillStyle = '#333';
       ctx.fillText('  \u2022  ' + topic, colLeft + 20, yMod);
-      yMod += 14;
+      yMod += subLineH;
     });
     yMod += 4;
   });
 
   // COMPETENCIES
-  ctx.font = 'bold 13px Arial, sans-serif';
+  ctx.font = 'bold ' + contentSize + 'px Arial, sans-serif';
   ctx.fillStyle = '#1B2A4A';
   ctx.fillText('TECHNICAL COMPETENCIES ACHIEVED', colMid + 10, yComp);
-  yComp += 22;
+  yComp += lineH + 6;
 
   competencies.forEach(function(cat) {
-    ctx.font = 'bold 11px Arial, sans-serif';
+    ctx.font = 'bold ' + Math.round(contentSize*0.85) + 'px Arial, sans-serif';
     ctx.fillStyle = '#1B2A4A';
     ctx.fillText(cat.category + ':', colMid + 10, yComp);
-    yComp += 16;
+    yComp += lineH;
     (cat.items || []).forEach(function(item) {
-      ctx.font = '10px Arial, sans-serif';
+      ctx.font = Math.round(contentSize*0.77) + 'px Arial, sans-serif';
       ctx.fillStyle = '#333';
       var lines = wrapText(ctx, item, colWidth - 30);
       lines.forEach(function(line) {
         ctx.fillText('  \u2022  ' + line, colMid + 20, yComp);
-        yComp += 13;
+        yComp += subLineH;
       });
     });
     yComp += 6;
@@ -20657,28 +20681,28 @@ function renderCertPage2OnBg(bgImg, student, tpl) {
 
   // PROGRAMME SPECIFICATIONS
   ctx.textAlign = 'center';
-  ctx.font = 'bold 13px Arial, sans-serif';
+  ctx.font = 'bold ' + specsSize + 'px Arial, sans-serif';
   ctx.fillStyle = '#1B2A4A';
-  ctx.fillText('PROGRAMME SPECIFICATIONS', w / 2, specsY);
+  ctx.fillText('PROGRAMME SPECIFICATIONS', specsX, specsY);
 
-  ctx.font = '11px Arial, sans-serif';
+  ctx.font = Math.round(specsSize*0.85) + 'px Arial, sans-serif';
   ctx.fillStyle = '#333';
-  ctx.fillText('Duration: ' + (specs.duration || 'N/A') + ' | Industry: ' + (specs.industry || 'N/A'), w / 2, specsY + 16);
-  ctx.fillText('| Sub-Sector: ' + (specs.subSector || 'N/A') + ' | Entry Requirements: ' + (specs.entryRequirements || 'N/A'), w / 2, specsY + 30);
-  ctx.fillText('| ' + (specs.assessment || 'Industry Psychometric Assessment: Pass'), w / 2, specsY + 44);
-  ctx.fillText('Alignment: ' + (specs.alignment || 'N/A'), w / 2, specsY + 58);
+  ctx.fillText('Duration: ' + (specs.duration || 'N/A') + ' | Industry: ' + (specs.industry || 'N/A'), specsX, specsY + specsSize*1.3);
+  ctx.fillText('Sub-Sector: ' + (specs.subSector || 'N/A') + ' | Entry Requirements: ' + (specs.entryRequirements || 'N/A'), specsX, specsY + specsSize*2.4);
+  ctx.fillText(specs.assessment || 'Industry Psychometric Assessment: Pass', specsX, specsY + specsSize*3.5);
+  ctx.fillText('Alignment: ' + (specs.alignment || 'N/A'), specsX, specsY + specsSize*4.6);
 
   // Footer validation text
-  ctx.font = 'italic 10px Arial, sans-serif';
+  ctx.font = 'italic ' + footerSize + 'px Arial, sans-serif';
   ctx.fillStyle = '#444';
   var p2CourseType = tpl.courseType || 'Short Course';
-  ctx.fillText('This certificate confirms that the holder has successfully completed all requirements of the ' + courseFullName, w / 2, footerY);
-  ctx.fillText(p2CourseType + '. For transcript requests or verification, contact: ' + contactEmail + ' | ' + contactPhone, w / 2, footerY + 14);
+  ctx.fillText('This certificate confirms completion of all requirements of the ' + courseFullName, footerX, footerY);
+  ctx.fillText(p2CourseType + '. Contact: ' + contactEmail + ' | ' + contactPhone, footerX, footerY + footerSize*1.4);
 
-  // Certificate No at bottom
-  ctx.font = 'bold 18px Georgia, serif';
+  // Certificate No
+  ctx.font = 'bold ' + Math.round(footerSize*1.8) + 'px Georgia, serif';
   ctx.fillStyle = '#1B2A4A';
-  ctx.fillText('Certificate No. ' + student.certNo, w / 2, footerY + 42);
+  ctx.fillText('Certificate No. ' + student.certNo, footerX, footerY + footerSize*3.5);
 
   return canvas;
 }
@@ -20720,375 +20744,272 @@ function previewCertBgUpload(input, previewId) {
   reader.readAsDataURL(input.files[0]);
 }
 
-// ---- Live Certificate Text Position Preview ----
+// ---- Live Certificate Preview System (Canvas-based drag for both pages) ----
 var _certLivePreviewImg = null;
-var _certLivePreviewDragging = null; // 'name', 'body', or 'certno'
+var _certLivePreviewImgP2 = null;
+var _certDrag = { active: false, zone: null, canvasId: null };
 
+// Helper: read input value with fallback
+function _cpv(id, def) { var el = document.getElementById(id); return el ? (parseFloat(el.value) || def) : def; }
+
+// ===== PAGE 1 PREVIEW =====
 function updateCertLivePreview() {
   var container = document.getElementById('certLivePreviewContainer');
   var canvas = document.getElementById('certLivePreviewCanvas');
   if(!container || !canvas) return;
-
-  // Get the background image (from preview data-base64 or existing template)
   var bgSrc = '';
   var p1Preview = document.getElementById('ctplBgPage1Preview');
   if(p1Preview) bgSrc = p1Preview.getAttribute('data-base64') || '';
-  if(!bgSrc && _certTplEditingCourse && certTemplates[_certTplEditingCourse]) {
-    bgSrc = certTemplates[_certTplEditingCourse].bgPage1 || '';
-  }
-
-  if(!bgSrc) {
-    container.style.display = 'none';
-    return;
-  }
+  if(!bgSrc && _certTplEditingCourse && certTemplates[_certTplEditingCourse]) bgSrc = certTemplates[_certTplEditingCourse].bgPage1 || '';
+  if(!bgSrc) { container.style.display = 'none'; return; }
   container.style.display = 'block';
-
-  // Load image and render
+  if(_certLivePreviewImg && _certLivePreviewImg._src === bgSrc) { _renderCertLivePreview(); return; }
   var img = new Image();
-  img.onload = function() {
-    _certLivePreviewImg = img;
-    _renderCertLivePreview();
-  };
-  if(_certLivePreviewImg && _certLivePreviewImg.src === bgSrc) {
-    _renderCertLivePreview();
-  } else {
-    img.src = bgSrc;
-  }
+  img.onload = function() { img._src = bgSrc; _certLivePreviewImg = img; _renderCertLivePreview(); };
+  img.src = bgSrc;
 }
 
 function _renderCertLivePreview() {
   var canvas = document.getElementById('certLivePreviewCanvas');
   if(!canvas || !_certLivePreviewImg) return;
-
   var img = _certLivePreviewImg;
-  var w = img.naturalWidth;
-  var h = img.naturalHeight;
-  canvas.width = w;
-  canvas.height = h;
+  var w = img.naturalWidth, h = img.naturalHeight;
+  canvas.width = w; canvas.height = h;
   var ctx = canvas.getContext('2d');
-
-  // Draw background
   ctx.drawImage(img, 0, 0, w, h);
 
-  // Semi-transparent overlay to make guide lines more visible
-  ctx.fillStyle = 'rgba(0,0,0,0.05)';
-  ctx.fillRect(0, 0, w, h);
+  var nameX = _cpv('ctplP1NameX',50)/100*w, nameY = _cpv('ctplP1NameY',48)/100*h, nameSize = _cpv('ctplP1NameSize',48);
+  var bodyX = _cpv('ctplP1BodyX',50)/100*w, bodyY = _cpv('ctplP1BodyY',62)/100*h, bodySize = _cpv('ctplP1BodySize',18);
+  var certX = _cpv('ctplP1CertNoX',50)/100*w, certY = _cpv('ctplP1CertNoY',95)/100*h, certSize = _cpv('ctplP1CertNoSize',16);
+  var courseFullName = document.getElementById('ctplCourseFullName')?.value || (_certTplEditingCourse || 'Course Name');
+  var courseType = (document.getElementById('ctplCourseType')?.value || 'Short Course').toLowerCase();
 
-  // Read current values
-  var nameY = (parseInt(document.getElementById('ctplP1NameY').value) || 48) / 100 * h;
-  var bodyY = (parseInt(document.getElementById('ctplP1BodyY').value) || 62) / 100 * h;
-  var certNoY = (parseInt(document.getElementById('ctplP1CertNoY').value) || 95) / 100 * h;
-  var nameSize = parseInt(document.getElementById('ctplP1NameSize').value) || 48;
-  var courseFullName = document.getElementById('ctplCourseFullName').value || (_certTplEditingCourse || 'Course Name');
+  // Store hit zones for drag
+  canvas._hitZones = [];
 
-  // Scale font size relative to image
-  var scaledNameSize = nameSize * (w / 1400);
-  var bodyFontSize = Math.round(scaledNameSize * 0.38);
-
-  // Draw student name (red guide)
+  // --- Name (red) ---
   ctx.textAlign = 'center';
-  ctx.font = 'bold ' + Math.round(scaledNameSize) + 'px Georgia, "Times New Roman", serif';
-  ctx.fillStyle = 'rgba(255,80,80,0.85)';
-  ctx.fillText('SAMPLE STUDENT NAME', w / 2, nameY);
-  // Underline
-  var nameW = ctx.measureText('SAMPLE STUDENT NAME').width;
-  ctx.strokeStyle = 'rgba(255,80,80,0.5)';
-  ctx.lineWidth = 2;
-  ctx.setLineDash([8, 4]);
-  ctx.beginPath(); ctx.moveTo(0, nameY); ctx.lineTo(w, nameY); ctx.stroke();
-  ctx.setLineDash([]);
+  ctx.font = 'bold ' + nameSize + 'px Georgia, "Times New Roman", serif';
+  ctx.fillStyle = 'rgba(255,80,80,0.9)';
+  ctx.fillText('SAMPLE STUDENT NAME', nameX, nameY);
+  ctx.strokeStyle = 'rgba(255,80,80,0.4)'; ctx.lineWidth = 1; ctx.setLineDash([6,4]);
+  ctx.beginPath(); ctx.moveTo(0,nameY); ctx.lineTo(w,nameY); ctx.stroke();
+  ctx.beginPath(); ctx.moveTo(nameX,0); ctx.lineTo(nameX,h); ctx.stroke(); ctx.setLineDash([]);
+  canvas._hitZones.push({id:'name', x:nameX, y:nameY, xInput:'ctplP1NameX', yInput:'ctplP1NameY', r:nameSize*3});
 
-  // Draw body text (green guide)
-  ctx.font = 'italic ' + bodyFontSize + 'px Georgia, serif';
-  ctx.fillStyle = 'rgba(80,200,80,0.85)';
-  var previewCourseType = (document.getElementById('ctplCourseType')?.value || 'Short Course').toLowerCase();
-  ctx.fillText('has successfully completed their vocational training in the ' + previewCourseType, w / 2, bodyY);
-  ctx.font = 'bold italic ' + Math.round(bodyFontSize * 1.15) + 'px Georgia, serif';
-  ctx.fillText(courseFullName, w / 2, bodyY + bodyFontSize * 1.5);
-  ctx.font = 'italic ' + bodyFontSize + 'px Georgia, serif';
-  ctx.fillText('on this day, the March 09, 2026, at the Community Educational and Skills', w / 2, bodyY + bodyFontSize * 3);
-  ctx.font = 'bold italic ' + bodyFontSize + 'px Georgia, serif';
-  ctx.fillText('Training Institute and Services Ltd.', w / 2, bodyY + bodyFontSize * 4.3);
-  // Guide line
-  ctx.strokeStyle = 'rgba(80,200,80,0.5)';
-  ctx.lineWidth = 2;
-  ctx.setLineDash([8, 4]);
-  ctx.beginPath(); ctx.moveTo(0, bodyY); ctx.lineTo(w, bodyY); ctx.stroke();
-  ctx.setLineDash([]);
+  // --- Body (green) ---
+  ctx.font = 'italic ' + bodySize + 'px Georgia, serif';
+  ctx.fillStyle = 'rgba(80,200,80,0.9)';
+  ctx.fillText('has successfully completed their vocational training in the ' + courseType, bodyX, bodyY);
+  ctx.font = 'bold italic ' + Math.round(bodySize*1.15) + 'px Georgia, serif';
+  ctx.fillText(courseFullName, bodyX, bodyY + bodySize*1.5);
+  ctx.font = 'italic ' + bodySize + 'px Georgia, serif';
+  ctx.fillText('on this day, the March 09, 2026, at the Community Educational and Skills', bodyX, bodyY + bodySize*3);
+  ctx.font = 'bold italic ' + bodySize + 'px Georgia, serif';
+  ctx.fillText('Training Institute and Services Ltd.', bodyX, bodyY + bodySize*4.3);
+  ctx.strokeStyle = 'rgba(80,200,80,0.4)'; ctx.lineWidth = 1; ctx.setLineDash([6,4]);
+  ctx.beginPath(); ctx.moveTo(0,bodyY); ctx.lineTo(w,bodyY); ctx.stroke();
+  ctx.beginPath(); ctx.moveTo(bodyX,0); ctx.lineTo(bodyX,h); ctx.stroke(); ctx.setLineDash([]);
+  canvas._hitZones.push({id:'body', x:bodyX, y:bodyY, xInput:'ctplP1BodyX', yInput:'ctplP1BodyY', r:bodySize*8});
 
-  // Draw cert number (blue guide)
-  ctx.font = 'bold ' + Math.round(bodyFontSize * 0.9) + 'px Georgia, serif';
-  ctx.fillStyle = 'rgba(80,150,255,0.85)';
-  ctx.fillText('Certificate No. WE-2026-0001', w / 2, certNoY);
-  ctx.strokeStyle = 'rgba(80,150,255,0.5)';
-  ctx.lineWidth = 2;
-  ctx.setLineDash([8, 4]);
-  ctx.beginPath(); ctx.moveTo(0, certNoY); ctx.lineTo(w, certNoY); ctx.stroke();
-  ctx.setLineDash([]);
-
-  // Position the draggable guide line overlays
-  var canvasEl = canvas;
-  var displayH = canvasEl.getBoundingClientRect().height;
-  var scale = displayH / h;
-  var nameLineEl = document.getElementById('certGuideNameLine');
-  var bodyLineEl = document.getElementById('certGuideBodyLine');
-  var certNoLineEl = document.getElementById('certGuideCertNoLine');
-  if(nameLineEl) nameLineEl.style.top = (nameY * scale) + 'px';
-  if(bodyLineEl) bodyLineEl.style.top = (bodyY * scale) + 'px';
-  if(certNoLineEl) certNoLineEl.style.top = (certNoY * scale) + 'px';
+  // --- Cert No (blue) ---
+  ctx.font = 'bold ' + certSize + 'px Georgia, serif';
+  ctx.fillStyle = 'rgba(80,150,255,0.9)';
+  ctx.fillText('Certificate No. WE-2026-0001', certX, certY);
+  ctx.strokeStyle = 'rgba(80,150,255,0.4)'; ctx.lineWidth = 1; ctx.setLineDash([6,4]);
+  ctx.beginPath(); ctx.moveTo(0,certY); ctx.lineTo(w,certY); ctx.stroke();
+  ctx.beginPath(); ctx.moveTo(certX,0); ctx.lineTo(certX,h); ctx.stroke(); ctx.setLineDash([]);
+  canvas._hitZones.push({id:'certno', x:certX, y:certY, xInput:'ctplP1CertNoX', yInput:'ctplP1CertNoY', r:certSize*6});
 }
 
-// ---- Drag guide lines to adjust positions ----
-(function() {
-  function initCertGuideDrag() {
-    var lines = {
-      'certGuideNameLine': 'ctplP1NameY',
-      'certGuideBodyLine': 'ctplP1BodyY',
-      'certGuideCertNoLine': 'ctplP1CertNoY'
-    };
-
-    Object.keys(lines).forEach(function(lineId) {
-      var lineEl = document.getElementById(lineId);
-      if(!lineEl) return;
-
-      var inputId = lines[lineId];
-      var dragging = false;
-
-      function onStart(e) {
-        e.preventDefault();
-        dragging = true;
-        document.body.style.cursor = 'ns-resize';
-        document.body.style.userSelect = 'none';
-      }
-
-      function onMove(e) {
-        if(!dragging) return;
-        e.preventDefault();
-        var canvas = document.getElementById('certLivePreviewCanvas');
-        if(!canvas) return;
-        var rect = canvas.getBoundingClientRect();
-        var clientY = e.touches ? e.touches[0].clientY : e.clientY;
-        var relY = clientY - rect.top;
-        var pct = Math.round(Math.max(0, Math.min(100, (relY / rect.height) * 100)));
-        document.getElementById(inputId).value = pct;
-        updateCertLivePreview();
-      }
-
-      function onEnd() {
-        if(!dragging) return;
-        dragging = false;
-        document.body.style.cursor = '';
-        document.body.style.userSelect = '';
-      }
-
-      lineEl.addEventListener('mousedown', onStart);
-      lineEl.addEventListener('touchstart', onStart, { passive: false });
-      document.addEventListener('mousemove', onMove);
-      document.addEventListener('touchmove', onMove, { passive: false });
-      document.addEventListener('mouseup', onEnd);
-      document.addEventListener('touchend', onEnd);
-    });
-  }
-
-  // Initialize when DOM is ready
-  if(document.readyState === 'loading') {
-    document.addEventListener('DOMContentLoaded', initCertGuideDrag);
-  } else {
-    setTimeout(initCertGuideDrag, 100);
-  }
-})();
-
-// Also update preview when Course Full Name changes
-document.addEventListener('DOMContentLoaded', function() {
-  var cfn = document.getElementById('ctplCourseFullName');
-  if(cfn) {
-    cfn.addEventListener('input', function() { updateCertLivePreview(); updateCertLivePreviewP2(); });
-  }
-});
-
-// ---- Page 2 Live Certificate Text Position Preview ----
-var _certLivePreviewImgP2 = null;
-
+// ===== PAGE 2 PREVIEW =====
 function updateCertLivePreviewP2() {
   var container = document.getElementById('certLivePreviewContainerP2');
   var canvas = document.getElementById('certLivePreviewCanvasP2');
   if(!container || !canvas) return;
-
-  // Get the Page 2 background image
   var bgSrc = '';
   var p2Preview = document.getElementById('ctplBgPage2Preview');
   if(p2Preview) bgSrc = p2Preview.getAttribute('data-base64') || '';
-  if(!bgSrc && _certTplEditingCourse && certTemplates[_certTplEditingCourse]) {
-    bgSrc = certTemplates[_certTplEditingCourse].bgPage2 || '';
-  }
-
-  if(!bgSrc) {
-    container.style.display = 'none';
-    return;
-  }
+  if(!bgSrc && _certTplEditingCourse && certTemplates[_certTplEditingCourse]) bgSrc = certTemplates[_certTplEditingCourse].bgPage2 || '';
+  if(!bgSrc) { container.style.display = 'none'; return; }
   container.style.display = 'block';
-
+  if(_certLivePreviewImgP2 && _certLivePreviewImgP2._src === bgSrc) { _renderCertLivePreviewP2(); return; }
   var img = new Image();
-  img.onload = function() {
-    _certLivePreviewImgP2 = img;
-    _renderCertLivePreviewP2();
-  };
-  if(_certLivePreviewImgP2 && _certLivePreviewImgP2.src === bgSrc) {
-    _renderCertLivePreviewP2();
-  } else {
-    img.src = bgSrc;
-  }
+  img.onload = function() { img._src = bgSrc; _certLivePreviewImgP2 = img; _renderCertLivePreviewP2(); };
+  img.src = bgSrc;
 }
 
 function _renderCertLivePreviewP2() {
   var canvas = document.getElementById('certLivePreviewCanvasP2');
   if(!canvas || !_certLivePreviewImgP2) return;
-
   var img = _certLivePreviewImgP2;
-  var w = img.naturalWidth;
-  var h = img.naturalHeight;
-  canvas.width = w;
-  canvas.height = h;
+  var w = img.naturalWidth, h = img.naturalHeight;
+  canvas.width = w; canvas.height = h;
   var ctx = canvas.getContext('2d');
-
-  // Draw background
   ctx.drawImage(img, 0, 0, w, h);
-  ctx.fillStyle = 'rgba(0,0,0,0.05)';
-  ctx.fillRect(0, 0, w, h);
 
-  // Read current values
-  var titleY = (parseInt(document.getElementById('ctplP2TitleY').value) || 5) / 100 * h;
-  var headerY = (parseInt(document.getElementById('ctplP2HeaderY').value) || 18) / 100 * h;
-  var contentY = (parseInt(document.getElementById('ctplP2ContentY').value) || 25) / 100 * h;
-  var specsY = (parseInt(document.getElementById('ctplP2SpecsY').value) || 78) / 100 * h;
-  var footerY = (parseInt(document.getElementById('ctplP2FooterY').value) || 90) / 100 * h;
+  var titleX=_cpv('ctplP2TitleX',50)/100*w, titleY=_cpv('ctplP2TitleY',5)/100*h, titleSize=_cpv('ctplP2TitleSize',26);
+  var headerX=_cpv('ctplP2HeaderX',50)/100*w, headerY=_cpv('ctplP2HeaderY',18)/100*h, headerSize=_cpv('ctplP2HeaderSize',16);
+  var contentX=_cpv('ctplP2ContentX',4)/100*w, contentY=_cpv('ctplP2ContentY',25)/100*h, contentSize=_cpv('ctplP2ContentSize',13);
+  var specsX=_cpv('ctplP2SpecsX',50)/100*w, specsY=_cpv('ctplP2SpecsY',78)/100*h, specsSize=_cpv('ctplP2SpecsSize',13);
+  var footerX=_cpv('ctplP2FooterX',50)/100*w, footerY=_cpv('ctplP2FooterY',90)/100*h, footerSize=_cpv('ctplP2FooterSize',10);
 
-  var courseFullName = (document.getElementById('ctplCourseFullName').value || (_certTplEditingCourse || 'COURSE NAME')).toUpperCase();
+  var courseFullName = (document.getElementById('ctplCourseFullName')?.value || 'COURSE NAME').toUpperCase();
   var progCode = document.getElementById('ctplProgrammeCode')?.value || 'CESTIS-XXX-01';
   var version = document.getElementById('ctplVersion')?.value || '1.0';
   var devDate = document.getElementById('ctplDevelopedDate')?.value || 'May 2024';
+  var courseType = document.getElementById('ctplCourseType')?.value || 'Short Course';
+
+  canvas._hitZones = [];
 
   // --- Title (red) ---
   ctx.textAlign = 'center';
-  ctx.font = 'bold 26px Georgia, serif';
-  ctx.fillStyle = 'rgba(255,80,80,0.85)';
-  ctx.fillText(courseFullName, w / 2, titleY);
-  ctx.strokeStyle = 'rgba(255,80,80,0.5)'; ctx.lineWidth = 2; ctx.setLineDash([8,4]);
-  ctx.beginPath(); ctx.moveTo(0, titleY); ctx.lineTo(w, titleY); ctx.stroke(); ctx.setLineDash([]);
+  ctx.font = 'bold ' + titleSize + 'px Georgia, serif';
+  ctx.fillStyle = 'rgba(255,80,80,0.9)';
+  ctx.fillText(courseFullName, titleX, titleY);
+  ctx.strokeStyle = 'rgba(255,80,80,0.4)'; ctx.lineWidth = 1; ctx.setLineDash([6,4]);
+  ctx.beginPath(); ctx.moveTo(0,titleY); ctx.lineTo(w,titleY); ctx.stroke();
+  ctx.beginPath(); ctx.moveTo(titleX,0); ctx.lineTo(titleX,h); ctx.stroke(); ctx.setLineDash([]);
+  canvas._hitZones.push({id:'title', x:titleX, y:titleY, xInput:'ctplP2TitleX', yInput:'ctplP2TitleY', r:titleSize*5});
 
   // --- Header (orange) ---
-  ctx.font = 'bold 16px Georgia, serif';
-  ctx.fillStyle = 'rgba(255,180,50,0.85)';
-  ctx.fillText('Community Educational and Skills Training Institute and Services Limited', w / 2, headerY);
-  ctx.font = 'bold 13px Georgia, serif';
-  ctx.fillText('Programme Code: ' + progCode + ' | Version ' + version + ' | Developed: ' + devDate, w / 2, headerY + 22);
-  ctx.strokeStyle = 'rgba(255,180,50,0.5)'; ctx.lineWidth = 2; ctx.setLineDash([8,4]);
-  ctx.beginPath(); ctx.moveTo(0, headerY); ctx.lineTo(w, headerY); ctx.stroke(); ctx.setLineDash([]);
+  ctx.font = 'bold ' + headerSize + 'px Georgia, serif';
+  ctx.fillStyle = 'rgba(255,180,50,0.9)';
+  ctx.fillText('Community Educational and Skills Training Institute and Services Limited', headerX, headerY);
+  ctx.font = 'bold ' + Math.round(headerSize*0.8) + 'px Georgia, serif';
+  ctx.fillText('Programme Code: ' + progCode + ' | Version ' + version + ' | Developed: ' + devDate, headerX, headerY + headerSize*1.4);
+  ctx.strokeStyle = 'rgba(255,180,50,0.4)'; ctx.lineWidth = 1; ctx.setLineDash([6,4]);
+  ctx.beginPath(); ctx.moveTo(0,headerY); ctx.lineTo(w,headerY); ctx.stroke();
+  ctx.beginPath(); ctx.moveTo(headerX,0); ctx.lineTo(headerX,h); ctx.stroke(); ctx.setLineDash([]);
+  canvas._hitZones.push({id:'header', x:headerX, y:headerY, xInput:'ctplP2HeaderX', yInput:'ctplP2HeaderY', r:headerSize*8});
 
-  // --- Content area (green) ---
-  var colLeft = w * 0.04;
+  // --- Content (green) ---
   var colMid = w * 0.52;
   ctx.textAlign = 'left';
-  ctx.font = 'bold 13px Arial, sans-serif';
-  ctx.fillStyle = 'rgba(80,200,80,0.85)';
-  ctx.fillText('MODULES COMPLETED', colLeft + 10, contentY);
-  ctx.fillText('\u2611 Sample Module — 20 Contact Hours', colLeft + 10, contentY + 22);
-  ctx.font = '10px Arial, sans-serif';
-  ctx.fillText('  \u2022  Sample topic 1', colLeft + 20, contentY + 38);
-  ctx.fillText('  \u2022  Sample topic 2', colLeft + 20, contentY + 52);
-
-  ctx.font = 'bold 13px Arial, sans-serif';
+  ctx.font = 'bold ' + contentSize + 'px Arial, sans-serif';
+  ctx.fillStyle = 'rgba(80,200,80,0.9)';
+  ctx.fillText('MODULES COMPLETED', contentX + 10, contentY);
+  ctx.font = 'bold ' + Math.round(contentSize*0.85) + 'px Arial, sans-serif';
+  ctx.fillText('\u2611 Sample Module - 20 Contact Hours', contentX + 10, contentY + contentSize*1.7);
+  ctx.font = Math.round(contentSize*0.77) + 'px Arial, sans-serif';
+  ctx.fillText('  \u2022  Sample topic 1', contentX + 20, contentY + contentSize*3);
+  ctx.fillText('  \u2022  Sample topic 2', contentX + 20, contentY + contentSize*4);
+  ctx.font = 'bold ' + contentSize + 'px Arial, sans-serif';
   ctx.fillText('TECHNICAL COMPETENCIES ACHIEVED', colMid + 10, contentY);
-  ctx.fillText('Sample Category:', colMid + 10, contentY + 22);
-  ctx.font = '10px Arial, sans-serif';
-  ctx.fillText('  \u2022  Sample competency item', colMid + 20, contentY + 38);
-
-  ctx.strokeStyle = 'rgba(80,200,80,0.5)'; ctx.lineWidth = 2; ctx.setLineDash([8,4]);
-  ctx.beginPath(); ctx.moveTo(0, contentY); ctx.lineTo(w, contentY); ctx.stroke(); ctx.setLineDash([]);
-
-  // Draw column separator
-  ctx.strokeStyle = 'rgba(80,200,80,0.3)'; ctx.lineWidth = 1; ctx.setLineDash([4,4]);
-  ctx.beginPath(); ctx.moveTo(w * 0.50, contentY - 5); ctx.lineTo(w * 0.50, specsY - 10); ctx.stroke(); ctx.setLineDash([]);
+  ctx.font = 'bold ' + Math.round(contentSize*0.85) + 'px Arial, sans-serif';
+  ctx.fillText('Sample Category:', colMid + 10, contentY + contentSize*1.7);
+  ctx.font = Math.round(contentSize*0.77) + 'px Arial, sans-serif';
+  ctx.fillText('  \u2022  Sample competency item', colMid + 20, contentY + contentSize*3);
+  ctx.strokeStyle = 'rgba(80,200,80,0.4)'; ctx.lineWidth = 1; ctx.setLineDash([6,4]);
+  ctx.beginPath(); ctx.moveTo(0,contentY); ctx.lineTo(w,contentY); ctx.stroke(); ctx.setLineDash([]);
+  canvas._hitZones.push({id:'content', x:contentX, y:contentY, xInput:'ctplP2ContentX', yInput:'ctplP2ContentY', r:contentSize*8});
 
   // --- Specs (purple) ---
   ctx.textAlign = 'center';
-  ctx.font = 'bold 13px Arial, sans-serif';
-  ctx.fillStyle = 'rgba(200,80,255,0.85)';
-  ctx.fillText('PROGRAMME SPECIFICATIONS', w / 2, specsY);
-  ctx.font = '11px Arial, sans-serif';
-  ctx.fillText('Duration: 40 Contact Hours | Industry: Sample Industry', w / 2, specsY + 16);
-  ctx.fillText('Sub-Sector: Sample | Entry Requirements: Grade 9', w / 2, specsY + 30);
-  ctx.strokeStyle = 'rgba(200,80,255,0.5)'; ctx.lineWidth = 2; ctx.setLineDash([8,4]);
-  ctx.beginPath(); ctx.moveTo(0, specsY); ctx.lineTo(w, specsY); ctx.stroke(); ctx.setLineDash([]);
+  ctx.font = 'bold ' + specsSize + 'px Arial, sans-serif';
+  ctx.fillStyle = 'rgba(200,80,255,0.9)';
+  ctx.fillText('PROGRAMME SPECIFICATIONS', specsX, specsY);
+  ctx.font = Math.round(specsSize*0.85) + 'px Arial, sans-serif';
+  ctx.fillText('Duration: 40 Contact Hours | Industry: Sample Industry', specsX, specsY + specsSize*1.3);
+  ctx.fillText('Sub-Sector: Sample | Entry Requirements: Grade 9', specsX, specsY + specsSize*2.4);
+  ctx.strokeStyle = 'rgba(200,80,255,0.4)'; ctx.lineWidth = 1; ctx.setLineDash([6,4]);
+  ctx.beginPath(); ctx.moveTo(0,specsY); ctx.lineTo(w,specsY); ctx.stroke();
+  ctx.beginPath(); ctx.moveTo(specsX,0); ctx.lineTo(specsX,h); ctx.stroke(); ctx.setLineDash([]);
+  canvas._hitZones.push({id:'specs', x:specsX, y:specsY, xInput:'ctplP2SpecsX', yInput:'ctplP2SpecsY', r:specsSize*8});
 
   // --- Footer (blue) ---
-  ctx.font = 'italic 10px Arial, sans-serif';
-  ctx.fillStyle = 'rgba(80,150,255,0.85)';
-  var p2PreviewCourseType = document.getElementById('ctplCourseType')?.value || 'Short Course';
-  ctx.fillText('This certificate confirms that the holder has successfully completed all requirements of the ' + courseFullName, w / 2, footerY);
-  ctx.fillText(p2PreviewCourseType + '. For transcript requests or verification, contact: cestisadmn@gmail.com | +(876) 679-0111', w / 2, footerY + 14);
-  ctx.font = 'bold 18px Georgia, serif';
-  ctx.fillText('Certificate No. WE-2026-0001', w / 2, footerY + 42);
-  ctx.strokeStyle = 'rgba(80,150,255,0.5)'; ctx.lineWidth = 2; ctx.setLineDash([8,4]);
-  ctx.beginPath(); ctx.moveTo(0, footerY); ctx.lineTo(w, footerY); ctx.stroke(); ctx.setLineDash([]);
-
-  // Position draggable guide overlays
-  var displayH = canvas.getBoundingClientRect().height;
-  var scale = displayH / h;
-  var el;
-  el = document.getElementById('certGuideP2TitleLine'); if(el) el.style.top = (titleY * scale) + 'px';
-  el = document.getElementById('certGuideP2HeaderLine'); if(el) el.style.top = (headerY * scale) + 'px';
-  el = document.getElementById('certGuideP2ContentLine'); if(el) el.style.top = (contentY * scale) + 'px';
-  el = document.getElementById('certGuideP2SpecsLine'); if(el) el.style.top = (specsY * scale) + 'px';
-  el = document.getElementById('certGuideP2FooterLine'); if(el) el.style.top = (footerY * scale) + 'px';
+  ctx.font = 'italic ' + footerSize + 'px Arial, sans-serif';
+  ctx.fillStyle = 'rgba(80,150,255,0.9)';
+  ctx.fillText('This certificate confirms completion of all requirements of the ' + courseFullName, footerX, footerY);
+  ctx.fillText(courseType + '. Contact: cestisadmn@gmail.com | +(876) 679-0111', footerX, footerY + footerSize*1.4);
+  ctx.font = 'bold ' + Math.round(footerSize*1.8) + 'px Georgia, serif';
+  ctx.fillText('Certificate No. WE-2026-0001', footerX, footerY + footerSize*3.5);
+  ctx.strokeStyle = 'rgba(80,150,255,0.4)'; ctx.lineWidth = 1; ctx.setLineDash([6,4]);
+  ctx.beginPath(); ctx.moveTo(0,footerY); ctx.lineTo(w,footerY); ctx.stroke();
+  ctx.beginPath(); ctx.moveTo(footerX,0); ctx.lineTo(footerX,h); ctx.stroke(); ctx.setLineDash([]);
+  canvas._hitZones.push({id:'footer', x:footerX, y:footerY, xInput:'ctplP2FooterX', yInput:'ctplP2FooterY', r:footerSize*8});
 }
 
-// ---- Page 2 Drag guide lines ----
-(function() {
-  function initCertGuideDragP2() {
-    var lines = {
-      'certGuideP2TitleLine': 'ctplP2TitleY',
-      'certGuideP2HeaderLine': 'ctplP2HeaderY',
-      'certGuideP2ContentLine': 'ctplP2ContentY',
-      'certGuideP2SpecsLine': 'ctplP2SpecsY',
-      'certGuideP2FooterLine': 'ctplP2FooterY'
-    };
+// ===== CANVAS DRAG SYSTEM (works for both pages) =====
+function _certCanvasGetXY(canvas, e) {
+  var rect = canvas.getBoundingClientRect();
+  var clientX = e.touches ? e.touches[0].clientX : e.clientX;
+  var clientY = e.touches ? e.touches[0].clientY : e.clientY;
+  var scaleX = canvas.width / rect.width;
+  var scaleY = canvas.height / rect.height;
+  return { x: (clientX - rect.left) * scaleX, y: (clientY - rect.top) * scaleY };
+}
 
-    Object.keys(lines).forEach(function(lineId) {
-      var lineEl = document.getElementById(lineId);
-      if(!lineEl) return;
-      var inputId = lines[lineId];
-      var dragging = false;
+function _certFindHitZone(canvas, pos) {
+  if(!canvas._hitZones) return null;
+  var best = null, bestDist = Infinity;
+  canvas._hitZones.forEach(function(z) {
+    var dx = pos.x - z.x, dy = pos.y - z.y;
+    var dist = Math.sqrt(dx*dx + dy*dy);
+    if(dist < z.r && dist < bestDist) { best = z; bestDist = dist; }
+  });
+  return best;
+}
 
-      function onStart(e) { e.preventDefault(); dragging = true; document.body.style.cursor = 'ns-resize'; document.body.style.userSelect = 'none'; }
-      function onMove(e) {
-        if(!dragging) return;
-        e.preventDefault();
-        var canvas = document.getElementById('certLivePreviewCanvasP2');
-        if(!canvas) return;
-        var rect = canvas.getBoundingClientRect();
-        var clientY = e.touches ? e.touches[0].clientY : e.clientY;
-        var relY = clientY - rect.top;
-        var pct = Math.round(Math.max(0, Math.min(100, (relY / rect.height) * 100)));
-        document.getElementById(inputId).value = pct;
-        updateCertLivePreviewP2();
-      }
-      function onEnd() { if(!dragging) return; dragging = false; document.body.style.cursor = ''; document.body.style.userSelect = ''; }
+function _initCertCanvasDrag(canvasId, updateFn) {
+  var canvas = document.getElementById(canvasId);
+  if(!canvas || canvas._dragInit) return;
+  canvas._dragInit = true;
 
-      lineEl.addEventListener('mousedown', onStart);
-      lineEl.addEventListener('touchstart', onStart, { passive: false });
-      document.addEventListener('mousemove', onMove);
-      document.addEventListener('touchmove', onMove, { passive: false });
-      document.addEventListener('mouseup', onEnd);
-      document.addEventListener('touchend', onEnd);
-    });
+  function onDown(e) {
+    var pos = _certCanvasGetXY(canvas, e);
+    var zone = _certFindHitZone(canvas, pos);
+    if(zone) {
+      e.preventDefault();
+      _certDrag = { active: true, zone: zone, canvasId: canvasId };
+      document.body.style.cursor = 'move';
+      document.body.style.userSelect = 'none';
+      var status = document.getElementById(canvasId === 'certLivePreviewCanvas' ? 'certP1DragStatus' : 'certP2DragStatus');
+      if(status) status.textContent = 'Dragging: ' + zone.id.toUpperCase();
+    }
   }
-  if(document.readyState === 'loading') {
-    document.addEventListener('DOMContentLoaded', initCertGuideDragP2);
-  } else {
-    setTimeout(initCertGuideDragP2, 150);
-  }
-})();
+  canvas.addEventListener('mousedown', onDown);
+  canvas.addEventListener('touchstart', onDown, { passive: false });
+}
+
+// Global move/up handlers (attached once)
+document.addEventListener('mousemove', _certOnDragMove);
+document.addEventListener('touchmove', _certOnDragMove, { passive: false });
+document.addEventListener('mouseup', _certOnDragEnd);
+document.addEventListener('touchend', _certOnDragEnd);
+
+function _certOnDragMove(e) {
+  if(!_certDrag.active) return;
+  e.preventDefault();
+  var canvas = document.getElementById(_certDrag.canvasId);
+  if(!canvas) return;
+  var pos = _certCanvasGetXY(canvas, e);
+  var z = _certDrag.zone;
+  var xPct = Math.round(Math.max(0, Math.min(100, pos.x / canvas.width * 100)));
+  var yPct = Math.round(Math.max(0, Math.min(100, pos.y / canvas.height * 100)));
+  document.getElementById(z.xInput).value = xPct;
+  document.getElementById(z.yInput).value = yPct;
+  if(_certDrag.canvasId === 'certLivePreviewCanvas') updateCertLivePreview();
+  else updateCertLivePreviewP2();
+}
+
+function _certOnDragEnd() {
+  if(!_certDrag.active) return;
+  var status = document.getElementById(_certDrag.canvasId === 'certLivePreviewCanvas' ? 'certP1DragStatus' : 'certP2DragStatus');
+  if(status) status.textContent = 'Click and drag text to reposition';
+  _certDrag = { active: false, zone: null, canvasId: null };
+  document.body.style.cursor = '';
+  document.body.style.userSelect = '';
+}
+
+// Update previews when Course Full Name or Course Type changes
+document.addEventListener('DOMContentLoaded', function() {
+  ['ctplCourseFullName','ctplCourseType','ctplProgrammeCode','ctplVersion','ctplDevelopedDate'].forEach(function(id) {
+    var el = document.getElementById(id);
+    if(el) el.addEventListener('input', function() { updateCertLivePreview(); updateCertLivePreviewP2(); });
+    if(el) el.addEventListener('change', function() { updateCertLivePreview(); updateCertLivePreviewP2(); });
+  });
+});
 
 
 // ============================== CERTIFICATE TEMPLATE MANAGEMENT ==============================
@@ -21195,17 +21116,33 @@ function openCertTemplateEditor() {
 
   // Load text position settings
   var pos = tpl.textPositions || {};
+  // Page 1 positions - X%, Y%, Font Size for each section
+  document.getElementById('ctplP1NameX').value = pos.p1NameX || 50;
   document.getElementById('ctplP1NameY').value = pos.p1NameY || 48;
-  document.getElementById('ctplP1BodyY').value = pos.p1BodyY || 62;
-  document.getElementById('ctplP1CertNoY').value = pos.p1CertNoY || 95;
   document.getElementById('ctplP1NameSize').value = pos.p1NameSize || 48;
+  document.getElementById('ctplP1BodyX').value = pos.p1BodyX || 50;
+  document.getElementById('ctplP1BodyY').value = pos.p1BodyY || 62;
+  document.getElementById('ctplP1BodySize').value = pos.p1BodySize || 18;
+  document.getElementById('ctplP1CertNoX').value = pos.p1CertNoX || 50;
+  document.getElementById('ctplP1CertNoY').value = pos.p1CertNoY || 95;
+  document.getElementById('ctplP1CertNoSize').value = pos.p1CertNoSize || 14;
 
-  // Page 2 positions
+  // Page 2 positions - X%, Y%, Font Size for each section
+  document.getElementById('ctplP2TitleX').value = pos.p2TitleX || 50;
   document.getElementById('ctplP2TitleY').value = pos.p2TitleY || 5;
+  document.getElementById('ctplP2TitleSize').value = pos.p2TitleSize || 24;
+  document.getElementById('ctplP2HeaderX').value = pos.p2HeaderX || 50;
   document.getElementById('ctplP2HeaderY').value = pos.p2HeaderY || 18;
+  document.getElementById('ctplP2HeaderSize').value = pos.p2HeaderSize || 14;
+  document.getElementById('ctplP2ContentX').value = pos.p2ContentX || 50;
   document.getElementById('ctplP2ContentY').value = pos.p2ContentY || 25;
+  document.getElementById('ctplP2ContentSize').value = pos.p2ContentSize || 11;
+  document.getElementById('ctplP2SpecsX').value = pos.p2SpecsX || 50;
   document.getElementById('ctplP2SpecsY').value = pos.p2SpecsY || 78;
+  document.getElementById('ctplP2SpecsSize').value = pos.p2SpecsSize || 10;
+  document.getElementById('ctplP2FooterX').value = pos.p2FooterX || 50;
   document.getElementById('ctplP2FooterY').value = pos.p2FooterY || 90;
+  document.getElementById('ctplP2FooterSize').value = pos.p2FooterSize || 10;
 
   // Rebuild modules
   var mc = document.getElementById('ctplModulesContainer');
@@ -21229,7 +21166,11 @@ function openCertTemplateEditor() {
   // Initialize live previews after modal is visible
   _certLivePreviewImg = null;
   _certLivePreviewImgP2 = null;
-  setTimeout(function() { updateCertLivePreview(); updateCertLivePreviewP2(); }, 150);
+  setTimeout(function() {
+    updateCertLivePreview(); updateCertLivePreviewP2();
+    _initCertCanvasDrag('certLivePreviewCanvas', updateCertLivePreview);
+    _initCertCanvasDrag('certLivePreviewCanvasP2', updateCertLivePreviewP2);
+  }, 200);
 }
 
 var _certModuleIdx = 0;
@@ -21305,15 +21246,30 @@ function saveCertTemplate() {
     bgPage1: bgPage1,
     bgPage2: bgPage2,
     textPositions: {
+      p1NameX: parseInt(document.getElementById('ctplP1NameX').value) || 50,
       p1NameY: parseInt(document.getElementById('ctplP1NameY').value) || 48,
-      p1BodyY: parseInt(document.getElementById('ctplP1BodyY').value) || 62,
-      p1CertNoY: parseInt(document.getElementById('ctplP1CertNoY').value) || 95,
       p1NameSize: parseInt(document.getElementById('ctplP1NameSize').value) || 48,
+      p1BodyX: parseInt(document.getElementById('ctplP1BodyX').value) || 50,
+      p1BodyY: parseInt(document.getElementById('ctplP1BodyY').value) || 62,
+      p1BodySize: parseInt(document.getElementById('ctplP1BodySize').value) || 18,
+      p1CertNoX: parseInt(document.getElementById('ctplP1CertNoX').value) || 50,
+      p1CertNoY: parseInt(document.getElementById('ctplP1CertNoY').value) || 95,
+      p1CertNoSize: parseInt(document.getElementById('ctplP1CertNoSize').value) || 16,
+      p2TitleX: parseInt(document.getElementById('ctplP2TitleX').value) || 50,
       p2TitleY: parseInt(document.getElementById('ctplP2TitleY').value) || 5,
+      p2TitleSize: parseInt(document.getElementById('ctplP2TitleSize').value) || 26,
+      p2HeaderX: parseInt(document.getElementById('ctplP2HeaderX').value) || 50,
       p2HeaderY: parseInt(document.getElementById('ctplP2HeaderY').value) || 18,
+      p2HeaderSize: parseInt(document.getElementById('ctplP2HeaderSize').value) || 16,
+      p2ContentX: parseInt(document.getElementById('ctplP2ContentX').value) || 4,
       p2ContentY: parseInt(document.getElementById('ctplP2ContentY').value) || 25,
+      p2ContentSize: parseInt(document.getElementById('ctplP2ContentSize').value) || 13,
+      p2SpecsX: parseInt(document.getElementById('ctplP2SpecsX').value) || 50,
       p2SpecsY: parseInt(document.getElementById('ctplP2SpecsY').value) || 78,
-      p2FooterY: parseInt(document.getElementById('ctplP2FooterY').value) || 90
+      p2SpecsSize: parseInt(document.getElementById('ctplP2SpecsSize').value) || 13,
+      p2FooterX: parseInt(document.getElementById('ctplP2FooterX').value) || 50,
+      p2FooterY: parseInt(document.getElementById('ctplP2FooterY').value) || 90,
+      p2FooterSize: parseInt(document.getElementById('ctplP2FooterSize').value) || 10
     },
     programmeSpecs: {
       duration: document.getElementById('ctplSpecDuration').value.trim(),
