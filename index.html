@@ -13869,7 +13869,16 @@ async function saveToCloud() {
         adminStaffAccessSettings: adminStaffAccessSettings,
         supportMessages: supportMessages,
         notifications: notifications,
-        skillAreas: skillAreas
+        skillAreas: skillAreas,
+        certTemplates: (function() {
+          var clean = {};
+          Object.keys(certTemplates).forEach(function(k) {
+            clean[k] = Object.assign({}, certTemplates[k]);
+            delete clean[k].bgPage1; delete clean[k].bgPage2;
+          });
+          return clean;
+        })(),
+        certDownloadApprovals: certDownloadApprovals
       }
     };
 
@@ -14047,7 +14056,12 @@ async function syncFromCloud() {
       if (Array.isArray(backupData.data.supportMessages)) { supportMessages = backupData.data.supportMessages; saveSupportMessages(); }
       if (Array.isArray(backupData.data.notifications)) { notifications = backupData.data.notifications; saveNotifications(); }
       if (backupData.data.chatFollows && typeof backupData.data.chatFollows === 'object') lmsChatFollows = backupData.data.chatFollows;
+      if (Array.isArray(backupData.data.chatRooms)) lmsChatRooms = backupData.data.chatRooms;
+      if (Array.isArray(backupData.data.chatMessages)) lmsChatMessages = backupData.data.chatMessages;
+      if (backupData.data.chatProfiles && typeof backupData.data.chatProfiles === 'object') lmsChatProfiles = backupData.data.chatProfiles;
       if (Array.isArray(backupData.data.skillAreas) && backupData.data.skillAreas.length > 0) skillAreas = backupData.data.skillAreas;
+      if (backupData.data.certTemplates && typeof backupData.data.certTemplates === 'object') certTemplates = backupData.data.certTemplates;
+      if (Array.isArray(backupData.data.certDownloadApprovals)) certDownloadApprovals = backupData.data.certDownloadApprovals;
     } catch(e) { console.warn('[SyncFromCloud] Error restoring additional data:', e); }
 
     // Persist all restored data to localStorage
