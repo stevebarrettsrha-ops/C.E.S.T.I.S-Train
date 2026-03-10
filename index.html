@@ -430,6 +430,13 @@ body::-webkit-scrollbar { width:0; display:none; }
   pointer-events:none;
   transform:scale(0.97);
 }
+/* Student card stays active even before cloud sync — students can login/register without admin sync */
+.role-cards.sync-pending .role-card.student-card {
+  opacity:1;
+  filter:none;
+  pointer-events:auto;
+  transform:scale(1);
+}
 .role-cards.sync-complete .role-card {
   opacity:1;
   filter:none;
