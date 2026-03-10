@@ -6350,6 +6350,18 @@ function buildAdminPages() {
             <td style="padding:2px 4px;"><input type="number" id="ctplP2ContentSize" value="13" step="1" min="6" max="30" style="width:52px;font-size:11px;" oninput="updateCertLivePreviewP2()"></td>
           </tr>
           <tr style="border-bottom:1px solid var(--border-light);">
+            <td style="padding:4px 6px;color:#2A7B88;font-weight:600;">Modules Heading</td>
+            <td style="padding:2px 4px;"><input type="number" id="ctplP2ModHeadX" value="4" step="1" min="0" max="100" style="width:52px;font-size:11px;" oninput="updateCertLivePreviewP2()"></td>
+            <td style="padding:2px 4px;"><input type="number" id="ctplP2ModHeadY" value="25" step="1" min="0" max="100" style="width:52px;font-size:11px;" oninput="updateCertLivePreviewP2()"></td>
+            <td style="padding:2px 4px;"><input type="number" id="ctplP2ModHeadSize" value="18" step="1" min="8" max="40" style="width:52px;font-size:11px;" oninput="updateCertLivePreviewP2()"></td>
+          </tr>
+          <tr style="border-bottom:1px solid var(--border-light);">
+            <td style="padding:4px 6px;color:#2A7B88;font-weight:600;">Competencies Heading</td>
+            <td style="padding:2px 4px;"><input type="number" id="ctplP2CompHeadX" value="52" step="1" min="0" max="100" style="width:52px;font-size:11px;" oninput="updateCertLivePreviewP2()"></td>
+            <td style="padding:2px 4px;"><input type="number" id="ctplP2CompHeadY" value="25" step="1" min="0" max="100" style="width:52px;font-size:11px;" oninput="updateCertLivePreviewP2()"></td>
+            <td style="padding:2px 4px;"><input type="number" id="ctplP2CompHeadSize" value="18" step="1" min="8" max="40" style="width:52px;font-size:11px;" oninput="updateCertLivePreviewP2()"></td>
+          </tr>
+          <tr style="border-bottom:1px solid var(--border-light);">
             <td style="padding:4px 6px;color:#c850ff;font-weight:600;">Specs</td>
             <td style="padding:2px 4px;"><input type="number" id="ctplP2SpecsX" value="50" step="1" min="0" max="100" style="width:52px;font-size:11px;" oninput="updateCertLivePreviewP2()"></td>
             <td style="padding:2px 4px;"><input type="number" id="ctplP2SpecsY" value="78" step="1" min="0" max="100" style="width:52px;font-size:11px;" oninput="updateCertLivePreviewP2()"></td>
@@ -20931,6 +20943,8 @@ function renderCertPage2OnBg(bgImg, student, tpl) {
   var titleX = (pos.p2TitleX || 50) / 100 * w, titleY = (pos.p2TitleY || 5) / 100 * h, titleSize = pos.p2TitleSize || 26;
   var headerX = (pos.p2HeaderX || 50) / 100 * w, headerY = (pos.p2HeaderY || 18) / 100 * h, headerSize = pos.p2HeaderSize || 16;
   var contentX = (pos.p2ContentX || 4) / 100 * w, contentY = (pos.p2ContentY || 25) / 100 * h, contentSize = pos.p2ContentSize || 13;
+  var modHeadX = (pos.p2ModHeadX || 4) / 100 * w, modHeadY = (pos.p2ModHeadY || 25) / 100 * h, modHeadSize = pos.p2ModHeadSize || 18;
+  var compHeadX = (pos.p2CompHeadX || 52) / 100 * w, compHeadY = (pos.p2CompHeadY || 25) / 100 * h, compHeadSize = pos.p2CompHeadSize || 18;
   var specsX = (pos.p2SpecsX || 50) / 100 * w, specsY = (pos.p2SpecsY || 78) / 100 * h, specsSize = pos.p2SpecsSize || 13;
   var footerX = (pos.p2FooterX || 50) / 100 * w, footerY = (pos.p2FooterY || 90) / 100 * h, footerSize = pos.p2FooterSize || 10;
 
@@ -20950,29 +20964,26 @@ function renderCertPage2OnBg(bgImg, student, tpl) {
 
   // Two-column content: modules (left) and competencies (right)
   var colLeft = contentX;
-  var colMid = w * 0.52;
+  var colMid = compHeadX;
   var colWidth = w * 0.44;
-  var yMod = contentY;
-  var yComp = contentY;
   var lineH = Math.round(contentSize * 1.3);
   var subLineH = Math.round(contentSize * 1.1);
 
   ctx.textAlign = 'left';
 
-  // MODULES COMPLETED (two sub-columns within the left column)
-  var headingSize = Math.round(contentSize * 1.35);
-  ctx.font = 'bold ' + headingSize + 'px Arial, sans-serif';
+  // MODULES COMPLETED heading (independently positioned)
+  ctx.font = 'bold ' + modHeadSize + 'px Arial, sans-serif';
   ctx.fillStyle = '#1B2A4A';
-  ctx.fillText('MODULES COMPLETED', colLeft + 10, yMod);
+  ctx.fillText('MODULES COMPLETED', modHeadX + 10, modHeadY);
   // Underline
   var modHeadingWidth = ctx.measureText('MODULES COMPLETED').width;
   ctx.strokeStyle = '#2A7B88';
   ctx.lineWidth = 1.5;
   ctx.beginPath();
-  ctx.moveTo(colLeft + 10, yMod + 4);
-  ctx.lineTo(colLeft + 10 + modHeadingWidth, yMod + 4);
+  ctx.moveTo(modHeadX + 10, modHeadY + 4);
+  ctx.lineTo(modHeadX + 10 + modHeadingWidth, modHeadY + 4);
   ctx.stroke();
-  yMod += Math.round(headingSize * 1.4) + 8;
+  var yMod = modHeadY + Math.round(modHeadSize * 1.4) + 8;
 
   var bulletPrefix = '  \u2022  ';
 
@@ -21016,20 +21027,19 @@ function renderCertPage2OnBg(bgImg, student, tpl) {
   var yModCol2 = renderModSubCol(modCol2, modCol2X, yMod, modSubColWidth);
   yMod = Math.max(yModCol1, yModCol2);
 
-  // COMPETENCIES
-  var compHeadingSize = Math.round(contentSize * 1.35);
-  ctx.font = 'bold ' + compHeadingSize + 'px Arial, sans-serif';
+  // COMPETENCIES heading (independently positioned)
+  ctx.font = 'bold ' + compHeadSize + 'px Arial, sans-serif';
   ctx.fillStyle = '#1B2A4A';
-  ctx.fillText('TECHNICAL COMPETENCIES ACHIEVED', colMid + 10, yComp);
+  ctx.fillText('TECHNICAL COMPETENCIES ACHIEVED', compHeadX + 10, compHeadY);
   // Underline
   var compHeadingWidth = ctx.measureText('TECHNICAL COMPETENCIES ACHIEVED').width;
   ctx.strokeStyle = '#2A7B88';
   ctx.lineWidth = 1.5;
   ctx.beginPath();
-  ctx.moveTo(colMid + 10, yComp + 4);
-  ctx.lineTo(colMid + 10 + compHeadingWidth, yComp + 4);
+  ctx.moveTo(compHeadX + 10, compHeadY + 4);
+  ctx.lineTo(compHeadX + 10 + compHeadingWidth, compHeadY + 4);
   ctx.stroke();
-  yComp += Math.round(compHeadingSize * 1.4) + 8;
+  var yComp = compHeadY + Math.round(compHeadSize * 1.4) + 8;
 
   competencies.forEach(function(cat) {
     ctx.font = 'bold ' + Math.round(contentSize*0.85) + 'px Arial, sans-serif';
@@ -21245,6 +21255,8 @@ function _renderCertLivePreviewP2() {
   var titleX=_cpv('ctplP2TitleX',50)/100*w, titleY=_cpv('ctplP2TitleY',5)/100*h, titleSize=_cpv('ctplP2TitleSize',26);
   var headerX=_cpv('ctplP2HeaderX',50)/100*w, headerY=_cpv('ctplP2HeaderY',18)/100*h, headerSize=_cpv('ctplP2HeaderSize',16);
   var contentX=_cpv('ctplP2ContentX',4)/100*w, contentY=_cpv('ctplP2ContentY',25)/100*h, contentSize=_cpv('ctplP2ContentSize',13);
+  var modHeadX=_cpv('ctplP2ModHeadX',4)/100*w, modHeadY=_cpv('ctplP2ModHeadY',25)/100*h, modHeadSize=_cpv('ctplP2ModHeadSize',18);
+  var compHeadX=_cpv('ctplP2CompHeadX',52)/100*w, compHeadY=_cpv('ctplP2CompHeadY',25)/100*h, compHeadSize=_cpv('ctplP2CompHeadSize',18);
   var specsX=_cpv('ctplP2SpecsX',50)/100*w, specsY=_cpv('ctplP2SpecsY',78)/100*h, specsSize=_cpv('ctplP2SpecsSize',13);
   var footerX=_cpv('ctplP2FooterX',50)/100*w, footerY=_cpv('ctplP2FooterY',90)/100*h, footerSize=_cpv('ctplP2FooterSize',10);
 
@@ -21277,42 +21289,55 @@ function _renderCertLivePreviewP2() {
   ctx.beginPath(); ctx.moveTo(headerX,0); ctx.lineTo(headerX,h); ctx.stroke(); ctx.setLineDash([]);
   canvas._hitZones.push({id:'header', x:headerX, y:headerY, xInput:'ctplP2HeaderX', yInput:'ctplP2HeaderY', r:headerSize*8});
 
-  // --- Content (green) ---
-  var colMid = w * 0.52;
+  // --- Content (green) - sample module/competency items ---
   ctx.textAlign = 'left';
-  var prevHeadingSize = Math.round(contentSize * 1.35);
-  ctx.font = 'bold ' + prevHeadingSize + 'px Arial, sans-serif';
-  ctx.fillStyle = 'rgba(80,200,80,0.9)';
-  ctx.fillText('MODULES COMPLETED', contentX + 10, contentY);
-  var prevModHW = ctx.measureText('MODULES COMPLETED').width;
-  ctx.strokeStyle = 'rgba(80,200,80,0.6)';
-  ctx.lineWidth = 1.5;
-  ctx.beginPath();
-  ctx.moveTo(contentX + 10, contentY + 4);
-  ctx.lineTo(contentX + 10 + prevModHW, contentY + 4);
-  ctx.stroke();
-  var prevContentStart = contentY + Math.round(prevHeadingSize * 1.4) + 8;
+  var modContentStartY = modHeadY + Math.round(modHeadSize * 1.4) + 8;
   ctx.font = 'bold ' + Math.round(contentSize*0.85) + 'px Arial, sans-serif';
   ctx.fillStyle = 'rgba(80,200,80,0.9)';
-  ctx.fillText('\u2611 Sample Module - 20 Contact Hours', contentX + 10, prevContentStart);
+  ctx.fillText('\u2611 Sample Module - 20 Contact Hours', contentX + 10, modContentStartY);
   ctx.font = Math.round(contentSize*0.77) + 'px Arial, sans-serif';
-  ctx.fillText('  \u2022  Sample topic 1', contentX + 20, prevContentStart + contentSize*1.3);
-  ctx.fillText('  \u2022  Sample topic 2', contentX + 20, prevContentStart + contentSize*2.3);
-  ctx.font = 'bold ' + prevHeadingSize + 'px Arial, sans-serif';
-  ctx.fillText('TECHNICAL COMPETENCIES ACHIEVED', colMid + 10, contentY);
-  var prevCompHW = ctx.measureText('TECHNICAL COMPETENCIES ACHIEVED').width;
-  ctx.strokeStyle = 'rgba(80,200,80,0.6)';
-  ctx.beginPath();
-  ctx.moveTo(colMid + 10, contentY + 4);
-  ctx.lineTo(colMid + 10 + prevCompHW, contentY + 4);
-  ctx.stroke();
+  ctx.fillText('  \u2022  Sample topic 1', contentX + 20, modContentStartY + contentSize*1.3);
+  ctx.fillText('  \u2022  Sample topic 2', contentX + 20, modContentStartY + contentSize*2.3);
+  var compContentStartY = compHeadY + Math.round(compHeadSize * 1.4) + 8;
   ctx.font = 'bold ' + Math.round(contentSize*0.85) + 'px Arial, sans-serif';
-  ctx.fillText('Sample Category:', colMid + 10, prevContentStart);
+  ctx.fillText('Sample Category:', compHeadX + 10, compContentStartY);
   ctx.font = Math.round(contentSize*0.77) + 'px Arial, sans-serif';
-  ctx.fillText('  \u2022  Sample competency item', colMid + 20, prevContentStart + contentSize*1.3);
+  ctx.fillText('  \u2022  Sample competency item', compHeadX + 20, compContentStartY + contentSize*1.3);
   ctx.strokeStyle = 'rgba(80,200,80,0.4)'; ctx.lineWidth = 1; ctx.setLineDash([6,4]);
   ctx.beginPath(); ctx.moveTo(0,contentY); ctx.lineTo(w,contentY); ctx.stroke(); ctx.setLineDash([]);
   canvas._hitZones.push({id:'content', x:contentX, y:contentY, xInput:'ctplP2ContentX', yInput:'ctplP2ContentY', r:contentSize*8});
+
+  // --- Modules Heading (teal) ---
+  ctx.font = 'bold ' + modHeadSize + 'px Arial, sans-serif';
+  ctx.fillStyle = 'rgba(42,123,136,0.9)';
+  ctx.fillText('MODULES COMPLETED', modHeadX + 10, modHeadY);
+  var prevModHW = ctx.measureText('MODULES COMPLETED').width;
+  ctx.strokeStyle = 'rgba(42,123,136,0.6)';
+  ctx.lineWidth = 1.5; ctx.setLineDash([]);
+  ctx.beginPath();
+  ctx.moveTo(modHeadX + 10, modHeadY + 4);
+  ctx.lineTo(modHeadX + 10 + prevModHW, modHeadY + 4);
+  ctx.stroke();
+  ctx.strokeStyle = 'rgba(42,123,136,0.4)'; ctx.lineWidth = 1; ctx.setLineDash([6,4]);
+  ctx.beginPath(); ctx.moveTo(0,modHeadY); ctx.lineTo(w,modHeadY); ctx.stroke();
+  ctx.beginPath(); ctx.moveTo(modHeadX,0); ctx.lineTo(modHeadX,h); ctx.stroke(); ctx.setLineDash([]);
+  canvas._hitZones.push({id:'modules heading', x:modHeadX, y:modHeadY, xInput:'ctplP2ModHeadX', yInput:'ctplP2ModHeadY', r:modHeadSize*5});
+
+  // --- Competencies Heading (teal) ---
+  ctx.font = 'bold ' + compHeadSize + 'px Arial, sans-serif';
+  ctx.fillStyle = 'rgba(42,123,136,0.9)';
+  ctx.fillText('TECHNICAL COMPETENCIES ACHIEVED', compHeadX + 10, compHeadY);
+  var prevCompHW = ctx.measureText('TECHNICAL COMPETENCIES ACHIEVED').width;
+  ctx.strokeStyle = 'rgba(42,123,136,0.6)';
+  ctx.lineWidth = 1.5; ctx.setLineDash([]);
+  ctx.beginPath();
+  ctx.moveTo(compHeadX + 10, compHeadY + 4);
+  ctx.lineTo(compHeadX + 10 + prevCompHW, compHeadY + 4);
+  ctx.stroke();
+  ctx.strokeStyle = 'rgba(42,123,136,0.4)'; ctx.lineWidth = 1; ctx.setLineDash([6,4]);
+  ctx.beginPath(); ctx.moveTo(0,compHeadY); ctx.lineTo(w,compHeadY); ctx.stroke();
+  ctx.beginPath(); ctx.moveTo(compHeadX,0); ctx.lineTo(compHeadX,h); ctx.stroke(); ctx.setLineDash([]);
+  canvas._hitZones.push({id:'competencies heading', x:compHeadX, y:compHeadY, xInput:'ctplP2CompHeadX', yInput:'ctplP2CompHeadY', r:compHeadSize*5});
 
   // --- Specs (purple) ---
   ctx.textAlign = 'center';
@@ -21543,6 +21568,12 @@ function openCertTemplateEditor() {
   document.getElementById('ctplP2ContentX').value = pos.p2ContentX || 50;
   document.getElementById('ctplP2ContentY').value = pos.p2ContentY || 25;
   document.getElementById('ctplP2ContentSize').value = pos.p2ContentSize || 11;
+  document.getElementById('ctplP2ModHeadX').value = pos.p2ModHeadX || 4;
+  document.getElementById('ctplP2ModHeadY').value = pos.p2ModHeadY || 25;
+  document.getElementById('ctplP2ModHeadSize').value = pos.p2ModHeadSize || 18;
+  document.getElementById('ctplP2CompHeadX').value = pos.p2CompHeadX || 52;
+  document.getElementById('ctplP2CompHeadY').value = pos.p2CompHeadY || 25;
+  document.getElementById('ctplP2CompHeadSize').value = pos.p2CompHeadSize || 18;
   document.getElementById('ctplP2SpecsX').value = pos.p2SpecsX || 50;
   document.getElementById('ctplP2SpecsY').value = pos.p2SpecsY || 78;
   document.getElementById('ctplP2SpecsSize').value = pos.p2SpecsSize || 10;
@@ -21670,6 +21701,12 @@ function saveCertTemplate() {
       p2ContentX: parseInt(document.getElementById('ctplP2ContentX').value) || 4,
       p2ContentY: parseInt(document.getElementById('ctplP2ContentY').value) || 25,
       p2ContentSize: parseInt(document.getElementById('ctplP2ContentSize').value) || 13,
+      p2ModHeadX: parseInt(document.getElementById('ctplP2ModHeadX').value) || 4,
+      p2ModHeadY: parseInt(document.getElementById('ctplP2ModHeadY').value) || 25,
+      p2ModHeadSize: parseInt(document.getElementById('ctplP2ModHeadSize').value) || 18,
+      p2CompHeadX: parseInt(document.getElementById('ctplP2CompHeadX').value) || 52,
+      p2CompHeadY: parseInt(document.getElementById('ctplP2CompHeadY').value) || 25,
+      p2CompHeadSize: parseInt(document.getElementById('ctplP2CompHeadSize').value) || 18,
       p2SpecsX: parseInt(document.getElementById('ctplP2SpecsX').value) || 50,
       p2SpecsY: parseInt(document.getElementById('ctplP2SpecsY').value) || 78,
       p2SpecsSize: parseInt(document.getElementById('ctplP2SpecsSize').value) || 13,
