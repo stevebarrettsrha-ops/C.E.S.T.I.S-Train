@@ -3529,7 +3529,7 @@ textarea.form-control { resize:vertical; min-height:80px; }
     <div class="modal-header"><h3>Add New Student</h3><button class="modal-close" onclick="closeModal('addStudentModal')">✕</button></div>
     <div class="form-group"><label>Full Name</label><input type="text" class="form-control" id="newStudentName" placeholder="e.g. John Smith"></div>
     <div class="form-group"><label>Email</label><input type="email" class="form-control" id="newStudentEmail" placeholder="e.g. john@email.com"></div>
-    <div class="form-group"><label>Programme</label><select class="form-control" id="newStudentCourse"><option>Welding</option><option>Electrical Installation</option><option>Cosmetology</option><option>Business Administration</option><option>Auto Mechanics</option><option>Plumbing</option><option>Carpentry</option><option>Hospitality</option><option>Information Technology</option><option>Garment Construction</option></select></div>
+    <div class="form-group"><label>Programme</label><select class="form-control" id="newStudentCourse"></select></div>
     <div class="form-group"><label>Starting Stage</label><select class="form-control" id="newStudentStage"><option value="testing">Testing</option><option value="interview">Interview</option><option value="training">In Training</option></select></div>
     <div style="display:flex;gap:10px;justify-content:flex-end;margin-top:20px;"><button class="btn btn-secondary" onclick="closeModal('addStudentModal')">Cancel</button><button class="btn btn-primary" onclick="addStudent()">Add Student</button></div>
   </div>
@@ -3541,7 +3541,7 @@ textarea.form-control { resize:vertical; min-height:80px; }
     <!-- Step 1: Exam Details -->
     <div id="examStep1">
       <div class="form-group"><label>Exam Title</label><input type="text" class="form-control" id="examTitle" placeholder="e.g. Welding Level 2 — Final Assessment"></div>
-      <div class="form-group"><label>Programme</label><select class="form-control" id="examCourse"><option>Welding</option><option>Electrical Installation</option><option>Cosmetology</option><option>Business Administration</option><option>Auto Mechanics</option><option>Plumbing</option><option>Carpentry</option><option>Hospitality</option><option>Information Technology</option></select></div>
+      <div class="form-group"><label>Programme</label><select class="form-control" id="examCourse"></select></div>
       <div class="grid-2col" style="gap:12px;"><div class="form-group"><label>Date</label><input type="date" class="form-control" id="examDate"></div><div class="form-group"><label>Start Time</label><input type="time" class="form-control" id="examTime"></div></div>
       <div class="grid-2col" style="gap:12px;"><div class="form-group"><label>Duration (minutes)</label><input type="number" class="form-control" id="examDuration" value="90" min="15" max="300"></div><div class="form-group"><label>Pass Mark (%)</label><input type="number" class="form-control" id="examPassMark" value="60" min="1" max="100"></div></div>
       <div class="form-group"><label>Shuffle Questions</label><select class="form-control" id="examShuffle"><option value="false">No — Keep original order</option><option value="true">Yes — Randomise order for each student</option></select></div>
@@ -3596,7 +3596,7 @@ textarea.form-control { resize:vertical; min-height:80px; }
       <div class="form-group"><label>Password</label><input type="password" class="form-control" id="newUserPassword" placeholder="Minimum 6 characters"></div>
     </div>
     <div class="form-group"><label>Email</label><input type="email" class="form-control" id="newUserEmail" placeholder="e.g. john@heartlms.edu.jm"></div>
-    <div class="form-group" id="newUserProgrammeGroup"><label>Programme</label><select class="form-control" id="newUserProgramme"><option value="">— Select Programme —</option><option>Welding</option><option>Electrical Installation</option><option>Cosmetology</option><option>Business Administration</option><option>Auto Mechanics</option><option>Plumbing</option><option>Carpentry</option><option>Hospitality &amp; Tourism</option><option>Information Technology</option><option>Garment Construction</option><option>Refrigeration &amp; AC</option><option>Heavy Equipment Ops</option><option>Commercial Cooking</option><option>Beauty Therapy</option><option>Data Operations</option><option>Agriculture</option><option>Masonry</option><option>Solar Energy Tech</option><option>Early Childhood Ed</option><option>Customer Service</option></select></div>
+    <div class="form-group" id="newUserProgrammeGroup"><label>Programme</label><select class="form-control" id="newUserProgramme"><option value="">— Select Programme —</option></select></div>
     <div style="display:flex;gap:10px;justify-content:flex-end;margin-top:20px;">
       <button class="btn btn-secondary" onclick="closeModal('createUserModal')">Cancel</button>
       <button class="btn btn-primary" onclick="createUserAccount()">Create User</button>
@@ -3615,7 +3615,7 @@ textarea.form-control { resize:vertical; min-height:80px; }
     </div>
     <div class="form-group"><label>Username</label><input type="text" class="form-control" id="editUserUsername"></div>
     <div class="form-group"><label>Email</label><input type="email" class="form-control" id="editUserEmail"></div>
-    <div class="form-group" id="editUserProgrammeGroup"><label>Programme</label><select class="form-control" id="editUserProgramme"><option value="">— Select Programme —</option><option>Welding</option><option>Electrical Installation</option><option>Cosmetology</option><option>Business Administration</option><option>Auto Mechanics</option><option>Plumbing</option><option>Carpentry</option><option>Hospitality &amp; Tourism</option><option>Information Technology</option><option>Garment Construction</option><option>Refrigeration &amp; AC</option><option>Heavy Equipment Ops</option><option>Commercial Cooking</option><option>Beauty Therapy</option><option>Data Operations</option><option>Agriculture</option><option>Masonry</option><option>Solar Energy Tech</option><option>Early Childhood Ed</option><option>Customer Service</option></select></div>
+    <div class="form-group" id="editUserProgrammeGroup"><label>Programme</label><select class="form-control" id="editUserProgramme"><option value="">— Select Programme —</option></select></div>
     <div style="display:flex;gap:10px;justify-content:flex-end;margin-top:20px;">
       <button class="btn btn-secondary" onclick="closeModal('editUserModal')">Cancel</button>
       <button class="btn btn-primary" onclick="saveUserEdit()">Save Changes</button>
@@ -3645,7 +3645,7 @@ textarea.form-control { resize:vertical; min-height:80px; }
   <div class="modal">
     <div class="modal-header"><h3>Create New Class Session</h3><button class="modal-close" onclick="closeModal('createClassSessionModal')">✕</button></div>
     <div class="form-group"><label>Session Name</label><input type="text" class="form-control" id="csSessionName" placeholder="e.g. Welding Theory — Session 5"></div>
-    <div class="form-group"><label>Programme / Course</label><select class="form-control" id="csCourse"><option>Welding</option><option>Electrical Installation</option><option>Cosmetology</option><option>Business Administration</option><option>Auto Mechanics</option><option>Plumbing</option><option>Carpentry</option><option>Hospitality</option><option>Information Technology</option><option>Garment Construction</option></select></div>
+    <div class="form-group"><label>Programme / Course</label><select class="form-control" id="csCourse"></select></div>
     <div class="grid-2col" style="gap:12px;">
       <div class="form-group"><label>Date</label><input type="date" class="form-control" id="csDate"></div>
       <div class="form-group"><label>Start Time</label><input type="time" class="form-control" id="csTime"></div>
@@ -3853,7 +3853,8 @@ const stages = ['testing','interview','training','certified','collected','incomp
 const stageLabels = {testing:'Testing',interview:'Interview',training:'In Training',certified:'Certified',collected:'Collected',incomplete:'Incomplete'};
 const stageBadge = {testing:'badge-blue',interview:'badge-purple',training:'badge-amber',certified:'badge-green',collected:'badge-green',incomplete:'badge-red'};
 const stageIcons = {testing:'\uD83D\uDCDD',interview:'\uD83D\uDDE3\uFE0F',training:'\uD83D\uDCDA',certified:'\uD83C\uDF93',collected:'\u2705',incomplete:'\u26A0\uFE0F'};
-const courses = ['Welding','Electrical Installation','Cosmetology','Business Administration','Auto Mechanics','Plumbing','Carpentry','Hospitality & Tourism'];
+function getCourseList() { return skillAreas.map(function(s) { return s.name; }); }
+var courses = getCourseList();
 
 let students = [];
 let certDownloadApprovals = []; // {studentId, name, course, certNo, certDate, approved, approvedDate, approvedBy, downloadCount, lastDownloaded}
@@ -6090,7 +6091,7 @@ function buildAdminPages() {
         <p style="font-size:13px;color:var(--text-secondary);margin-bottom:16px;">Configure the exam settings and import the questions.</p>
         <div class="form-group"><label>Exam Title</label><input type="text" class="form-control" id="importExamTitle" placeholder="e.g. Welding Level 2 — Final Assessment"></div>
         <div class="grid-2col" style="gap:12px;">
-          <div class="form-group"><label>Programme</label><select class="form-control" id="importExamCourse"><option>Welding</option><option>Electrical Installation</option><option>Cosmetology</option><option>Business Administration</option><option>Auto Mechanics</option><option>Plumbing</option><option>Carpentry</option><option>Hospitality</option><option>Information Technology</option></select></div>
+          <div class="form-group"><label>Programme</label><select class="form-control" id="importExamCourse"></select></div>
           <div class="form-group"><label>Pass Mark (%)</label><input type="number" class="form-control" id="importExamPassMark" value="60" min="1" max="100"></div>
         </div>
         <div class="grid-2col" style="gap:12px;">
@@ -6770,6 +6771,7 @@ function buildAdminPages() {
   </section>
   `;
 
+  populateCourseDropdowns();
   renderStudents(students);
   renderSkills();
   renderExams('upcoming');
@@ -10376,6 +10378,35 @@ function toggleEmojiGrid(gridId) {
 
 var centreViewMode = 'grid';
 
+function populateCourseDropdowns() {
+  courses = getCourseList();
+  // IDs of all dropdowns that need course options (no placeholder)
+  var plainIds = ['newStudentCourse','examCourse','csCourse','importExamCourse'];
+  // IDs that need a "— Select Programme —" placeholder first
+  var placeholderIds = ['newUserProgramme','editUserProgramme'];
+  plainIds.forEach(function(id) {
+    var sel = document.getElementById(id);
+    if(!sel) return;
+    var prev = sel.value;
+    sel.innerHTML = courses.map(function(c) { return '<option>' + c + '</option>'; }).join('');
+    if(prev && sel.querySelector('option[value="'+prev+'"]')) sel.value = prev;
+  });
+  placeholderIds.forEach(function(id) {
+    var sel = document.getElementById(id);
+    if(!sel) return;
+    var prev = sel.value;
+    sel.innerHTML = '<option value="">— Select Programme —</option>' + courses.map(function(c) { return '<option>' + c + '</option>'; }).join('');
+    if(prev) sel.value = prev;
+  });
+  // Also refresh the filter dropdown if it exists
+  var filterCourse = document.getElementById('filterCourse');
+  if(filterCourse) {
+    var prevFilter = filterCourse.value;
+    filterCourse.innerHTML = '<option value="all">All Courses</option>' + courses.map(function(c) { return '<option>' + c + '</option>'; }).join('');
+    if(prevFilter) filterCourse.value = prevFilter;
+  }
+}
+
 function initTrainingAdminControls() {
   var ctrl = document.getElementById('trainingAdminControls');
   if(ctrl && currentRole === 'admin') {
@@ -10467,6 +10498,7 @@ function addTrainingCentre() {
   if(centreViewMode === 'table') renderCentreTable();
   showToast(name + ' training centre added!');
   addNotification('New training centre created: ' + name, 'system', null, ['admin']);
+  populateCourseDropdowns();
   saveState();
 }
 
@@ -10504,8 +10536,10 @@ function saveTrainingCentre() {
   updateCentreCount();
   if(centreViewMode === 'table') renderCentreTable();
   showToast(name + ' updated successfully!');
+  populateCourseDropdowns();
   saveState();
 }
+
 
 function openDeleteCentre(id) {
   if(currentRole !== 'admin') { alert('Only administrators can delete training centres.'); return; }
@@ -10528,6 +10562,7 @@ function confirmDeleteCentre() {
   if(centreViewMode === 'table') renderCentreTable();
   showToast(name + ' has been deleted.');
   addNotification('Training centre deleted: ' + name, 'system', null, ['admin']);
+  populateCourseDropdowns();
   saveState();
 }
 
