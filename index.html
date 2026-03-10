@@ -3583,6 +3583,28 @@ textarea.form-control { resize:vertical; min-height:80px; }
     <div id="updateStageContent"></div>
   </div>
 </div>
+<div class="modal-overlay" id="editStudentModal">
+  <div class="modal">
+    <div class="modal-header"><h3>Edit Student</h3><button class="modal-close" onclick="closeModal('editStudentModal')">✕</button></div>
+    <input type="hidden" id="editStudentIdx">
+    <div class="form-group"><label>Full Name</label><input type="text" class="form-control" id="editStudentName"></div>
+    <div class="form-group"><label>Email</label><input type="email" class="form-control" id="editStudentEmail" placeholder="e.g. john@email.com"></div>
+    <div class="form-group"><label>Programme</label><select class="form-control" id="editStudentCourse"></select></div>
+    <div class="form-group"><label>Instructor</label><input type="text" class="form-control" id="editStudentInstructor"></div>
+    <div class="form-group"><label>Attendance (%)</label><input type="number" class="form-control" id="editStudentAttendance" min="0" max="100"></div>
+    <div class="form-group"><label>GPA</label><input type="text" class="form-control" id="editStudentGPA"></div>
+    <div style="display:flex;gap:10px;justify-content:flex-end;margin-top:20px;"><button class="btn btn-secondary" onclick="closeModal('editStudentModal')">Cancel</button><button class="btn btn-primary" onclick="saveEditStudent()">Save Changes</button></div>
+  </div>
+</div>
+<div class="modal-overlay" id="deleteStudentModal">
+  <div class="modal" style="max-width:420px;">
+    <div class="modal-header"><h3>Delete Student</h3><button class="modal-close" onclick="closeModal('deleteStudentModal')">✕</button></div>
+    <input type="hidden" id="deleteStudentIdx">
+    <p style="margin-bottom:16px;">Are you sure you want to delete <strong id="deleteStudentName"></strong>?</p>
+    <p style="font-size:13px;color:var(--text-muted);margin-bottom:20px;">This action cannot be undone. All student records will be permanently removed.</p>
+    <div style="display:flex;gap:10px;justify-content:flex-end;"><button class="btn btn-secondary" onclick="closeModal('deleteStudentModal')">Cancel</button><button class="btn" style="background:#e74c3c;color:#fff;" onclick="confirmDeleteStudent()">Delete</button></div>
+  </div>
+</div>
 <!-- CREATE USER MODAL -->
 <div class="modal-overlay" id="createUserModal">
   <div class="modal">
@@ -10258,7 +10280,7 @@ function renderStudents(data) {
     <tr><td><strong>${s.name}</strong></td><td style="font-family:monospace;font-size:12px;color:var(--text-muted);">${s.id}</td><td>${s.course}</td>
     <td><span class="badge ${stageBadge[s.stage]}"><span class="badge-dot"></span>${stageLabels[s.stage]}</span></td><td>${s.score||'—'}</td>
     <td><div style="display:flex;align-items:center;gap:8px;"><div class="progress-bar" style="width:80px;"><div class="fill" style="width:${s.progress}%;background:${s.progress>=80?'var(--green)':s.progress>=40?'var(--accent)':'var(--red)'};"></div></div><span style="font-size:12px;color:var(--text-muted);">${s.progress}%</span></div></td>
-    <td><button class="btn btn-sm btn-secondary" onclick="openUpdateStage(${students.indexOf(s)})">Update</button></td></tr>
+    <td><div style="display:flex;gap:6px;"><button class="btn btn-sm btn-secondary" onclick="openUpdateStage(${students.indexOf(s)})">Update</button><button class="btn btn-sm btn-secondary" onclick="openEditStudent(${students.indexOf(s)})" style="font-size:11px;">✎ Edit</button><button class="btn btn-sm" style="background:#e74c3c;color:#fff;font-size:11px;border:none;border-radius:var(--radius-sm);cursor:pointer;" onclick="openDeleteStudent(${students.indexOf(s)})">✕ Delete</button></div></td></tr>
   `).join('');
   const sc = document.getElementById('studentCount');
   if(sc) sc.textContent = `Showing ${data.length} students`;
@@ -10298,6 +10320,61 @@ function updateStudentStage(idx) {
   else addNotification(students[idx].name + ' moved to ' + stageLabels[newStage], 'student', null, ['admin']);
   saveState();
 }
+function openEditStudent(idx) {
+  var s = students[idx];
+  document.getElementById('editStudentIdx').value = idx;
+  document.getElementById('editStudentName').value = s.name;
+  var profile = studentProfiles[s.id] || {};
+  document.getElementById('editStudentEmail').value = profile.email || '';
+  document.getElementById('editStudentInstructor').value = s.instructor || '';
+  document.getElementById('editStudentAttendance').value = s.attendance || 0;
+  document.getElementById('editStudentGPA').value = s.gpa || '0.0';
+  populateCourseDropdowns();
+  var courseSel = document.getElementById('editStudentCourse');
+  if(courseSel) courseSel.value = s.course;
+  openModal('editStudentModal');
+}
+function saveEditStudent() {
+  var idx = parseInt(document.getElementById('editStudentIdx').value);
+  var name = document.getElementById('editStudentName').value.trim();
+  if(!name){alert('Please enter a name');return;}
+  var s = students[idx];
+  s.name = name;
+  s.course = document.getElementById('editStudentCourse').value;
+  s.instructor = document.getElementById('editStudentInstructor').value.trim();
+  s.attendance = parseInt(document.getElementById('editStudentAttendance').value) || 0;
+  s.gpa = document.getElementById('editStudentGPA').value.trim() || '0.0';
+  var email = document.getElementById('editStudentEmail').value.trim();
+  if(email) {
+    if(!studentProfiles[s.id]) studentProfiles[s.id] = {};
+    studentProfiles[s.id].email = email;
+    studentProfiles[s.id].updatedAt = new Date().toISOString();
+  }
+  closeModal('editStudentModal');
+  filterStudents();
+  showToast(s.name + ' updated successfully');
+  saveState();
+}
+function openDeleteStudent(idx) {
+  var s = students[idx];
+  document.getElementById('deleteStudentIdx').value = idx;
+  document.getElementById('deleteStudentName').textContent = s.name + ' (' + s.id + ')';
+  openModal('deleteStudentModal');
+}
+function confirmDeleteStudent() {
+  var idx = parseInt(document.getElementById('deleteStudentIdx').value);
+  var s = students[idx];
+  var name = s.name;
+  var sid = s.id;
+  students.splice(idx, 1);
+  if(studentProfiles[sid]) delete studentProfiles[sid];
+  closeModal('deleteStudentModal');
+  filterStudents();
+  updatePipelineCounts();
+  showToast(name + ' has been deleted');
+  addNotification('Student removed: ' + name, 'student', null, ['admin']);
+  saveState();
+}
 function updatePipelineCounts() {
   stages.forEach(s => {
     const count = students.filter(st=>st.stage===s).length;
@@ -10309,7 +10386,7 @@ function addStudent() {
   if(!name){alert('Please enter a name');return;}
   var selectedCourse = document.getElementById('newStudentCourse').value;
   var assignedInstructor = (instructorData.find(function(ins){return ins.course === selectedCourse;})||{}).name || '';
-  students.unshift({id:'STU-'+String(2026000+students.length),name,stage:document.getElementById('newStudentStage').value,course:selectedCourse,score:'',progress:10,certNo:null,certDate:null,certCollected:false,attendance:0,assignments:0,assignmentsTotal:8,gpa:'0.0',instructor:assignedInstructor});
+  students.unshift({id:'STU-'+Date.now().toString(36).toUpperCase()+Math.random().toString(36).substring(2,6).toUpperCase(),name,stage:document.getElementById('newStudentStage').value,course:selectedCourse,score:'',progress:10,certNo:null,certDate:null,certCollected:false,attendance:0,assignments:0,assignmentsTotal:8,gpa:'0.0',instructor:assignedInstructor});
   closeModal('addStudentModal');filterStudents();updatePipelineCounts();showToast(`${name} added!`);document.getElementById('newStudentName').value='';
   addNotification('New student enrolled: ' + name + ' — ' + document.getElementById('newStudentCourse').value, 'student', null, ['admin','instructor']);
   saveState();
@@ -10393,7 +10470,7 @@ var centreViewMode = 'grid';
 function populateCourseDropdowns() {
   courses = getCourseList();
   // IDs of all dropdowns that need course options (no placeholder)
-  var plainIds = ['newStudentCourse','examCourse','csCourse','importExamCourse'];
+  var plainIds = ['newStudentCourse','editStudentCourse','examCourse','csCourse','importExamCourse'];
   // IDs that need a "— Select Programme —" placeholder first
   var placeholderIds = ['newUserProgramme','editUserProgramme'];
   plainIds.forEach(function(id) {
