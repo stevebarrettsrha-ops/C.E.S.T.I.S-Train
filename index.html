@@ -4057,6 +4057,11 @@ let instructorData = [];
 let currentRole = null;
 let currentStudent = null;
 let currentInstructor = null;
+
+// ============================== SESSION EXPIRY CONFIG ==============================
+const SESSION_EXPIRY_MS = 8 * 60 * 60 * 1000; // 8 hours default session duration
+const SESSION_CHECK_INTERVAL_MS = 60 * 1000;   // Check every 60 seconds
+var _sessionCheckIntervalId = null;
 let videoTimerInterval = null;
 let videoSeconds = 0;
 // WebRTC Video Conferencing State
@@ -4380,6 +4385,231 @@ function lmsChatScheduleDriveSync() {
 // Admin Staff Access Settings (declared early for saveState/loadState)
 var adminStaffAccessSettings = { attendance:false, announcements:false, calendar:false, students:false, certificates:false, reports:false, training:false, exams:false, video:false, resources:false };
 
+// ============================== SESSION & DATA CLEANUP ==============================
+
+// Set session expiry timestamp on login
+function setSessionExpiry() {
+  var expiry = Date.now() + SESSION_EXPIRY_MS;
+  localStorage.setItem('voctrain_sessionExpiry', String(expiry));
+  localStorage.setItem('voctrain_sessionRole', currentRole || '');
+  if(currentLoggedInUser) {
+    localStorage.setItem('voctrain_sessionUserId', currentLoggedInUser.id || '');
+  }
+}
+
+// Check if session has expired; if so, clear sensitive data and force logout
+function checkSessionExpiry() {
+  var expiry = localStorage.getItem('voctrain_sessionExpiry');
+  if(!expiry) return;
+  if(Date.now() > Number(expiry)) {
+    console.log('[Session] Session expired — clearing sensitive data');
+    clearSensitiveDataOnExpiry();
+    stopSessionExpiryCheck();
+    if(currentRole) {
+      showToast('Your session has expired. You have been logged out.', 'warning');
+      logout();
+    }
+  }
+}
+
+// Start periodic session expiry check
+function startSessionExpiryCheck() {
+  stopSessionExpiryCheck();
+  _sessionCheckIntervalId = setInterval(checkSessionExpiry, SESSION_CHECK_INTERVAL_MS);
+}
+
+function stopSessionExpiryCheck() {
+  if(_sessionCheckIntervalId) { clearInterval(_sessionCheckIntervalId); _sessionCheckIntervalId = null; }
+}
+
+// Selectively clear sensitive data while preserving the student's own progress
+// Called on student logout or session expiry
+function clearSensitiveStudentData() {
+  var sessionRole = currentRole || localStorage.getItem('voctrain_sessionRole');
+  // Only do selective clearing for student role; admins/instructors wipe all data
+  if(sessionRole !== 'student') {
+    clearAllSessionData();
+    return;
+  }
+
+  var studentId = currentStudent ? currentStudent.id : null;
+  var studentName = currentStudent ? currentStudent.name : null;
+  var userId = currentLoggedInUser ? currentLoggedInUser.id : localStorage.getItem('voctrain_sessionUserId');
+
+  // --- CLEAR BOTH localStorage AND in-memory arrays ---
+  // This prevents data leaking back via saveState() if another user logs in on the same page session.
+
+  // 1. Remove all user account credentials — reset to defaults only
+  localStorage.removeItem('voctrain_users');
+  userAccounts = userAccounts.filter(function(u) {
+    return u.id === 'USR-001' || u.id === 'USR-011' || u.id === 'USR-021'; // keep built-in defaults
+  });
+
+  // 2. Keep only this student's record
+  try {
+    var myStudent = students.filter(function(s) {
+      return (studentId && s.id === studentId) || (studentName && s.name === studentName);
+    });
+    students = myStudent;
+    localStorage.setItem('voctrain_students', JSON.stringify(myStudent));
+  } catch(e) { students = []; localStorage.removeItem('voctrain_students'); }
+
+  // 3. Keep only this student's exam results
+  try {
+    var myResults = examResults.filter(function(r) {
+      return (studentId && r.studentId === studentId) || (studentName && r.studentName === studentName);
+    });
+    examResults = myResults;
+    localStorage.setItem('voctrain_examResults', JSON.stringify(myResults));
+  } catch(e) { examResults = []; localStorage.removeItem('voctrain_examResults'); }
+
+  // 4. Keep only this student's profile
+  try {
+    var myProfile = {};
+    if(userId && studentProfiles[userId]) { myProfile[userId] = studentProfiles[userId]; }
+    studentProfiles = myProfile;
+    localStorage.setItem('voctrain_studentProfiles', JSON.stringify(myProfile));
+  } catch(e) { studentProfiles = {}; localStorage.removeItem('voctrain_studentProfiles'); }
+
+  // 5. Keep only this student's attendance
+  try {
+    var myAttendance = attendanceRecords.filter(function(a) {
+      return (studentId && a.studentId === studentId) || (studentName && a.studentName === studentName);
+    });
+    attendanceRecords = myAttendance;
+    localStorage.setItem('voctrain_attendance', JSON.stringify(myAttendance));
+  } catch(e) { attendanceRecords = []; localStorage.removeItem('voctrain_attendance'); }
+
+  // 6. Remove admin/instructor-only data (localStorage + in-memory)
+  localStorage.removeItem('voctrain_adminMeetings');
+  adminMeetings = [];
+  localStorage.removeItem('voctrain_adrTasks');
+  adrTasks = [];
+  localStorage.removeItem('voctrain_adrStaffMeta');
+  adrStaffMeta = {};
+  localStorage.removeItem('voctrain_adminStaffAccess');
+  adminStaffAccessSettings = { attendance:false, announcements:false, calendar:false, students:false, certificates:false, reports:false, training:false, exams:false, video:false, resources:false };
+  localStorage.removeItem('voctrain_instructorData');
+  instructorData = [];
+  localStorage.removeItem('voctrain_instructorProfiles');
+  instructorProfiles = {};
+  localStorage.removeItem('voctrain_certDownloadApprovals');
+  certDownloadApprovals = [];
+  localStorage.removeItem('voctrain_certTemplates');
+  certTemplates = {};
+
+  // 7. Remove chat messages (may contain sensitive conversations)
+  localStorage.removeItem('voctrain_chatMessages');
+  lmsChatMessages = {};
+  localStorage.removeItem('voctrain_chatProfiles');
+  lmsChatProfiles = {};
+  localStorage.removeItem('voctrain_chatFollows');
+  lmsChatFollows = {};
+
+  // 8. Remove support messages
+  localStorage.removeItem('voctrain_support_messages');
+  if(typeof supportMessages !== 'undefined') supportMessages = [];
+
+  // 9. Clear Google Drive tokens (in-memory + localStorage)
+  localStorage.removeItem('schoolDashboardGoogleAccessToken');
+  localStorage.removeItem('schoolDashboardGoogleTokenExpiry');
+  localStorage.removeItem('schoolDashboardCloudFileId');
+  localStorage.removeItem('schoolDashboardLastSyncTime');
+  googleAccessToken = null;
+  isCloudConnected = false;
+  cloudFileId = null;
+  lastSyncTime = null;
+  loginSyncCompleted = false;
+
+  // 10. Clear CMC data
+  localStorage.removeItem('cmcDashboardData');
+  localStorage.removeItem('cmcHtmlContent');
+
+  // 11. Clear session tracking
+  localStorage.removeItem('voctrain_sessionExpiry');
+  localStorage.removeItem('voctrain_sessionRole');
+  localStorage.removeItem('voctrain_sessionUserId');
+
+  // 12. Clear IndexedDB databases (chat images, cert images)
+  try { indexedDB.deleteDatabase('CESTIS_ChatImages'); } catch(e) {}
+  try { indexedDB.deleteDatabase('CESTIS_CertImages'); } catch(e) {}
+
+  // Keep in localStorage AND in-memory:
+  //   announcements, calendarEvents, exams (read-only for students),
+  //   instructorAssignments, instructorResources, driveResources, skillAreas,
+  //   chatRooms (room list only, messages removed), systemSettings,
+  //   classSessions, notifications
+  // These are non-sensitive, read-only data that helps the student experience on next login.
+
+  console.log('[Session] Sensitive student data cleared from localStorage and memory. Own progress preserved.');
+}
+
+// Full data wipe for session expiry (when we can't identify the student)
+function clearSensitiveDataOnExpiry() {
+  var sessionRole = localStorage.getItem('voctrain_sessionRole');
+  if(sessionRole === 'student') {
+    clearSensitiveStudentData();
+  } else {
+    clearAllSessionData();
+  }
+}
+
+// Complete data wipe (for admin/instructor/staff logout or unknown sessions)
+function clearAllSessionData() {
+  // Clear localStorage
+  var keysToRemove = [];
+  for(var i = 0; i < localStorage.length; i++) {
+    var key = localStorage.key(i);
+    if(key && (key.startsWith('voctrain_') || key.startsWith('schoolDashboard') || key === 'cmcDashboardData' || key === 'cmcHtmlContent')) {
+      keysToRemove.push(key);
+    }
+  }
+  keysToRemove.forEach(function(k) { localStorage.removeItem(k); });
+
+  // Clear in-memory arrays to prevent saveState() from restoring data
+  students = [];
+  exams = [];
+  announcements = [];
+  attendanceRecords = [];
+  examResults = [];
+  calendarEvents = [];
+  classSessions = [];
+  adminMeetings = [];
+  instructorAssignments = [];
+  instructorResources = [];
+  driveResources = [];
+  studentProfiles = {};
+  instructorProfiles = {};
+  instructorData = [];
+  adrTasks = [];
+  adrStaffMeta = {};
+  adminStaffAccessSettings = { attendance:false, announcements:false, calendar:false, students:false, certificates:false, reports:false, training:false, exams:false, video:false, resources:false };
+  certDownloadApprovals = [];
+  certTemplates = {};
+  skillAreas = [];
+  lmsChatRooms = [];
+  lmsChatMessages = {};
+  lmsChatProfiles = {};
+  lmsChatFollows = {};
+  if(typeof supportMessages !== 'undefined') supportMessages = [];
+  if(typeof notifications !== 'undefined') notifications = [];
+  userAccounts = userAccounts.filter(function(u) {
+    return u.id === 'USR-001' || u.id === 'USR-011' || u.id === 'USR-021';
+  });
+
+  // Clear cloud connection state
+  googleAccessToken = null;
+  isCloudConnected = false;
+  cloudFileId = null;
+  lastSyncTime = null;
+  loginSyncCompleted = false;
+
+  // Clear IndexedDB
+  try { indexedDB.deleteDatabase('CESTIS_ChatImages'); } catch(e) {}
+  try { indexedDB.deleteDatabase('CESTIS_CertImages'); } catch(e) {}
+  console.log('[Session] All session data cleared from localStorage and memory.');
+}
+
 function saveState() {
   try {
     localStorage.setItem('voctrain_students', JSON.stringify(students));
@@ -4494,6 +4724,15 @@ function updateSkillAreaCounts() {
   });
 }
 loadState();
+
+// Check for expired session on page load (e.g. user returns to stale tab)
+(function() {
+  var expiry = localStorage.getItem('voctrain_sessionExpiry');
+  if(expiry && Date.now() > Number(expiry)) {
+    console.log('[Session] Expired session detected on page load — clearing sensitive data');
+    clearSensitiveDataOnExpiry();
+  }
+})();
 
 // ============================== USER ACCOUNTS MANAGEMENT ==============================
 let userAccounts = [
@@ -5296,6 +5535,10 @@ function enterApp(role) {
     updateNotificationDot();
     setTimeout(animateAllCounters, 100);
 
+    // Set session expiry and start periodic check
+    setSessionExpiry();
+    startSessionExpiryCheck();
+
     // Auto-sync from all Google Drive folders on login, then start 5s auto-save
     setTimeout(function() {
       autoSyncOnLogin().then(function() {
@@ -5683,6 +5926,12 @@ function logout() {
   closeMobileSidebar();
   // Release all camera/mic permissions and cleanup WebRTC
   vcCleanupMediaIfNeeded();
+  // Stop auto-save and session expiry checks
+  stopAutoSave();
+  stopSessionExpiryCheck();
+  // Clear sensitive data from localStorage based on role
+  clearSensitiveStudentData();
+  // Clear in-memory session state
   currentRole = null;
   currentStudent = null;
   currentInstructor = null;
