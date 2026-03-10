@@ -3189,7 +3189,7 @@ textarea.form-control { resize:vertical; min-height:80px; }
       <button class="close-btn" onclick="closeCertCheckOverlay()">&times;</button>
       <div style="text-align:center;margin-bottom:8px;font-size:40px;">🎓</div>
       <h2 style="text-align:center;">Certificate Verification</h2>
-      <p class="subtitle" style="text-align:center;">Enter your Student Number (TRN) or Certificate Number to check your certificate status and download.</p>
+      <p class="subtitle" style="text-align:center;">Enter your <strong>Student ID Number</strong> to download your certificate, or your <strong>Certificate Number</strong> to verify a certificate.</p>
       <div class="cert-check-input-group">
         <input type="text" id="certCheckInput" placeholder="e.g. STU-2026001 or WE-2026-1234" onkeydown="if(event.key==='Enter')checkCertificatePublic()">
         <button onclick="checkCertificatePublic()">Search</button>
@@ -19952,19 +19952,34 @@ function closeCertCheckOverlay() {
 function checkCertificatePublic() {
   var query = (document.getElementById('certCheckInput').value || '').trim();
   var resultDiv = document.getElementById('certCheckResult');
-  if(!query) { resultDiv.innerHTML = '<p style="color:var(--red);font-size:13px;margin-top:8px;">Please enter a Student Number or Certificate Number.</p>'; return; }
+  if(!query) { resultDiv.innerHTML = '<p style="color:var(--red);font-size:13px;margin-top:8px;">Please enter a Student ID Number or Certificate Number.</p>'; return; }
 
   var queryLower = query.toLowerCase();
-  var student = students.find(function(s) {
-    return s.id.toLowerCase() === queryLower || (s.certNo && s.certNo.toLowerCase() === queryLower);
+
+  // Determine if the query matched by Student ID or by Certificate Number
+  var student = null;
+  var searchedByStudentId = false;
+
+  // First try matching by Student ID
+  student = students.find(function(s) {
+    return s.id.toLowerCase() === queryLower;
   });
+  if(student) {
+    searchedByStudentId = true;
+  } else {
+    // Then try matching by Certificate Number
+    student = students.find(function(s) {
+      return s.certNo && s.certNo.toLowerCase() === queryLower;
+    });
+    searchedByStudentId = false;
+  }
 
   if(!student) {
     resultDiv.innerHTML = '<div class="cert-result-card not-found">' +
       '<div class="cert-result-header"><div class="cert-result-icon" style="background:rgba(231,76,60,0.15);color:var(--red);">&#10005;</div>' +
       '<div><div style="font-size:16px;font-weight:700;color:var(--red);">No Record Found</div>' +
       '<div style="font-size:12px;color:var(--text-muted);">No student or certificate matches &quot;' + query + '&quot;</div></div></div>' +
-      '<p style="font-size:13px;color:var(--text-muted);">Please double-check your Student Number (e.g. STU-2026001) or Certificate Number and try again.</p></div>';
+      '<p style="font-size:13px;color:var(--text-muted);">Please double-check your Student ID Number (e.g. STU-2026001) or Certificate Number and try again.</p></div>';
     return;
   }
 
@@ -19986,6 +20001,20 @@ function checkCertificatePublic() {
   var approval = certDownloadApprovals.find(function(d){ return d.studentId === student.id; });
   var canDownload = approval && approval.approved;
 
+  // Certificate Number search: verification only (no download)
+  // Student ID search: verification + download (if approved)
+  var downloadSection = '';
+  if(searchedByStudentId) {
+    downloadSection = '<div class="cert-detail-item"><div class="label">Download</div><div class="value">' + (canDownload ? 'Approved' : 'Not yet approved') + '</div></div>' +
+      '</div>' +
+      (canDownload
+        ? '<button class="cert-download-btn" onclick="generateCertificatePDF(\'' + student.id + '\')"><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg> Download Certificate</button>'
+        : '<p style="font-size:13px;color:var(--text-muted);margin-top:4px;">Certificate download has not been approved yet. Please contact the administration office.</p>');
+  } else {
+    downloadSection = '</div>' +
+      '<p style="font-size:13px;color:var(--text-muted);margin-top:4px;">To download your certificate, please search using your <strong>Student ID Number</strong> instead.</p>';
+  }
+
   resultDiv.innerHTML = '<div class="cert-result-card success">' +
     '<div class="cert-result-header"><div class="cert-result-icon" style="background:rgba(46,204,113,0.15);color:var(--green);">&#10003;</div>' +
     '<div><div style="font-size:16px;font-weight:700;color:var(--green);">Certificate Verified</div>' +
@@ -19996,11 +20025,7 @@ function checkCertificatePublic() {
     '<div class="cert-detail-item"><div class="label">Programme</div><div class="value">' + student.course + '</div></div>' +
     '<div class="cert-detail-item"><div class="label">Date Certified</div><div class="value">' + student.certDate + '</div></div>' +
     '<div class="cert-detail-item"><div class="label">Collection Status</div><div class="value">' + (student.certCollected ? 'Collected' : 'Awaiting Collection') + '</div></div>' +
-    '<div class="cert-detail-item"><div class="label">Download</div><div class="value">' + (canDownload ? 'Approved' : 'Not yet approved') + '</div></div>' +
-    '</div>' +
-    (canDownload
-      ? '<button class="cert-download-btn" onclick="generateCertificatePDF(\'' + student.id + '\')"><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg> Download Certificate</button>'
-      : '<p style="font-size:13px;color:var(--text-muted);margin-top:4px;">Certificate download has not been approved yet. Please contact the administration office.</p>') +
+    downloadSection +
     '</div>';
 }
 
