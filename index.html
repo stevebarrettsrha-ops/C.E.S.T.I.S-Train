@@ -13619,7 +13619,8 @@ async function saveToCloud() {
         adrStaffMeta: adrStaffMeta,
         adminStaffAccessSettings: adminStaffAccessSettings,
         supportMessages: supportMessages,
-        notifications: notifications
+        notifications: notifications,
+        skillAreas: skillAreas
       }
     };
 
@@ -13797,6 +13798,7 @@ async function syncFromCloud() {
       if (Array.isArray(backupData.data.supportMessages)) { supportMessages = backupData.data.supportMessages; saveSupportMessages(); }
       if (Array.isArray(backupData.data.notifications)) { notifications = backupData.data.notifications; saveNotifications(); }
       if (backupData.data.chatFollows && typeof backupData.data.chatFollows === 'object') lmsChatFollows = backupData.data.chatFollows;
+      if (Array.isArray(backupData.data.skillAreas) && backupData.data.skillAreas.length > 0) skillAreas = backupData.data.skillAreas;
     } catch(e) { console.warn('[SyncFromCloud] Error restoring additional data:', e); }
 
     // Persist all restored data to localStorage
@@ -14646,6 +14648,29 @@ async function silentMergeFromBackup(fileId) {
       } catch(e) { console.warn('[Merge] certDownloadApprovals error:', e); }
     }
 
+    // Merge skillAreas (training centres)
+    if (Array.isArray(backupData.data.skillAreas)) {
+      try {
+        backupData.data.skillAreas.forEach(function(sa) {
+          if (sa && sa.id && !skillAreas.some(function(l) { return l.id === sa.id; })) {
+            skillAreas.push(sa);
+            changed = true;
+          }
+        });
+        // Also update existing skill areas with cloud data (name, desc, icon, color changes)
+        backupData.data.skillAreas.forEach(function(sa) {
+          if (!sa || !sa.id) return;
+          var local = skillAreas.find(function(l) { return l.id === sa.id; });
+          if (local) {
+            if (sa.name && sa.name !== local.name) { local.name = sa.name; changed = true; }
+            if (sa.desc && sa.desc !== local.desc) { local.desc = sa.desc; changed = true; }
+            if (sa.icon && sa.icon !== local.icon) { local.icon = sa.icon; changed = true; }
+            if (sa.color && sa.color !== local.color) { local.color = sa.color; changed = true; }
+          }
+        });
+      } catch(e) { console.warn('[Merge] skillAreas error:', e); }
+    }
+
     if (changed) {
       saveState();
     }
@@ -14870,7 +14895,8 @@ async function autoSaveToAllFolders() {
           });
           return clean;
         })(),
-        certDownloadApprovals: certDownloadApprovals
+        certDownloadApprovals: certDownloadApprovals,
+        skillAreas: skillAreas
       }
     };
 
@@ -15292,6 +15318,14 @@ async function studentLightSync(uname, pw) {
       }
     });
 
+    // Merge skill areas (training centres)
+    var cloudSkillAreas = backupData.skillAreas || [];
+    cloudSkillAreas.forEach(function(sa) {
+      if (sa && sa.id && !skillAreas.some(function(l) { return l.id === sa.id; })) {
+        skillAreas.push(sa);
+      }
+    });
+
     saveState();
     updateLoginSyncStatus('Account data synced! Logging in...', 'success');
     console.log('[StudentLightSync] Merged ' + cloudAccounts.length + ' accounts, ' + cloudStudents.length + ' students, ' + cloudCertApprovals.length + ' cert approvals from cloud');
@@ -15566,6 +15600,14 @@ async function studentRefreshCertData() {
         certTemplates[key] = cloudCertTemplates[key];
         if (localBg1) certTemplates[key].bgPage1 = localBg1;
         if (localBg2) certTemplates[key].bgPage2 = localBg2;
+      }
+    });
+
+    // Merge skill areas (training centres)
+    var cloudSkillAreas = backupData.skillAreas || [];
+    cloudSkillAreas.forEach(function(sa) {
+      if (sa && sa.id && !skillAreas.some(function(l) { return l.id === sa.id; })) {
+        skillAreas.push(sa);
       }
     });
 
@@ -21333,6 +21375,15 @@ async function fetchCertDataFromDrive() {
       Object.keys(backupData.data.certTemplates).forEach(function(k) {
         if (!certTemplates[k]) {
           certTemplates[k] = backupData.data.certTemplates[k];
+        }
+      });
+    }
+
+    // Merge skill areas (training centres)
+    if (Array.isArray(backupData.data.skillAreas)) {
+      backupData.data.skillAreas.forEach(function(sa) {
+        if (sa && sa.id && !skillAreas.some(function(l) { return l.id === sa.id; })) {
+          skillAreas.push(sa);
         }
       });
     }
