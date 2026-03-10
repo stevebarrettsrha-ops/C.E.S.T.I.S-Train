@@ -3371,6 +3371,44 @@ textarea.form-control { resize:vertical; min-height:80px; }
 </div>
 
 <!-- MODALS -->
+<!-- Add Training Centre Modal -->
+<div class="modal-overlay" id="addCentreModal">
+  <div class="modal">
+    <div class="modal-header"><h3>Add Training Centre</h3><button class="modal-close" onclick="closeModal('addCentreModal')">✕</button></div>
+    <div class="form-group"><label>Centre Name</label><input type="text" class="form-control" id="newCentreName" placeholder="e.g. Solar Energy Technology"></div>
+    <div class="form-group"><label>Icon (emoji)</label><input type="text" class="form-control" id="newCentreIcon" placeholder="e.g. ☀️" maxlength="4"></div>
+    <div class="form-group"><label>Colour</label><input type="color" class="form-control" id="newCentreColor" value="#3498db" style="height:40px;padding:4px;"></div>
+    <div class="form-group"><label>Description</label><textarea class="form-control" id="newCentreDesc" rows="2" placeholder="Brief description of the training centre"></textarea></div>
+    <div style="display:flex;gap:10px;justify-content:flex-end;margin-top:20px;"><button class="btn btn-secondary" onclick="closeModal('addCentreModal')">Cancel</button><button class="btn btn-primary" onclick="addTrainingCentre()">Add Centre</button></div>
+  </div>
+</div>
+
+<!-- Edit Training Centre Modal -->
+<div class="modal-overlay" id="editCentreModal">
+  <div class="modal">
+    <div class="modal-header"><h3>Edit Training Centre</h3><button class="modal-close" onclick="closeModal('editCentreModal')">✕</button></div>
+    <input type="hidden" id="editCentreId">
+    <div class="form-group"><label>Centre Name</label><input type="text" class="form-control" id="editCentreName"></div>
+    <div class="form-group"><label>Icon (emoji)</label><input type="text" class="form-control" id="editCentreIcon" maxlength="4"></div>
+    <div class="form-group"><label>Colour</label><input type="color" class="form-control" id="editCentreColor" style="height:40px;padding:4px;"></div>
+    <div class="form-group"><label>Description</label><textarea class="form-control" id="editCentreDesc" rows="2"></textarea></div>
+    <div class="form-group"><label>Students</label><input type="number" class="form-control" id="editCentreStudents" min="0"></div>
+    <div class="form-group"><label>Materials</label><input type="number" class="form-control" id="editCentreMaterials" min="0"></div>
+    <div style="display:flex;gap:10px;justify-content:flex-end;margin-top:20px;"><button class="btn btn-secondary" onclick="closeModal('editCentreModal')">Cancel</button><button class="btn btn-primary" onclick="saveTrainingCentre()">Save Changes</button></div>
+  </div>
+</div>
+
+<!-- Delete Training Centre Confirmation Modal -->
+<div class="modal-overlay" id="deleteCentreModal">
+  <div class="modal" style="max-width:420px;">
+    <div class="modal-header"><h3>Delete Training Centre</h3><button class="modal-close" onclick="closeModal('deleteCentreModal')">✕</button></div>
+    <input type="hidden" id="deleteCentreId">
+    <p style="margin-bottom:16px;">Are you sure you want to delete <strong id="deleteCentreName"></strong>?</p>
+    <p style="font-size:13px;color:var(--text-muted);margin-bottom:20px;">This action cannot be undone.</p>
+    <div style="display:flex;gap:10px;justify-content:flex-end;"><button class="btn btn-secondary" onclick="closeModal('deleteCentreModal')">Cancel</button><button class="btn" style="background:#e74c3c;color:#fff;" onclick="confirmDeleteCentre()">Delete</button></div>
+  </div>
+</div>
+
 <div class="modal-overlay" id="addStudentModal">
   <div class="modal">
     <div class="modal-header"><h3>Add New Student</h3><button class="modal-close" onclick="closeModal('addStudentModal')">✕</button></div>
@@ -3673,7 +3711,7 @@ textarea.form-control { resize:vertical; min-height:80px; }
 </div>
 
 <script>
-const skillAreas = [
+let skillAreas = [
   {id:1,name:"Welding & Fabrication",icon:"\uD83D\uDD25",color:"#e74c3c",students:0,materials:0,desc:"SMAW, MIG, TIG welding processes and metal fabrication"},
   {id:2,name:"Electrical Installation",icon:"\u26A1",color:"#f1c40f",students:0,materials:0,desc:"Residential and commercial wiring, conduit bending, circuits"},
   {id:3,name:"Cosmetology",icon:"\uD83D\uDC87",color:"#e91e63",students:0,materials:0,desc:"Hair care, styling, chemical treatments, salon management"},
@@ -4217,6 +4255,7 @@ function saveState() {
     localStorage.setItem('voctrain_adminStaffAccess', JSON.stringify(adminStaffAccessSettings));
     localStorage.setItem('voctrain_instructorData', JSON.stringify(instructorData));
     localStorage.setItem('voctrain_certDownloadApprovals', JSON.stringify(certDownloadApprovals));
+    localStorage.setItem('voctrain_skillAreas', JSON.stringify(skillAreas));
     // Strip large base64 images before saving to localStorage (images are in IndexedDB)
     var certTplsClean = {};
     Object.keys(certTemplates).forEach(function(k) {
@@ -4273,6 +4312,8 @@ function loadState() {
     if(cda) certDownloadApprovals = JSON.parse(cda);
     var ct = localStorage.getItem('voctrain_certTemplates');
     if(ct) certTemplates = JSON.parse(ct);
+    var sa = localStorage.getItem('voctrain_skillAreas');
+    if(sa) skillAreas = JSON.parse(sa);
   } catch(e) { /* parse error, use defaults */ }
   // Migrate any cert template images from localStorage to IndexedDB, then load from IndexedDB
   var needsMigration = false;
@@ -5677,6 +5718,7 @@ function showPage(pageId) {
   if(pageId === 's-lms-chat') lmsChatOnPageShow('student');
   if(pageId === 'i-lms-chat') lmsChatOnPageShow('instructor');
   if(pageId === 'as-lms-chat') lmsChatOnPageShow('adminStaff');
+  if(pageId === 'training') { initTrainingAdminControls(); renderSkills(); updateCentreCount(); }
   // Lazy-load external iframes only when their page is first visited after login.
   // This avoids stale cached error states that appear when iframes are destroyed
   // on logout and recreated on the next login with the same src URL.
@@ -5822,7 +5864,25 @@ function buildAdminPages() {
 
   <!-- TRAINING -->
   <section class="page" id="page-training">
-    <div id="trainingOverview"><p style="color:var(--text-secondary);margin-bottom:20px;font-size:14px;">20 dedicated skill centres — select a programme to view materials, curriculum, and resources.</p><div class="skills-grid" id="skillsGrid"></div></div>
+    <div id="trainingOverview">
+      <p style="color:var(--text-secondary);margin-bottom:20px;font-size:14px;" id="trainingCentreCount">20 dedicated skill centres — select a programme to view materials, curriculum, and resources.</p>
+      <div id="trainingAdminControls" style="display:none;margin-bottom:20px;">
+        <div style="display:flex;gap:12px;align-items:center;flex-wrap:wrap;">
+          <button class="btn btn-primary" onclick="openModal('addCentreModal')">+ Add Training Centre</button>
+          <div style="flex:1;"></div>
+          <div style="display:flex;gap:8px;">
+            <button class="btn btn-secondary" onclick="toggleCentreView('grid')" id="centreViewGrid" title="Grid View" style="padding:8px 12px;">▦</button>
+            <button class="btn btn-secondary" onclick="toggleCentreView('table')" id="centreViewTable" title="Table View" style="padding:8px 12px;">☰</button>
+          </div>
+        </div>
+      </div>
+      <div class="skills-grid" id="skillsGrid"></div>
+      <div id="centreTableView" style="display:none;">
+        <div class="card"><div class="card-header"><h3>Training Centres</h3></div>
+          <div class="table-wrapper"><table><thead><tr><th>Icon</th><th>Centre Name</th><th>Description</th><th>Students</th><th>Materials</th><th>Actions</th></tr></thead><tbody id="centreTableBody"></tbody></table></div>
+        </div>
+      </div>
+    </div>
     <div id="skillDetailPage" style="display:none;"></div>
   </section>
 
@@ -10134,7 +10194,11 @@ function addStudent() {
 function renderSkills() {
   const grid = document.getElementById('skillsGrid');
   if(!grid) return;
-  grid.innerHTML = skillAreas.map(s=>`<div class="skill-card" onclick="showSkillDetail(${s.id})"><div class="skill-icon" style="background:${s.color}22;color:${s.color};">${s.icon}</div><h4>${s.name}</h4><p>${s.desc}</p><div class="skill-meta"><span>👥 ${s.students}</span><span>📄 ${s.materials}</span></div></div>`).join('');
+  var isAdmin = currentRole === 'admin';
+  grid.innerHTML = skillAreas.map(function(s) {
+    var adminBtns = isAdmin ? '<div style="display:flex;gap:6px;margin-top:8px;justify-content:center;" onclick="event.stopPropagation()"><button class="btn btn-sm btn-secondary" onclick="openEditCentre('+s.id+')" style="font-size:11px;padding:3px 8px;">✎ Edit</button><button class="btn btn-sm" style="background:#e74c3c;color:#fff;font-size:11px;padding:3px 8px;border:none;border-radius:var(--radius-sm);cursor:pointer;" onclick="openDeleteCentre('+s.id+')">✕ Delete</button></div>' : '';
+    return '<div class="skill-card" onclick="showSkillDetail('+s.id+')"><div class="skill-icon" style="background:'+s.color+'22;color:'+s.color+';">'+s.icon+'</div><h4>'+s.name+'</h4><p>'+s.desc+'</p><div class="skill-meta"><span>👥 '+s.students+'</span><span>📄 '+s.materials+'</span></div>'+adminBtns+'</div>';
+  }).join('');
 }
 function showSkillDetail(id) {
   const skill = skillAreas.find(s=>s.id===id);
@@ -10147,6 +10211,161 @@ function showSkillDetail(id) {
   ${mats.map(mt=>`<div class="card"><div class="card-header"><h3>${mt.t}</h3></div><ul class="material-list">${mt.items.map(item=>`<li class="material-item"><div class="material-icon" style="background:${skill.color}22;color:${skill.color};">${mt.t.split(' ')[0]}</div><div style="flex:1;"><div style="font-size:13.5px;">${item}</div><div style="font-size:11px;color:var(--text-muted);">Updated ${Math.floor(Math.random()*14)+1} days ago</div></div><button class="btn btn-sm btn-secondary">Open</button></li>`).join('')}</ul></div>`).join('')}`;
 }
 function backToSkills() { document.getElementById('trainingOverview').style.display='block'; document.getElementById('skillDetailPage').style.display='none'; }
+
+// ============================== TRAINING CENTRE MANAGEMENT (Admin) ==============================
+
+var centreViewMode = 'grid';
+
+function initTrainingAdminControls() {
+  var ctrl = document.getElementById('trainingAdminControls');
+  if(ctrl && currentRole === 'admin') {
+    ctrl.style.display = 'block';
+  } else if(ctrl) {
+    ctrl.style.display = 'none';
+  }
+}
+
+function toggleCentreView(mode) {
+  centreViewMode = mode;
+  var grid = document.getElementById('skillsGrid');
+  var table = document.getElementById('centreTableView');
+  var btnGrid = document.getElementById('centreViewGrid');
+  var btnTable = document.getElementById('centreViewTable');
+  if(mode === 'table') {
+    grid.style.display = 'none';
+    table.style.display = 'block';
+    btnTable.style.background = 'var(--accent)';
+    btnTable.style.color = '#fff';
+    btnGrid.style.background = '';
+    btnGrid.style.color = '';
+    renderCentreTable();
+  } else {
+    grid.style.display = '';
+    table.style.display = 'none';
+    btnGrid.style.background = 'var(--accent)';
+    btnGrid.style.color = '#fff';
+    btnTable.style.background = '';
+    btnTable.style.color = '';
+  }
+}
+
+function renderCentreTable() {
+  var tbody = document.getElementById('centreTableBody');
+  if(!tbody) return;
+  tbody.innerHTML = skillAreas.map(function(c) {
+    return '<tr>' +
+      '<td style="font-size:24px;text-align:center;">' + c.icon + '</td>' +
+      '<td><strong>' + c.name + '</strong></td>' +
+      '<td style="font-size:13px;color:var(--text-secondary);">' + c.desc + '</td>' +
+      '<td style="text-align:center;">' + c.students + '</td>' +
+      '<td style="text-align:center;">' + c.materials + '</td>' +
+      '<td><div style="display:flex;gap:6px;">' +
+        '<button class="btn btn-sm btn-secondary" onclick="openEditCentre(' + c.id + ')" title="Edit">✎ Edit</button>' +
+        '<button class="btn btn-sm" style="background:#e74c3c;color:#fff;font-size:12px;padding:4px 10px;border:none;border-radius:var(--radius-sm);cursor:pointer;" onclick="openDeleteCentre(' + c.id + ')" title="Delete">✕ Delete</button>' +
+      '</div></td>' +
+    '</tr>';
+  }).join('');
+}
+
+function updateCentreCount() {
+  var el = document.getElementById('trainingCentreCount');
+  if(el) el.textContent = skillAreas.length + ' dedicated skill centres — select a programme to view materials, curriculum, and resources.';
+}
+
+function getNextCentreId() {
+  var maxId = 0;
+  skillAreas.forEach(function(c) { if(c.id > maxId) maxId = c.id; });
+  return maxId + 1;
+}
+
+function addTrainingCentre() {
+  if(currentRole !== 'admin') { alert('Only administrators can add training centres.'); return; }
+  var name = document.getElementById('newCentreName').value.trim();
+  var icon = document.getElementById('newCentreIcon').value.trim() || '📋';
+  var color = document.getElementById('newCentreColor').value || '#3498db';
+  var desc = document.getElementById('newCentreDesc').value.trim();
+  if(!name) { alert('Please enter a centre name.'); return; }
+  if(!desc) { alert('Please enter a description.'); return; }
+  skillAreas.push({
+    id: getNextCentreId(),
+    name: name,
+    icon: icon,
+    color: color,
+    students: 0,
+    materials: 0,
+    desc: desc
+  });
+  closeModal('addCentreModal');
+  document.getElementById('newCentreName').value = '';
+  document.getElementById('newCentreIcon').value = '';
+  document.getElementById('newCentreColor').value = '#3498db';
+  document.getElementById('newCentreDesc').value = '';
+  renderSkills();
+  updateCentreCount();
+  if(centreViewMode === 'table') renderCentreTable();
+  showToast(name + ' training centre added!');
+  addNotification('New training centre created: ' + name, 'system', null, ['admin']);
+  saveState();
+}
+
+function openEditCentre(id) {
+  if(currentRole !== 'admin') { alert('Only administrators can edit training centres.'); return; }
+  var centre = skillAreas.find(function(c) { return c.id === id; });
+  if(!centre) return;
+  document.getElementById('editCentreId').value = id;
+  document.getElementById('editCentreName').value = centre.name;
+  document.getElementById('editCentreIcon').value = centre.icon;
+  document.getElementById('editCentreColor').value = centre.color;
+  document.getElementById('editCentreDesc').value = centre.desc;
+  document.getElementById('editCentreStudents').value = centre.students;
+  document.getElementById('editCentreMaterials').value = centre.materials;
+  openModal('editCentreModal');
+}
+
+function saveTrainingCentre() {
+  if(currentRole !== 'admin') { alert('Only administrators can edit training centres.'); return; }
+  var id = parseInt(document.getElementById('editCentreId').value);
+  var centre = skillAreas.find(function(c) { return c.id === id; });
+  if(!centre) return;
+  var name = document.getElementById('editCentreName').value.trim();
+  if(!name) { alert('Please enter a centre name.'); return; }
+  centre.name = name;
+  centre.icon = document.getElementById('editCentreIcon').value.trim() || centre.icon;
+  centre.color = document.getElementById('editCentreColor').value || centre.color;
+  centre.desc = document.getElementById('editCentreDesc').value.trim();
+  centre.students = parseInt(document.getElementById('editCentreStudents').value) || 0;
+  centre.materials = parseInt(document.getElementById('editCentreMaterials').value) || 0;
+  closeModal('editCentreModal');
+  renderSkills();
+  updateCentreCount();
+  if(centreViewMode === 'table') renderCentreTable();
+  showToast(name + ' updated successfully!');
+  saveState();
+}
+
+function openDeleteCentre(id) {
+  if(currentRole !== 'admin') { alert('Only administrators can delete training centres.'); return; }
+  var centre = skillAreas.find(function(c) { return c.id === id; });
+  if(!centre) return;
+  document.getElementById('deleteCentreId').value = id;
+  document.getElementById('deleteCentreName').textContent = centre.name;
+  openModal('deleteCentreModal');
+}
+
+function confirmDeleteCentre() {
+  if(currentRole !== 'admin') { alert('Only administrators can delete training centres.'); return; }
+  var id = parseInt(document.getElementById('deleteCentreId').value);
+  var centre = skillAreas.find(function(c) { return c.id === id; });
+  var name = centre ? centre.name : 'Centre';
+  skillAreas = skillAreas.filter(function(c) { return c.id !== id; });
+  closeModal('deleteCentreModal');
+  renderSkills();
+  updateCentreCount();
+  if(centreViewMode === 'table') renderCentreTable();
+  showToast(name + ' has been deleted.');
+  addNotification('Training centre deleted: ' + name, 'system', null, ['admin']);
+  saveState();
+}
 
 // ============================== AUTO EXAM STATUS RESOLUTION ==============================
 // Automatically transitions exam statuses based on scheduled date/time:
