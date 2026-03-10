@@ -3156,8 +3156,8 @@ textarea.form-control { resize:vertical; min-height:80px; }
     <div class="login-sync-bar" id="loginSyncBar">
       <span class="sync-icon">☁️</span>
       <div class="sync-text">
-        <strong>Sync from Cloud before logging in</strong>
-        Pull the latest user accounts and data from Google Drive so all credentials are up to date.
+        <strong>Admin/Staff: Sync from Cloud before logging in</strong>
+        Pull the latest data from Google Drive. <em>Students can login or register directly without syncing.</em>
         <div class="login-sync-status" id="loginSyncStatus"></div>
       </div>
       <button class="login-sync-btn" id="loginSyncBtn" onclick="loginPageSync()">Sync Now</button>
@@ -5051,8 +5051,17 @@ function enableLoginButtons() {
   if(rc) { rc.classList.remove('sync-pending'); rc.classList.add('sync-complete'); }
 }
 function disableLoginButtons() {
-  document.querySelectorAll('.role-enter-btn').forEach(function(btn){ btn.disabled = true; });
-  document.querySelectorAll('.role-card .gmail-btn').forEach(function(btn){ btn.disabled = true; });
+  // Disable all login buttons EXCEPT student card — students can login/register without cloud sync
+  document.querySelectorAll('.role-enter-btn').forEach(function(btn){
+    var card = btn.closest('.role-card');
+    if(card && card.id === 'studentCard') return; // Keep student button enabled
+    btn.disabled = true;
+  });
+  document.querySelectorAll('.role-card .gmail-btn').forEach(function(btn){
+    var card = btn.closest('.role-card');
+    if(card && card.id === 'studentCard') return; // Keep student Gmail enabled
+    btn.disabled = true;
+  });
   var rc = document.querySelector('.role-cards');
   if(rc) { rc.classList.add('sync-pending'); rc.classList.remove('sync-complete'); }
 }
@@ -5086,7 +5095,7 @@ function handleStudentClick() {
       document.getElementById('studentUser').focus();
       return;
     }
-    if(requireLoginSync()) return;
+    // Students can login without full cloud sync — their data will be fetched on-demand after login
     var uname = (document.getElementById('studentUser').value || '').trim();
     var pw = document.getElementById('studentPass').value;
     if(!uname || !pw) { alert('Please enter your email/username and password.'); return; }
@@ -5098,7 +5107,13 @@ function handleStudentClick() {
       var anyMatch = userAccounts.find(function(u) { return u.role === 'student' && (u.username === uname || u.email === uname); });
       if(anyMatch && anyMatch.status === 'disabled') { alert('This account has been disabled. Contact an administrator.'); return; }
       if(anyMatch && anyMatch.status === 'pending') { showPendingApprovalScreen(anyMatch); return; }
-      alert('Invalid email/username or password.'); return;
+      // If no local match, try fetching accounts from cloud before failing
+      if(!loginSyncCompleted && !studentCloudLoginAttempted) {
+        studentCloudLoginAttempted = true;
+        studentLightSync(uname, pw);
+        return;
+      }
+      alert('Invalid email/username or password. If you are a new student, please register first.'); return;
     }
     if(userAccount.status === 'disabled') { alert('This account has been disabled. Contact an administrator.'); return; }
     if(userAccount.status === 'pending') { showPendingApprovalScreen(userAccount); return; }
@@ -5113,6 +5128,7 @@ function handleStudentClick() {
     enterApp('student');
   } catch(err) { console.error('handleStudentClick error:', err); alert('Error: ' + err.message); }
 }
+var studentCloudLoginAttempted = false;
 function handleInstructorClick() {
   try {
     if(!instructorLoginShown) {
@@ -5294,7 +5310,8 @@ var currentLoggedInUser = null;
 
 // ----- Gmail Sign-In via Google Identity Services -----
 function gmailSignIn(role) {
-  if(requireLoginSync()) return;
+  // Students and new registrations can sign in without full cloud sync
+  if(role !== 'student' && requireLoginSync()) return;
   if(typeof google === 'undefined' || !google.accounts || !google.accounts.oauth2) {
     alert('Google Sign-In is not available. Please check your internet connection and reload the page.');
     return;
@@ -7130,6 +7147,7 @@ function buildStudentPages() {
 
   <!-- STUDENT CERTIFICATE -->
   <section class="page" id="page-s-certificate">
+    <div id="studentCertContent">
     ${s.certNo ? `
       <div class="card" style="text-align:center;padding:40px;">
         <div style="font-size:64px;margin-bottom:16px;">🎓</div>
@@ -7156,6 +7174,9 @@ function buildStudentPages() {
             }
           })()}
         </div>
+        <div style="margin-top:16px;">
+          <button class="btn btn-sm btn-secondary" onclick="studentRefreshCertData()" id="studentCertRefreshBtn">↻ Refresh from Cloud</button>
+        </div>
       </div>
     ` : `
       <div class="card" style="text-align:center;padding:40px;">
@@ -7166,8 +7187,13 @@ function buildStudentPages() {
           <span>Current Status:</span>
           <span class="badge ${stageBadge[s.stage]}"><span class="badge-dot"></span>${stageLabels[s.stage]}</span>
         </div>
+        <div style="margin-top:20px;">
+          <button class="btn btn-sm btn-secondary" onclick="studentRefreshCertData()" id="studentCertRefreshBtn">↻ Check Cloud for Updates</button>
+          <p style="font-size:12px;color:var(--text-muted);margin-top:8px;">If your certificate has been issued, click above to check for updates from the cloud.</p>
+        </div>
       </div>
     `}
+    </div>
   </section>
 
   <section class="page" id="page-s-profile">
@@ -15139,6 +15165,269 @@ function loginPageGoogleAuth() {
     }
   }, 600);
 })();
+
+// ============================================
+// STUDENT LIGHT SYNC — Fetch only user accounts & student data from cloud
+// Allows students to login on any device without needing full admin sync
+// ============================================
+
+async function studentLightSync(uname, pw) {
+  try {
+    updateLoginSyncStatus('Checking cloud for your account...', '');
+
+    // Step 1: Get a Google access token (use saved or request new)
+    var token = googleAccessToken;
+    if (!token) {
+      var savedToken = localStorage.getItem('schoolDashboardGoogleAccessToken');
+      var savedExpiry = localStorage.getItem('schoolDashboardGoogleTokenExpiry');
+      if (savedToken && savedExpiry && new Date(savedExpiry) > new Date()) {
+        token = savedToken;
+      } else {
+        // Request Google auth for student
+        token = await loginPageGoogleAuth();
+      }
+    }
+
+    if (!token) {
+      alert('Could not connect to cloud. Please try the Sync button first, or register a new account.');
+      studentCloudLoginAttempted = false;
+      return;
+    }
+
+    // Step 2: Find and read the backup file from Google Drive
+    var folderId = typeof GOOGLE_DRIVE_CONFIG !== 'undefined' ? GOOGLE_DRIVE_CONFIG.FOLDER_ID : '1lNpI00Et1BN5c4eaV5WfQwuQVhCMBtv8';
+    var backupFileName = typeof GOOGLE_DRIVE_CONFIG !== 'undefined' && GOOGLE_DRIVE_CONFIG.BACKUP_FILE ? GOOGLE_DRIVE_CONFIG.BACKUP_FILE : 'CESTIS_LMS_BACKUP.json';
+
+    var searchUrl = 'https://www.googleapis.com/drive/v3/files?q=' +
+      encodeURIComponent("'" + folderId + "' in parents and name='" + backupFileName + "' and trashed=false") +
+      '&fields=files(id,name)&orderBy=modifiedTime desc&pageSize=1';
+
+    var searchResp = await fetch(searchUrl, { headers: { Authorization: 'Bearer ' + token } });
+    if (!searchResp.ok) {
+      alert('Could not access cloud data. Please ask your administrator to share access, or register a new account.');
+      studentCloudLoginAttempted = false;
+      return;
+    }
+
+    var searchData = await searchResp.json();
+    if (!searchData.files || searchData.files.length === 0) {
+      alert('No cloud backup found. Please register a new account or contact your administrator.');
+      studentCloudLoginAttempted = false;
+      return;
+    }
+
+    // Step 3: Download the backup file
+    var fileId = searchData.files[0].id;
+    var downloadResp = await fetch('https://www.googleapis.com/drive/v3/files/' + fileId + '?alt=media', {
+      headers: { Authorization: 'Bearer ' + token }
+    });
+    if (!downloadResp.ok) {
+      alert('Could not download cloud data. Please contact your administrator.');
+      studentCloudLoginAttempted = false;
+      return;
+    }
+
+    var backupData = await downloadResp.json();
+
+    // Step 4: Merge ONLY student-relevant data (user accounts, students, cert approvals)
+    // Do NOT overwrite admin data or give access to backup folders
+    var cloudAccounts = backupData.userAccounts || [];
+    var cloudStudents = backupData.students || [];
+    var cloudCertApprovals = backupData.certDownloadApprovals || [];
+    var cloudCertTemplates = backupData.certTemplates || {};
+
+    // Merge user accounts (add cloud accounts not already local)
+    cloudAccounts.forEach(function(ca) {
+      if (!userAccounts.find(function(la) { return la.id === ca.id || la.email === ca.email; })) {
+        userAccounts.push(ca);
+      }
+    });
+
+    // Merge student records
+    cloudStudents.forEach(function(cs) {
+      if (!students.find(function(ls) { return ls.id === cs.id; })) {
+        students.push(cs);
+      } else {
+        // Update existing student with cloud data (cloud is authoritative)
+        var idx = students.findIndex(function(ls) { return ls.id === cs.id; });
+        if (idx !== -1) students[idx] = cs;
+      }
+    });
+
+    // Merge cert download approvals
+    cloudCertApprovals.forEach(function(ca) {
+      if (!certDownloadApprovals.find(function(la) { return la.studentId === ca.studentId; })) {
+        certDownloadApprovals.push(ca);
+      } else {
+        var idx = certDownloadApprovals.findIndex(function(la) { return la.studentId === ca.studentId; });
+        if (idx !== -1) certDownloadApprovals[idx] = ca;
+      }
+    });
+
+    // Merge cert templates (without large background images — those are fetched on-demand)
+    Object.keys(cloudCertTemplates).forEach(function(key) {
+      if (!certTemplates[key]) {
+        certTemplates[key] = cloudCertTemplates[key];
+      } else {
+        // Merge fields but preserve any locally loaded images
+        var localBg1 = certTemplates[key].bgPage1;
+        var localBg2 = certTemplates[key].bgPage2;
+        certTemplates[key] = cloudCertTemplates[key];
+        if (localBg1) certTemplates[key].bgPage1 = localBg1;
+        if (localBg2) certTemplates[key].bgPage2 = localBg2;
+      }
+    });
+
+    saveState();
+    updateLoginSyncStatus('Account data synced! Logging in...', 'success');
+    console.log('[StudentLightSync] Merged ' + cloudAccounts.length + ' accounts, ' + cloudStudents.length + ' students, ' + cloudCertApprovals.length + ' cert approvals from cloud');
+
+    // Step 5: Now retry the login with the merged data
+    var userAccount = userAccounts.find(function(u) {
+      return u.role === 'student' && (u.username === uname || u.email === uname) && u.password === pw;
+    });
+
+    if (!userAccount) {
+      var anyMatch = userAccounts.find(function(u) { return u.role === 'student' && (u.username === uname || u.email === uname); });
+      if (anyMatch && anyMatch.status === 'disabled') { alert('This account has been disabled. Contact an administrator.'); return; }
+      if (anyMatch && anyMatch.status === 'pending') { showPendingApprovalScreen(anyMatch); return; }
+      alert('Account not found in cloud data. Please check your credentials or register a new account.');
+      studentCloudLoginAttempted = false;
+      return;
+    }
+
+    if (userAccount.status === 'disabled') { alert('This account has been disabled. Contact an administrator.'); return; }
+    if (userAccount.status === 'pending') { showPendingApprovalScreen(userAccount); return; }
+
+    var studentMatch = students.find(function(s) { return s.name === userAccount.name || s.id === userAccount.studentDataId; });
+    if (!studentMatch) {
+      studentMatch = createStudentDataForAccount(userAccount);
+    }
+    currentStudent = studentMatch;
+    currentLoggedInUser = userAccount;
+    enterApp('student');
+
+  } catch (err) {
+    console.error('[StudentLightSync] Error:', err);
+    alert('Could not fetch your account from the cloud. Please try the Sync button or register a new account.\n\nError: ' + err.message);
+    studentCloudLoginAttempted = false;
+  }
+}
+
+// ============================================
+// STUDENT ON-DEMAND CERTIFICATE DATA REFRESH
+// Allows students to pull their latest certificate status from cloud
+// ============================================
+
+async function studentRefreshCertData() {
+  if (!currentStudent) { showToast('No student session active.'); return; }
+
+  var btn = document.getElementById('studentCertRefreshBtn');
+  if (btn) { btn.disabled = true; btn.textContent = '↻ Checking cloud...'; }
+
+  try {
+    var token = googleAccessToken;
+    if (!token) {
+      var savedToken = localStorage.getItem('schoolDashboardGoogleAccessToken');
+      var savedExpiry = localStorage.getItem('schoolDashboardGoogleTokenExpiry');
+      if (savedToken && savedExpiry && new Date(savedExpiry) > new Date()) {
+        token = savedToken;
+      } else {
+        token = await loginPageGoogleAuth();
+      }
+    }
+
+    if (!token) {
+      showToast('Could not connect to cloud. Please check your internet connection.');
+      return;
+    }
+
+    var folderId = typeof GOOGLE_DRIVE_CONFIG !== 'undefined' ? GOOGLE_DRIVE_CONFIG.FOLDER_ID : '1lNpI00Et1BN5c4eaV5WfQwuQVhCMBtv8';
+    var backupFileName = typeof GOOGLE_DRIVE_CONFIG !== 'undefined' && GOOGLE_DRIVE_CONFIG.BACKUP_FILE ? GOOGLE_DRIVE_CONFIG.BACKUP_FILE : 'CESTIS_LMS_BACKUP.json';
+
+    var searchUrl = 'https://www.googleapis.com/drive/v3/files?q=' +
+      encodeURIComponent("'" + folderId + "' in parents and name='" + backupFileName + "' and trashed=false") +
+      '&fields=files(id,name)&orderBy=modifiedTime desc&pageSize=1';
+
+    var searchResp = await fetch(searchUrl, { headers: { Authorization: 'Bearer ' + token } });
+    if (!searchResp.ok) { showToast('Could not access cloud. Contact your administrator.'); return; }
+
+    var searchData = await searchResp.json();
+    if (!searchData.files || searchData.files.length === 0) { showToast('No cloud backup found.'); return; }
+
+    var fileId = searchData.files[0].id;
+    var downloadResp = await fetch('https://www.googleapis.com/drive/v3/files/' + fileId + '?alt=media', {
+      headers: { Authorization: 'Bearer ' + token }
+    });
+    if (!downloadResp.ok) { showToast('Could not download cloud data.'); return; }
+
+    var backupData = await downloadResp.json();
+
+    // Update current student's data from cloud
+    var cloudStudents = backupData.students || [];
+    var cloudCertApprovals = backupData.certDownloadApprovals || [];
+    var cloudCertTemplates = backupData.certTemplates || {};
+    var updated = false;
+
+    // Find this student in cloud data (by name match or ID)
+    var cloudStudent = cloudStudents.find(function(cs) {
+      return cs.id === currentStudent.id || cs.name === currentStudent.name;
+    });
+
+    if (cloudStudent) {
+      // Update the student record with cloud data
+      var localIdx = students.findIndex(function(s) { return s.id === currentStudent.id; });
+      if (localIdx !== -1) {
+        students[localIdx] = cloudStudent;
+        currentStudent = cloudStudent;
+        updated = true;
+      }
+    }
+
+    // Update cert approvals
+    cloudCertApprovals.forEach(function(ca) {
+      var existIdx = certDownloadApprovals.findIndex(function(la) { return la.studentId === ca.studentId; });
+      if (existIdx === -1) {
+        certDownloadApprovals.push(ca);
+      } else {
+        certDownloadApprovals[existIdx] = ca;
+      }
+    });
+
+    // Merge cert templates (metadata only, images fetched on-demand)
+    Object.keys(cloudCertTemplates).forEach(function(key) {
+      if (!certTemplates[key]) {
+        certTemplates[key] = cloudCertTemplates[key];
+      } else {
+        var localBg1 = certTemplates[key].bgPage1;
+        var localBg2 = certTemplates[key].bgPage2;
+        certTemplates[key] = cloudCertTemplates[key];
+        if (localBg1) certTemplates[key].bgPage1 = localBg1;
+        if (localBg2) certTemplates[key].bgPage2 = localBg2;
+      }
+    });
+
+    saveState();
+
+    if (updated && currentStudent.certNo) {
+      showToast('Certificate data updated from cloud!');
+    } else if (!currentStudent.certNo) {
+      showToast('No certificate issued yet. Check back after your certification is complete.');
+    } else {
+      showToast('Certificate data is up to date.');
+    }
+
+    // Rebuild student pages to reflect updated data
+    buildStudentPages();
+    showPage('s-certificate');
+
+  } catch (err) {
+    console.error('[StudentCertRefresh] Error:', err);
+    showToast('Error refreshing certificate data: ' + err.message);
+  } finally {
+    if (btn) { btn.disabled = false; btn.textContent = '↻ Refresh from Cloud'; }
+  }
+}
 
 // ============================================
 // C.E.S.T.I.S LMS CHAT - FULL IMPLEMENTATION
