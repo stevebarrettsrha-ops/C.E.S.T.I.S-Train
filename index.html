@@ -20137,13 +20137,20 @@ function renderCertPage2OnBg(bgImg, student, tpl) {
   modules.forEach(function(mod) {
     ctx.font = 'bold ' + Math.round(contentSize*0.85) + 'px Arial, sans-serif';
     ctx.fillStyle = '#2A7B88';
-    ctx.fillText('\u2611 ' + mod.name + ' ' + (mod.contactHours || '') + ' Contact Hours', colLeft + 10, yMod);
-    yMod += lineH;
+    var modTitle = '\u2611 ' + mod.name + ' ' + (mod.contactHours || '') + ' Contact Hours';
+    var modLines = wrapText(ctx, modTitle, colMid - colLeft - 20);
+    modLines.forEach(function(line) {
+      ctx.fillText(line, colLeft + 10, yMod);
+      yMod += lineH;
+    });
     (mod.topics || []).forEach(function(topic) {
       ctx.font = Math.round(contentSize*0.77) + 'px Arial, sans-serif';
       ctx.fillStyle = '#333';
-      ctx.fillText('  \u2022  ' + topic, colLeft + 20, yMod);
-      yMod += subLineH;
+      var topicLines = wrapText(ctx, topic, colMid - colLeft - 40);
+      topicLines.forEach(function(line) {
+        ctx.fillText('  \u2022  ' + line, colLeft + 20, yMod);
+        yMod += subLineH;
+      });
     });
     yMod += 4;
   });
@@ -20179,22 +20186,46 @@ function renderCertPage2OnBg(bgImg, student, tpl) {
 
   ctx.font = Math.round(specsSize*0.85) + 'px Arial, sans-serif';
   ctx.fillStyle = '#333';
-  ctx.fillText('Duration: ' + (specs.duration || 'N/A') + ' | Industry: ' + (specs.industry || 'N/A'), specsX, specsY + specsSize*1.3);
-  ctx.fillText('Sub-Sector: ' + (specs.subSector || 'N/A') + ' | Entry Requirements: ' + (specs.entryRequirements || 'N/A'), specsX, specsY + specsSize*2.4);
-  ctx.fillText(specs.assessment || 'Industry Psychometric Assessment: Pass', specsX, specsY + specsSize*3.5);
-  ctx.fillText('Alignment: ' + (specs.alignment || 'N/A'), specsX, specsY + specsSize*4.6);
+  var specsMaxWidth = w * 0.88;
+  var specsLineH = Math.round(specsSize * 1.2);
+  var specsCurY = specsY + specsSize*1.3;
+  var specsTexts = [
+    'Duration: ' + (specs.duration || 'N/A') + ' | Industry: ' + (specs.industry || 'N/A'),
+    'Sub-Sector: ' + (specs.subSector || 'N/A') + ' | Entry Requirements: ' + (specs.entryRequirements || 'N/A'),
+    specs.assessment || 'Industry Psychometric Assessment: Pass',
+    'Alignment: ' + (specs.alignment || 'N/A')
+  ];
+  specsTexts.forEach(function(txt) {
+    var sLines = wrapText(ctx, txt, specsMaxWidth);
+    sLines.forEach(function(line) {
+      ctx.fillText(line, specsX, specsCurY);
+      specsCurY += specsLineH;
+    });
+  });
 
   // Footer validation text
   ctx.font = 'italic ' + footerSize + 'px Arial, sans-serif';
   ctx.fillStyle = '#444';
   var p2CourseType = tpl.courseType || 'Short Course';
-  ctx.fillText('This certificate confirms completion of all requirements of the ' + courseFullName, footerX, footerY);
-  ctx.fillText(p2CourseType + '. Contact: ' + contactEmail + ' | ' + contactPhone, footerX, footerY + footerSize*1.4);
+  var footerMaxW = w * 0.88;
+  var footerLineH = Math.round(footerSize * 1.3);
+  var footerCurY = footerY;
+  var footerTexts = [
+    'This certificate confirms completion of all requirements of the ' + courseFullName,
+    p2CourseType + '. Contact: ' + contactEmail + ' | ' + contactPhone
+  ];
+  footerTexts.forEach(function(ft) {
+    var fLines = wrapText(ctx, ft, footerMaxW);
+    fLines.forEach(function(line) {
+      ctx.fillText(line, footerX, footerCurY);
+      footerCurY += footerLineH;
+    });
+  });
 
   // Certificate No
   ctx.font = 'bold ' + Math.round(footerSize*1.8) + 'px Georgia, serif';
   ctx.fillStyle = '#1B2A4A';
-  ctx.fillText('Certificate No. ' + student.certNo, footerX, footerY + footerSize*3.5);
+  ctx.fillText('Certificate No. ' + student.certNo, footerX, footerCurY + footerSize*0.8);
 
   return canvas;
 }
@@ -20205,7 +20236,7 @@ function wrapText(ctx, text, maxWidth) {
   var currentLine = '';
   words.forEach(function(word) {
     var test = currentLine ? currentLine + ' ' + word : word;
-    if(ctx.measureText('  \u2022  ' + test).width > maxWidth && currentLine) {
+    if(ctx.measureText(test).width > maxWidth && currentLine) {
       lines.push(currentLine);
       currentLine = word;
     } else {
