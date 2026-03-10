@@ -20134,6 +20134,7 @@ function renderCertPage2OnBg(bgImg, student, tpl) {
   ctx.fillText('MODULES COMPLETED', colLeft + 10, yMod);
   yMod += lineH + 6;
 
+  var bulletPrefix = '  \u2022  ';
   modules.forEach(function(mod) {
     ctx.font = 'bold ' + Math.round(contentSize*0.85) + 'px Arial, sans-serif';
     ctx.fillStyle = '#2A7B88';
@@ -20146,9 +20147,10 @@ function renderCertPage2OnBg(bgImg, student, tpl) {
     (mod.topics || []).forEach(function(topic) {
       ctx.font = Math.round(contentSize*0.77) + 'px Arial, sans-serif';
       ctx.fillStyle = '#333';
-      var topicLines = wrapText(ctx, topic, colMid - colLeft - 40);
+      var bulletW = ctx.measureText(bulletPrefix).width;
+      var topicLines = wrapText(ctx, topic, colMid - colLeft - 30 - bulletW);
       topicLines.forEach(function(line) {
-        ctx.fillText('  \u2022  ' + line, colLeft + 20, yMod);
+        ctx.fillText(bulletPrefix + line, colLeft + 20, yMod);
         yMod += subLineH;
       });
     });
@@ -20169,9 +20171,10 @@ function renderCertPage2OnBg(bgImg, student, tpl) {
     (cat.items || []).forEach(function(item) {
       ctx.font = Math.round(contentSize*0.77) + 'px Arial, sans-serif';
       ctx.fillStyle = '#333';
-      var lines = wrapText(ctx, item, colWidth - 30);
+      var compBulletW = ctx.measureText(bulletPrefix).width;
+      var lines = wrapText(ctx, item, w - colMid - 30 - compBulletW);
       lines.forEach(function(line) {
-        ctx.fillText('  \u2022  ' + line, colMid + 20, yComp);
+        ctx.fillText(bulletPrefix + line, colMid + 20, yComp);
         yComp += subLineH;
       });
     });
