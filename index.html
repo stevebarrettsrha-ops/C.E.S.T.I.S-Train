@@ -19737,10 +19737,10 @@ function renderCertPage1OnBg(bgImg, student, tpl) {
   ctx.fillText(courseFullName, bodyX, bodyY + bodySize * 1.5);
 
   ctx.font = 'italic ' + bodySize + 'px Georgia, serif';
-  ctx.fillText('on this day, the ' + student.certDate + ', at the Community Educational and Skills', bodyX, bodyY + bodySize * 3);
+  ctx.fillText('on this day, the ' + student.certDate + ', at the', bodyX, bodyY + bodySize * 3);
 
   ctx.font = 'bold italic ' + bodySize + 'px Georgia, serif';
-  ctx.fillText('Training Institute and Services Ltd.', bodyX, bodyY + bodySize * 4.3);
+  ctx.fillText('Community Educational and Skills Training Institute and Services Ltd.', bodyX, bodyY + bodySize * 4.3);
 
   // Certificate number
   ctx.font = 'bold ' + certNoSize + 'px Georgia, serif';
@@ -19973,9 +19973,9 @@ function _renderCertLivePreview() {
   ctx.font = 'bold italic ' + Math.round(bodySize*1.15) + 'px Georgia, serif';
   ctx.fillText(courseFullName, bodyX, bodyY + bodySize*1.5);
   ctx.font = 'italic ' + bodySize + 'px Georgia, serif';
-  ctx.fillText('on this day, the March 09, 2026, at the Community Educational and Skills', bodyX, bodyY + bodySize*3);
+  ctx.fillText('on this day, the March 09, 2026, at the', bodyX, bodyY + bodySize*3);
   ctx.font = 'bold italic ' + bodySize + 'px Georgia, serif';
-  ctx.fillText('Training Institute and Services Ltd.', bodyX, bodyY + bodySize*4.3);
+  ctx.fillText('Community Educational and Skills Training Institute and Services Ltd.', bodyX, bodyY + bodySize*4.3);
   ctx.strokeStyle = 'rgba(80,200,80,0.4)'; ctx.lineWidth = 1; ctx.setLineDash([6,4]);
   ctx.beginPath(); ctx.moveTo(0,bodyY); ctx.lineTo(w,bodyY); ctx.stroke();
   ctx.beginPath(); ctx.moveTo(bodyX,0); ctx.lineTo(bodyX,h); ctx.stroke(); ctx.setLineDash([]);
