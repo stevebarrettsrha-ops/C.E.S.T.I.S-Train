@@ -4874,11 +4874,6 @@ function createUserAccount() {
   renderUserAccountsTable();
   showToast('User account created successfully!');
   addNotification('New user account created: ' + name + ' (' + role + ')', 'student', null, ['admin']);
-
-  // Auto-merge from cloud to pick up accounts created on other devices
-  if (isCloudConnected && googleAccessToken) {
-    autoSyncOnLogin();
-  }
 }
 
 function openEditUser(userId) {
@@ -4914,11 +4909,6 @@ function saveUserEdit() {
   closeModal('editUserModal');
   renderUserAccountsTable();
   showToast('User updated successfully!');
-
-  // Auto-merge from cloud to pick up changes from other devices
-  if (isCloudConnected && googleAccessToken) {
-    autoSyncOnLogin();
-  }
 }
 
 function openResetPassword(userId) {
