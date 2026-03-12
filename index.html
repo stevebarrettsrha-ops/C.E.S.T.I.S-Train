@@ -4440,11 +4440,8 @@ function clearSensitiveStudentData() {
   // --- CLEAR BOTH localStorage AND in-memory arrays ---
   // This prevents data leaking back via saveState() if another user logs in on the same page session.
 
-  // 1. Remove all user account credentials — reset to defaults only
-  localStorage.removeItem('voctrain_users');
-  userAccounts = userAccounts.filter(function(u) {
-    return u.id === 'USR-001' || u.id === 'USR-011' || u.id === 'USR-021'; // keep built-in defaults
-  });
+  // 1. Preserve user accounts so other users can still log in on this device
+  // Only clear the current user's sensitive session data, not the account registry
 
   // 2. Keep only this student's record
   try {
@@ -4511,13 +4508,8 @@ function clearSensitiveStudentData() {
   localStorage.removeItem('voctrain_support_messages');
   if(typeof supportMessages !== 'undefined') supportMessages = [];
 
-  // 9. Clear Google Drive tokens (in-memory + localStorage)
-  localStorage.removeItem('schoolDashboardGoogleAccessToken');
-  localStorage.removeItem('schoolDashboardGoogleTokenExpiry');
-  localStorage.removeItem('schoolDashboardCloudFileId');
-  localStorage.removeItem('schoolDashboardLastSyncTime');
-  googleAccessToken = null;
-  isCloudConnected = false;
+  // 9. Preserve Google Drive tokens so cloud sync can work on next login
+  // Only clear session-specific cloud state, keep auth tokens for auto-sync
   cloudFileId = null;
   lastSyncTime = null;
   loginSyncCompleted = false;
@@ -4557,10 +4549,12 @@ function clearSensitiveDataOnExpiry() {
 
 // Complete data wipe (for admin/instructor/staff logout or unknown sessions)
 function clearAllSessionData() {
-  // Clear localStorage
+  // Clear localStorage (preserve user accounts so other users can still log in)
   var keysToRemove = [];
   for(var i = 0; i < localStorage.length; i++) {
     var key = localStorage.key(i);
+    if(key === 'voctrain_users') continue; // preserve user accounts for login
+    if(key === 'schoolDashboardGoogleAccessToken' || key === 'schoolDashboardGoogleTokenExpiry') continue; // preserve auth tokens for cloud sync
     if(key && (key.startsWith('voctrain_') || key.startsWith('schoolDashboard') || key === 'cmcDashboardData' || key === 'cmcHtmlContent')) {
       keysToRemove.push(key);
     }
@@ -4594,13 +4588,8 @@ function clearAllSessionData() {
   lmsChatFollows = {};
   if(typeof supportMessages !== 'undefined') supportMessages = [];
   if(typeof notifications !== 'undefined') notifications = [];
-  userAccounts = userAccounts.filter(function(u) {
-    return u.id === 'USR-001' || u.id === 'USR-011' || u.id === 'USR-021';
-  });
 
-  // Clear cloud connection state
-  googleAccessToken = null;
-  isCloudConnected = false;
+  // Clear cloud connection state (preserve auth token so auto-sync works on next login)
   cloudFileId = null;
   lastSyncTime = null;
   loginSyncCompleted = false;
@@ -5288,6 +5277,11 @@ function switchSettingsTab(tab, which) {
 let adminLoginShown = false, studentLoginShown = false, instructorLoginShown = false, adminStaffLoginShown = false, cmcLoginShown = false;
 function requireLoginSync() {
   if(loginSyncCompleted) return false;
+  // Allow login if user accounts exist locally (beyond the 3 system defaults)
+  var hasLocalAccounts = userAccounts.length > 3 || userAccounts.some(function(u) {
+    return u.id !== 'USR-001' && u.id !== 'USR-011' && u.id !== 'USR-021';
+  });
+  if(hasLocalAccounts) { loginSyncCompleted = true; return false; }
   alert('Please sync from Cloud first before signing in.\n\nClick the "Sync Now" button at the top of the page to pull the latest data.');
   var bar = document.getElementById('loginSyncBar');
   if(bar) { bar.style.animation = 'none'; bar.offsetHeight; bar.style.animation = 'fadeSlideDown 0.4s ease'; }
@@ -15384,8 +15378,20 @@ function getTimeAgo(date) {
 initializeCloudSync();
 setTimeout(() => { initGoogleAuth(); }, 500);
 
-// Disable login buttons until pre-login sync completes
-setTimeout(function() { if(!loginSyncCompleted) disableLoginButtons(); }, 100);
+// Disable login buttons until pre-login sync completes — but allow login if local accounts exist
+setTimeout(function() {
+  if(loginSyncCompleted) return;
+  // If user accounts beyond the 3 system defaults exist locally, allow login without sync
+  var hasLocalAccounts = userAccounts.length > 3 || userAccounts.some(function(u) {
+    return u.id !== 'USR-001' && u.id !== 'USR-011' && u.id !== 'USR-021';
+  });
+  if(hasLocalAccounts) {
+    loginSyncCompleted = true;
+    enableLoginButtons();
+  } else {
+    disableLoginButtons();
+  }
+}, 100);
 
 // ============================================
 // PRE-LOGIN CLOUD SYNC (Landing Page)
