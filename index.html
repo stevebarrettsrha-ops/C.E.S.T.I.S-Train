@@ -4440,11 +4440,8 @@ function clearSensitiveStudentData() {
   // --- CLEAR BOTH localStorage AND in-memory arrays ---
   // This prevents data leaking back via saveState() if another user logs in on the same page session.
 
-  // 1. Remove all user account credentials — reset to defaults only
-  localStorage.removeItem('voctrain_users');
-  userAccounts = userAccounts.filter(function(u) {
-    return u.id === 'USR-001' || u.id === 'USR-011' || u.id === 'USR-021'; // keep built-in defaults
-  });
+  // 1. Preserve user accounts so other users can still log in on this device
+  // Only clear the current user's sensitive session data, not the account registry
 
   // 2. Keep only this student's record
   try {
@@ -4557,10 +4554,11 @@ function clearSensitiveDataOnExpiry() {
 
 // Complete data wipe (for admin/instructor/staff logout or unknown sessions)
 function clearAllSessionData() {
-  // Clear localStorage
+  // Clear localStorage (preserve user accounts so other users can still log in)
   var keysToRemove = [];
   for(var i = 0; i < localStorage.length; i++) {
     var key = localStorage.key(i);
+    if(key === 'voctrain_users') continue; // preserve user accounts for login
     if(key && (key.startsWith('voctrain_') || key.startsWith('schoolDashboard') || key === 'cmcDashboardData' || key === 'cmcHtmlContent')) {
       keysToRemove.push(key);
     }
@@ -4594,9 +4592,6 @@ function clearAllSessionData() {
   lmsChatFollows = {};
   if(typeof supportMessages !== 'undefined') supportMessages = [];
   if(typeof notifications !== 'undefined') notifications = [];
-  userAccounts = userAccounts.filter(function(u) {
-    return u.id === 'USR-001' || u.id === 'USR-011' || u.id === 'USR-021';
-  });
 
   // Clear cloud connection state
   googleAccessToken = null;
