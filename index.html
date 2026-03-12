@@ -5334,6 +5334,7 @@ function handleAdminClick() {
       alert('Invalid username or password.'); return;
     }
     if(adminUser.status === 'disabled') { alert('This account has been disabled. Contact a system administrator.'); return; }
+    currentLoggedInUser = adminUser;
     enterApp('admin');
   } catch(err) { console.error('handleAdminClick error:', err); alert('Error: ' + err.message); }
 }
@@ -5484,10 +5485,12 @@ function enterApp(role) {
     if(role === 'admin') {
       buildAdminSidebar();
       buildAdminPages();
+      var adminName = currentLoggedInUser ? currentLoggedInUser.name : 'Administrator';
+      var adminInitials = adminName.split(' ').map(function(n){return n[0];}).join('').substring(0,2) || 'A';
       document.getElementById('sidebarRoleLabel').textContent = 'Administrator Panel';
-      document.getElementById('sidebarAvatar').textContent = 'A';
+      document.getElementById('sidebarAvatar').textContent = adminInitials;
       document.getElementById('sidebarAvatar').style.background = 'linear-gradient(135deg,var(--accent),var(--orange))';
-      document.getElementById('sidebarUserName').textContent = 'Administrator';
+      document.getElementById('sidebarUserName').textContent = adminName;
       document.getElementById('sidebarUserRole').textContent = 'System Admin';
       showPage('dashboard');
     } else if(role === 'instructor') {
@@ -5624,7 +5627,14 @@ function handleGmailProfile(profile, role) {
       currentLoggedInUser = existing;
       enterApp('instructor');
     } else if(existing.role === 'admin') {
+      currentLoggedInUser = existing;
       enterApp('admin');
+    } else if(existing.role === 'adminstaff') {
+      currentLoggedInUser = existing;
+      enterApp('adminstaff');
+    } else if(existing.role === 'cmc') {
+      currentLoggedInUser = existing;
+      enterApp('cmc');
     }
     return;
   }
