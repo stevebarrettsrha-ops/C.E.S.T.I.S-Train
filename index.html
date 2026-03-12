@@ -5934,8 +5934,13 @@ function logout() {
   closeMobileSidebar();
   // Release all camera/mic permissions and cleanup WebRTC
   vcCleanupMediaIfNeeded();
-  // Stop auto-save and session expiry checks
+  // Final cloud save before logout to ensure latest data (including new accounts) reaches the cloud
+  if(isCloudConnected && googleAccessToken) {
+    try { autoSaveToAllFolders(); } catch(e) { console.warn('[Logout] Final cloud save failed:', e); }
+  }
+  // Stop auto-save, debounced cloud save, and session expiry checks
   stopAutoSave();
+  if(_debouncedCloudSaveTimer) { clearTimeout(_debouncedCloudSaveTimer); _debouncedCloudSaveTimer = null; }
   stopSessionExpiryCheck();
   // Clear sensitive data from localStorage based on role
   clearSensitiveStudentData();
@@ -5954,6 +5959,14 @@ function logout() {
     var el = document.getElementById(id);
     if(el) el.classList.remove('active');
   });
+  // Re-enable login buttons if local accounts exist (they were preserved across logout)
+  var hasLocalAccounts = userAccounts.length > 3 || userAccounts.some(function(u) {
+    return u.id !== 'USR-001' && u.id !== 'USR-011' && u.id !== 'USR-021';
+  });
+  if(hasLocalAccounts) {
+    loginSyncCompleted = true;
+    enableLoginButtons();
+  }
 }
 
 function buildAdminSidebar() {
