@@ -13719,6 +13719,12 @@ function showManualTokenForm() {
 function closeGoogleAuthModal() {
   const modal = document.getElementById('googleAuthModal');
   if (modal) modal.remove();
+  // If a login page sync was waiting for auth and user closed modal, resolve with null
+  if (window._loginPageAuthResolve) {
+    var pendingResolve = window._loginPageAuthResolve;
+    window._loginPageAuthResolve = null;
+    pendingResolve(null);
+  }
 }
 
 async function submitGoogleToken() {
@@ -13754,6 +13760,14 @@ async function submitGoogleToken() {
 
     await findExistingBackupFile();
 
+    // If a login page sync was waiting for auth, resolve its promise
+    if (window._loginPageAuthResolve) {
+      var pendingResolve = window._loginPageAuthResolve;
+      window._loginPageAuthResolve = null;
+      pendingResolve(token);
+      return;
+    }
+
     // Auto-sync from all folders and start auto-save
     if (currentRole) {
       autoSyncOnLogin().then(function() {
@@ -13783,6 +13797,14 @@ async function handleGoogleAuthCallback(tokenResponse) {
   updateCloudUI(true);
 
   await findExistingBackupFile();
+
+  // If a login page sync was waiting for auth, resolve its promise
+  if (window._loginPageAuthResolve) {
+    var pendingResolve = window._loginPageAuthResolve;
+    window._loginPageAuthResolve = null;
+    pendingResolve(googleAccessToken);
+    return;
+  }
 
   // Auto-sync from all folders and start auto-save
   if (currentRole) {
@@ -15578,9 +15600,44 @@ function loginPageGoogleAuth() {
       });
       client.requestAccessToken();
     } else {
-      // Google Identity Services not loaded — show manual token modal
-      showGoogleAuthModal();
-      resolve(null);
+      // Google Identity Services not loaded yet (async defer) — wait for it
+      var waitAttempts = 0;
+      var maxWaitAttempts = 20; // 20 x 250ms = 5 seconds
+      var waitInterval = setInterval(function() {
+        waitAttempts++;
+        if (typeof google !== 'undefined' && google.accounts && google.accounts.oauth2) {
+          clearInterval(waitInterval);
+          // GIS loaded — proceed with OAuth popup
+          var client = google.accounts.oauth2.initTokenClient({
+            client_id: GOOGLE_DRIVE_CONFIG.CLIENT_ID,
+            scope: GOOGLE_DRIVE_CONFIG.SCOPES,
+            callback: function(tokenResponse) {
+              if (tokenResponse.error) {
+                resolve(null);
+                return;
+              }
+              var expiry = new Date();
+              expiry.setSeconds(expiry.getSeconds() + (tokenResponse.expires_in || 3600));
+              localStorage.setItem('schoolDashboardGoogleAccessToken', tokenResponse.access_token);
+              localStorage.setItem('schoolDashboardGoogleTokenExpiry', expiry.toISOString());
+              resolve(tokenResponse.access_token);
+            },
+            error_callback: function(err) {
+              if (err.type === 'popup_closed') {
+                resolve(null);
+              } else {
+                reject(new Error(err.message || 'Google auth failed'));
+              }
+            }
+          });
+          client.requestAccessToken();
+        } else if (waitAttempts >= maxWaitAttempts) {
+          clearInterval(waitInterval);
+          // GIS failed to load — show manual auth modal and wait for completion
+          window._loginPageAuthResolve = resolve;
+          showGoogleAuthModal();
+        }
+      }, 250);
     }
   });
 }
