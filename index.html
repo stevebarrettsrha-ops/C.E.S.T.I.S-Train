@@ -2983,14 +2983,34 @@ body.vc-fullscreen-mode.vc-host-only-mode .video-grid .video-tile:not(.vc-hoston
 
 /* Responsive */
 @media(max-width:768px) {
-  .lms-chat-container { flex-direction:column; height:calc(100vh - var(--topbar-h) - 32px); border-radius:0; }
-  .lms-chat-sidebar { width:100%; min-width:100%; }
+  .lms-chat-container {
+    flex-direction:column; height:calc(100vh - var(--topbar-h) - 32px);
+    border-radius:0; border:none;
+  }
+  .lms-chat-sidebar {
+    width:100%; min-width:100%; flex:1; min-height:0;
+    border-right:none; border-bottom:1px solid var(--border);
+  }
   .lms-chat-sidebar.chat-open { display:none; }
-  .lms-chat-main { display:none; }
+  .lms-chat-main { display:none; flex:1; min-height:0; }
   .lms-chat-main.chat-open { display:flex; }
   .lms-chat-main-header-left .back-btn { display:flex; }
   .lms-chat-info-panel.open { width:100%; min-width:100%; }
   .lms-chat-msg { max-width:85%; }
+  .lms-chat-sidebar-header { padding:12px 14px; }
+  .lms-chat-sidebar-header h3 { font-size:15px; }
+  .lms-chat-search { padding:8px 12px; }
+  .lms-chat-item { padding:10px 12px; gap:10px; }
+  .lms-chat-avatar { width:42px; height:42px; min-width:42px; font-size:17px; }
+  .lms-chat-input-area { padding:10px 12px; gap:6px; }
+  .lms-chat-input-area .msg-input { font-size:14px; }
+  .lms-chat-messages { padding:12px; }
+}
+@media(max-width:480px) {
+  .lms-chat-container { height:calc(100vh - var(--topbar-h) - 16px); }
+  .lms-chat-sidebar-actions button { width:32px; height:32px; font-size:14px; }
+  .lms-chat-header-actions button { width:34px; height:34px; font-size:14px; }
+  .lms-chat-main-header { padding:10px 12px; }
 }
 
 /* ============================== ADMIN DUTY REGISTER ============================== */
