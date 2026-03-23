@@ -8837,6 +8837,7 @@ function vcOnData(raw, fromId) {
         var unshareTile = document.getElementById('vc-tile-'+sanitizePeerId(msg.peerId));
         if(unshareTile) { unshareTile.classList.remove('screen-share'); }
       }
+      showToast((msg.name || 'Host') + ' stopped sharing their screen');
       vcExitScreenShareView();
       break;
     case 'permission-update':
@@ -9366,7 +9367,7 @@ async function vcToggleScreen() {
     var lv = document.getElementById('vc-local-video');
     if(lv && localStream) { lv.srcObject = localStream; lv.parentElement.classList.add('local'); }
     // Notify peers that screen share stopped
-    vcBroadcastData({type:'screen-share-stopped', peerId: rtcPeer ? rtcPeer.id : ''});
+    vcBroadcastData({type:'screen-share-stopped', peerId: rtcPeer ? rtcPeer.id : '', name: vcCurrentUserName});
     return;
   }
   try {
@@ -9438,6 +9439,7 @@ function vcEnterScreenShareView(sharingPeerId) {
 
 // Restore the normal multi-tile grid when screen sharing ends.
 function vcExitScreenShareView() {
+  var prevSharingPeerId = vcScreenSharingPeerId;
   vcScreenSharingPeerId = null;
   var grid = document.getElementById('vc-video-grid');
   if (!grid) return;
@@ -9453,6 +9455,25 @@ function vcExitScreenShareView() {
     tile.classList.remove('screen-share');
   });
   grid.classList.remove('vc-screen-share-mode');
+
+  // If the sharer's video tile exists, force a refresh on its video element
+  // to avoid showing a frozen last-frame of the screen share
+  if (prevSharingPeerId) {
+    var safeId = sanitizePeerId(prevSharingPeerId);
+    var vid = document.getElementById('vc-vid-' + safeId);
+    if (vid && vid.srcObject) {
+      // Re-assign the stream to force the video element to pick up the replaced track
+      var stream = vid.srcObject;
+      vid.srcObject = null;
+      vid.srcObject = stream;
+      vid.play().catch(function(){});
+    }
+  }
+
+  // Re-apply current view mode to restore correct layout
+  if (vcCurrentViewMode === 'host-only') {
+    vcApplyHostOnlyVisibility();
+  }
 }
 
 function vcToggleHand() {
