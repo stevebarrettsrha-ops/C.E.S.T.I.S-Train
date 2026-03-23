@@ -6787,7 +6787,7 @@ function buildAdminPages() {
     <div class="attendance-summary" id="attendanceSummary"></div>
     <div style="display:flex;gap:12px;margin-bottom:20px;align-items:center;">
       <label style="font-size:13px;font-weight:600;">Date:</label>
-      <input type="date" class="form-control" style="width:180px;" id="attendanceDate" value="2026-02-18" onchange="currentAttendanceDate=this.value;renderAttendancePage()">
+      <input type="date" class="form-control" style="width:180px;" id="attendanceDate" value="${new Date().toISOString().split('T')[0]}" onchange="currentAttendanceDate=this.value;renderAttendancePage()">
       <select class="form-control" style="width:200px;" id="attendanceCourseFilter" onchange="renderAttendancePage()"><option value="all">All Courses</option>${courses.map(c=>'<option>'+c+'</option>').join('')}</select>
       <button class="btn btn-primary" onclick="saveAttendance()">Save Attendance</button>
       <button class="btn-export" onclick="exportStudentsCSV()">\uD83D\uDCC4 Export</button>
@@ -8383,9 +8383,10 @@ function filterInstructorStudents() {
 function updateInstructorPipeline() {
   if(!currentInstructor) return;
   const myStudents = students.filter(s => s.instructor === currentInstructor.name);
+  const stageIdMap = {testing:'ipTest',interview:'ipInterview',training:'ipTraining',certified:'ipCertified',collected:'ipCollected',incomplete:'ipIncomplete'};
   stages.forEach(s => {
     const count = myStudents.filter(st => st.stage === s).length;
-    const el = document.getElementById('ip' + s.charAt(0).toUpperCase() + s.slice(1));
+    const el = document.getElementById(stageIdMap[s] || ('ip' + s.charAt(0).toUpperCase() + s.slice(1)));
     if(el) el.textContent = count;
   });
 }
