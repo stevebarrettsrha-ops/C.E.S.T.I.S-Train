@@ -3539,12 +3539,13 @@ body.vc-fullscreen-mode.vc-host-only-mode .video-grid .video-tile:not(.vc-hoston
     </div>
     <nav class="sidebar-nav" id="sidebarNav"></nav>
     <div class="sidebar-footer">
-      <div class="sidebar-user">
+      <div class="sidebar-user" onclick="openAccountProfileEdit()" style="cursor:pointer;" title="Click to edit your profile">
         <div class="sidebar-user-avatar" id="sidebarAvatar" style="background:linear-gradient(135deg,var(--accent),var(--orange));">A</div>
         <div class="sidebar-user-info">
           <div class="name" id="sidebarUserName">Admin</div>
           <div class="role" id="sidebarUserRole">Administrator</div>
         </div>
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:14px;height:14px;color:var(--text-muted);flex-shrink:0;"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
       </div>
     </div>
   </aside>
@@ -3962,7 +3963,7 @@ body.vc-fullscreen-mode.vc-host-only-mode .video-grid .video-tile:not(.vc-hoston
 <div class="modal-overlay" id="editStudentProfileModal">
   <div class="modal">
     <div class="modal-header"><h3>Edit Profile</h3><button class="modal-close" onclick="closeModal('editStudentProfileModal')">✕</button></div>
-    <div class="form-group"><label>Full Name</label><input type="text" class="form-control" id="editProfileName" disabled></div>
+    <div class="form-group"><label>Full Name</label><input type="text" class="form-control" id="editProfileName" placeholder="Your full name"></div>
     <div class="form-group"><label>Student ID</label><input type="text" class="form-control" id="editProfileId" disabled></div>
     <div class="form-group"><label>Email</label><input type="email" class="form-control" id="editProfileEmail" placeholder="your.email@student.heartlms.edu.jm"></div>
     <div class="form-group"><label>Phone</label><input type="tel" class="form-control" id="editProfilePhone" placeholder="+1 (876) 000-0000"></div>
@@ -3979,7 +3980,7 @@ body.vc-fullscreen-mode.vc-host-only-mode .video-grid .video-tile:not(.vc-hoston
 <div class="modal-overlay" id="editInstructorProfileModal">
   <div class="modal">
     <div class="modal-header"><h3>Edit Profile</h3><button class="modal-close" onclick="closeModal('editInstructorProfileModal')">✕</button></div>
-    <div class="form-group"><label>Full Name</label><input type="text" class="form-control" id="editInsProfileName" disabled></div>
+    <div class="form-group"><label>Full Name</label><input type="text" class="form-control" id="editInsProfileName" placeholder="Your full name"></div>
     <div class="form-group"><label>Staff ID</label><input type="text" class="form-control" id="editInsProfileId" disabled></div>
     <div class="form-group"><label>Email</label><input type="email" class="form-control" id="editInsProfileEmail" placeholder="your.email@heartlms.edu.jm"></div>
     <div class="form-group"><label>Phone</label><input type="tel" class="form-control" id="editInsProfilePhone" placeholder="+1 (876) 000-0000"></div>
@@ -3988,6 +3989,21 @@ body.vc-fullscreen-mode.vc-host-only-mode .video-grid .video-tile:not(.vc-hoston
     <div style="display:flex;gap:10px;justify-content:flex-end;margin-top:20px;">
       <button class="btn btn-secondary" onclick="closeModal('editInstructorProfileModal')">Cancel</button>
       <button class="btn btn-primary" onclick="saveInstructorProfile()">Save Profile</button>
+    </div>
+  </div>
+</div>
+
+<!-- EDIT ACCOUNT PROFILE MODAL (Admin, Admin Staff, CMC) -->
+<div class="modal-overlay" id="editAccountProfileModal">
+  <div class="modal">
+    <div class="modal-header"><h3>Edit Profile</h3><button class="modal-close" onclick="closeModal('editAccountProfileModal')">&#x2715;</button></div>
+    <div class="form-group"><label>Full Name</label><input type="text" class="form-control" id="editAcctName" placeholder="Your full name"></div>
+    <div class="form-group"><label>User ID</label><input type="text" class="form-control" id="editAcctId" disabled></div>
+    <div class="form-group"><label>Email</label><input type="email" class="form-control" id="editAcctEmail" placeholder="your.email@heartlms.edu.jm"></div>
+    <div class="form-group"><label>Phone</label><input type="tel" class="form-control" id="editAcctPhone" placeholder="+1 (876) 000-0000"></div>
+    <div style="display:flex;gap:10px;justify-content:flex-end;margin-top:20px;">
+      <button class="btn btn-secondary" onclick="closeModal('editAccountProfileModal')">Cancel</button>
+      <button class="btn btn-primary" onclick="saveAccountProfile()">Save Profile</button>
     </div>
   </div>
 </div>
@@ -5495,6 +5511,11 @@ function handleStudentClick() {
       studentMatch = createStudentDataForAccount(userAccount);
     }
     currentStudent = studentMatch;
+    // Apply any saved profile edits back to the student data object
+    var savedStuProfile = studentProfiles[studentMatch.id];
+    if(savedStuProfile) {
+      if(savedStuProfile.name) { studentMatch.name = savedStuProfile.name; userAccount.name = savedStuProfile.name; }
+    }
     currentLoggedInUser = userAccount;
     enterApp('student');
   } catch(err) { console.error('handleStudentClick error:', err); alert('Error: ' + err.message); }
@@ -5532,6 +5553,7 @@ function handleInstructorClick() {
     // Apply any saved profile edits back to the instructor data object
     var savedInsProfile = instructorProfiles[insMatch.id];
     if(savedInsProfile) {
+      if(savedInsProfile.name) { insMatch.name = savedInsProfile.name; userAccount.name = savedInsProfile.name; }
       if(savedInsProfile.email) insMatch.email = savedInsProfile.email;
       if(savedInsProfile.phone) insMatch.phone = savedInsProfile.phone;
       if(savedInsProfile.specialization) insMatch.specialization = savedInsProfile.specialization;
@@ -5732,6 +5754,8 @@ function handleGmailProfile(profile, role) {
       var studentMatch = students.find(function(s) { return s.name === existing.name || s.id === existing.studentDataId; });
       if(!studentMatch) studentMatch = createStudentDataForAccount(existing);
       currentStudent = studentMatch;
+      var savedSP = studentProfiles[studentMatch.id];
+      if(savedSP && savedSP.name) { studentMatch.name = savedSP.name; existing.name = savedSP.name; }
       currentLoggedInUser = existing;
       enterApp('student');
     } else if(existing.role === 'instructor') {
@@ -10903,14 +10927,27 @@ function saveStudentProfile() {
   const s = currentStudent;
   if(!s) return;
 
+  const newName = document.getElementById('editProfileName')?.value?.trim();
   const email = document.getElementById('editProfileEmail')?.value?.trim();
   const phone = document.getElementById('editProfilePhone')?.value?.trim();
   const emergencyName = document.getElementById('editProfileEmergencyName')?.value?.trim();
   const emergencyPhone = document.getElementById('editProfileEmergencyPhone')?.value?.trim();
 
+  if(!newName) { showToast('Please enter your name'); return; }
   if(!email) { showToast('Please enter an email address'); return; }
 
+  // Update name in student data object, userAccounts, and students array
+  if(newName !== s.name) {
+    s.name = newName;
+    if(currentLoggedInUser) currentLoggedInUser.name = newName;
+    var acct = userAccounts.find(function(u){ return u.id === currentLoggedInUser.id; });
+    if(acct) acct.name = newName;
+    var stu = students.find(function(st){ return st.id === s.id; });
+    if(stu) stu.name = newName;
+  }
+
   studentProfiles[s.id] = {
+    name: newName,
     email: email,
     phone: phone,
     emergencyName: emergencyName,
@@ -10922,11 +10959,12 @@ function saveStudentProfile() {
   closeModal('editStudentProfileModal');
   showToast('Profile updated successfully');
 
-  // Update the displayed profile info if visible
-  var emailEl = document.getElementById('sProfileEmail');
-  var phoneEl = document.getElementById('sProfilePhone');
-  if(emailEl) emailEl.textContent = email;
-  if(phoneEl) phoneEl.textContent = phone || 'Not provided';
+  // Update sidebar name
+  vcUpdateSidebarName(newName);
+
+  // Re-render the student profile page to reflect changes
+  buildStudentPages();
+  showPage('s-profile');
 }
 
 // ============================== INSTRUCTOR PROFILE FUNCTIONS ==============================
@@ -10948,14 +10986,25 @@ function saveInstructorProfile() {
   const ins = currentInstructor;
   if(!ins) return;
 
+  const newName = document.getElementById('editInsProfileName')?.value?.trim();
   const email = document.getElementById('editInsProfileEmail')?.value?.trim();
   const phone = document.getElementById('editInsProfilePhone')?.value?.trim();
   const specialization = document.getElementById('editInsProfileSpecialization')?.value?.trim();
   const bio = document.getElementById('editInsProfileBio')?.value?.trim();
 
+  if(!newName) { showToast('Please enter your name'); return; }
   if(!email) { showToast('Please enter an email address'); return; }
 
+  // Update name in instructor data, userAccounts, and instructorData array
+  if(newName !== ins.name) {
+    ins.name = newName;
+    if(currentLoggedInUser) currentLoggedInUser.name = newName;
+    var acct = userAccounts.find(function(u){ return u.id === currentLoggedInUser.id; });
+    if(acct) acct.name = newName;
+  }
+
   instructorProfiles[ins.id] = {
+    name: newName,
     email: email,
     phone: phone,
     specialization: specialization,
@@ -10972,9 +11021,81 @@ function saveInstructorProfile() {
   closeModal('editInstructorProfileModal');
   showToast('Profile updated successfully');
 
+  // Update sidebar name
+  vcUpdateSidebarName(newName);
+
   // Re-render the instructor profile page to reflect changes
   buildInstructorPages();
   showPage('i-profile');
+}
+
+// ============================== SHARED PROFILE EDIT (Admin, Admin Staff, CMC) ==============================
+function openAccountProfileEdit() {
+  var user = currentLoggedInUser;
+  if(!user) return;
+  // If the user is a student or instructor, redirect to their specific profile edit
+  if(user.role === 'student') { openEditStudentProfile(); return; }
+  if(user.role === 'instructor') { openEditInstructorProfile(); return; }
+  document.getElementById('editAcctName').value = user.name || '';
+  document.getElementById('editAcctId').value = user.id || '';
+  document.getElementById('editAcctEmail').value = user.email || '';
+  document.getElementById('editAcctPhone').value = user.phone || '';
+  openModal('editAccountProfileModal');
+}
+
+function saveAccountProfile() {
+  var user = currentLoggedInUser;
+  if(!user) return;
+
+  var newName = document.getElementById('editAcctName')?.value?.trim();
+  var email = document.getElementById('editAcctEmail')?.value?.trim();
+  var phone = document.getElementById('editAcctPhone')?.value?.trim();
+
+  if(!newName) { showToast('Please enter your name'); return; }
+
+  // Update the userAccounts entry
+  var acct = userAccounts.find(function(u){ return u.id === user.id; });
+  if(acct) {
+    acct.name = newName;
+    if(email) acct.email = email;
+    if(phone) acct.phone = phone;
+  }
+  user.name = newName;
+  if(email) user.email = email;
+  if(phone) user.phone = phone;
+
+  saveState();
+  closeModal('editAccountProfileModal');
+  showToast('Profile updated successfully');
+
+  // Update sidebar name
+  vcUpdateSidebarName(newName);
+
+  // Re-render the current role's profile page
+  var role = user.role || currentRole;
+  if(role === 'adminstaff') {
+    // Re-render admin staff pages to reflect changes
+    var mc = document.getElementById('mainContent');
+    if(mc) {
+      // Find and update the profile name element
+      var pName = document.getElementById('asProfileName');
+      if(pName) pName.textContent = newName;
+    }
+  } else if(role === 'cmc') {
+    var cmcName = document.getElementById('cmcProfileName');
+    if(cmcName) cmcName.textContent = newName;
+  }
+}
+
+// ============================== SIDEBAR NAME HELPER ==============================
+function vcUpdateSidebarName(name) {
+  var el = document.getElementById('sidebarUserName');
+  if(el) el.textContent = name;
+  var avatar = document.getElementById('sidebarAvatar');
+  if(avatar) {
+    var initials = name.split(' ').map(function(n){ return n[0]; }).join('').substring(0,2).toUpperCase();
+    avatar.textContent = initials;
+  }
 }
 
 // ============================== SYSTEM SETTINGS FUNCTIONS ==============================
@@ -16220,6 +16341,8 @@ async function studentLightSync(uname, pw) {
       studentMatch = createStudentDataForAccount(userAccount);
     }
     currentStudent = studentMatch;
+    var savedSP2 = studentProfiles[studentMatch.id];
+    if(savedSP2 && savedSP2.name) { studentMatch.name = savedSP2.name; userAccount.name = savedSP2.name; }
     currentLoggedInUser = userAccount;
     enterApp('student');
 
@@ -19642,8 +19765,9 @@ function buildAdminStaffPages() {
   html += '<section class="page" id="page-as-profile">' +
     '<div class="card" style="max-width:600px;margin:0 auto;text-align:center;padding:40px;">' +
       '<div style="width:80px;height:80px;border-radius:50%;background:linear-gradient(135deg,var(--purple),#8e44ad);display:flex;align-items:center;justify-content:center;font-size:28px;font-weight:700;margin:0 auto 16px;">'+pInitials+'</div>' +
-      '<h3 style="font-size:20px;margin-bottom:4px;">'+user.name+'</h3>' +
-      '<p style="color:var(--text-muted);font-size:13px;margin-bottom:20px;">Administrative Staff</p>' +
+      '<h3 style="font-size:20px;margin-bottom:4px;" id="asProfileName">'+user.name+'</h3>' +
+      '<p style="color:var(--text-muted);font-size:13px;margin-bottom:4px;">Administrative Staff</p>' +
+      '<button class="btn btn-secondary btn-sm" style="margin-bottom:16px;" onclick="openAccountProfileEdit()">Edit Profile</button>' +
       '<div style="text-align:left;max-width:400px;margin:0 auto;">' +
         '<div style="display:flex;justify-content:space-between;padding:10px 0;border-bottom:1px solid var(--border);"><span style="color:var(--text-muted);font-size:13px;">User ID</span><span style="font-size:13px;">'+user.id+'</span></div>' +
         '<div style="display:flex;justify-content:space-between;padding:10px 0;border-bottom:1px solid var(--border);"><span style="color:var(--text-muted);font-size:13px;">Username</span><span style="font-size:13px;">'+user.username+'</span></div>' +
@@ -20767,8 +20891,9 @@ function buildCmcPages() {
   html += '<div style="display:flex;align-items:center;gap:16px;margin-bottom:16px;">';
   html += '<div style="width:64px;height:64px;border-radius:50%;background:linear-gradient(135deg,var(--teal),#16a085);display:flex;align-items:center;justify-content:center;font-size:24px;font-weight:700;color:#fff;">' +
     (user.name.split(' ').map(function(n){return n[0];}).join('').substring(0,2)) + '</div>';
-  html += '<div><h3 style="margin:0;font-size:18px;">' + user.name + '</h3>';
-  html += '<p style="margin:4px 0 0;font-size:13px;color:var(--text-muted);">CMC Board Member</p></div></div>';
+  html += '<div><h3 style="margin:0;font-size:18px;" id="cmcProfileName">' + user.name + '</h3>';
+  html += '<p style="margin:4px 0 0;font-size:13px;color:var(--text-muted);">CMC Board Member</p>';
+  html += '<button class="btn btn-secondary btn-sm" style="margin-top:8px;" onclick="openAccountProfileEdit()">Edit Profile</button></div></div>';
   html += '<div style="font-size:13px;color:var(--text-secondary);line-height:1.8;">';
   html += '<div><strong>Username:</strong> ' + (user.username||'--') + '</div>';
   html += '<div><strong>Email:</strong> ' + (user.email||'--') + '</div>';
