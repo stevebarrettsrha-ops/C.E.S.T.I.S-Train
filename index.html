@@ -6402,6 +6402,8 @@ function buildInstructorSidebar() {
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg>Gradebook</div>
     <div class="nav-item" data-page="i-resources" onclick="showPage('i-resources')">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/></svg>Resources</div>
+    <div class="nav-item" data-page="i-exams" onclick="showPage('i-exams')">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg>Online Exams</div>
     <div class="nav-section-label">Tasks</div>
     <div class="nav-item" data-page="i-duties" onclick="showPage('i-duties')" style="position:relative;">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 5H7a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V7a2 2 0 0 0-2-2h-2"/><rect x="9" y="3" width="6" height="4" rx="1"/><path d="M9 14l2 2 4-4"/></svg>My Assigned Tasks<span id="iDutyTasksBadge" class="nav-badge" style="display:none;position:absolute;right:12px;top:50%;transform:translateY(-50%);background:var(--red);color:#fff;border-radius:10px;font-size:10px;padding:1px 6px;min-width:18px;text-align:center;">0</span></div>
@@ -6473,7 +6475,7 @@ function showPage(pageId) {
     's-resources':'My Resources','s-exams':'My Exams','s-certificate':'My Certificate',
     's-profile':'My Profile','s-calendar':'My Calendar',
     'i-dashboard':'Instructor Dashboard','i-classes':'My Classes','i-students':'My Students',
-    'i-attendance':'Class Attendance','i-gradebook':'Gradebook','i-resources':'Course Resources',
+    'i-attendance':'Class Attendance','i-gradebook':'Gradebook','i-resources':'Course Resources','i-exams':'Online Exams',
     'i-duties':'My Assigned Tasks','i-announcements':'Announcements','i-calendar':'Calendar','i-profile':'My Profile',
     'lms-chat':'C.E.S.T.I.S LMS Chat','s-lms-chat':'C.E.S.T.I.S LMS Chat','i-lms-chat':'C.E.S.T.I.S LMS Chat',
     'admin-duty-register':'Admin Duty Register',
@@ -6495,6 +6497,7 @@ function showPage(pageId) {
   if(pageId === 'i-duties') iOnDutiesPageShow();
   if(pageId === 'verify-users') renderVerifyUsersPage();
   if(pageId === 'a-resources') renderAdminResources();
+  if(pageId === 'exams' || pageId === 'i-exams') renderInstructorExams();
   if(pageId === 's-resources') renderStudentDriveResources();
   if(pageId === 'lms-chat') lmsChatOnPageShow('admin');
   if(pageId === 's-lms-chat') lmsChatOnPageShow('student');
@@ -8368,6 +8371,31 @@ function buildInstructorPages() {
   <!-- TIME TRACKING (Instructor) -->
   <section class="page" id="page-i-timetracking">
     <iframe id="iTimetrackingFrame" style="width:100%;height:calc(100vh - 80px);border:none;border-radius:12px;"></iframe>
+  </section>
+
+  <!-- INSTRUCTOR ONLINE EXAMS -->
+  <section class="page" id="page-i-exams">
+    <div id="iExamListView">
+      <div class="stats-grid" id="iExamStatsGrid"></div>
+      <div style="display:flex;gap:12px;margin-bottom:18px;flex-wrap:wrap;align-items:center;">
+        <button class="btn btn-primary" onclick="openModal('createExamModal')">+ Create Exam</button>
+        <button class="btn btn-secondary" onclick="exportExamResults()">Export Results</button>
+      </div>
+      <div class="tabs" style="margin-bottom:16px;">
+        <div class="tab active" onclick="switchInstructorExamTab(this,'upcoming')">Upcoming</div>
+        <div class="tab" onclick="switchInstructorExamTab(this,'active')">Active Now</div>
+        <div class="tab" onclick="switchInstructorExamTab(this,'completed')">Completed</div>
+      </div>
+      <div class="card">
+        <div class="table-wrapper">
+          <table>
+            <thead><tr><th>Exam Title</th><th>Course</th><th>Date & Time</th><th>Duration</th><th>Questions</th><th>Status</th><th>Actions</th></tr></thead>
+            <tbody id="iExamTableBody"></tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+    <div id="iExamResultsView" style="display:none;"></div>
   </section>
   `;
 
@@ -12140,20 +12168,80 @@ function renderExams(filter) {
     var qCount = (e.questionData && e.questionData.length > 0) ? e.questionData.length : e.questions;
     var hasQuestions = e.questionData && e.questionData.length > 0;
     var resultsForExam = examResults.filter(function(r){return r.examId===e.id;});
-    var actionBtns = '';
+    var actionBtns = '<button class="btn btn-sm btn-secondary" onclick="viewExamDetail('+idx+')" title="View exam details & questions">View</button>';
     if(e.status==='upcoming') {
-      actionBtns = '<button class="btn btn-sm btn-secondary" onclick="editExamQuestions('+idx+')">'+(!hasQuestions?'Add Questions':'Edit')+'</button>' +
+      actionBtns += '<button class="btn btn-sm btn-secondary" style="margin-left:4px;" onclick="editExam('+idx+')" title="Edit exam details & questions">'+(!hasQuestions?'Add Questions':'Edit')+'</button>' +
         '<button class="btn btn-sm btn-primary" style="margin-left:4px;" onclick="activateExam('+idx+')">Activate</button>';
     } else if(e.status==='active') {
-      actionBtns = '<button class="btn btn-sm btn-primary" onclick="viewExamResults('+idx+')">Monitor ('+resultsForExam.length+')</button>' +
+      actionBtns += '<button class="btn btn-sm btn-primary" style="margin-left:4px;" onclick="viewExamResults('+idx+')">Monitor ('+resultsForExam.length+')</button>' +
+        '<button class="btn btn-sm btn-secondary" style="margin-left:4px;" onclick="editExam('+idx+')" title="Edit exam">Edit</button>' +
         '<button class="btn btn-sm btn-secondary" style="margin-left:4px;" onclick="completeExam('+idx+')">Complete</button>';
     } else {
-      actionBtns = '<button class="btn btn-sm btn-secondary" onclick="viewExamResults('+idx+')">Results ('+resultsForExam.length+')</button>';
+      actionBtns += '<button class="btn btn-sm btn-secondary" style="margin-left:4px;" onclick="viewExamResults('+idx+')">Results ('+resultsForExam.length+')</button>' +
+        '<button class="btn btn-sm btn-secondary" style="margin-left:4px;" onclick="editExam('+idx+')" title="Edit exam">Edit</button>';
     }
     return '<tr><td><strong>'+e.title+'</strong>'+(hasQuestions?'<br><span style="font-size:11px;color:var(--green);">✓ Questions added</span>':'')+'</td><td>'+e.course+'</td><td>'+e.date+' @ '+e.time+'</td><td>'+e.duration+' min</td><td>'+qCount+'</td><td><span class="badge '+(e.status==='upcoming'?'badge-blue':e.status==='active'?'badge-red':'badge-green')+'"><span class="badge-dot"></span>'+(e.status==='active'?'In Progress':e.status==='completed'?'Completed ✓':'Scheduled')+'</span>'+(e.passRate?'<br><span style="font-size:11px;color:var(--text-muted);">Pass: '+e.passRate+'</span>':'')+'</td><td>'+actionBtns+'</td></tr>';
   }).join('');
 }
 function switchExamTab(el,tab) { document.querySelectorAll('#page-exams .tab').forEach(t=>t.classList.remove('active')); el.classList.add('active'); renderExams(tab); }
+
+// Instructor exam rendering — shows exams for instructor's course and uses instructor-specific DOM elements
+var instructorExamFilter = 'upcoming';
+function renderInstructorExams(filter) {
+  if(filter) instructorExamFilter = filter;
+  else filter = instructorExamFilter;
+  resolveExamStatuses();
+
+  // For instructors, filter to their course; for admin show all
+  var courseFilter = (currentRole === 'instructor' && currentInstructor) ? currentInstructor.course : null;
+  var allExams = courseFilter ? exams.filter(function(e){ return e.course === courseFilter; }) : exams;
+  var filtered = allExams.filter(function(e){ return e.status === (filter || 'upcoming'); });
+
+  // Use instructor-specific elements if available, fallback to admin ones
+  var tbody = document.getElementById('iExamTableBody') || document.getElementById('examTableBody');
+  if(!tbody) return;
+
+  // Stats
+  var statsEl = document.getElementById('iExamStatsGrid') || document.getElementById('examStatsGrid');
+  if(statsEl) {
+    var myResults = courseFilter ? examResults.filter(function(r){ var ex = exams.find(function(e){return e.id===r.examId;}); return ex && ex.course===courseFilter; }) : examResults;
+    var totalExams = allExams.length;
+    var activeExams = allExams.filter(function(e){return e.status==='active';}).length;
+    var completedExams = allExams.filter(function(e){return e.status==='completed';}).length;
+    var avgScore = myResults.length > 0 ? Math.round(myResults.reduce(function(a,r){return a+r.score;},0)/myResults.length) : 0;
+    statsEl.innerHTML =
+      '<div class="stat-card"><div class="stat-icon" style="background:var(--blue-dim);color:var(--blue);">📝</div><div class="stat-value">'+totalExams+'</div><div class="stat-label">Total Exams</div></div>' +
+      '<div class="stat-card"><div class="stat-icon" style="background:var(--red-dim);color:var(--red);">🔴</div><div class="stat-value">'+activeExams+'</div><div class="stat-label">Active Now</div></div>' +
+      '<div class="stat-card"><div class="stat-icon" style="background:var(--green-dim);color:var(--green);">✅</div><div class="stat-value">'+completedExams+'</div><div class="stat-label">Completed</div></div>' +
+      '<div class="stat-card"><div class="stat-icon" style="background:var(--accent-dim);color:var(--accent);">📊</div><div class="stat-value">'+avgScore+'%</div><div class="stat-label">Avg Score</div></div>';
+  }
+
+  tbody.innerHTML = filtered.map(function(e) {
+    var idx = exams.indexOf(e);
+    var qCount = (e.questionData && e.questionData.length > 0) ? e.questionData.length : e.questions;
+    var hasQuestions = e.questionData && e.questionData.length > 0;
+    var resultsForExam = examResults.filter(function(r){return r.examId===e.id;});
+    var actionBtns = '<button class="btn btn-sm btn-secondary" onclick="viewExamDetail('+idx+')" title="View exam details & questions">View</button>';
+    if(e.status==='upcoming') {
+      actionBtns += '<button class="btn btn-sm btn-secondary" style="margin-left:4px;" onclick="editExam('+idx+')" title="Edit exam details & questions">'+(!hasQuestions?'Add Questions':'Edit')+'</button>' +
+        '<button class="btn btn-sm btn-primary" style="margin-left:4px;" onclick="activateExam('+idx+')">Activate</button>';
+    } else if(e.status==='active') {
+      actionBtns += '<button class="btn btn-sm btn-primary" style="margin-left:4px;" onclick="viewExamResults('+idx+')">Monitor ('+resultsForExam.length+')</button>' +
+        '<button class="btn btn-sm btn-secondary" style="margin-left:4px;" onclick="editExam('+idx+')" title="Edit exam">Edit</button>' +
+        '<button class="btn btn-sm btn-secondary" style="margin-left:4px;" onclick="completeExam('+idx+')">Complete</button>';
+    } else {
+      actionBtns += '<button class="btn btn-sm btn-secondary" style="margin-left:4px;" onclick="viewExamResults('+idx+')">Results ('+resultsForExam.length+')</button>' +
+        '<button class="btn btn-sm btn-secondary" style="margin-left:4px;" onclick="editExam('+idx+')" title="Edit exam">Edit</button>';
+    }
+    return '<tr><td><strong>'+e.title+'</strong>'+(hasQuestions?'<br><span style="font-size:11px;color:var(--green);">✓ Questions added</span>':'')+'</td><td>'+e.course+'</td><td>'+e.date+' @ '+e.time+'</td><td>'+e.duration+' min</td><td>'+qCount+'</td><td><span class="badge '+(e.status==='upcoming'?'badge-blue':e.status==='active'?'badge-red':'badge-green')+'"><span class="badge-dot"></span>'+(e.status==='active'?'In Progress':e.status==='completed'?'Completed ✓':'Scheduled')+'</span>'+(e.passRate?'<br><span style="font-size:11px;color:var(--text-muted);">Pass: '+e.passRate+'</span>':'')+'</td><td>'+actionBtns+'</td></tr>';
+  }).join('') || '<tr><td colspan="7" style="text-align:center;color:var(--text-muted);padding:24px;">No '+filter+' exams'+(courseFilter?' for '+courseFilter:'')+'</td></tr>';
+}
+
+function switchInstructorExamTab(el,tab) {
+  document.querySelectorAll('#page-i-exams .tab').forEach(function(t){t.classList.remove('active');});
+  el.classList.add('active');
+  renderInstructorExams(tab);
+}
 
 // ============================== EXAM BUILDER ==============================
 var examBuilderQuestions = [];
@@ -12316,19 +12404,8 @@ function createExam() {
 }
 
 function editExamQuestions(idx) {
-  var e = exams[idx];
-  editingExamIdx = idx;
-  examBuilderQuestions = e.questionData ? JSON.parse(JSON.stringify(e.questionData)) : [];
-  document.getElementById('examTitle').value = e.title;
-  document.getElementById('examCourse').value = e.course;
-  document.getElementById('examDate').value = e.date;
-  document.getElementById('examTime').value = e.time;
-  document.getElementById('examDuration').value = e.duration;
-  document.getElementById('examPassMark').value = e.passMark;
-  document.getElementById('examShuffle').value = e.shuffleQuestions ? 'true' : 'false';
-  document.getElementById('examInstructions').value = e.instructions || '';
-  openModal('createExamModal');
-  goToExamStep2();
+  // Legacy function — now delegates to editExam which starts at Step 1
+  editExam(idx);
 }
 
 function activateExam(idx) {
@@ -12364,8 +12441,9 @@ function completeExam(idx) {
 function viewExamResults(idx) {
   var e = exams[idx];
   var results = examResults.filter(function(r){return r.examId===e.id;});
-  var view = document.getElementById('examResultsView');
-  var listView = document.getElementById('examListView');
+  var isInstructor = currentRole === 'instructor' && document.getElementById('iExamResultsView');
+  var view = document.getElementById(isInstructor ? 'iExamResultsView' : 'examResultsView');
+  var listView = document.getElementById(isInstructor ? 'iExamListView' : 'examListView');
   listView.style.display='none';
   view.style.display='block';
 
@@ -12412,8 +12490,111 @@ function viewExamResults(idx) {
 }
 
 function backToExamList() {
-  document.getElementById('examResultsView').style.display='none';
-  document.getElementById('examListView').style.display='block';
+  var isInstructor = currentRole === 'instructor' && document.getElementById('iExamResultsView');
+  var viewId = isInstructor ? 'iExamResultsView' : 'examResultsView';
+  var listId = isInstructor ? 'iExamListView' : 'examListView';
+  document.getElementById(viewId).style.display='none';
+  document.getElementById(listId).style.display='block';
+}
+
+// ============================== VIEW EXAM DETAIL ==============================
+function viewExamDetail(idx) {
+  var e = exams[idx];
+  if(!e) return;
+  var isInstructor = currentRole === 'instructor' && document.getElementById('iExamResultsView');
+  var view = document.getElementById(isInstructor ? 'iExamResultsView' : 'examResultsView');
+  var listView = document.getElementById(isInstructor ? 'iExamListView' : 'examListView');
+  listView.style.display='none';
+  view.style.display='block';
+
+  var resultsForExam = examResults.filter(function(r){return r.examId===e.id;});
+  var hasQuestions = e.questionData && e.questionData.length > 0;
+  var statusLabel = e.status==='active'?'In Progress':e.status==='completed'?'Completed':'Scheduled';
+  var statusBadge = '<span class="badge '+(e.status==='upcoming'?'badge-blue':e.status==='active'?'badge-red':'badge-green')+'"><span class="badge-dot"></span>'+statusLabel+'</span>';
+
+  var html = '<div style="display:flex;align-items:center;gap:12px;margin-bottom:20px;">' +
+    '<button class="btn btn-secondary" onclick="backToExamList()">&larr; Back to Exams</button>' +
+    '<h3 style="flex:1;">'+e.title+'</h3>' +
+    '<button class="btn btn-sm btn-primary" onclick="editExam('+idx+')">Edit Exam</button>' +
+    '</div>';
+
+  // Exam info card
+  html += '<div class="card" style="margin-bottom:18px;"><div class="card-header"><h3>Exam Details</h3>'+statusBadge+'</div>' +
+    '<div style="padding:16px;display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:16px;">' +
+    '<div><div style="font-size:11px;color:var(--text-muted);text-transform:uppercase;margin-bottom:4px;">Programme</div><div style="font-weight:600;">'+e.course+'</div></div>' +
+    '<div><div style="font-size:11px;color:var(--text-muted);text-transform:uppercase;margin-bottom:4px;">Date & Time</div><div style="font-weight:600;">'+e.date+' @ '+e.time+'</div></div>' +
+    '<div><div style="font-size:11px;color:var(--text-muted);text-transform:uppercase;margin-bottom:4px;">Duration</div><div style="font-weight:600;">'+e.duration+' minutes</div></div>' +
+    '<div><div style="font-size:11px;color:var(--text-muted);text-transform:uppercase;margin-bottom:4px;">Pass Mark</div><div style="font-weight:600;">'+e.passMark+'%</div></div>' +
+    '<div><div style="font-size:11px;color:var(--text-muted);text-transform:uppercase;margin-bottom:4px;">Questions</div><div style="font-weight:600;">'+(hasQuestions?e.questionData.length:'None added')+'</div></div>' +
+    '<div><div style="font-size:11px;color:var(--text-muted);text-transform:uppercase;margin-bottom:4px;">Submissions</div><div style="font-weight:600;">'+resultsForExam.length+'</div></div>' +
+    '<div><div style="font-size:11px;color:var(--text-muted);text-transform:uppercase;margin-bottom:4px;">Shuffle Questions</div><div style="font-weight:600;">'+(e.shuffleQuestions?'Yes':'No')+'</div></div>' +
+    (e.passRate?'<div><div style="font-size:11px;color:var(--text-muted);text-transform:uppercase;margin-bottom:4px;">Pass Rate</div><div style="font-weight:600;">'+e.passRate+'</div></div>':'') +
+    '</div>' +
+    (e.instructions ? '<div style="padding:0 16px 16px;"><div style="font-size:11px;color:var(--text-muted);text-transform:uppercase;margin-bottom:4px;">Instructions</div><div style="font-size:13px;color:var(--text-secondary);background:var(--bg-input);padding:10px 14px;border-radius:var(--radius-sm);">'+e.instructions+'</div></div>' : '') +
+    '</div>';
+
+  // Questions card
+  if(hasQuestions) {
+    var typeLabels = {mcq:'Multiple Choice',tf:'True / False',fill:'Fill in the Blank',short:'Short Answer'};
+    var typeIcons = {mcq:'&#127313;',tf:'&#9989;',fill:'&#9999;&#65039;',short:'&#128221;'};
+    html += '<div class="card"><div class="card-header"><h3>Questions ('+e.questionData.length+')</h3>' +
+      '<span style="font-size:12px;color:var(--text-muted);">Total Points: '+e.questionData.reduce(function(a,q){return a+(q.points||1);},0)+'</span></div>';
+    e.questionData.forEach(function(q, qi) {
+      var correctDisplay = '';
+      if(q.type==='mcq') {
+        correctDisplay = q.options[q.correctAnswer] || 'Option '+(q.correctAnswer+1);
+      } else if(q.type==='tf') {
+        correctDisplay = q.correctAnswer ? 'True' : 'False';
+      } else if(q.type==='fill' || q.type==='short') {
+        correctDisplay = q.correctAnswer || '(Manual grading)';
+      }
+      html += '<div style="padding:14px 16px;border-bottom:1px solid var(--border);'+(qi%2===0?'':'background:var(--bg-input);')+'">' +
+        '<div style="display:flex;align-items:center;gap:10px;margin-bottom:6px;">' +
+        '<span style="font-size:12px;font-weight:700;color:var(--accent);min-width:32px;">Q'+(qi+1)+'</span>' +
+        '<span style="font-size:11px;padding:2px 8px;border-radius:10px;background:var(--blue-dim);color:var(--blue);">'+(typeLabels[q.type]||q.type)+'</span>' +
+        '<span style="font-size:11px;color:var(--text-muted);margin-left:auto;">'+(q.points||1)+' pt'+(q.points>1?'s':'')+'</span>' +
+        '</div>' +
+        '<div style="font-size:13.5px;margin-bottom:8px;">'+q.text+'</div>';
+      if(q.type==='mcq' && q.options) {
+        html += '<div style="display:grid;grid-template-columns:1fr 1fr;gap:4px 16px;margin-bottom:6px;">';
+        q.options.forEach(function(opt, oi) {
+          var isCorrect = oi === q.correctAnswer;
+          html += '<div style="font-size:12px;padding:4px 8px;border-radius:4px;'+(isCorrect?'background:var(--green-dim);color:var(--green);font-weight:600;':'color:var(--text-secondary);')+'">'+String.fromCharCode(65+oi)+'. '+opt+(isCorrect?' &#10003;':'')+'</div>';
+        });
+        html += '</div>';
+      } else {
+        html += '<div style="font-size:12px;color:var(--green);"><strong>Answer:</strong> '+correctDisplay+'</div>';
+      }
+      html += '</div>';
+    });
+    html += '</div>';
+  } else {
+    html += '<div class="card" style="text-align:center;padding:32px;color:var(--text-muted);"><div style="font-size:36px;margin-bottom:8px;">&#128221;</div><p>No questions added to this exam yet.</p>' +
+      '<button class="btn btn-primary btn-sm" style="margin-top:12px;" onclick="editExamQuestions('+idx+')">Add Questions</button></div>';
+  }
+
+  view.innerHTML = html;
+}
+
+function editExam(idx) {
+  var e = exams[idx];
+  if(e.status === 'active') {
+    if(!confirm('This exam is currently active. Editing it may affect students currently taking it. Continue?')) return;
+  } else if(e.status === 'completed') {
+    if(!confirm('This exam is completed. Editing it will not change existing results. Continue?')) return;
+  }
+  editingExamIdx = idx;
+  examBuilderQuestions = e.questionData ? JSON.parse(JSON.stringify(e.questionData)) : [];
+  document.getElementById('examTitle').value = e.title;
+  document.getElementById('examCourse').value = e.course;
+  document.getElementById('examDate').value = e.date;
+  document.getElementById('examTime').value = e.time;
+  document.getElementById('examDuration').value = e.duration;
+  document.getElementById('examPassMark').value = e.passMark;
+  document.getElementById('examShuffle').value = e.shuffleQuestions ? 'true' : 'false';
+  document.getElementById('examInstructions').value = e.instructions || '';
+  openModal('createExamModal');
+  goToExamStep1();
 }
 
 // ============================== MANUAL GRADING PANEL ==============================
