@@ -795,6 +795,7 @@ textarea.form-control { resize:vertical; min-height:80px; }
 .centre-emoji-grid .emoji-section-label { grid-column:1/-1; font-size:11px; font-weight:600; color:var(--text-muted); padding:6px 2px 2px; text-transform:uppercase; letter-spacing:0.5px; }
 
 .video-grid { display:grid; grid-template-columns:repeat(auto-fit,minmax(280px,1fr)); gap:16px; margin-bottom:20px; }
+.video-grid .video-tile.host-tile { grid-column:1/-1; min-height:340px; border:2px solid var(--blue); }
 .video-tile {
   aspect-ratio:16/9; background:var(--bg-input); border-radius:var(--radius);
   border:1px solid var(--border); display:flex; align-items:center;
@@ -925,6 +926,69 @@ textarea.form-control { resize:vertical; min-height:80px; }
   position:relative; bottom:auto; right:auto; align-self:flex-end;
   box-shadow:none;
 }
+/* ============================== FULLSCREEN CONFERENCE MODE ============================== */
+body.vc-fullscreen-mode .sidebar { transform:translateX(-100%) !important; }
+body.vc-fullscreen-mode .topbar { display:none !important; }
+body.vc-fullscreen-mode .main-content {
+  left:0 !important; top:0 !important; padding:0 !important;
+  position:fixed; right:0; bottom:0;
+}
+body.vc-fullscreen-mode .page.active {
+  height:100vh; display:flex; flex-direction:column;
+}
+body.vc-fullscreen-mode .vc-conference-wrapper {
+  flex:1; display:flex; flex-direction:column; height:100vh;
+}
+body.vc-fullscreen-mode .vc-conference-header {
+  padding:8px 16px; background:rgba(12,17,23,0.95); border-bottom:1px solid var(--border);
+  display:flex; align-items:center; justify-content:space-between; flex-wrap:wrap; gap:8px;
+  flex-shrink:0;
+}
+body.vc-fullscreen-mode .vc-conference-body {
+  flex:1; display:flex; overflow:hidden; min-height:0;
+}
+body.vc-fullscreen-mode .vc-conference-body .vc-main-video-area {
+  flex:1; display:flex; flex-direction:column; min-width:0;
+}
+body.vc-fullscreen-mode .vc-conference-body .video-grid {
+  flex:1; padding:8px; margin-bottom:0; align-content:center;
+}
+body.vc-fullscreen-mode .vc-conference-body .video-controls {
+  margin-top:0; border-radius:0; border-left:0; border-right:0; border-bottom:0;
+  padding:10px 16px; flex-shrink:0;
+}
+body.vc-fullscreen-mode .vc-conference-body .vc-side-panel {
+  width:320px; display:flex; flex-direction:column; border-left:1px solid var(--border);
+  background:var(--bg-primary); flex-shrink:0; overflow-y:auto;
+}
+body.vc-fullscreen-mode .vc-conference-body .vc-side-panel .chat-panel {
+  flex:1; border-radius:0; border:none; border-bottom:1px solid var(--border);
+}
+body.vc-fullscreen-mode .vc-conference-body .vc-side-panel .card {
+  border-radius:0; border:none; margin-top:0;
+}
+/* Hide side panel when in host-only view */
+body.vc-fullscreen-mode.vc-host-only-mode .vc-conference-body .vc-side-panel { display:none; }
+body.vc-fullscreen-mode.vc-host-only-mode .video-grid { display:flex; align-items:center; justify-content:center; }
+body.vc-fullscreen-mode.vc-host-only-mode .video-grid .video-tile { display:none !important; }
+body.vc-fullscreen-mode.vc-host-only-mode .video-grid .video-tile.host-tile { display:flex !important; width:100%; height:100%; max-height:calc(100vh - 140px); aspect-ratio:16/9; }
+body.vc-fullscreen-mode.vc-host-only-mode .video-grid .video-tile.local { display:none !important; }
+/* For host in host-only mode: show only their own tile */
+body.vc-fullscreen-mode.vc-host-only-mode.vc-is-host .video-grid .video-tile.local { display:flex !important; width:100%; height:100%; max-height:calc(100vh - 140px); aspect-ratio:16/9; }
+
+/* View mode toggle button styling */
+.vc-view-toggle {
+  display:flex; align-items:center; gap:4px; background:var(--bg-input); border-radius:var(--radius-sm);
+  padding:2px; border:1px solid var(--border);
+}
+.vc-view-btn {
+  padding:5px 10px; border:none; border-radius:4px; font-size:11px; font-weight:600;
+  color:var(--text-muted); background:transparent; cursor:pointer;
+  transition:all var(--transition); white-space:nowrap;
+}
+.vc-view-btn:hover { color:var(--text-primary); background:rgba(255,255,255,0.06); }
+.vc-view-btn.active { background:var(--accent); color:#000; }
+
 .vc-divider {
   color:var(--text-muted); font-size:12px; display:flex; align-items:center; gap:12px; width:280px;
 }
@@ -8832,66 +8896,77 @@ function vcShowConference(title, role) {
   var userName = vcCurrentUserName;
   var showHostControls = isRoomHost && (role==='instructor' || role==='admin' || role==='adminstaff');
 
+  // Enter fullscreen conference mode
+  document.body.classList.add('vc-fullscreen-mode');
+  if(isRoomHost) document.body.classList.add('vc-is-host');
+
   room.innerHTML = `
-    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px;flex-wrap:wrap;gap:8px;">
-      <div style="display:flex;align-items:center;gap:12px;">
-        <button class="btn btn-secondary btn-sm" onclick="exitVideoRoom('${role}')">&#8592; Leave</button>
-        <h3 style="font-family:'Playfair Display',serif;">${title}</h3>
-        <span class="badge badge-red"><span class="live-dot"></span>&nbsp;LIVE</span>
-      </div>
-      <div style="display:flex;align-items:center;gap:16px;">
-        <div style="font-family:monospace;font-size:13px;color:var(--accent);background:var(--accent-dim);padding:4px 12px;border-radius:6px;cursor:pointer;" onclick="vcCopyCode()" title="Click to copy room code">Room: ${currentRoomCode}</div>
-        <div id="vc-rec-indicator" class="vc-rec-indicator" style="display:none;"><span class="vc-rec-dot"></span><span id="vc-rec-timer">REC 00:00</span></div>
-        <div style="font-size:13px;color:var(--text-muted);" id="vTimer-${role}">00:00:00</div>
-      </div>
-    </div>
-    ${showHostControls ? `
-    <div id="vc-host-bar" style="display:flex;align-items:center;gap:8px;margin-bottom:12px;flex-wrap:wrap;padding:10px;background:rgba(240,165,0,0.06);border:1px solid rgba(240,165,0,0.15);border-radius:var(--radius-sm);">
-      <span style="font-size:11px;font-weight:700;color:var(--accent);margin-right:4px;">HOST CONTROLS:</span>
-      <button class="vc-host-btn warning" onclick="vcMuteAll()" title="Mute all participants">&#x1F507; Mute All</button>
-      <button class="vc-host-btn" onclick="vcTakeScreenshot()" title="Take meeting screenshot">&#x1F4F8; Screenshot</button>
-      <span style="font-size:10px;color:var(--text-muted);margin-left:8px;">PERMISSIONS:</span>
-      <button class="vc-host-btn" id="vc-perm-screen-btn" onclick="vcToggleScreenSharePermission()" title="Allow/deny participant screen sharing" style="font-size:10px;">&#x1F5A5;&#xFE0F; Screen: OFF</button>
-      <button class="vc-host-btn" id="vc-perm-rec-btn" onclick="vcToggleRecordingPermission()" title="Allow/deny participant recording" style="font-size:10px;">&#x23FA;&#xFE0F; Record: OFF</button>
-    </div>
-    ` : ''}
-    <div class="grid-sidebar">
-      <div>
-        <div class="video-grid" id="vc-video-grid">
-          <div class="video-tile local" id="vc-tile-local" style="border:2px solid var(--accent);">
-            <video id="vc-local-video" autoplay muted playsinline></video>
-            <div class="participant-info">${userName} (You)${isRoomHost ? ' <span class="vc-host-badge">HOST</span>' : ''}</div>
-          </div>
+    <div class="vc-conference-wrapper">
+      <div class="vc-conference-header">
+        <div style="display:flex;align-items:center;gap:12px;">
+          <button class="btn btn-secondary btn-sm" onclick="exitVideoRoom('${role}')">&#8592; Exit Meeting</button>
+          <h3 style="font-family:'Playfair Display',serif;font-size:16px;margin:0;">${title}</h3>
+          <span class="badge badge-red"><span class="live-dot"></span>&nbsp;LIVE</span>
         </div>
-        <div class="video-controls" style="margin-top:12px;">
-          <button class="vc-btn active" id="vc-mic-btn" onclick="vcToggleMic()" title="Microphone">&#x1F3A4;</button>
-          <button class="vc-btn active" id="vc-cam-btn" onclick="vcToggleCam()" title="Camera">&#x1F4F9;</button>
-          <button class="vc-btn" id="vc-screen-btn" onclick="vcToggleScreen()" title="Screen Share${!showHostControls ? ' (requires host permission)' : ''}" ${!showHostControls ? 'style="opacity:0.5;"' : ''}>&#x1F5A5;&#xFE0F;</button>
-          ${role==='student'
-            ? `<button class="vc-btn" id="vc-hand-btn" onclick="vcToggleHand()" title="Raise Hand">&#x270B;</button>`
-            : showHostControls
-              ? `<button class="vc-btn" id="vc-rec-btn" onclick="vcToggleRecord()" title="Record Session">&#x23FA;&#xFE0F;</button>`
-              : `<button class="vc-btn" id="vc-rec-btn" onclick="vcToggleRecord()" title="Record Session (requires host permission)" style="opacity:0.5;">&#x23FA;&#xFE0F;</button>`}
-          <button class="vc-btn danger" onclick="exitVideoRoom('${role}')" title="Leave Call">&#x1F4DE;</button>
-          ${showHostControls
-            ? `<button class="vc-btn danger vc-end-all-btn" onclick="vcEndMeetingForAll()" title="End Meeting for All" style="font-size:11px;width:auto;border-radius:8px;padding:8px 14px;">End All</button>`
-            : ''}
+        <div style="display:flex;align-items:center;gap:12px;">
+          <div class="vc-view-toggle">
+            <button class="vc-view-btn" id="vc-view-hostonly" onclick="vcSetViewMode('host-only')" title="Host screen only">Host Only</button>
+            <button class="vc-view-btn active" id="vc-view-fullscreen" onclick="vcSetViewMode('fullscreen')" title="Full screen conference">Full Screen</button>
+            <button class="vc-view-btn" id="vc-view-gallery" onclick="vcSetViewMode('gallery')" title="Gallery view with sidebar">Gallery</button>
+          </div>
+          <div style="font-family:monospace;font-size:12px;color:var(--accent);background:var(--accent-dim);padding:3px 10px;border-radius:6px;cursor:pointer;" onclick="vcCopyCode()" title="Click to copy room code">Room: ${currentRoomCode}</div>
+          <div id="vc-rec-indicator" class="vc-rec-indicator" style="display:none;"><span class="vc-rec-dot"></span><span id="vc-rec-timer">REC 00:00</span></div>
+          <div style="font-size:13px;color:var(--text-muted);" id="vTimer-${role}">00:00:00</div>
         </div>
       </div>
-      <div>
-        <div class="chat-panel">
-          <h4 style="font-size:14px;margin-bottom:12px;font-family:'Playfair Display',serif;">Class Chat</h4>
-          <div class="chat-messages" id="chatMsgs-${role}">
-            <div class="chat-msg"><div class="sender" style="color:var(--text-muted);">System</div><div class="text">Connected to room ${currentRoomCode}. Share this code with participants.</div></div>
+      ${showHostControls ? `
+      <div id="vc-host-bar" style="display:flex;align-items:center;gap:8px;padding:8px 16px;background:rgba(240,165,0,0.06);border-bottom:1px solid rgba(240,165,0,0.15);flex-wrap:wrap;flex-shrink:0;">
+        <span style="font-size:11px;font-weight:700;color:var(--accent);margin-right:4px;">HOST CONTROLS:</span>
+        <button class="vc-host-btn warning" onclick="vcMuteAll()" title="Mute all participants">&#x1F507; Mute All</button>
+        <button class="vc-host-btn" onclick="vcTakeScreenshot()" title="Take meeting screenshot">&#x1F4F8; Screenshot</button>
+        <span style="font-size:10px;color:var(--text-muted);margin-left:8px;">PERMISSIONS:</span>
+        <button class="vc-host-btn" id="vc-perm-screen-btn" onclick="vcToggleScreenSharePermission()" title="Allow/deny participant screen sharing" style="font-size:10px;">&#x1F5A5;&#xFE0F; Screen: OFF</button>
+        <button class="vc-host-btn" id="vc-perm-rec-btn" onclick="vcToggleRecordingPermission()" title="Allow/deny participant recording" style="font-size:10px;">&#x23FA;&#xFE0F; Record: OFF</button>
+      </div>
+      ` : ''}
+      <div class="vc-conference-body">
+        <div class="vc-main-video-area">
+          <div class="video-grid" id="vc-video-grid">
+            <div class="video-tile local" id="vc-tile-local" style="border:2px solid var(--accent);">
+              <video id="vc-local-video" autoplay muted playsinline></video>
+              <div class="participant-info">${userName} (You)${isRoomHost ? ' <span class="vc-host-badge">HOST</span>' : ''}</div>
+            </div>
           </div>
-          <div class="chat-input-row">
-            <input type="text" class="form-control" placeholder="Type a message..." id="chatIn-${role}" onkeyup="if(event.key==='Enter')sendChatMsg('${role}','${userName}')">
-            <button class="btn btn-primary btn-sm" onclick="sendChatMsg('${role}','${userName}')">Send</button>
+          <div class="video-controls">
+            <button class="vc-btn active" id="vc-mic-btn" onclick="vcToggleMic()" title="Microphone">&#x1F3A4;</button>
+            <button class="vc-btn active" id="vc-cam-btn" onclick="vcToggleCam()" title="Camera">&#x1F4F9;</button>
+            <button class="vc-btn" id="vc-screen-btn" onclick="vcToggleScreen()" title="Screen Share${!showHostControls ? ' (requires host permission)' : ''}" ${!showHostControls ? 'style="opacity:0.5;"' : ''}>&#x1F5A5;&#xFE0F;</button>
+            ${role==='student'
+              ? `<button class="vc-btn" id="vc-hand-btn" onclick="vcToggleHand()" title="Raise Hand">&#x270B;</button>`
+              : showHostControls
+                ? `<button class="vc-btn" id="vc-rec-btn" onclick="vcToggleRecord()" title="Record Session">&#x23FA;&#xFE0F;</button>`
+                : `<button class="vc-btn" id="vc-rec-btn" onclick="vcToggleRecord()" title="Record Session (requires host permission)" style="opacity:0.5;">&#x23FA;&#xFE0F;</button>`}
+            <button class="vc-btn danger" onclick="exitVideoRoom('${role}')" title="Leave Call">&#x1F4DE;</button>
+            ${showHostControls
+              ? `<button class="vc-btn danger vc-end-all-btn" onclick="vcEndMeetingForAll()" title="End Meeting for All" style="font-size:11px;width:auto;border-radius:8px;padding:8px 14px;">End All</button>`
+              : ''}
           </div>
         </div>
-        <div class="card" style="margin-top:12px;padding:14px;">
-          <h4 style="font-size:13px;margin-bottom:10px;" id="vc-part-title">Participants (1)</h4>
-          <div id="vc-part-list"></div>
+        <div class="vc-side-panel">
+          <div class="chat-panel">
+            <h4 style="font-size:14px;margin-bottom:12px;font-family:'Playfair Display',serif;">Class Chat</h4>
+            <div class="chat-messages" id="chatMsgs-${role}">
+              <div class="chat-msg"><div class="sender" style="color:var(--text-muted);">System</div><div class="text">Connected to room ${currentRoomCode}. Share this code with participants.</div></div>
+            </div>
+            <div class="chat-input-row">
+              <input type="text" class="form-control" placeholder="Type a message..." id="chatIn-${role}" onkeyup="if(event.key==='Enter')sendChatMsg('${role}','${userName}')">
+              <button class="btn btn-primary btn-sm" onclick="sendChatMsg('${role}','${userName}')">Send</button>
+            </div>
+          </div>
+          <div class="card" style="margin-top:0;padding:14px;border-top:1px solid var(--border);">
+            <h4 style="font-size:13px;margin-bottom:10px;" id="vc-part-title">Participants (1)</h4>
+            <div id="vc-part-list"></div>
+          </div>
         </div>
       </div>
     </div>
@@ -8923,6 +8998,36 @@ function vcShowConference(title, role) {
     var el = document.getElementById('vTimer-'+vcCurrentRole);
     if(el) el.textContent = String(h).padStart(2,'0')+':'+String(m).padStart(2,'0')+':'+String(sc).padStart(2,'0');
   }, 1000);
+}
+
+// ── View Mode Management ──
+var vcCurrentViewMode = 'fullscreen'; // 'host-only', 'fullscreen', 'gallery'
+
+function vcSetViewMode(mode) {
+  vcCurrentViewMode = mode;
+  var body = document.body;
+
+  // Update toggle button states
+  var btns = document.querySelectorAll('.vc-view-btn');
+  btns.forEach(function(b){ b.classList.remove('active'); });
+  var activeBtn = document.getElementById('vc-view-' + mode.replace('-',''));
+  if(!activeBtn) activeBtn = document.getElementById('vc-view-' + mode);
+  if(activeBtn) activeBtn.classList.add('active');
+
+  // Reset mode classes
+  body.classList.remove('vc-host-only-mode');
+
+  if(mode === 'host-only') {
+    // Host screen only - fullscreen stays on, hide everything except host video
+    body.classList.add('vc-fullscreen-mode');
+    body.classList.add('vc-host-only-mode');
+  } else if(mode === 'fullscreen') {
+    // Full screen conference - like the Zoom reference image
+    body.classList.add('vc-fullscreen-mode');
+  } else if(mode === 'gallery') {
+    // Gallery mode - restore sidebar, topbar, show everything
+    body.classList.remove('vc-fullscreen-mode');
+  }
 }
 
 // ── Video Grid Management ──
@@ -8987,11 +9092,18 @@ function vcAddVideo(peerId, stream, name) {
   // Host-focus mode: participants only see the host's video + their own local tile.
   // The host peer ID always ends with '-host'. Non-host peers are hidden.
   var isPeerHost = peerId.endsWith('-host');
+
+  // Always mark host tiles for priority display and host-only view mode
+  if (isPeerHost) {
+    tile.classList.add('host-tile');
+    // Host priority: move host tile to first position in grid
+    if (grid.firstChild) {
+      grid.insertBefore(tile, grid.firstChild);
+    }
+  }
+
   if (!isRoomHost) {
-    if (isPeerHost) {
-      // This is the host tile — mark it for CSS styling
-      tile.classList.add('host-tile');
-    } else {
+    if (!isPeerHost) {
       // This is another participant — hide it (participants only see host + self)
       tile.style.display = 'none';
       tile.dataset.hiddenByHostView = '1';
@@ -9892,6 +10004,10 @@ function vcEndMeetingForAll() {
 
 // ── Exit / Cleanup ──
 function exitVideoRoom(role) {
+  // Restore normal layout - exit fullscreen conference mode
+  document.body.classList.remove('vc-fullscreen-mode', 'vc-host-only-mode', 'vc-is-host');
+  vcCurrentViewMode = 'fullscreen';
+
   // Stop recording if active
   if(vcIsRecording && vcMediaRecorder && vcMediaRecorder.state !== 'inactive') {
     vcMediaRecorder.stop();
