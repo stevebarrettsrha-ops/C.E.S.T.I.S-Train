@@ -18484,6 +18484,72 @@ function lmsChatBack(prefix) {
 }
 
 // ============================================
+// MEDIA PERMISSION HELPERS
+// ============================================
+async function lmsChatCheckMediaPermission(kind) {
+  // kind: 'camera' or 'microphone'
+  if(navigator.permissions && navigator.permissions.query) {
+    try {
+      var result = await navigator.permissions.query({name: kind});
+      return result.state; // 'granted', 'denied', or 'prompt'
+    } catch(e) { return 'prompt'; } // browser doesn't support querying this permission
+  }
+  return 'prompt'; // assume prompt if Permissions API not available
+}
+
+function lmsChatShowPermissionHelp(overlay, callType, roomId) {
+  var isVideo = callType === 'video';
+  var statusEl = document.getElementById('lmsCallStatus');
+  if(statusEl) {
+    statusEl.innerHTML =
+      '<div style="color:#f59e0b;font-size:14px;font-weight:600;">' + (isVideo ? 'Camera/microphone' : 'Microphone') + ' access is blocked</div>' +
+      '<div style="font-size:12px;color:var(--text-muted);margin-top:6px;line-height:1.5;">' +
+        'Your browser has blocked media access.<br>' +
+        'Click the <span style="display:inline-block;width:16px;height:16px;border:1px solid #888;border-radius:3px;text-align:center;line-height:16px;font-size:10px;vertical-align:middle;">&#128274;</span> icon in your address bar<br>' +
+        'and allow ' + (isVideo ? 'camera and microphone' : 'microphone') + ' access, then retry.' +
+      '</div>';
+  }
+  // Add retry button to controls
+  var controls = overlay.querySelector('.call-controls');
+  if(controls) {
+    var retryBtn = document.createElement('button');
+    retryBtn.className = 'call-btn';
+    retryBtn.style.cssText = 'background:#2563eb;color:#fff;font-size:13px;padding:10px 20px;border-radius:24px;';
+    retryBtn.innerHTML = '&#x1F504; Retry';
+    retryBtn.onclick = function() {
+      if(roomId) { lmsChatJoinCall(roomId, callType); }
+      else { lmsChatInitiateCall(callType); }
+    };
+    controls.insertBefore(retryBtn, controls.firstChild);
+  }
+}
+
+async function lmsChatRequestMedia(constraints, callType, overlay, roomId) {
+  var isVideo = callType === 'video';
+  try {
+    var stream = await navigator.mediaDevices.getUserMedia(constraints);
+    return stream;
+  } catch(err) {
+    console.warn('getUserMedia failed:', err.name, err.message);
+    // If video+audio failed, try audio-only as fallback
+    if(isVideo && constraints.video) {
+      try {
+        var audioStream = await navigator.mediaDevices.getUserMedia({audio: true, video: false});
+        showToast('Camera unavailable — connected with audio only');
+        var statusEl = document.getElementById('lmsCallStatus');
+        if(statusEl) statusEl.textContent = 'LMS Video Call - Audio Only';
+        return audioStream;
+      } catch(e2) {
+        // Both failed
+      }
+    }
+    // Show permission help
+    lmsChatShowPermissionHelp(overlay, callType, roomId);
+    return null;
+  }
+}
+
+// ============================================
 // VOICE CALLS
 // ============================================
 function lmsChatStartVoiceCall() {
@@ -18504,12 +18570,20 @@ function lmsChatToggleMute() {
 }
 
 // ── Unified call initiation (voice or video) ──
-function lmsChatInitiateCall(callType) {
+async function lmsChatInitiateCall(callType) {
   if(!lmsChatActiveRoom) return;
   var room = lmsChatRooms.find(function(r){ return r.id === lmsChatActiveRoom; });
   if(!room) return;
   var user = lmsChatGetCurrentUser();
   var isVideo = callType === 'video';
+
+  // Check permission status before opening overlay
+  var permKind = isVideo ? 'camera' : 'microphone';
+  var permState = await lmsChatCheckMediaPermission(permKind);
+  if(permState === 'denied') {
+    // Permission permanently blocked — show guidance immediately
+    showToast('Browser has blocked ' + permKind + ' access. Click the lock icon in the address bar to allow it, then try again.');
+  }
 
   // Set active call on the room so other users can see it
   room.activeCall = {
@@ -18539,7 +18613,7 @@ function lmsChatInitiateCall(callType) {
         '<div class="video-tile"><video id="lmsLocalVideo" autoplay muted playsinline></video><div class="tile-name">You</div></div>' +
       '</div>' +
       '<div class="call-name" style="margin-top:16px;">'+room.name+' - LMS Video Call</div>' +
-      '<div class="call-status" id="lmsCallStatus">Connecting camera...</div>' +
+      '<div class="call-status" id="lmsCallStatus">Requesting ' + (isVideo ? 'camera' : 'microphone') + ' access...</div>' +
       '<div class="call-timer" id="lmsCallTimer">00:00</div>' +
       '<div class="call-participants" id="lmsCallParticipants"></div>' +
       '<div class="call-controls">' +
@@ -18551,7 +18625,7 @@ function lmsChatInitiateCall(callType) {
     overlay.innerHTML =
       '<div class="call-avatar" style="background:'+room.color+'22;color:'+room.color+';">'+room.icon+'</div>' +
       '<div class="call-name">'+room.name+'</div>' +
-      '<div class="call-status" id="lmsCallStatus">LMS Voice Call - Connecting...</div>' +
+      '<div class="call-status" id="lmsCallStatus">Requesting microphone access...</div>' +
       '<div class="call-timer" id="lmsCallTimer">00:00</div>' +
       '<div class="call-participants" id="lmsCallParticipants"></div>' +
       '<div class="call-controls">' +
@@ -18563,48 +18637,50 @@ function lmsChatInitiateCall(callType) {
   overlay.classList.add('active');
 
   var mediaConstraints = isVideo ? {audio:true, video:true} : {audio:true};
-  navigator.mediaDevices.getUserMedia(mediaConstraints).then(function(stream) {
-    lmsChatLocalStream = stream;
-    if(isVideo) {
-      var vid = document.getElementById('lmsLocalVideo');
-      if(vid) vid.srcObject = stream;
-    }
-    document.getElementById('lmsCallStatus').textContent = (isVideo ? 'LMS Video Call' : 'LMS Voice Call') + ' - Connected';
+  var stream = await lmsChatRequestMedia(mediaConstraints, callType, overlay, null);
 
-    lmsChatCallTimer = setInterval(function() {
-      lmsChatCallSeconds++;
-      var m = Math.floor(lmsChatCallSeconds/60).toString().padStart(2,'0');
-      var s = (lmsChatCallSeconds%60).toString().padStart(2,'0');
-      var el = document.getElementById('lmsCallTimer');
-      if(el) el.textContent = m+':'+s;
-    }, 1000);
-
-    // Log call message
-    var msg = {
-      id:'msg-'+Date.now(), roomId:lmsChatActiveRoom, senderId:user.id, senderName:user.name,
-      text:user.name+' started a '+ callType +' call', type:'call', callType:callType,
-      timestamp:new Date().toISOString(), readBy:[user.id]
-    };
-    if(!lmsChatMessages[lmsChatActiveRoom]) lmsChatMessages[lmsChatActiveRoom] = [];
-    lmsChatMessages[lmsChatActiveRoom].push(msg);
-
-    // Notify all room members
-    lmsChatNotifyCallMembers(room, user, callType);
-
-    saveLmsChatData();
-    if(typeof lmsChatSyncToDrive === 'function') lmsChatSyncToDrive();
-
-    var prefix = lmsChatGetRolePrefix();
-    lmsChatRenderMessages(prefix);
-    lmsChatRenderRoomList(prefix);
-    lmsChatUpdateCallParticipantsUI(room);
-  }).catch(function(err) {
-    document.getElementById('lmsCallStatus').textContent = (isVideo ? 'Camera/microphone' : 'Microphone') + ' access denied';
-    console.error(callType + ' call error:', err);
-    // Clear active call on failure
+  if(!stream) {
+    // Media request failed — permission help already shown by lmsChatRequestMedia
+    console.error(callType + ' call error: media access denied');
     delete room.activeCall;
     lmsChatCallState = null;
-  });
+    return;
+  }
+
+  lmsChatLocalStream = stream;
+  if(isVideo) {
+    var vid = document.getElementById('lmsLocalVideo');
+    if(vid) vid.srcObject = stream;
+  }
+  document.getElementById('lmsCallStatus').textContent = (isVideo ? 'LMS Video Call' : 'LMS Voice Call') + ' - Connected';
+
+  lmsChatCallTimer = setInterval(function() {
+    lmsChatCallSeconds++;
+    var m = Math.floor(lmsChatCallSeconds/60).toString().padStart(2,'0');
+    var s = (lmsChatCallSeconds%60).toString().padStart(2,'0');
+    var el = document.getElementById('lmsCallTimer');
+    if(el) el.textContent = m+':'+s;
+  }, 1000);
+
+  // Log call message
+  var msg = {
+    id:'msg-'+Date.now(), roomId:lmsChatActiveRoom, senderId:user.id, senderName:user.name,
+    text:user.name+' started a '+ callType +' call', type:'call', callType:callType,
+    timestamp:new Date().toISOString(), readBy:[user.id]
+  };
+  if(!lmsChatMessages[lmsChatActiveRoom]) lmsChatMessages[lmsChatActiveRoom] = [];
+  lmsChatMessages[lmsChatActiveRoom].push(msg);
+
+  // Notify all room members
+  lmsChatNotifyCallMembers(room, user, callType);
+
+  saveLmsChatData();
+  if(typeof lmsChatSyncToDrive === 'function') lmsChatSyncToDrive();
+
+  var prefix = lmsChatGetRolePrefix();
+  lmsChatRenderMessages(prefix);
+  lmsChatRenderRoomList(prefix);
+  lmsChatUpdateCallParticipantsUI(room);
 }
 
 // ── Notify room members about the call ──
@@ -18677,7 +18753,7 @@ function lmsChatDismissIncomingCall() {
 // ── Join an active call from the banner ──
 var lmsChatCallRoomId = null;
 
-function lmsChatJoinCall(roomId, callType) {
+async function lmsChatJoinCall(roomId, callType) {
   lmsChatDismissIncomingCall();
 
   var room = lmsChatRooms.find(function(r){ return r.id === roomId; });
@@ -18696,8 +18772,15 @@ function lmsChatJoinCall(roomId, callType) {
     lmsChatOpenRoom(roomId, prefix);
   }
 
-  // Now start the call UI
+  // Check permission status
   var isVideo = callType === 'video';
+  var permKind = isVideo ? 'camera' : 'microphone';
+  var permState = await lmsChatCheckMediaPermission(permKind);
+  if(permState === 'denied') {
+    showToast('Browser has blocked ' + permKind + ' access. Click the lock icon in the address bar to allow it, then try again.');
+  }
+
+  // Now start the call UI
   var overlay = document.getElementById('lmsChatCallOverlay');
   if(!overlay) {
     overlay = document.createElement('div');
@@ -18716,7 +18799,7 @@ function lmsChatJoinCall(roomId, callType) {
         '<div class="video-tile"><video id="lmsLocalVideo" autoplay muted playsinline></video><div class="tile-name">You</div></div>' +
       '</div>' +
       '<div class="call-name" style="margin-top:16px;">'+room.name+' - LMS Video Call</div>' +
-      '<div class="call-status" id="lmsCallStatus">Joining call...</div>' +
+      '<div class="call-status" id="lmsCallStatus">Requesting ' + (isVideo ? 'camera' : 'microphone') + ' access...</div>' +
       '<div class="call-timer" id="lmsCallTimer">00:00</div>' +
       '<div class="call-participants" id="lmsCallParticipants"></div>' +
       '<div class="call-controls">' +
@@ -18728,7 +18811,7 @@ function lmsChatJoinCall(roomId, callType) {
     overlay.innerHTML =
       '<div class="call-avatar" style="background:'+room.color+'22;color:'+room.color+';">'+room.icon+'</div>' +
       '<div class="call-name">'+room.name+'</div>' +
-      '<div class="call-status" id="lmsCallStatus">Joining call...</div>' +
+      '<div class="call-status" id="lmsCallStatus">Requesting microphone access...</div>' +
       '<div class="call-timer" id="lmsCallTimer">00:00</div>' +
       '<div class="call-participants" id="lmsCallParticipants"></div>' +
       '<div class="call-controls">' +
@@ -18740,40 +18823,42 @@ function lmsChatJoinCall(roomId, callType) {
   overlay.classList.add('active');
 
   var mediaConstraints = isVideo ? {audio:true, video:true} : {audio:true};
-  navigator.mediaDevices.getUserMedia(mediaConstraints).then(function(stream) {
-    lmsChatLocalStream = stream;
-    if(isVideo) {
-      var vid = document.getElementById('lmsLocalVideo');
-      if(vid) vid.srcObject = stream;
-    }
-    document.getElementById('lmsCallStatus').textContent = (isVideo ? 'LMS Video Call' : 'LMS Voice Call') + ' - Connected';
+  var stream = await lmsChatRequestMedia(mediaConstraints, callType, overlay, roomId);
 
-    lmsChatCallTimer = setInterval(function() {
-      lmsChatCallSeconds++;
-      var m = Math.floor(lmsChatCallSeconds/60).toString().padStart(2,'0');
-      var s = (lmsChatCallSeconds%60).toString().padStart(2,'0');
-      var el = document.getElementById('lmsCallTimer');
-      if(el) el.textContent = m+':'+s;
-    }, 1000);
-
-    // Log join message
-    var joinMsg = {
-      id:'msg-'+Date.now(), roomId:roomId, senderId:user.id, senderName:user.name,
-      text:user.name+' joined the '+callType+' call', type:'call', timestamp:new Date().toISOString(), readBy:[user.id]
-    };
-    if(!lmsChatMessages[roomId]) lmsChatMessages[roomId] = [];
-    lmsChatMessages[roomId].push(joinMsg);
-    saveLmsChatData();
-    if(typeof lmsChatSyncToDrive === 'function') lmsChatSyncToDrive();
-
-    var prefix = lmsChatGetRolePrefix();
-    lmsChatRenderMessages(prefix);
-    lmsChatRenderRoomList(prefix);
-    lmsChatUpdateCallParticipantsUI(room);
-  }).catch(function(err) {
-    document.getElementById('lmsCallStatus').textContent = 'Media access denied';
+  if(!stream) {
     lmsChatCallState = null;
-  });
+    return;
+  }
+
+  lmsChatLocalStream = stream;
+  if(isVideo) {
+    var vid = document.getElementById('lmsLocalVideo');
+    if(vid) vid.srcObject = stream;
+  }
+  document.getElementById('lmsCallStatus').textContent = (isVideo ? 'LMS Video Call' : 'LMS Voice Call') + ' - Connected';
+
+  lmsChatCallTimer = setInterval(function() {
+    lmsChatCallSeconds++;
+    var m = Math.floor(lmsChatCallSeconds/60).toString().padStart(2,'0');
+    var s = (lmsChatCallSeconds%60).toString().padStart(2,'0');
+    var el = document.getElementById('lmsCallTimer');
+    if(el) el.textContent = m+':'+s;
+  }, 1000);
+
+  // Log join message
+  var joinMsg = {
+    id:'msg-'+Date.now(), roomId:roomId, senderId:user.id, senderName:user.name,
+    text:user.name+' joined the '+callType+' call', type:'call', timestamp:new Date().toISOString(), readBy:[user.id]
+  };
+  if(!lmsChatMessages[roomId]) lmsChatMessages[roomId] = [];
+  lmsChatMessages[roomId].push(joinMsg);
+  saveLmsChatData();
+  if(typeof lmsChatSyncToDrive === 'function') lmsChatSyncToDrive();
+
+  var prefix = lmsChatGetRolePrefix();
+  lmsChatRenderMessages(prefix);
+  lmsChatRenderRoomList(prefix);
+  lmsChatUpdateCallParticipantsUI(room);
 }
 
 // ── Update participants display in call overlay ──
