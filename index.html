@@ -7165,7 +7165,6 @@ function buildAdminPages() {
       <button class="btn btn-primary" onclick="openModal('driveUploadModal')">+ Upload Resource to Drive</button>
       <select class="form-control" id="arFilterCourse" style="width:220px;" onchange="renderAdminResources()">
         <option value="all">All Programmes</option>
-        ${courses.map(c => '<option value="'+c+'">'+c+'</option>').join('')}
       </select>
       <select class="form-control" id="arFilterType" style="width:180px;" onchange="renderAdminResources()">
         <option value="all">All Types</option>
@@ -10784,8 +10783,11 @@ function generateResourceId() {
     origOpen(id);
     if (id === 'driveUploadModal') {
       const sel = document.getElementById('driveResCourse');
-      if (sel && sel.options.length <= 1) {
-        courses.forEach(c => { const o = document.createElement('option'); o.value = c; o.textContent = c; sel.appendChild(o); });
+      if (sel) {
+        var currentVal = sel.value;
+        sel.innerHTML = '<option value="">— Select Programme —</option>';
+        getCourseList().forEach(function(c) { var o = document.createElement('option'); o.value = c; o.textContent = c; sel.appendChild(o); });
+        if(currentVal) sel.value = currentVal;
       }
       document.getElementById('driveResId').value = generateResourceId();
       _driveSelectedFile = null;
@@ -10989,6 +10991,15 @@ async function uploadResourceToDrive() {
 function renderAdminResources() {
   const container = document.getElementById('adminResourcesList');
   if (!container) return;
+
+  // Dynamically populate course filter from current skillAreas
+  var courseSel = document.getElementById('arFilterCourse');
+  if(courseSel) {
+    var currentVal = courseSel.value || 'all';
+    var freshCourses = getCourseList();
+    courseSel.innerHTML = '<option value="all">All Programmes</option>' + freshCourses.map(function(c){ return '<option value="'+c+'">'+c+'</option>'; }).join('');
+    courseSel.value = currentVal;
+  }
 
   const filterCourse = document.getElementById('arFilterCourse')?.value || 'all';
   const filterType = document.getElementById('arFilterType')?.value || 'all';
@@ -11832,12 +11843,22 @@ function populateCourseDropdowns() {
     sel.innerHTML = '<option value="">— Select Programme —</option>' + courses.map(function(c) { return '<option>' + c + '</option>'; }).join('');
     if(prev) sel.value = prev;
   });
-  // Also refresh the filter dropdown if it exists
-  var filterCourse = document.getElementById('filterCourse');
-  if(filterCourse) {
-    var prevFilter = filterCourse.value;
-    filterCourse.innerHTML = '<option value="all">All Courses</option>' + courses.map(function(c) { return '<option>' + c + '</option>'; }).join('');
-    if(prevFilter) filterCourse.value = prevFilter;
+  // Also refresh the filter dropdowns if they exist
+  var filterLabels = {arFilterCourse:'All Programmes'};
+  ['filterCourse','arFilterCourse','attendanceCourseFilter','asStudentCourse'].forEach(function(filterId) {
+    var el = document.getElementById(filterId);
+    if(!el) return;
+    var prev = el.value;
+    var label = filterLabels[filterId] || 'All Courses';
+    el.innerHTML = '<option value="all">'+label+'</option>' + courses.map(function(c) { return '<option value="'+c+'">'+c+'</option>'; }).join('');
+    if(prev) el.value = prev;
+  });
+  // Refresh the resource upload modal course dropdown
+  var driveResSel = document.getElementById('driveResCourse');
+  if(driveResSel) {
+    var prevDrive = driveResSel.value;
+    driveResSel.innerHTML = '<option value="">— Select Programme —</option>' + courses.map(function(c) { return '<option value="'+c+'">'+c+'</option>'; }).join('');
+    if(prevDrive) driveResSel.value = prevDrive;
   }
   // Also refresh the cert template skill area dropdown
   if(typeof populateCertTemplateSkillSelect === 'function') populateCertTemplateSkillSelect();
@@ -24237,12 +24258,13 @@ function renderCertDownloadMgmt() {
   var filter = document.getElementById('certDlFilter')?.value || 'all';
   var courseFilter = document.getElementById('certDlCourseFilter')?.value || 'all';
 
-  // Populate course filter dropdown
+  // Populate course filter dropdown from current data
   var courseSelect = document.getElementById('certDlCourseFilter');
-  if(courseSelect && courseSelect.options.length <= 1) {
+  if(courseSelect) {
     var coursesUsed = [];
     students.forEach(function(s){ if(s.certNo && coursesUsed.indexOf(s.course) === -1) coursesUsed.push(s.course); });
-    coursesUsed.sort().forEach(function(c){ courseSelect.innerHTML += '<option value="' + c + '">' + c + '</option>'; });
+    courseSelect.innerHTML = '<option value="all">All Programmes</option>' + coursesUsed.sort().map(function(c){ return '<option value="' + c + '">' + c + '</option>'; }).join('');
+    courseSelect.value = courseFilter;
   }
 
   var certified = students.filter(function(s){ return s.certNo; });
