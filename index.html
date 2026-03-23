@@ -1942,6 +1942,8 @@ textarea.form-control { resize:vertical; min-height:80px; }
 .vc-host-btn.danger:hover { background:rgba(231,76,60,0.15); }
 .vc-host-btn.warning { border-color:rgba(240,165,0,0.3); color:var(--accent); }
 .vc-host-btn.warning:hover { background:rgba(240,165,0,0.15); }
+.vc-host-btn.active { border-color:rgba(46,204,113,0.4); color:var(--green); background:rgba(46,204,113,0.1); }
+.vc-host-btn.active:hover { background:rgba(46,204,113,0.2); }
 .vc-participant-item {
   display:flex; align-items:center; gap:8px; padding:8px 10px;
   border:1px solid var(--border); border-radius:var(--radius-sm);
@@ -4088,6 +4090,7 @@ let peerRoles = {}; // track roles: {peerId: 'student'|'instructor'|'admin'}
 let mutedPeers = {}; // track muted peers: {peerId: true}
 let vcCoHosts = {}; // track co-hosts: {peerId: true}
 let vcScreenSharingPeerId = null; // peerId currently sharing screen, or null
+let vcHostPermissions = { screenShare: false, recording: false }; // host-granted permissions for participants
 let calendarMonth = 1;
 let calendarYear = 2026;
 let selectedCalendarDay = null;
@@ -6084,6 +6087,7 @@ function vcCleanupMediaIfNeeded() {
   });
   peerConnections = {}; dataConnections = {}; peerNames = {};
   peerRoles = {}; mutedPeers = {}; vcCoHosts = {};
+  vcHostPermissions = { screenShare: false, recording: false };
   if(rtcPeer) { rtcPeer.destroy(); rtcPeer = null; }
   if(vcRecordingAudioCtx) { try { vcRecordingAudioCtx.close(); } catch(e){} vcRecordingAudioCtx = null; }
   if(vcIsRecording && vcMediaRecorder && vcMediaRecorder.state !== 'inactive') { vcMediaRecorder.stop(); }
@@ -8272,17 +8276,20 @@ function enterVideoRoom(title, role) {
 
 async function vcStartCameraPreview() {
   try {
-    localStream = await navigator.mediaDevices.getUserMedia({video:true, audio:true});
+    localStream = await navigator.mediaDevices.getUserMedia({video:{width:{ideal:1280},height:{ideal:720},facingMode:'user'}, audio:{echoCancellation:true,noiseSuppression:true,autoGainControl:true}});
     const vid = document.getElementById('vc-preview');
-    if(vid) { vid.srcObject = localStream; }
+    if(vid) { vid.srcObject = localStream; vid.muted = true; vid.play().catch(function(){}); }
     const ph = document.getElementById('vc-preview-ph');
     if(ph) ph.style.display = 'none';
   } catch(err) {
     console.warn('Camera not available:', err);
     const ph = document.getElementById('vc-preview-ph');
     if(ph) ph.innerHTML = '<div style="text-align:center;color:var(--text-muted);"><div style="font-size:48px;margin-bottom:8px;">&#x1F6AB;</div><div>Camera not available</div><div style="font-size:11px;margin-top:4px;">You can still join with audio only</div></div>';
-    try { localStream = await navigator.mediaDevices.getUserMedia({video:false, audio:true}); }
-    catch(e) { localStream = null; }
+    try { localStream = await navigator.mediaDevices.getUserMedia({video:false, audio:{echoCancellation:true,noiseSuppression:true,autoGainControl:true}}); }
+    catch(e) {
+      console.warn('Audio also not available:', e);
+      localStream = null;
+    }
   }
 }
 
@@ -8314,7 +8321,7 @@ async function vcCreateRoom(title, role) {
 
   try {
     rtcPeer = new Peer('cestis-' + currentRoomCode + '-host', {
-      config: { iceServers: [{urls:'stun:stun.l.google.com:19302'},{urls:'stun:stun1.l.google.com:19302'}] }
+      config: { iceServers: [{urls:'stun:stun.l.google.com:19302'},{urls:'stun:stun1.l.google.com:19302'},{urls:'turn:openrelay.metered.ca:80',username:'openrelayproject',credential:'openrelayproject'},{urls:'turn:openrelay.metered.ca:443',username:'openrelayproject',credential:'openrelayproject'}] }
     });
 
     rtcPeer.on('open', function() {
@@ -8322,7 +8329,7 @@ async function vcCreateRoom(title, role) {
     });
 
     rtcPeer.on('call', function(call) {
-      if(localStream) call.answer(localStream); else call.answer();
+      call.answer(localStream || new MediaStream());
       call.on('stream', function(rs) {
         var pid = call.peer;
         if(!peerConnections[pid]) peerConnections[pid] = {};
@@ -8331,6 +8338,7 @@ async function vcCreateRoom(title, role) {
         vcAddVideo(pid, rs, peerNames[pid] || 'Participant');
       });
       call.on('close', function() { vcRemoveVideo(call.peer); });
+      call.on('error', function(err) { console.warn('Incoming call error:', err); });
     });
 
     rtcPeer.on('connection', function(conn) { vcHandleDataConn(conn); });
@@ -8354,7 +8362,7 @@ async function vcRejoinRoom(title, role) {
 
   try {
     rtcPeer = new Peer('cestis-' + currentRoomCode + '-host', {
-      config: { iceServers: [{urls:'stun:stun.l.google.com:19302'},{urls:'stun:stun1.l.google.com:19302'}] }
+      config: { iceServers: [{urls:'stun:stun.l.google.com:19302'},{urls:'stun:stun1.l.google.com:19302'},{urls:'turn:openrelay.metered.ca:80',username:'openrelayproject',credential:'openrelayproject'},{urls:'turn:openrelay.metered.ca:443',username:'openrelayproject',credential:'openrelayproject'}] }
     });
 
     rtcPeer.on('open', function() {
@@ -8363,7 +8371,7 @@ async function vcRejoinRoom(title, role) {
     });
 
     rtcPeer.on('call', function(call) {
-      if(localStream) call.answer(localStream); else call.answer();
+      call.answer(localStream || new MediaStream());
       call.on('stream', function(rs) {
         var pid = call.peer;
         if(!peerConnections[pid]) peerConnections[pid] = {};
@@ -8372,6 +8380,7 @@ async function vcRejoinRoom(title, role) {
         vcAddVideo(pid, rs, peerNames[pid] || 'Participant');
       });
       call.on('close', function() { vcRemoveVideo(call.peer); });
+      call.on('error', function(err) { console.warn('Incoming call error:', err); });
     });
 
     rtcPeer.on('connection', function(conn) { vcHandleDataConn(conn); });
@@ -8400,7 +8409,7 @@ async function vcJoinRoom(title, role, codeOverride) {
 
   try {
     rtcPeer = new Peer('cestis-' + code + '-' + Math.random().toString(36).substr(2,6), {
-      config: { iceServers: [{urls:'stun:stun.l.google.com:19302'},{urls:'stun:stun1.l.google.com:19302'}] }
+      config: { iceServers: [{urls:'stun:stun.l.google.com:19302'},{urls:'stun:stun1.l.google.com:19302'},{urls:'turn:openrelay.metered.ca:80',username:'openrelayproject',credential:'openrelayproject'},{urls:'turn:openrelay.metered.ca:443',username:'openrelayproject',credential:'openrelayproject'}] }
     });
 
     rtcPeer.on('open', function() {
@@ -8423,9 +8432,10 @@ async function vcJoinRoom(title, role, codeOverride) {
       });
       conn.on('error', function() { vcUpdateStatus('error', 'Room not found. Check code and try again.'); });
 
-      // Media connection to host
-      if(localStream) {
-        var call = rtcPeer.call(hostId, localStream);
+      // Media connection to host — always establish even without camera/mic
+      var mediaStream = localStream || new MediaStream();
+      var call = rtcPeer.call(hostId, mediaStream);
+      if(call) {
         call.on('stream', function(rs) {
           if(!peerConnections[hostId]) peerConnections[hostId] = {};
           peerConnections[hostId].media = call;
@@ -8433,11 +8443,14 @@ async function vcJoinRoom(title, role, codeOverride) {
           vcAddVideo(hostId, rs, peerNames[hostId] || 'Host');
         });
         call.on('close', function() { vcRemoveVideo(hostId); });
+        call.on('error', function(err) {
+          console.warn('Media call to host failed:', err);
+        });
       }
     });
 
     rtcPeer.on('call', function(call) {
-      if(localStream) call.answer(localStream); else call.answer();
+      call.answer(localStream || new MediaStream());
       call.on('stream', function(rs) {
         var pid = call.peer;
         if(!peerConnections[pid]) peerConnections[pid] = {};
@@ -8446,6 +8459,7 @@ async function vcJoinRoom(title, role, codeOverride) {
         vcAddVideo(pid, rs, peerNames[pid] || 'Participant');
       });
       call.on('close', function() { vcRemoveVideo(call.peer); });
+      call.on('error', function(err) { console.warn('Incoming call error:', err); });
     });
 
     rtcPeer.on('connection', function(conn) { vcHandleDataConn(conn); });
@@ -8488,8 +8502,8 @@ function vcStartHostReconnect(code, hostId) {
         vcStartHostReconnect(code, hostId);
       });
       // Re-establish media connection
-      if(localStream) {
-        var call = rtcPeer.call(hostId, localStream);
+      {
+        var call = rtcPeer.call(hostId, localStream || new MediaStream());
         call.on('stream', function(rs) {
           if(!peerConnections[hostId]) peerConnections[hostId] = {};
           peerConnections[hostId].media = call;
@@ -8533,6 +8547,13 @@ function vcHandleDataConn(conn) {
       // so their view switches to screen-share mode right away.
       if(screenStream) {
         conn.send(JSON.stringify({type:'screen-share-started', peerId: rtcPeer ? rtcPeer.id : '', name: vcCurrentUserName}));
+      }
+      // Send current permissions to new joiner
+      if(vcHostPermissions.screenShare) {
+        conn.send(JSON.stringify({type:'permission-update', permission:'screenShare', granted:true}));
+      }
+      if(vcHostPermissions.recording) {
+        conn.send(JSON.stringify({type:'permission-update', permission:'recording', granted:true}));
       }
     }
 
@@ -8685,6 +8706,20 @@ function vcOnData(raw, fromId) {
       }
       vcExitScreenShareView();
       break;
+    case 'permission-update':
+      // Host grants/revokes permissions to participants
+      if(msg.permission === 'screenShare') {
+        vcHostPermissions.screenShare = !!msg.granted;
+        var screenBtn = document.getElementById('vc-screen-btn');
+        if(screenBtn) screenBtn.style.opacity = msg.granted ? '1' : '0.5';
+        showToast(msg.granted ? 'Host enabled screen sharing for participants' : 'Host disabled screen sharing for participants');
+      } else if(msg.permission === 'recording') {
+        vcHostPermissions.recording = !!msg.granted;
+        var recBtn = document.getElementById('vc-rec-btn');
+        if(recBtn) recBtn.style.opacity = msg.granted ? '1' : '0.5';
+        showToast(msg.granted ? 'Host enabled recording for participants' : 'Host disabled recording for participants');
+      }
+      break;
   }
 }
 
@@ -8711,10 +8746,10 @@ function vcConnectToPeer(peerId, name) {
 }
 
 function vcCallPeerWithRetry(peerId, name, attempt) {
-  if(!localStream || !rtcPeer || rtcPeer.destroyed) return;
+  if(!rtcPeer || rtcPeer.destroyed) return;
   if(attempt > 2) return; // max 3 attempts
 
-  var call = rtcPeer.call(peerId, localStream);
+  var call = rtcPeer.call(peerId, localStream || new MediaStream());
   if(!call) {
     setTimeout(function() { vcCallPeerWithRetry(peerId, name, attempt + 1); }, 2000 * (attempt + 1));
     return;
@@ -8767,6 +8802,9 @@ function vcShowConference(title, role) {
       <span style="font-size:11px;font-weight:700;color:var(--accent);margin-right:4px;">HOST CONTROLS:</span>
       <button class="vc-host-btn warning" onclick="vcMuteAll()" title="Mute all participants">&#x1F507; Mute All</button>
       <button class="vc-host-btn" onclick="vcTakeScreenshot()" title="Take meeting screenshot">&#x1F4F8; Screenshot</button>
+      <span style="font-size:10px;color:var(--text-muted);margin-left:8px;">PERMISSIONS:</span>
+      <button class="vc-host-btn" id="vc-perm-screen-btn" onclick="vcToggleScreenSharePermission()" title="Allow/deny participant screen sharing" style="font-size:10px;">&#x1F5A5;&#xFE0F; Screen: OFF</button>
+      <button class="vc-host-btn" id="vc-perm-rec-btn" onclick="vcToggleRecordingPermission()" title="Allow/deny participant recording" style="font-size:10px;">&#x23FA;&#xFE0F; Record: OFF</button>
     </div>
     ` : ''}
     <div class="grid-sidebar">
@@ -8780,10 +8818,12 @@ function vcShowConference(title, role) {
         <div class="video-controls" style="margin-top:12px;">
           <button class="vc-btn active" id="vc-mic-btn" onclick="vcToggleMic()" title="Microphone">&#x1F3A4;</button>
           <button class="vc-btn active" id="vc-cam-btn" onclick="vcToggleCam()" title="Camera">&#x1F4F9;</button>
-          <button class="vc-btn" id="vc-screen-btn" onclick="vcToggleScreen()" title="Screen Share">&#x1F5A5;&#xFE0F;</button>
+          <button class="vc-btn" id="vc-screen-btn" onclick="vcToggleScreen()" title="Screen Share${!showHostControls ? ' (requires host permission)' : ''}" ${!showHostControls ? 'style="opacity:0.5;"' : ''}>&#x1F5A5;&#xFE0F;</button>
           ${role==='student'
             ? `<button class="vc-btn" id="vc-hand-btn" onclick="vcToggleHand()" title="Raise Hand">&#x270B;</button>`
-            : `<button class="vc-btn" id="vc-rec-btn" onclick="vcToggleRecord()" title="Record Session">&#x23FA;&#xFE0F;</button>`}
+            : showHostControls
+              ? `<button class="vc-btn" id="vc-rec-btn" onclick="vcToggleRecord()" title="Record Session">&#x23FA;&#xFE0F;</button>`
+              : `<button class="vc-btn" id="vc-rec-btn" onclick="vcToggleRecord()" title="Record Session (requires host permission)" style="opacity:0.5;">&#x23FA;&#xFE0F;</button>`}
           <button class="vc-btn danger" onclick="exitVideoRoom('${role}')" title="Leave Call">&#x1F4DE;</button>
           ${showHostControls
             ? `<button class="vc-btn danger vc-end-all-btn" onclick="vcEndMeetingForAll()" title="End Meeting for All" style="font-size:11px;width:auto;border-radius:8px;padding:8px 14px;">End All</button>`
@@ -8810,7 +8850,13 @@ function vcShowConference(title, role) {
   `;
 
   var lv = document.getElementById('vc-local-video');
-  if(lv && localStream) lv.srcObject = localStream;
+  if(lv && localStream) {
+    lv.srcObject = localStream;
+    lv.muted = true;
+    lv.setAttribute('playsinline', '');
+    lv.setAttribute('webkit-playsinline', '');
+    lv.play().catch(function(){ setTimeout(function(){ lv.play().catch(function(){}); }, 500); });
+  }
 
   // Host-focus mode: participants only see the host video + their own local tile
   if (!isRoomHost) {
@@ -8853,16 +8899,27 @@ function vcAddVideo(peerId, stream, name) {
   video.autoplay = true;
   video.playsInline = true;
   video.setAttribute('playsinline', '');
+  video.setAttribute('webkit-playsinline', '');
   video.srcObject = stream;
   video.style.cssText = 'width:100%;height:100%;object-fit:cover;border-radius:var(--radius);';
 
   // Ensure playback starts even if autoplay is restricted
-  video.play().catch(function() {
-    // Autoplay was prevented — add click-to-play handler
-    video.muted = true;
-    video.play().catch(function(){});
-    setTimeout(function() { video.muted = false; video.play().catch(function(){}); }, 1000);
-  });
+  var playPromise = video.play();
+  if(playPromise) {
+    playPromise.catch(function() {
+      // Autoplay was prevented — try muted first, then unmute
+      video.muted = true;
+      video.play().catch(function(){});
+      // Add click-to-play handler as fallback
+      var clickHandler = function() {
+        video.muted = false;
+        video.play().catch(function(){});
+        video.removeEventListener('click', clickHandler);
+      };
+      video.addEventListener('click', clickHandler);
+      setTimeout(function() { video.muted = false; video.play().catch(function(){}); }, 2000);
+    });
+  }
 
   // Listen for new tracks being added to the stream
   stream.onaddtrack = function() {
@@ -8983,23 +9040,79 @@ function vcUpdateParticipants() {
 
 // ── Conference Controls ──
 function vcToggleMic() {
-  if(!localStream) return;
+  if(!localStream) {
+    // Try to acquire audio if we don't have a stream yet
+    navigator.mediaDevices.getUserMedia({audio:{echoCancellation:true,noiseSuppression:true,autoGainControl:true}}).then(function(stream) {
+      localStream = stream;
+      var btn = document.getElementById('vc-mic-btn');
+      if(btn) btn.classList.add('active');
+      showToast('Microphone connected');
+    }).catch(function(err) {
+      showToast('Could not access microphone: ' + (err.name === 'NotAllowedError' ? 'Permission denied' : err.message));
+    });
+    return;
+  }
   var btn = document.getElementById('vc-mic-btn');
-  localStream.getAudioTracks().forEach(function(t){t.enabled=!t.enabled;});
-  btn.classList.toggle('active');
+  var audioTracks = localStream.getAudioTracks();
+  if(audioTracks.length === 0) {
+    // No audio track — try to add one
+    navigator.mediaDevices.getUserMedia({audio:{echoCancellation:true,noiseSuppression:true,autoGainControl:true}}).then(function(audioStream) {
+      audioStream.getAudioTracks().forEach(function(t) { localStream.addTrack(t); });
+      if(btn) btn.classList.add('active');
+      showToast('Microphone connected');
+    }).catch(function(err) {
+      showToast('Could not access microphone');
+    });
+    return;
+  }
+  audioTracks.forEach(function(t){t.enabled=!t.enabled;});
+  if(btn) btn.classList.toggle('active');
 }
 
 function vcToggleCam() {
-  if(!localStream) return;
+  if(!localStream) {
+    // Try to acquire video if we don't have a stream yet
+    navigator.mediaDevices.getUserMedia({video:{width:{ideal:1280},height:{ideal:720},facingMode:'user'}}).then(function(stream) {
+      localStream = stream;
+      var lv = document.getElementById('vc-local-video');
+      if(lv) { lv.srcObject = localStream; lv.play().catch(function(){}); }
+      var btn = document.getElementById('vc-cam-btn');
+      if(btn) btn.classList.add('active');
+      showToast('Camera connected');
+    }).catch(function(err) {
+      showToast('Could not access camera: ' + (err.name === 'NotAllowedError' ? 'Permission denied' : err.message));
+    });
+    return;
+  }
   var btn = document.getElementById('vc-cam-btn');
   var tracks = localStream.getVideoTracks();
+  if(tracks.length === 0) {
+    // No video track — try to add one
+    navigator.mediaDevices.getUserMedia({video:{width:{ideal:1280},height:{ideal:720},facingMode:'user'}}).then(function(vidStream) {
+      var newTrack = vidStream.getVideoTracks()[0];
+      localStream.addTrack(newTrack);
+      vcReplaceVideoTrackForAll(newTrack);
+      var lv = document.getElementById('vc-local-video');
+      if(lv) { lv.srcObject = localStream; lv.play().catch(function(){}); lv.style.opacity = '1'; }
+      if(btn) btn.classList.add('active');
+      showToast('Camera connected');
+    }).catch(function(err) {
+      showToast('Could not access camera');
+    });
+    return;
+  }
   tracks.forEach(function(t){t.enabled=!t.enabled;});
-  btn.classList.toggle('active');
+  if(btn) btn.classList.toggle('active');
   var lv = document.getElementById('vc-local-video');
   if(lv) lv.style.opacity = tracks[0] && tracks[0].enabled ? '1' : '0.15';
 }
 
 async function vcToggleScreen() {
+  // Non-host participants need host permission to screen share
+  if(!isRoomHost && !vcCoHosts[rtcPeer ? rtcPeer.id : ''] && !vcHostPermissions.screenShare && !screenStream) {
+    showToast('Screen sharing requires host permission');
+    return;
+  }
   var btn = document.getElementById('vc-screen-btn');
   if(screenStream) {
     screenStream.getTracks().forEach(function(t){t.stop();});
@@ -9131,6 +9244,11 @@ function vcGetSupportedMimeType() {
 }
 
 function vcToggleRecord() {
+  // Non-host participants need host permission to record
+  if(!isRoomHost && !vcCoHosts[rtcPeer ? rtcPeer.id : ''] && !vcHostPermissions.recording && !vcIsRecording) {
+    showToast('Recording requires host permission');
+    return;
+  }
   if (vcIsRecording) {
     vcStopRecording();
   } else {
@@ -9508,8 +9626,35 @@ function vcInsertHostBar() {
   bar.style.cssText = 'display:flex;align-items:center;gap:8px;margin-bottom:12px;flex-wrap:wrap;';
   bar.innerHTML =
     '<button class="vc-host-btn warning" onclick="vcMuteAll()" title="Mute all participants">&#x1F507; Mute All</button>' +
-    '<button class="vc-host-btn" onclick="vcTakeScreenshot()" title="Take meeting screenshot">&#x1F4F8; Screenshot</button>';
+    '<button class="vc-host-btn" onclick="vcTakeScreenshot()" title="Take meeting screenshot">&#x1F4F8; Screenshot</button>' +
+    '<span style="font-size:10px;color:var(--text-muted);margin-left:8px;">PERMISSIONS:</span>' +
+    '<button class="vc-host-btn" id="vc-perm-screen-btn" onclick="vcToggleScreenSharePermission()" title="Allow/deny participant screen sharing" style="font-size:10px;">&#x1F5A5;&#xFE0F; Screen: OFF</button>' +
+    '<button class="vc-host-btn" id="vc-perm-rec-btn" onclick="vcToggleRecordingPermission()" title="Allow/deny participant recording" style="font-size:10px;">&#x23FA;&#xFE0F; Record: OFF</button>';
   grid.parentElement.insertBefore(bar, grid);
+}
+
+// ── Host Control: Toggle participant screen share permission ──
+function vcToggleScreenSharePermission() {
+  vcHostPermissions.screenShare = !vcHostPermissions.screenShare;
+  vcBroadcastData({type:'permission-update', permission:'screenShare', granted:vcHostPermissions.screenShare});
+  var btn = document.getElementById('vc-perm-screen-btn');
+  if(btn) {
+    btn.classList.toggle('active', vcHostPermissions.screenShare);
+    btn.innerHTML = vcHostPermissions.screenShare ? '&#x1F5A5;&#xFE0F; Screen: ON' : '&#x1F5A5;&#xFE0F; Screen: OFF';
+  }
+  showToast(vcHostPermissions.screenShare ? 'Participants can now share screen' : 'Participants can no longer share screen');
+}
+
+// ── Host Control: Toggle participant recording permission ──
+function vcToggleRecordingPermission() {
+  vcHostPermissions.recording = !vcHostPermissions.recording;
+  vcBroadcastData({type:'permission-update', permission:'recording', granted:vcHostPermissions.recording});
+  var btn = document.getElementById('vc-perm-rec-btn');
+  if(btn) {
+    btn.classList.toggle('active', vcHostPermissions.recording);
+    btn.innerHTML = vcHostPermissions.recording ? '&#x23FA;&#xFE0F; Record: ON' : '&#x23FA;&#xFE0F; Record: OFF';
+  }
+  showToast(vcHostPermissions.recording ? 'Participants can now record' : 'Participants can no longer record');
 }
 
 // ── Screenshot: Capture meeting view ──
@@ -9520,30 +9665,50 @@ function vcTakeScreenshot() {
   var videos = grid.querySelectorAll('video');
   if(videos.length === 0) { showToast('No video streams to capture'); return; }
 
-  // Create a canvas to composite all video tiles
+  // Create a high-resolution canvas to composite all video tiles
   var cols = Math.min(videos.length, 3);
   var rows = Math.ceil(videos.length / cols);
-  var tileW = 480, tileH = 270;
+  var tileW = 1280, tileH = 720;
+  var headerH = 56;
   var canvas = document.createElement('canvas');
   canvas.width = cols * tileW;
-  canvas.height = rows * tileH;
+  canvas.height = rows * tileH + headerH;
   var ctx = canvas.getContext('2d');
+  ctx.imageSmoothingEnabled = true;
+  ctx.imageSmoothingQuality = 'high';
   ctx.fillStyle = '#0c1117';
   ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+  // Draw timestamp header first
+  ctx.fillStyle = 'rgba(0,0,0,0.85)';
+  ctx.fillRect(0, 0, canvas.width, headerH);
+  ctx.fillStyle = '#f0a500';
+  ctx.font = 'bold 22px DM Sans, sans-serif';
+  ctx.textAlign = 'left';
+  ctx.fillText('CESTIS Meeting — Room: ' + currentRoomCode + ' — ' + new Date().toLocaleString(), 20, 38);
 
   videos.forEach(function(video, i) {
     var col = i % cols;
     var row = Math.floor(i / cols);
     var x = col * tileW;
-    var y = row * tileH;
+    var y = row * tileH + headerH;
     try {
-      ctx.drawImage(video, x, y, tileW, tileH);
+      // Use actual video resolution for best quality
+      var vw = video.videoWidth || tileW;
+      var vh = video.videoHeight || tileH;
+      // Draw at full tile size, maintaining aspect ratio (cover)
+      var scale = Math.max(tileW / vw, tileH / vh);
+      var sw = tileW / scale;
+      var sh = tileH / scale;
+      var sx = (vw - sw) / 2;
+      var sy = (vh - sh) / 2;
+      ctx.drawImage(video, sx, sy, sw, sh, x, y, tileW, tileH);
     } catch(e) {
       // Video may be from a different origin or not ready
       ctx.fillStyle = '#1a2332';
       ctx.fillRect(x, y, tileW, tileH);
       ctx.fillStyle = '#556677';
-      ctx.font = '16px DM Sans, sans-serif';
+      ctx.font = '24px DM Sans, sans-serif';
       ctx.textAlign = 'center';
       ctx.fillText('Video unavailable', x + tileW/2, y + tileH/2);
     }
@@ -9552,23 +9717,15 @@ function vcTakeScreenshot() {
     var label = tile ? tile.querySelector('.participant-info') : null;
     var name = label ? label.textContent : 'Participant ' + (i+1);
     ctx.fillStyle = 'rgba(0,0,0,0.6)';
-    ctx.fillRect(x, y + tileH - 30, tileW, 30);
+    ctx.fillRect(x, y + tileH - 48, tileW, 48);
     ctx.fillStyle = '#e8edf3';
-    ctx.font = '13px DM Sans, sans-serif';
+    ctx.font = '20px DM Sans, sans-serif';
     ctx.textAlign = 'left';
-    ctx.fillText(name, x + 10, y + tileH - 10);
+    ctx.fillText(name, x + 16, y + tileH - 16);
   });
 
-  // Add timestamp header
-  ctx.fillStyle = 'rgba(0,0,0,0.7)';
-  ctx.fillRect(0, 0, canvas.width, 36);
-  ctx.fillStyle = '#f0a500';
-  ctx.font = 'bold 14px DM Sans, sans-serif';
-  ctx.textAlign = 'left';
-  ctx.fillText('CESTIS Meeting — Room: ' + currentRoomCode + ' — ' + new Date().toLocaleString(), 12, 24);
-
-  // Show modal with screenshot
-  var dataUrl = canvas.toDataURL('image/png');
+  // Show modal with screenshot (full quality PNG)
+  var dataUrl = canvas.toDataURL('image/png', 1.0);
   var modalHTML = '<div id="vcScreenshotModal" class="vc-screenshot-modal">' +
     '<div class="modal-content">' +
     '<h3 style="font-family:Playfair Display,serif;margin-bottom:16px;">Meeting Screenshot</h3>' +
