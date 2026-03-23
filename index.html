@@ -7171,7 +7171,6 @@ function buildAdminPages() {
       <button class="btn btn-primary" onclick="openModal('driveUploadModal')">+ Upload Resource to Drive</button>
       <select class="form-control" id="arFilterCourse" style="width:220px;" onchange="renderAdminResources()">
         <option value="all">All Programmes</option>
-        ${courses.map(c => '<option value="'+c+'">'+c+'</option>').join('')}
       </select>
       <select class="form-control" id="arFilterType" style="width:180px;" onchange="renderAdminResources()">
         <option value="all">All Types</option>
@@ -10814,8 +10813,11 @@ function generateResourceId() {
     origOpen(id);
     if (id === 'driveUploadModal') {
       const sel = document.getElementById('driveResCourse');
-      if (sel && sel.options.length <= 1) {
-        courses.forEach(c => { const o = document.createElement('option'); o.value = c; o.textContent = c; sel.appendChild(o); });
+      if (sel) {
+        var currentVal = sel.value;
+        sel.innerHTML = '<option value="">— Select Programme —</option>';
+        getCourseList().forEach(function(c) { var o = document.createElement('option'); o.value = c; o.textContent = c; sel.appendChild(o); });
+        if(currentVal) sel.value = currentVal;
       }
       document.getElementById('driveResId').value = generateResourceId();
       _driveSelectedFile = null;
@@ -11019,6 +11021,15 @@ async function uploadResourceToDrive() {
 function renderAdminResources() {
   const container = document.getElementById('adminResourcesList');
   if (!container) return;
+
+  // Dynamically populate course filter from current skillAreas
+  var courseSel = document.getElementById('arFilterCourse');
+  if(courseSel) {
+    var currentVal = courseSel.value || 'all';
+    var freshCourses = getCourseList();
+    courseSel.innerHTML = '<option value="all">All Programmes</option>' + freshCourses.map(function(c){ return '<option value="'+c+'">'+c+'</option>'; }).join('');
+    courseSel.value = currentVal;
+  }
 
   const filterCourse = document.getElementById('arFilterCourse')?.value || 'all';
   const filterType = document.getElementById('arFilterType')?.value || 'all';
@@ -11862,12 +11873,22 @@ function populateCourseDropdowns() {
     sel.innerHTML = '<option value="">— Select Programme —</option>' + courses.map(function(c) { return '<option>' + c + '</option>'; }).join('');
     if(prev) sel.value = prev;
   });
-  // Also refresh the filter dropdown if it exists
-  var filterCourse = document.getElementById('filterCourse');
-  if(filterCourse) {
-    var prevFilter = filterCourse.value;
-    filterCourse.innerHTML = '<option value="all">All Courses</option>' + courses.map(function(c) { return '<option>' + c + '</option>'; }).join('');
-    if(prevFilter) filterCourse.value = prevFilter;
+  // Also refresh the filter dropdowns if they exist
+  var filterLabels = {arFilterCourse:'All Programmes'};
+  ['filterCourse','arFilterCourse','attendanceCourseFilter','asStudentCourse'].forEach(function(filterId) {
+    var el = document.getElementById(filterId);
+    if(!el) return;
+    var prev = el.value;
+    var label = filterLabels[filterId] || 'All Courses';
+    el.innerHTML = '<option value="all">'+label+'</option>' + courses.map(function(c) { return '<option value="'+c+'">'+c+'</option>'; }).join('');
+    if(prev) el.value = prev;
+  });
+  // Refresh the resource upload modal course dropdown
+  var driveResSel = document.getElementById('driveResCourse');
+  if(driveResSel) {
+    var prevDrive = driveResSel.value;
+    driveResSel.innerHTML = '<option value="">— Select Programme —</option>' + courses.map(function(c) { return '<option value="'+c+'">'+c+'</option>'; }).join('');
+    if(prevDrive) driveResSel.value = prevDrive;
   }
   // Also refresh the cert template skill area dropdown
   if(typeof populateCertTemplateSkillSelect === 'function') populateCertTemplateSkillSelect();
@@ -18514,6 +18535,72 @@ function lmsChatBack(prefix) {
 }
 
 // ============================================
+// MEDIA PERMISSION HELPERS
+// ============================================
+async function lmsChatCheckMediaPermission(kind) {
+  // kind: 'camera' or 'microphone'
+  if(navigator.permissions && navigator.permissions.query) {
+    try {
+      var result = await navigator.permissions.query({name: kind});
+      return result.state; // 'granted', 'denied', or 'prompt'
+    } catch(e) { return 'prompt'; } // browser doesn't support querying this permission
+  }
+  return 'prompt'; // assume prompt if Permissions API not available
+}
+
+function lmsChatShowPermissionHelp(overlay, callType, roomId) {
+  var isVideo = callType === 'video';
+  var statusEl = document.getElementById('lmsCallStatus');
+  if(statusEl) {
+    statusEl.innerHTML =
+      '<div style="color:#f59e0b;font-size:14px;font-weight:600;">' + (isVideo ? 'Camera/microphone' : 'Microphone') + ' access is blocked</div>' +
+      '<div style="font-size:12px;color:var(--text-muted);margin-top:6px;line-height:1.5;">' +
+        'Your browser has blocked media access.<br>' +
+        'Click the <span style="display:inline-block;width:16px;height:16px;border:1px solid #888;border-radius:3px;text-align:center;line-height:16px;font-size:10px;vertical-align:middle;">&#128274;</span> icon in your address bar<br>' +
+        'and allow ' + (isVideo ? 'camera and microphone' : 'microphone') + ' access, then retry.' +
+      '</div>';
+  }
+  // Add retry button to controls
+  var controls = overlay.querySelector('.call-controls');
+  if(controls) {
+    var retryBtn = document.createElement('button');
+    retryBtn.className = 'call-btn';
+    retryBtn.style.cssText = 'background:#2563eb;color:#fff;font-size:13px;padding:10px 20px;border-radius:24px;';
+    retryBtn.innerHTML = '&#x1F504; Retry';
+    retryBtn.onclick = function() {
+      if(roomId) { lmsChatJoinCall(roomId, callType); }
+      else { lmsChatInitiateCall(callType); }
+    };
+    controls.insertBefore(retryBtn, controls.firstChild);
+  }
+}
+
+async function lmsChatRequestMedia(constraints, callType, overlay, roomId) {
+  var isVideo = callType === 'video';
+  try {
+    var stream = await navigator.mediaDevices.getUserMedia(constraints);
+    return stream;
+  } catch(err) {
+    console.warn('getUserMedia failed:', err.name, err.message);
+    // If video+audio failed, try audio-only as fallback
+    if(isVideo && constraints.video) {
+      try {
+        var audioStream = await navigator.mediaDevices.getUserMedia({audio: true, video: false});
+        showToast('Camera unavailable — connected with audio only');
+        var statusEl = document.getElementById('lmsCallStatus');
+        if(statusEl) statusEl.textContent = 'LMS Video Call - Audio Only';
+        return audioStream;
+      } catch(e2) {
+        // Both failed
+      }
+    }
+    // Show permission help
+    lmsChatShowPermissionHelp(overlay, callType, roomId);
+    return null;
+  }
+}
+
+// ============================================
 // VOICE CALLS
 // ============================================
 function lmsChatStartVoiceCall() {
@@ -18649,12 +18736,20 @@ function lmsChatResolvePeerName(peerId) {
 }
 
 // ── Unified call initiation (voice or video) ──
-function lmsChatInitiateCall(callType) {
+async function lmsChatInitiateCall(callType) {
   if(!lmsChatActiveRoom) return;
   var room = lmsChatRooms.find(function(r){ return r.id === lmsChatActiveRoom; });
   if(!room) return;
   var user = lmsChatGetCurrentUser();
   var isVideo = callType === 'video';
+
+  // Check permission status before opening overlay
+  var permKind = isVideo ? 'camera' : 'microphone';
+  var permState = await lmsChatCheckMediaPermission(permKind);
+  if(permState === 'denied') {
+    // Permission permanently blocked — show guidance immediately
+    showToast('Browser has blocked ' + permKind + ' access. Click the lock icon in the address bar to allow it, then try again.');
+  }
 
   // Set active call on the room so other users can see it
   room.activeCall = {
@@ -18685,7 +18780,7 @@ function lmsChatInitiateCall(callType) {
         '<div class="video-tile"><video id="lmsLocalVideo" autoplay muted playsinline></video><div class="tile-name">You</div></div>' +
       '</div>' +
       '<div class="call-name" style="margin-top:16px;">'+room.name+' - LMS Video Call</div>' +
-      '<div class="call-status" id="lmsCallStatus">Connecting camera...</div>' +
+      '<div class="call-status" id="lmsCallStatus">Requesting ' + (isVideo ? 'camera' : 'microphone') + ' access...</div>' +
       '<div class="call-timer" id="lmsCallTimer">00:00</div>' +
       '<div class="call-participants" id="lmsCallParticipants"></div>' +
       '<div class="call-controls">' +
@@ -18697,7 +18792,7 @@ function lmsChatInitiateCall(callType) {
     overlay.innerHTML =
       '<div class="call-avatar" style="background:'+room.color+'22;color:'+room.color+';">'+room.icon+'</div>' +
       '<div class="call-name">'+room.name+'</div>' +
-      '<div class="call-status" id="lmsCallStatus">LMS Voice Call - Connecting...</div>' +
+      '<div class="call-status" id="lmsCallStatus">Requesting microphone access...</div>' +
       '<div class="call-timer" id="lmsCallTimer">00:00</div>' +
       '<div class="call-participants" id="lmsCallParticipants"></div>' +
       '<div class="call-controls">' +
@@ -18709,67 +18804,67 @@ function lmsChatInitiateCall(callType) {
   overlay.classList.add('active');
 
   var mediaConstraints = isVideo ? {audio:true, video:true} : {audio:true};
-  navigator.mediaDevices.getUserMedia(mediaConstraints).then(function(stream) {
-    lmsChatLocalStream = stream;
-    if(isVideo) {
-      var vid = document.getElementById('lmsLocalVideo');
-      if(vid) { vid.srcObject = stream; vid.play().catch(function(){}); }
-    }
+  var stream = await lmsChatRequestMedia(mediaConstraints, callType, overlay, null);
 
-    // Create PeerJS peer and listen for incoming calls from joiners
-    var myPeerId = lmsChatCallPeerId(lmsChatActiveRoom, user.id);
-    lmsChatPeer = new Peer(myPeerId, { config: { iceServers: LMS_CHAT_ICE_SERVERS } });
-
-    lmsChatPeer.on('open', function() {
-      document.getElementById('lmsCallStatus').textContent = (isVideo ? 'LMS Video Call' : 'LMS Voice Call') + ' - Connected';
-    });
-    lmsChatPeer.on('call', function(incomingCall) {
-      lmsChatHandleIncomingCall(incomingCall);
-    });
-    lmsChatPeer.on('error', function(err) {
-      console.warn('LMS Chat PeerJS error:', err.type, err);
-      if(err.type === 'unavailable-id') {
-        // Peer ID already taken, append random suffix
-        var retryId = myPeerId + '-' + Math.random().toString(36).substr(2,4);
-        lmsChatPeer = new Peer(retryId, { config: { iceServers: LMS_CHAT_ICE_SERVERS } });
-        lmsChatPeer.on('call', function(c) { lmsChatHandleIncomingCall(c); });
-      }
-    });
-
-    // Start call timer
-    lmsChatCallTimer = setInterval(function() {
-      lmsChatCallSeconds++;
-      var m = Math.floor(lmsChatCallSeconds/60).toString().padStart(2,'0');
-      var s = (lmsChatCallSeconds%60).toString().padStart(2,'0');
-      var el = document.getElementById('lmsCallTimer');
-      if(el) el.textContent = m+':'+s;
-    }, 1000);
-
-    // Log call message
-    var msg = {
-      id:'msg-'+Date.now(), roomId:lmsChatActiveRoom, senderId:user.id, senderName:user.name,
-      text:user.name+' started a '+ callType +' call', type:'call', callType:callType,
-      timestamp:new Date().toISOString(), readBy:[user.id]
-    };
-    if(!lmsChatMessages[lmsChatActiveRoom]) lmsChatMessages[lmsChatActiveRoom] = [];
-    lmsChatMessages[lmsChatActiveRoom].push(msg);
-
-    // Notify all room members
-    lmsChatNotifyCallMembers(room, user, callType);
-
-    saveLmsChatData();
-    if(typeof lmsChatSyncToDrive === 'function') lmsChatSyncToDrive();
-
-    var prefix = lmsChatGetRolePrefix();
-    lmsChatRenderMessages(prefix);
-    lmsChatRenderRoomList(prefix);
-    lmsChatUpdateCallParticipantsUI(room);
-  }).catch(function(err) {
-    document.getElementById('lmsCallStatus').textContent = (isVideo ? 'Camera/microphone' : 'Microphone') + ' access denied';
-    console.error(callType + ' call error:', err);
+  if(!stream) {
+    console.error(callType + ' call error: media access denied');
     delete room.activeCall;
     lmsChatCallState = null;
+    return;
+  }
+
+  lmsChatLocalStream = stream;
+  if(isVideo) {
+    var vid = document.getElementById('lmsLocalVideo');
+    if(vid) { vid.srcObject = stream; vid.play().catch(function(){}); }
+  }
+
+  // Create PeerJS peer and listen for incoming calls from joiners
+  var myPeerId = lmsChatCallPeerId(lmsChatActiveRoom, user.id);
+  lmsChatPeer = new Peer(myPeerId, { config: { iceServers: LMS_CHAT_ICE_SERVERS } });
+
+  lmsChatPeer.on('open', function() {
+    document.getElementById('lmsCallStatus').textContent = (isVideo ? 'LMS Video Call' : 'LMS Voice Call') + ' - Connected';
   });
+  lmsChatPeer.on('call', function(incomingCall) {
+    lmsChatHandleIncomingCall(incomingCall);
+  });
+  lmsChatPeer.on('error', function(err) {
+    console.warn('LMS Chat PeerJS error:', err.type, err);
+    if(err.type === 'unavailable-id') {
+      var retryId = myPeerId + '-' + Math.random().toString(36).substr(2,4);
+      lmsChatPeer = new Peer(retryId, { config: { iceServers: LMS_CHAT_ICE_SERVERS } });
+      lmsChatPeer.on('call', function(c) { lmsChatHandleIncomingCall(c); });
+    }
+  });
+
+  lmsChatCallTimer = setInterval(function() {
+    lmsChatCallSeconds++;
+    var m = Math.floor(lmsChatCallSeconds/60).toString().padStart(2,'0');
+    var s = (lmsChatCallSeconds%60).toString().padStart(2,'0');
+    var el = document.getElementById('lmsCallTimer');
+    if(el) el.textContent = m+':'+s;
+  }, 1000);
+
+  // Log call message
+  var msg = {
+    id:'msg-'+Date.now(), roomId:lmsChatActiveRoom, senderId:user.id, senderName:user.name,
+    text:user.name+' started a '+ callType +' call', type:'call', callType:callType,
+    timestamp:new Date().toISOString(), readBy:[user.id]
+  };
+  if(!lmsChatMessages[lmsChatActiveRoom]) lmsChatMessages[lmsChatActiveRoom] = [];
+  lmsChatMessages[lmsChatActiveRoom].push(msg);
+
+  // Notify all room members
+  lmsChatNotifyCallMembers(room, user, callType);
+
+  saveLmsChatData();
+  if(typeof lmsChatSyncToDrive === 'function') lmsChatSyncToDrive();
+
+  var prefix = lmsChatGetRolePrefix();
+  lmsChatRenderMessages(prefix);
+  lmsChatRenderRoomList(prefix);
+  lmsChatUpdateCallParticipantsUI(room);
 }
 
 // ── Notify room members about the call ──
@@ -18842,7 +18937,7 @@ function lmsChatDismissIncomingCall() {
 // ── Join an active call from the banner ──
 var lmsChatCallRoomId = null;
 
-function lmsChatJoinCall(roomId, callType) {
+async function lmsChatJoinCall(roomId, callType) {
   lmsChatDismissIncomingCall();
 
   var room = lmsChatRooms.find(function(r){ return r.id === roomId; });
@@ -18861,8 +18956,15 @@ function lmsChatJoinCall(roomId, callType) {
     lmsChatOpenRoom(roomId, prefix);
   }
 
-  // Now start the call UI
+  // Check permission status
   var isVideo = callType === 'video';
+  var permKind = isVideo ? 'camera' : 'microphone';
+  var permState = await lmsChatCheckMediaPermission(permKind);
+  if(permState === 'denied') {
+    showToast('Browser has blocked ' + permKind + ' access. Click the lock icon in the address bar to allow it, then try again.');
+  }
+
+  // Now start the call UI
   var overlay = document.getElementById('lmsChatCallOverlay');
   if(!overlay) {
     overlay = document.createElement('div');
@@ -18881,7 +18983,7 @@ function lmsChatJoinCall(roomId, callType) {
         '<div class="video-tile"><video id="lmsLocalVideo" autoplay muted playsinline></video><div class="tile-name">You</div></div>' +
       '</div>' +
       '<div class="call-name" style="margin-top:16px;">'+room.name+' - LMS Video Call</div>' +
-      '<div class="call-status" id="lmsCallStatus">Joining call...</div>' +
+      '<div class="call-status" id="lmsCallStatus">Requesting ' + (isVideo ? 'camera' : 'microphone') + ' access...</div>' +
       '<div class="call-timer" id="lmsCallTimer">00:00</div>' +
       '<div class="call-participants" id="lmsCallParticipants"></div>' +
       '<div class="call-controls">' +
@@ -18893,7 +18995,7 @@ function lmsChatJoinCall(roomId, callType) {
     overlay.innerHTML =
       '<div class="call-avatar" style="background:'+room.color+'22;color:'+room.color+';">'+room.icon+'</div>' +
       '<div class="call-name">'+room.name+'</div>' +
-      '<div class="call-status" id="lmsCallStatus">Joining call...</div>' +
+      '<div class="call-status" id="lmsCallStatus">Requesting microphone access...</div>' +
       '<div class="call-timer" id="lmsCallTimer">00:00</div>' +
       '<div class="call-participants" id="lmsCallParticipants"></div>' +
       '<div class="call-controls">' +
@@ -18907,78 +19009,79 @@ function lmsChatJoinCall(roomId, callType) {
   lmsChatPeerConnections = {};
 
   var mediaConstraints = isVideo ? {audio:true, video:true} : {audio:true};
-  navigator.mediaDevices.getUserMedia(mediaConstraints).then(function(stream) {
-    lmsChatLocalStream = stream;
-    if(isVideo) {
-      var vid = document.getElementById('lmsLocalVideo');
-      if(vid) { vid.srcObject = stream; vid.play().catch(function(){}); }
-    }
+  var stream = await lmsChatRequestMedia(mediaConstraints, callType, overlay, roomId);
 
-    // Create PeerJS peer and connect to all existing participants
-    var myPeerId = lmsChatCallPeerId(roomId, user.id);
-    lmsChatPeer = new Peer(myPeerId, { config: { iceServers: LMS_CHAT_ICE_SERVERS } });
-
-    lmsChatPeer.on('open', function() {
-      document.getElementById('lmsCallStatus').textContent = (isVideo ? 'LMS Video Call' : 'LMS Voice Call') + ' - Connected';
-
-      // Call each existing participant in the call
-      var existingParticipants = room.activeCall.participants.filter(function(pid){ return pid !== user.id; });
-      existingParticipants.forEach(function(participantId) {
-        var targetPeerId = lmsChatCallPeerId(roomId, participantId);
-        var pName = userAccounts.find(function(u){ return u.id === participantId; });
-        lmsChatCallPeer(targetPeerId, pName ? pName.name : 'Participant');
-      });
-    });
-
-    // Listen for incoming calls from future joiners
-    lmsChatPeer.on('call', function(incomingCall) {
-      lmsChatHandleIncomingCall(incomingCall);
-    });
-
-    lmsChatPeer.on('error', function(err) {
-      console.warn('LMS Chat PeerJS join error:', err.type, err);
-      if(err.type === 'unavailable-id') {
-        var retryId = myPeerId + '-' + Math.random().toString(36).substr(2,4);
-        lmsChatPeer = new Peer(retryId, { config: { iceServers: LMS_CHAT_ICE_SERVERS } });
-        lmsChatPeer.on('open', function() {
-          var existing = room.activeCall.participants.filter(function(pid){ return pid !== user.id; });
-          existing.forEach(function(pid) {
-            var tId = lmsChatCallPeerId(roomId, pid);
-            var pn = userAccounts.find(function(u){ return u.id === pid; });
-            lmsChatCallPeer(tId, pn ? pn.name : 'Participant');
-          });
-        });
-        lmsChatPeer.on('call', function(c) { lmsChatHandleIncomingCall(c); });
-      }
-    });
-
-    // Start call timer
-    lmsChatCallTimer = setInterval(function() {
-      lmsChatCallSeconds++;
-      var m = Math.floor(lmsChatCallSeconds/60).toString().padStart(2,'0');
-      var s = (lmsChatCallSeconds%60).toString().padStart(2,'0');
-      var el = document.getElementById('lmsCallTimer');
-      if(el) el.textContent = m+':'+s;
-    }, 1000);
-
-    // Log join message
-    var joinMsg = {
-      id:'msg-'+Date.now(), roomId:roomId, senderId:user.id, senderName:user.name,
-      text:user.name+' joined the '+callType+' call', type:'call', timestamp:new Date().toISOString(), readBy:[user.id]
-    };
-    if(!lmsChatMessages[roomId]) lmsChatMessages[roomId] = [];
-    lmsChatMessages[roomId].push(joinMsg);
-    saveLmsChatData();
-    if(typeof lmsChatSyncToDrive === 'function') lmsChatSyncToDrive();
-
-    var prefix = lmsChatGetRolePrefix();
-    lmsChatRenderMessages(prefix);
-    lmsChatRenderRoomList(prefix);
-    lmsChatUpdateCallParticipantsUI(room);
-  }).catch(function(err) {
-    document.getElementById('lmsCallStatus').textContent = 'Media access denied';
+  if(!stream) {
     lmsChatCallState = null;
+    return;
+  }
+
+  lmsChatLocalStream = stream;
+  if(isVideo) {
+    var vid = document.getElementById('lmsLocalVideo');
+    if(vid) { vid.srcObject = stream; vid.play().catch(function(){}); }
+  }
+
+  // Create PeerJS peer and connect to all existing participants
+  var myPeerId = lmsChatCallPeerId(roomId, user.id);
+  lmsChatPeer = new Peer(myPeerId, { config: { iceServers: LMS_CHAT_ICE_SERVERS } });
+
+  lmsChatPeer.on('open', function() {
+    document.getElementById('lmsCallStatus').textContent = (isVideo ? 'LMS Video Call' : 'LMS Voice Call') + ' - Connected';
+
+    // Call each existing participant in the call
+    var existingParticipants = room.activeCall.participants.filter(function(pid){ return pid !== user.id; });
+    existingParticipants.forEach(function(participantId) {
+      var targetPeerId = lmsChatCallPeerId(roomId, participantId);
+      var pName = userAccounts.find(function(u){ return u.id === participantId; });
+      lmsChatCallPeer(targetPeerId, pName ? pName.name : 'Participant');
+    });
   });
+
+  // Listen for incoming calls from future joiners
+  lmsChatPeer.on('call', function(incomingCall) {
+    lmsChatHandleIncomingCall(incomingCall);
+  });
+
+  lmsChatPeer.on('error', function(err) {
+    console.warn('LMS Chat PeerJS join error:', err.type, err);
+    if(err.type === 'unavailable-id') {
+      var retryId = myPeerId + '-' + Math.random().toString(36).substr(2,4);
+      lmsChatPeer = new Peer(retryId, { config: { iceServers: LMS_CHAT_ICE_SERVERS } });
+      lmsChatPeer.on('open', function() {
+        var existing = room.activeCall.participants.filter(function(pid){ return pid !== user.id; });
+        existing.forEach(function(pid) {
+          var tId = lmsChatCallPeerId(roomId, pid);
+          var pn = userAccounts.find(function(u){ return u.id === pid; });
+          lmsChatCallPeer(tId, pn ? pn.name : 'Participant');
+        });
+      });
+      lmsChatPeer.on('call', function(c) { lmsChatHandleIncomingCall(c); });
+    }
+  });
+
+  lmsChatCallTimer = setInterval(function() {
+    lmsChatCallSeconds++;
+    var m = Math.floor(lmsChatCallSeconds/60).toString().padStart(2,'0');
+    var s = (lmsChatCallSeconds%60).toString().padStart(2,'0');
+    var el = document.getElementById('lmsCallTimer');
+    if(el) el.textContent = m+':'+s;
+  }, 1000);
+
+  // Log join message
+  var joinMsg = {
+    id:'msg-'+Date.now(), roomId:roomId, senderId:user.id, senderName:user.name,
+    text:user.name+' joined the '+callType+' call', type:'call', timestamp:new Date().toISOString(), readBy:[user.id]
+  };
+  if(!lmsChatMessages[roomId]) lmsChatMessages[roomId] = [];
+  lmsChatMessages[roomId].push(joinMsg);
+  saveLmsChatData();
+  if(typeof lmsChatSyncToDrive === 'function') lmsChatSyncToDrive();
+
+  var prefix = lmsChatGetRolePrefix();
+  lmsChatRenderMessages(prefix);
+  lmsChatRenderRoomList(prefix);
+  lmsChatUpdateCallParticipantsUI(room);
 }
 
 // ── Update participants display in call overlay ──
@@ -24633,12 +24736,13 @@ function renderCertDownloadMgmt() {
   var filter = document.getElementById('certDlFilter')?.value || 'all';
   var courseFilter = document.getElementById('certDlCourseFilter')?.value || 'all';
 
-  // Populate course filter dropdown
+  // Populate course filter dropdown from current data
   var courseSelect = document.getElementById('certDlCourseFilter');
-  if(courseSelect && courseSelect.options.length <= 1) {
+  if(courseSelect) {
     var coursesUsed = [];
     students.forEach(function(s){ if(s.certNo && coursesUsed.indexOf(s.course) === -1) coursesUsed.push(s.course); });
-    coursesUsed.sort().forEach(function(c){ courseSelect.innerHTML += '<option value="' + c + '">' + c + '</option>'; });
+    courseSelect.innerHTML = '<option value="all">All Programmes</option>' + coursesUsed.sort().map(function(c){ return '<option value="' + c + '">' + c + '</option>'; }).join('');
+    courseSelect.value = courseFilter;
   }
 
   var certified = students.filter(function(s){ return s.certNo; });
