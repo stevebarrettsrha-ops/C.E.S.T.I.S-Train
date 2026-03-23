@@ -2796,6 +2796,55 @@ body.vc-fullscreen-mode.vc-host-only-mode .video-grid .video-tile:not(.vc-hoston
   padding:4px 10px; border-radius:12px; color:#fff;
 }
 
+/* Active call banner in chat */
+.lms-active-call-banner {
+  display:flex; align-items:center; gap:12px; padding:10px 16px;
+  background:linear-gradient(135deg, rgba(46,204,113,0.12), rgba(46,204,113,0.06));
+  border:1px solid rgba(46,204,113,0.25); border-radius:var(--radius-sm);
+  margin:8px 16px; flex-shrink:0; animation:callPulse 2s infinite;
+}
+@keyframes callPulse { 0%,100%{border-color:rgba(46,204,113,0.25);} 50%{border-color:rgba(46,204,113,0.5);} }
+.lms-active-call-banner .acb-icon {
+  width:36px; height:36px; border-radius:50%; background:var(--green);
+  display:flex; align-items:center; justify-content:center; font-size:16px;
+  color:#fff; flex-shrink:0; animation:pulse 1.5s infinite;
+}
+.lms-active-call-banner .acb-info { flex:1; min-width:0; }
+.lms-active-call-banner .acb-title { font-size:13px; font-weight:600; color:var(--green); }
+.lms-active-call-banner .acb-participants { font-size:11px; color:var(--text-muted); margin-top:2px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+.lms-active-call-banner .acb-join {
+  padding:6px 16px; border:none; border-radius:20px; background:var(--green);
+  color:#fff; font-size:12px; font-weight:700; cursor:pointer; white-space:nowrap;
+  transition:all var(--transition);
+}
+.lms-active-call-banner .acb-join:hover { background:#27ae60; transform:scale(1.05); }
+
+/* Incoming call notification overlay */
+.lms-incoming-call {
+  position:fixed; top:20px; right:20px; z-index:9998;
+  background:var(--bg-card); border:1px solid var(--green); border-radius:var(--radius-lg);
+  padding:20px; width:320px; max-width:90vw;
+  box-shadow:0 12px 40px rgba(0,0,0,0.5); animation:slideInRight 0.3s ease;
+}
+@keyframes slideInRight { from{transform:translateX(120%);opacity:0;} to{transform:translateX(0);opacity:1;} }
+.lms-incoming-call .ic-header { display:flex; align-items:center; gap:12px; margin-bottom:14px; }
+.lms-incoming-call .ic-avatar {
+  width:48px; height:48px; border-radius:50%; background:var(--green);
+  display:flex; align-items:center; justify-content:center; font-size:20px; color:#fff;
+}
+.lms-incoming-call .ic-info { flex:1; }
+.lms-incoming-call .ic-name { font-size:15px; font-weight:700; }
+.lms-incoming-call .ic-type { font-size:12px; color:var(--text-muted); }
+.lms-incoming-call .ic-actions { display:flex; gap:10px; }
+.lms-incoming-call .ic-actions button {
+  flex:1; padding:10px; border:none; border-radius:var(--radius-sm);
+  font-size:13px; font-weight:600; cursor:pointer; transition:all var(--transition);
+}
+.lms-incoming-call .ic-accept { background:var(--green); color:#fff; }
+.lms-incoming-call .ic-accept:hover { background:#27ae60; }
+.lms-incoming-call .ic-decline { background:var(--red-dim); color:var(--red); }
+.lms-incoming-call .ic-decline:hover { background:var(--red); color:#fff; }
+
 /* Profile pic upload modal */
 .lms-chat-profile-modal {
   position:fixed; inset:0; z-index:10000; background:rgba(0,0,0,0.7);
@@ -17240,6 +17289,9 @@ function lmsChatOpenRoom(roomId, prefix) {
 }
 
 function lmsChatRenderMessages(prefix) {
+  // Show/hide active call banner
+  lmsChatRenderCallBanner(prefix);
+
   var roomId = lmsChatActiveRoom;
   if(!roomId) return;
   var msgs = lmsChatMessages[roomId] || [];
@@ -18434,62 +18486,7 @@ function lmsChatBack(prefix) {
 // VOICE CALLS
 // ============================================
 function lmsChatStartVoiceCall() {
-  if(!lmsChatActiveRoom) return;
-  var room = lmsChatRooms.find(function(r){ return r.id === lmsChatActiveRoom; });
-  if(!room) return;
-
-  // Create call overlay
-  var overlay = document.getElementById('lmsChatCallOverlay');
-  if(!overlay) {
-    overlay = document.createElement('div');
-    overlay.id = 'lmsChatCallOverlay';
-    overlay.className = 'lms-call-overlay';
-    document.body.appendChild(overlay);
-  }
-
-  lmsChatCallSeconds = 0;
-  lmsChatCallState = 'voice';
-
-  overlay.innerHTML =
-    '<div class="call-avatar" style="background:'+room.color+'22;color:'+room.color+';">'+room.icon+'</div>' +
-    '<div class="call-name">'+room.name+'</div>' +
-    '<div class="call-status" id="lmsCallStatus">LMS Voice Call - Connecting...</div>' +
-    '<div class="call-timer" id="lmsCallTimer">00:00</div>' +
-    '<div class="call-controls">' +
-      '<button class="call-btn mute-call" id="lmsCallMuteBtn" onclick="lmsChatToggleMute()">&#128263;</button>' +
-      '<button class="call-btn end-call" onclick="lmsChatEndCall()">&#128244;</button>' +
-    '</div>';
-
-  overlay.classList.add('active');
-
-  // Start local audio
-  navigator.mediaDevices.getUserMedia({audio:true}).then(function(stream) {
-    lmsChatLocalStream = stream;
-    document.getElementById('lmsCallStatus').textContent = 'LMS Voice Call - Connected';
-    lmsChatCallTimer = setInterval(function() {
-      lmsChatCallSeconds++;
-      var m = Math.floor(lmsChatCallSeconds/60).toString().padStart(2,'0');
-      var s = (lmsChatCallSeconds%60).toString().padStart(2,'0');
-      var el = document.getElementById('lmsCallTimer');
-      if(el) el.textContent = m+':'+s;
-    }, 1000);
-
-    // Log call message
-    var user = lmsChatGetCurrentUser();
-    var msg = {
-      id:'msg-'+Date.now(), roomId:lmsChatActiveRoom, senderId:user.id, senderName:user.name,
-      text:user.name+' started a voice call', type:'call', timestamp:new Date().toISOString(), readBy:[user.id]
-    };
-    if(!lmsChatMessages[lmsChatActiveRoom]) lmsChatMessages[lmsChatActiveRoom] = [];
-    lmsChatMessages[lmsChatActiveRoom].push(msg);
-    saveLmsChatData();
-    var prefix = lmsChatGetRolePrefix();
-    lmsChatRenderMessages(prefix);
-    lmsChatRenderRoomList(prefix);
-  }).catch(function(err) {
-    document.getElementById('lmsCallStatus').textContent = 'Microphone access denied';
-    console.error('Voice call error:', err);
-  });
+  lmsChatInitiateCall('voice');
 }
 
 function lmsChatToggleMute() {
@@ -18505,40 +18502,24 @@ function lmsChatToggleMute() {
   }
 }
 
-function lmsChatEndCall() {
-  if(lmsChatCallTimer) { clearInterval(lmsChatCallTimer); lmsChatCallTimer = null; }
-  if(lmsChatLocalStream) { lmsChatLocalStream.getTracks().forEach(function(t){t.stop();}); lmsChatLocalStream = null; }
-
-  // Log end call
-  if(lmsChatActiveRoom && lmsChatCallSeconds > 0) {
-    var user = lmsChatGetCurrentUser();
-    var duration = Math.floor(lmsChatCallSeconds/60)+'m '+lmsChatCallSeconds%60+'s';
-    var msg = {
-      id:'msg-'+Date.now(), roomId:lmsChatActiveRoom, senderId:user.id, senderName:user.name,
-      text:'Call ended ('+duration+')', type:'call', timestamp:new Date().toISOString(), readBy:[user.id]
-    };
-    if(!lmsChatMessages[lmsChatActiveRoom]) lmsChatMessages[lmsChatActiveRoom] = [];
-    lmsChatMessages[lmsChatActiveRoom].push(msg);
-    saveLmsChatData();
-    var prefix = lmsChatGetRolePrefix();
-    lmsChatRenderMessages(prefix);
-    lmsChatRenderRoomList(prefix);
-  }
-
-  lmsChatCallState = null;
-  lmsChatCallSeconds = 0;
-  var overlay = document.getElementById('lmsChatCallOverlay');
-  if(overlay) overlay.classList.remove('active');
-}
-
-// ============================================
-// VIDEO CALLS
-// ============================================
-function lmsChatStartVideoCall() {
+// ── Unified call initiation (voice or video) ──
+function lmsChatInitiateCall(callType) {
   if(!lmsChatActiveRoom) return;
   var room = lmsChatRooms.find(function(r){ return r.id === lmsChatActiveRoom; });
   if(!room) return;
+  var user = lmsChatGetCurrentUser();
+  var isVideo = callType === 'video';
 
+  // Set active call on the room so other users can see it
+  room.activeCall = {
+    type: callType,
+    startedBy: user.id,
+    startedByName: user.name,
+    startedAt: new Date().toISOString(),
+    participants: [user.id]
+  };
+
+  // Create call overlay
   var overlay = document.getElementById('lmsChatCallOverlay');
   if(!overlay) {
     overlay = document.createElement('div');
@@ -18548,28 +18529,46 @@ function lmsChatStartVideoCall() {
   }
 
   lmsChatCallSeconds = 0;
-  lmsChatCallState = 'video';
+  lmsChatCallState = callType;
+  lmsChatCallRoomId = lmsChatActiveRoom;
 
-  overlay.innerHTML =
-    '<div class="lms-video-call-grid" id="lmsVideoGrid">' +
-      '<div class="video-tile"><video id="lmsLocalVideo" autoplay muted playsinline></video><div class="tile-name">You</div></div>' +
-    '</div>' +
-    '<div class="call-name" style="margin-top:16px;">'+room.name+' - LMS Class Video Call</div>' +
-    '<div class="call-status" id="lmsCallStatus">Connecting camera...</div>' +
-    '<div class="call-timer" id="lmsCallTimer">00:00</div>' +
-    '<div class="call-controls">' +
-      '<button class="call-btn mute-call" id="lmsCallMuteBtn" onclick="lmsChatToggleMute()">&#128263;</button>' +
-      '<button class="call-btn mute-call" id="lmsCallVideoBtn" onclick="lmsChatToggleVideo()">&#128249;</button>' +
-      '<button class="call-btn end-call" onclick="lmsChatEndCall()">&#128244;</button>' +
-    '</div>';
+  if(isVideo) {
+    overlay.innerHTML =
+      '<div class="lms-video-call-grid" id="lmsVideoGrid">' +
+        '<div class="video-tile"><video id="lmsLocalVideo" autoplay muted playsinline></video><div class="tile-name">You</div></div>' +
+      '</div>' +
+      '<div class="call-name" style="margin-top:16px;">'+room.name+' - LMS Video Call</div>' +
+      '<div class="call-status" id="lmsCallStatus">Connecting camera...</div>' +
+      '<div class="call-timer" id="lmsCallTimer">00:00</div>' +
+      '<div class="call-participants" id="lmsCallParticipants"></div>' +
+      '<div class="call-controls">' +
+        '<button class="call-btn mute-call" id="lmsCallMuteBtn" onclick="lmsChatToggleMute()">&#128263;</button>' +
+        '<button class="call-btn mute-call" id="lmsCallVideoBtn" onclick="lmsChatToggleVideo()">&#128249;</button>' +
+        '<button class="call-btn end-call" onclick="lmsChatEndCall()">&#128244;</button>' +
+      '</div>';
+  } else {
+    overlay.innerHTML =
+      '<div class="call-avatar" style="background:'+room.color+'22;color:'+room.color+';">'+room.icon+'</div>' +
+      '<div class="call-name">'+room.name+'</div>' +
+      '<div class="call-status" id="lmsCallStatus">LMS Voice Call - Connecting...</div>' +
+      '<div class="call-timer" id="lmsCallTimer">00:00</div>' +
+      '<div class="call-participants" id="lmsCallParticipants"></div>' +
+      '<div class="call-controls">' +
+        '<button class="call-btn mute-call" id="lmsCallMuteBtn" onclick="lmsChatToggleMute()">&#128263;</button>' +
+        '<button class="call-btn end-call" onclick="lmsChatEndCall()">&#128244;</button>' +
+      '</div>';
+  }
 
   overlay.classList.add('active');
 
-  navigator.mediaDevices.getUserMedia({audio:true, video:true}).then(function(stream) {
+  var mediaConstraints = isVideo ? {audio:true, video:true} : {audio:true};
+  navigator.mediaDevices.getUserMedia(mediaConstraints).then(function(stream) {
     lmsChatLocalStream = stream;
-    var vid = document.getElementById('lmsLocalVideo');
-    if(vid) vid.srcObject = stream;
-    document.getElementById('lmsCallStatus').textContent = 'LMS Class Video Call - Connected';
+    if(isVideo) {
+      var vid = document.getElementById('lmsLocalVideo');
+      if(vid) vid.srcObject = stream;
+    }
+    document.getElementById('lmsCallStatus').textContent = (isVideo ? 'LMS Video Call' : 'LMS Voice Call') + ' - Connected';
 
     lmsChatCallTimer = setInterval(function() {
       lmsChatCallSeconds++;
@@ -18579,21 +18578,310 @@ function lmsChatStartVideoCall() {
       if(el) el.textContent = m+':'+s;
     }, 1000);
 
-    var user = lmsChatGetCurrentUser();
+    // Log call message
     var msg = {
       id:'msg-'+Date.now(), roomId:lmsChatActiveRoom, senderId:user.id, senderName:user.name,
-      text:user.name+' started a video call', type:'call', timestamp:new Date().toISOString(), readBy:[user.id]
+      text:user.name+' started a '+ callType +' call', type:'call', callType:callType,
+      timestamp:new Date().toISOString(), readBy:[user.id]
     };
     if(!lmsChatMessages[lmsChatActiveRoom]) lmsChatMessages[lmsChatActiveRoom] = [];
     lmsChatMessages[lmsChatActiveRoom].push(msg);
+
+    // Notify all room members
+    lmsChatNotifyCallMembers(room, user, callType);
+
     saveLmsChatData();
+    if(typeof lmsChatSyncToDrive === 'function') lmsChatSyncToDrive();
+
     var prefix = lmsChatGetRolePrefix();
     lmsChatRenderMessages(prefix);
     lmsChatRenderRoomList(prefix);
+    lmsChatUpdateCallParticipantsUI(room);
   }).catch(function(err) {
-    document.getElementById('lmsCallStatus').textContent = 'Camera/microphone access denied';
-    console.error('Video call error:', err);
+    document.getElementById('lmsCallStatus').textContent = (isVideo ? 'Camera/microphone' : 'Microphone') + ' access denied';
+    console.error(callType + ' call error:', err);
+    // Clear active call on failure
+    delete room.activeCall;
+    lmsChatCallState = null;
   });
+}
+
+// ── Notify room members about the call ──
+function lmsChatNotifyCallMembers(room, caller, callType) {
+  var members = room.members || [];
+  var callLabel = callType === 'video' ? 'video call' : 'voice call';
+  var icon = callType === 'video' ? '&#128249;' : '&#128222;';
+
+  members.forEach(function(memberId) {
+    if(memberId === caller.id) return;
+    var memberAcct = userAccounts.find(function(u){ return u.id === memberId; });
+    if(!memberAcct) return;
+
+    // Add notification
+    addNotificationForUser(
+      icon + ' ' + caller.name + ' started a ' + callLabel + ' in ' + room.name + '. Tap to join!',
+      'info', icon, memberId, memberAcct.role
+    );
+  });
+
+  // For DM rooms, also show an incoming call notification popup
+  if(room.type === 'dm') {
+    var dmOtherId = (room.dmBetween || room.members).find(function(id){ return id !== caller.id; });
+    if(dmOtherId) {
+      lmsChatShowIncomingCallNotif(room, caller, callType, dmOtherId);
+    }
+  }
+}
+
+// ── Show incoming call notification popup ──
+function lmsChatShowIncomingCallNotif(room, caller, callType, targetUserId) {
+  // Only show if the target user is the current logged-in user
+  var me = lmsChatGetCurrentUser();
+  if(me.id !== targetUserId) return;
+
+  var existing = document.getElementById('lmsIncomingCallNotif');
+  if(existing) existing.remove();
+
+  var notif = document.createElement('div');
+  notif.id = 'lmsIncomingCallNotif';
+  notif.className = 'lms-incoming-call';
+
+  var callLabel = callType === 'video' ? 'Video Call' : 'Voice Call';
+  var callIcon = callType === 'video' ? '&#128249;' : '&#128222;';
+
+  notif.innerHTML =
+    '<div class="ic-header">' +
+      '<div class="ic-avatar">' + callIcon + '</div>' +
+      '<div class="ic-info">' +
+        '<div class="ic-name">' + caller.name + '</div>' +
+        '<div class="ic-type">Incoming ' + callLabel + '</div>' +
+      '</div>' +
+    '</div>' +
+    '<div class="ic-actions">' +
+      '<button class="ic-decline" onclick="lmsChatDismissIncomingCall()">Decline</button>' +
+      '<button class="ic-accept" onclick="lmsChatJoinCall(\'' + room.id + '\',\'' + callType + '\')">Join</button>' +
+    '</div>';
+
+  document.body.appendChild(notif);
+
+  // Auto-dismiss after 30 seconds
+  setTimeout(function() { lmsChatDismissIncomingCall(); }, 30000);
+}
+
+function lmsChatDismissIncomingCall() {
+  var el = document.getElementById('lmsIncomingCallNotif');
+  if(el) el.remove();
+}
+
+// ── Join an active call from the banner ──
+var lmsChatCallRoomId = null;
+
+function lmsChatJoinCall(roomId, callType) {
+  lmsChatDismissIncomingCall();
+
+  var room = lmsChatRooms.find(function(r){ return r.id === roomId; });
+  if(!room || !room.activeCall) { showToast('Call has ended'); return; }
+
+  var user = lmsChatGetCurrentUser();
+
+  // Add self to participants
+  if(room.activeCall.participants.indexOf(user.id) === -1) {
+    room.activeCall.participants.push(user.id);
+  }
+
+  // Open the room first if not already active
+  if(lmsChatActiveRoom !== roomId) {
+    var prefix = lmsChatGetRolePrefix();
+    lmsChatOpenRoom(roomId, prefix);
+  }
+
+  // Now start the call UI
+  var isVideo = callType === 'video';
+  var overlay = document.getElementById('lmsChatCallOverlay');
+  if(!overlay) {
+    overlay = document.createElement('div');
+    overlay.id = 'lmsChatCallOverlay';
+    overlay.className = 'lms-call-overlay';
+    document.body.appendChild(overlay);
+  }
+
+  lmsChatCallSeconds = 0;
+  lmsChatCallState = callType;
+  lmsChatCallRoomId = roomId;
+
+  if(isVideo) {
+    overlay.innerHTML =
+      '<div class="lms-video-call-grid" id="lmsVideoGrid">' +
+        '<div class="video-tile"><video id="lmsLocalVideo" autoplay muted playsinline></video><div class="tile-name">You</div></div>' +
+      '</div>' +
+      '<div class="call-name" style="margin-top:16px;">'+room.name+' - LMS Video Call</div>' +
+      '<div class="call-status" id="lmsCallStatus">Joining call...</div>' +
+      '<div class="call-timer" id="lmsCallTimer">00:00</div>' +
+      '<div class="call-participants" id="lmsCallParticipants"></div>' +
+      '<div class="call-controls">' +
+        '<button class="call-btn mute-call" id="lmsCallMuteBtn" onclick="lmsChatToggleMute()">&#128263;</button>' +
+        '<button class="call-btn mute-call" id="lmsCallVideoBtn" onclick="lmsChatToggleVideo()">&#128249;</button>' +
+        '<button class="call-btn end-call" onclick="lmsChatEndCall()">&#128244;</button>' +
+      '</div>';
+  } else {
+    overlay.innerHTML =
+      '<div class="call-avatar" style="background:'+room.color+'22;color:'+room.color+';">'+room.icon+'</div>' +
+      '<div class="call-name">'+room.name+'</div>' +
+      '<div class="call-status" id="lmsCallStatus">Joining call...</div>' +
+      '<div class="call-timer" id="lmsCallTimer">00:00</div>' +
+      '<div class="call-participants" id="lmsCallParticipants"></div>' +
+      '<div class="call-controls">' +
+        '<button class="call-btn mute-call" id="lmsCallMuteBtn" onclick="lmsChatToggleMute()">&#128263;</button>' +
+        '<button class="call-btn end-call" onclick="lmsChatEndCall()">&#128244;</button>' +
+      '</div>';
+  }
+
+  overlay.classList.add('active');
+
+  var mediaConstraints = isVideo ? {audio:true, video:true} : {audio:true};
+  navigator.mediaDevices.getUserMedia(mediaConstraints).then(function(stream) {
+    lmsChatLocalStream = stream;
+    if(isVideo) {
+      var vid = document.getElementById('lmsLocalVideo');
+      if(vid) vid.srcObject = stream;
+    }
+    document.getElementById('lmsCallStatus').textContent = (isVideo ? 'LMS Video Call' : 'LMS Voice Call') + ' - Connected';
+
+    lmsChatCallTimer = setInterval(function() {
+      lmsChatCallSeconds++;
+      var m = Math.floor(lmsChatCallSeconds/60).toString().padStart(2,'0');
+      var s = (lmsChatCallSeconds%60).toString().padStart(2,'0');
+      var el = document.getElementById('lmsCallTimer');
+      if(el) el.textContent = m+':'+s;
+    }, 1000);
+
+    // Log join message
+    var joinMsg = {
+      id:'msg-'+Date.now(), roomId:roomId, senderId:user.id, senderName:user.name,
+      text:user.name+' joined the '+callType+' call', type:'call', timestamp:new Date().toISOString(), readBy:[user.id]
+    };
+    if(!lmsChatMessages[roomId]) lmsChatMessages[roomId] = [];
+    lmsChatMessages[roomId].push(joinMsg);
+    saveLmsChatData();
+    if(typeof lmsChatSyncToDrive === 'function') lmsChatSyncToDrive();
+
+    var prefix = lmsChatGetRolePrefix();
+    lmsChatRenderMessages(prefix);
+    lmsChatRenderRoomList(prefix);
+    lmsChatUpdateCallParticipantsUI(room);
+  }).catch(function(err) {
+    document.getElementById('lmsCallStatus').textContent = 'Media access denied';
+    lmsChatCallState = null;
+  });
+}
+
+// ── Update participants display in call overlay ──
+function lmsChatUpdateCallParticipantsUI(room) {
+  var el = document.getElementById('lmsCallParticipants');
+  if(!el || !room.activeCall) return;
+  var names = room.activeCall.participants.map(function(pid) {
+    var acct = userAccounts.find(function(u){ return u.id === pid; });
+    return acct ? acct.name : 'Unknown';
+  });
+  el.innerHTML = '<div style="font-size:12px;color:var(--text-muted);margin-top:8px;">In call: ' + names.join(', ') + '</div>';
+}
+
+// ── Render active call banner in chat ──
+function lmsChatRenderCallBanner(prefix) {
+  var bannerId = prefix + 'CallBanner';
+  var existing = document.getElementById(bannerId);
+  if(existing) existing.remove();
+
+  if(!lmsChatActiveRoom) return;
+  var room = lmsChatRooms.find(function(r){ return r.id === lmsChatActiveRoom; });
+  if(!room || !room.activeCall) return;
+
+  // Don't show banner if we're already in the call
+  var me = lmsChatGetCurrentUser();
+  if(lmsChatCallState && lmsChatCallRoomId === room.id) return;
+
+  var call = room.activeCall;
+  var callLabel = call.type === 'video' ? 'Video Call' : 'Voice Call';
+  var callIcon = call.type === 'video' ? '&#128249;' : '&#128222;';
+  var participantNames = call.participants.map(function(pid) {
+    var acct = userAccounts.find(function(u){ return u.id === pid; });
+    return acct ? acct.name : 'Unknown';
+  }).join(', ');
+
+  var banner = document.createElement('div');
+  banner.id = bannerId;
+  banner.className = 'lms-active-call-banner';
+  banner.innerHTML =
+    '<div class="acb-icon">' + callIcon + '</div>' +
+    '<div class="acb-info">' +
+      '<div class="acb-title">' + callLabel + ' in progress</div>' +
+      '<div class="acb-participants">' + participantNames + '</div>' +
+    '</div>' +
+    '<button class="acb-join" onclick="lmsChatJoinCall(\'' + room.id + '\',\'' + call.type + '\')">Join Call</button>';
+
+  // Insert before messages container
+  var msgContainer = document.getElementById(prefix + 'ChatMessages');
+  if(msgContainer && msgContainer.parentNode) {
+    msgContainer.parentNode.insertBefore(banner, msgContainer);
+  }
+}
+
+function lmsChatEndCall() {
+  if(lmsChatCallTimer) { clearInterval(lmsChatCallTimer); lmsChatCallTimer = null; }
+  if(lmsChatLocalStream) { lmsChatLocalStream.getTracks().forEach(function(t){t.stop();}); lmsChatLocalStream = null; }
+
+  var callRoomId = lmsChatCallRoomId || lmsChatActiveRoom;
+
+  // Log end call and remove active call from room
+  if(callRoomId && lmsChatCallSeconds > 0) {
+    var user = lmsChatGetCurrentUser();
+    var duration = Math.floor(lmsChatCallSeconds/60)+'m '+lmsChatCallSeconds%60+'s';
+    var msg = {
+      id:'msg-'+Date.now(), roomId:callRoomId, senderId:user.id, senderName:user.name,
+      text:user.name+' left the call ('+duration+')', type:'call', timestamp:new Date().toISOString(), readBy:[user.id]
+    };
+    if(!lmsChatMessages[callRoomId]) lmsChatMessages[callRoomId] = [];
+    lmsChatMessages[callRoomId].push(msg);
+
+    // Remove self from participants
+    var room = lmsChatRooms.find(function(r){ return r.id === callRoomId; });
+    if(room && room.activeCall) {
+      var idx = room.activeCall.participants.indexOf(user.id);
+      if(idx !== -1) room.activeCall.participants.splice(idx, 1);
+      // If no participants left, end the call entirely
+      if(room.activeCall.participants.length === 0) {
+        delete room.activeCall;
+        var endMsg = {
+          id:'msg-'+Date.now()+'-end', roomId:callRoomId, senderId:user.id, senderName:user.name,
+          text:'Call ended ('+duration+')', type:'call', timestamp:new Date().toISOString(), readBy:[user.id]
+        };
+        lmsChatMessages[callRoomId].push(endMsg);
+      }
+    }
+
+    saveLmsChatData();
+    if(typeof lmsChatSyncToDrive === 'function') lmsChatSyncToDrive();
+    var prefix = lmsChatGetRolePrefix();
+    lmsChatRenderMessages(prefix);
+    lmsChatRenderRoomList(prefix);
+  }
+
+  lmsChatCallState = null;
+  lmsChatCallRoomId = null;
+  lmsChatCallSeconds = 0;
+  var overlay = document.getElementById('lmsChatCallOverlay');
+  if(overlay) overlay.classList.remove('active');
+
+  // Re-render call banner in case call is still active with other participants
+  var prefix2 = lmsChatGetRolePrefix();
+  lmsChatRenderCallBanner(prefix2);
+}
+
+// ============================================
+// VIDEO CALLS
+// ============================================
+function lmsChatStartVideoCall() {
+  lmsChatInitiateCall('video');
 }
 
 function lmsChatToggleVideo() {
@@ -18626,13 +18914,48 @@ function lmsChatOnPageShow(prefix) {
   if(isCloudConnected && googleAccessToken) {
     lmsChatSyncFromDrive().then(function() {
       lmsChatRenderRoomList(prefix);
+      // Check for any active calls in rooms the user is a member of
+      lmsChatCheckForActiveCalls();
     });
   }
+
+  // Start periodic sync to detect incoming calls (every 15 seconds)
+  if(lmsChatCallPollInterval) clearInterval(lmsChatCallPollInterval);
+  lmsChatCallPollInterval = setInterval(function() {
+    if(!isCloudConnected || !googleAccessToken) return;
+    lmsChatSyncFromDrive().then(function() {
+      lmsChatRenderRoomList(prefix);
+      if(lmsChatActiveRoom) lmsChatRenderCallBanner(prefix);
+      lmsChatCheckForActiveCalls();
+    });
+  }, 15000);
 
   // Save status (but skip the Drive sync timer — we just fetched)
   try {
     localStorage.setItem('voctrain_chatProfiles', JSON.stringify(lmsChatProfiles));
   } catch(e) {}
+}
+
+var lmsChatCallPollInterval = null;
+
+// Check if any rooms have active calls and show notification
+function lmsChatCheckForActiveCalls() {
+  var me = lmsChatGetCurrentUser();
+  if(!me) return;
+  lmsChatRooms.forEach(function(room) {
+    if(!room.activeCall) return;
+    if(!room.members || room.members.indexOf(me.id) === -1) return;
+    // Don't notify if I'm already in the call or started it
+    if(room.activeCall.participants.indexOf(me.id) !== -1) return;
+    if(lmsChatCallState) return; // Already in a call
+
+    // Check if this call was recently started (within last 30 seconds)
+    var callAge = Date.now() - new Date(room.activeCall.startedAt).getTime();
+    if(callAge < 30000) {
+      var caller = { id: room.activeCall.startedBy, name: room.activeCall.startedByName };
+      lmsChatShowIncomingCallNotif(room, caller, room.activeCall.type, me.id);
+    }
+  });
 }
 
 // ============================================
