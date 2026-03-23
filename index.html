@@ -12221,19 +12221,31 @@ function renderInstructorExams(filter) {
     var qCount = (e.questionData && e.questionData.length > 0) ? e.questionData.length : e.questions;
     var hasQuestions = e.questionData && e.questionData.length > 0;
     var resultsForExam = examResults.filter(function(r){return r.examId===e.id;});
+    // Instructors can only edit/activate/complete their own exams
+    var isOwner = currentRole === 'admin' || (currentInstructor && e.createdBy === currentInstructor.id);
+    var createdByLabel = '';
+    if(currentRole === 'instructor') {
+      createdByLabel = isOwner ? '<br><span style="font-size:10px;color:var(--accent);">Created by you</span>' : '<br><span style="font-size:10px;color:var(--text-muted);">Created by Admin</span>';
+    }
     var actionBtns = '<button class="btn btn-sm btn-secondary" onclick="viewExamDetail('+idx+')" title="View exam details & questions">View</button>';
     if(e.status==='upcoming') {
-      actionBtns += '<button class="btn btn-sm btn-secondary" style="margin-left:4px;" onclick="editExam('+idx+')" title="Edit exam details & questions">'+(!hasQuestions?'Add Questions':'Edit')+'</button>' +
-        '<button class="btn btn-sm btn-primary" style="margin-left:4px;" onclick="activateExam('+idx+')">Activate</button>';
+      if(isOwner) {
+        actionBtns += '<button class="btn btn-sm btn-secondary" style="margin-left:4px;" onclick="editExam('+idx+')" title="Edit exam details & questions">'+(!hasQuestions?'Add Questions':'Edit')+'</button>' +
+          '<button class="btn btn-sm btn-primary" style="margin-left:4px;" onclick="activateExam('+idx+')">Activate</button>';
+      }
     } else if(e.status==='active') {
-      actionBtns += '<button class="btn btn-sm btn-primary" style="margin-left:4px;" onclick="viewExamResults('+idx+')">Monitor ('+resultsForExam.length+')</button>' +
-        '<button class="btn btn-sm btn-secondary" style="margin-left:4px;" onclick="editExam('+idx+')" title="Edit exam">Edit</button>' +
-        '<button class="btn btn-sm btn-secondary" style="margin-left:4px;" onclick="completeExam('+idx+')">Complete</button>';
+      actionBtns += '<button class="btn btn-sm btn-primary" style="margin-left:4px;" onclick="viewExamResults('+idx+')">Monitor ('+resultsForExam.length+')</button>';
+      if(isOwner) {
+        actionBtns += '<button class="btn btn-sm btn-secondary" style="margin-left:4px;" onclick="editExam('+idx+')" title="Edit exam">Edit</button>' +
+          '<button class="btn btn-sm btn-secondary" style="margin-left:4px;" onclick="completeExam('+idx+')">Complete</button>';
+      }
     } else {
-      actionBtns += '<button class="btn btn-sm btn-secondary" style="margin-left:4px;" onclick="viewExamResults('+idx+')">Results ('+resultsForExam.length+')</button>' +
-        '<button class="btn btn-sm btn-secondary" style="margin-left:4px;" onclick="editExam('+idx+')" title="Edit exam">Edit</button>';
+      actionBtns += '<button class="btn btn-sm btn-secondary" style="margin-left:4px;" onclick="viewExamResults('+idx+')">Results ('+resultsForExam.length+')</button>';
+      if(isOwner) {
+        actionBtns += '<button class="btn btn-sm btn-secondary" style="margin-left:4px;" onclick="editExam('+idx+')" title="Edit exam">Edit</button>';
+      }
     }
-    return '<tr><td><strong>'+e.title+'</strong>'+(hasQuestions?'<br><span style="font-size:11px;color:var(--green);">✓ Questions added</span>':'')+'</td><td>'+e.course+'</td><td>'+e.date+' @ '+e.time+'</td><td>'+e.duration+' min</td><td>'+qCount+'</td><td><span class="badge '+(e.status==='upcoming'?'badge-blue':e.status==='active'?'badge-red':'badge-green')+'"><span class="badge-dot"></span>'+(e.status==='active'?'In Progress':e.status==='completed'?'Completed ✓':'Scheduled')+'</span>'+(e.passRate?'<br><span style="font-size:11px;color:var(--text-muted);">Pass: '+e.passRate+'</span>':'')+'</td><td>'+actionBtns+'</td></tr>';
+    return '<tr><td><strong>'+e.title+'</strong>'+(hasQuestions?'<br><span style="font-size:11px;color:var(--green);">✓ Questions added</span>':'')+createdByLabel+'</td><td>'+e.course+'</td><td>'+e.date+' @ '+e.time+'</td><td>'+e.duration+' min</td><td>'+qCount+'</td><td><span class="badge '+(e.status==='upcoming'?'badge-blue':e.status==='active'?'badge-red':'badge-green')+'"><span class="badge-dot"></span>'+(e.status==='active'?'In Progress':e.status==='completed'?'Completed ✓':'Scheduled')+'</span>'+(e.passRate?'<br><span style="font-size:11px;color:var(--text-muted);">Pass: '+e.passRate+'</span>':'')+'</td><td>'+actionBtns+'</td></tr>';
   }).join('') || '<tr><td colspan="7" style="text-align:center;color:var(--text-muted);padding:24px;">No '+filter+' exams'+(courseFilter?' for '+courseFilter:'')+'</td></tr>';
 }
 
@@ -12362,6 +12374,8 @@ function createExam() {
   if(hasInvalid) return;
 
   var examId = 'EXAM-'+Date.now();
+  var creatorId = currentRole === 'instructor' && currentInstructor ? currentInstructor.id : (currentRole === 'admin' ? 'admin' : 'unknown');
+  var creatorRole = currentRole || 'admin';
   var newExam = {
     id: examId,
     title: title,
@@ -12375,7 +12389,9 @@ function createExam() {
     passMark: Math.min(100, Math.max(1, parseInt(document.getElementById('examPassMark').value)||60)),
     questionData: JSON.parse(JSON.stringify(examBuilderQuestions)),
     shuffleQuestions: document.getElementById('examShuffle').value === 'true',
-    instructions: document.getElementById('examInstructions').value
+    instructions: document.getElementById('examInstructions').value,
+    createdBy: creatorId,
+    createdByRole: creatorRole
   };
 
   if(editingExamIdx >= 0) {
@@ -12410,6 +12426,10 @@ function editExamQuestions(idx) {
 
 function activateExam(idx) {
   var e = exams[idx];
+  if(currentRole === 'instructor' && currentInstructor && e.createdBy !== currentInstructor.id) {
+    alert('You can only activate exams you created.');
+    return;
+  }
   if(!e.questionData || e.questionData.length === 0) {
     alert('Please add questions to this exam before activating it.');
     return;
@@ -12423,8 +12443,12 @@ function activateExam(idx) {
 }
 
 function completeExam(idx) {
-  if(!confirm('Mark this exam as completed? Students will no longer be able to take it.')) return;
   var e = exams[idx];
+  if(currentRole === 'instructor' && currentInstructor && e.createdBy !== currentInstructor.id) {
+    alert('You can only complete exams you created.');
+    return;
+  }
+  if(!confirm('Mark this exam as completed? Students will no longer be able to take it.')) return;
   exams[idx].status = 'completed';
   // Calculate pass rate
   var results = examResults.filter(function(r){return r.examId===e.id;});
@@ -12512,10 +12536,11 @@ function viewExamDetail(idx) {
   var statusLabel = e.status==='active'?'In Progress':e.status==='completed'?'Completed':'Scheduled';
   var statusBadge = '<span class="badge '+(e.status==='upcoming'?'badge-blue':e.status==='active'?'badge-red':'badge-green')+'"><span class="badge-dot"></span>'+statusLabel+'</span>';
 
+  var canEdit = currentRole === 'admin' || (currentInstructor && e.createdBy === currentInstructor.id);
   var html = '<div style="display:flex;align-items:center;gap:12px;margin-bottom:20px;">' +
     '<button class="btn btn-secondary" onclick="backToExamList()">&larr; Back to Exams</button>' +
     '<h3 style="flex:1;">'+e.title+'</h3>' +
-    '<button class="btn btn-sm btn-primary" onclick="editExam('+idx+')">Edit Exam</button>' +
+    (canEdit ? '<button class="btn btn-sm btn-primary" onclick="editExam('+idx+')">Edit Exam</button>' : '') +
     '</div>';
 
   // Exam info card
@@ -12570,7 +12595,7 @@ function viewExamDetail(idx) {
     html += '</div>';
   } else {
     html += '<div class="card" style="text-align:center;padding:32px;color:var(--text-muted);"><div style="font-size:36px;margin-bottom:8px;">&#128221;</div><p>No questions added to this exam yet.</p>' +
-      '<button class="btn btn-primary btn-sm" style="margin-top:12px;" onclick="editExamQuestions('+idx+')">Add Questions</button></div>';
+      (canEdit ? '<button class="btn btn-primary btn-sm" style="margin-top:12px;" onclick="editExamQuestions('+idx+')">Add Questions</button>' : '') + '</div>';
   }
 
   view.innerHTML = html;
@@ -12578,6 +12603,10 @@ function viewExamDetail(idx) {
 
 function editExam(idx) {
   var e = exams[idx];
+  if(currentRole === 'instructor' && currentInstructor && e.createdBy !== currentInstructor.id) {
+    alert('You can only edit exams you created. This exam was created by an administrator.');
+    return;
+  }
   if(e.status === 'active') {
     if(!confirm('This exam is currently active. Editing it may affect students currently taking it. Continue?')) return;
   } else if(e.status === 'completed') {
