@@ -2126,6 +2126,29 @@ textarea.form-control { resize:vertical; min-height:80px; }
   .vc-btn { width:42px; height:42px; font-size:16px; }
   .chat-panel { height:280px; }
 
+  /* Mobile: participants only see host screen, local tile as tiny overlay */
+  .video-grid.vc-host-focus-mode .video-tile.host-tile {
+    min-height:60vh; width:100%; border-radius:0;
+  }
+  .video-grid.vc-host-focus-mode .video-tile.local {
+    width:100px; position:absolute; bottom:8px; right:8px;
+    opacity:0.85; border-radius:8px;
+  }
+  /* Hide non-host/non-local tiles on mobile for participants */
+  .video-grid.vc-host-focus-mode .video-tile:not(.host-tile):not(.local) {
+    display:none !important;
+  }
+  /* Screen share mode on mobile: host screen fills view */
+  .video-grid.vc-screen-share-mode .video-tile.screen-share {
+    min-height:55vh; width:100%;
+  }
+  .video-grid.vc-screen-share-mode .video-tile.local {
+    width:90px; align-self:flex-end;
+  }
+  /* Hide host bar permission buttons text on mobile to save space */
+  #vc-host-bar { flex-wrap:wrap; padding:8px; gap:6px; }
+  #vc-host-bar .vc-host-btn { font-size:10px; padding:4px 8px; }
+
   /* Modals: slightly larger on mobile */
   .modal { padding:20px 16px; width:95%; max-height:90vh; }
 
@@ -2241,6 +2264,20 @@ textarea.form-control { resize:vertical; min-height:80px; }
   /* Class schedule cards: fully stacked */
   .class-schedule-card { flex-direction:column; align-items:flex-start; }
   .class-time-block { min-width:auto; width:100%; }
+
+  /* Video conference: host screen fills most of viewport on small phones */
+  .video-grid.vc-host-focus-mode .video-tile.host-tile {
+    min-height:65vh; border-radius:0; margin:0 -12px; width:calc(100% + 24px);
+  }
+  .video-grid.vc-host-focus-mode .video-tile.local {
+    width:80px; bottom:6px; right:6px; border-radius:6px;
+  }
+  .video-grid.vc-screen-share-mode .video-tile.screen-share {
+    min-height:60vh; margin:0 -12px; width:calc(100% + 24px); border-radius:0;
+  }
+  .video-grid.vc-screen-share-mode .video-tile.local {
+    width:70px;
+  }
 }
 
 /* ============================== C.E.S.T.I.S LMS CHAT ============================== */
