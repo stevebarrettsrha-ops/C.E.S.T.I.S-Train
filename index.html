@@ -905,7 +905,10 @@ textarea.form-control { resize:vertical; min-height:80px; }
 }
 .video-tile.screen-share {
   grid-column:1/-1; aspect-ratio:auto; min-height:300px;
-  border:2px solid var(--blue);
+  border:2px solid var(--blue); background:#000;
+}
+.video-tile.screen-share video {
+  object-fit:contain !important; background:#000;
 }
 /* Participant screen-share view: grid becomes flex column so the screen tile dominates */
 .video-grid.vc-screen-share-mode {
@@ -923,7 +926,10 @@ textarea.form-control { resize:vertical; min-height:80px; }
   display:flex; flex-direction:column; gap:12px; position:relative;
 }
 .video-grid.vc-host-focus-mode .video-tile.host-tile {
-  flex:1; min-height:400px; aspect-ratio:16/9; border:2px solid var(--blue);
+  flex:1; min-height:400px; aspect-ratio:16/9; border:2px solid var(--blue); background:#000;
+}
+.video-grid.vc-host-focus-mode .video-tile.host-tile video {
+  object-fit:contain; background:#000;
 }
 .video-grid.vc-host-focus-mode .video-tile.local {
   position:absolute; bottom:12px; right:12px; width:180px; aspect-ratio:16/9;
@@ -2274,6 +2280,29 @@ body.vc-fullscreen-mode.vc-host-only-mode .video-grid .video-tile:not(.vc-hoston
   .vc-btn { width:42px; height:42px; font-size:16px; }
   .chat-panel { height:280px; }
 
+  /* Mobile: participants only see host screen, local tile as tiny overlay */
+  .video-grid.vc-host-focus-mode .video-tile.host-tile {
+    min-height:60vh; width:100%; border-radius:0;
+  }
+  .video-grid.vc-host-focus-mode .video-tile.local {
+    width:100px; position:absolute; bottom:8px; right:8px;
+    opacity:0.85; border-radius:8px;
+  }
+  /* Hide non-host/non-local tiles on mobile for participants */
+  .video-grid.vc-host-focus-mode .video-tile:not(.host-tile):not(.local) {
+    display:none !important;
+  }
+  /* Screen share mode on mobile: host screen fills view */
+  .video-grid.vc-screen-share-mode .video-tile.screen-share {
+    min-height:55vh; width:100%;
+  }
+  .video-grid.vc-screen-share-mode .video-tile.local {
+    width:90px; align-self:flex-end;
+  }
+  /* Hide host bar permission buttons text on mobile to save space */
+  #vc-host-bar { flex-wrap:wrap; padding:8px; gap:6px; }
+  #vc-host-bar .vc-host-btn { font-size:10px; padding:4px 8px; }
+
   /* Modals: slightly larger on mobile */
   .modal { padding:20px 16px; width:95%; max-height:90vh; }
 
@@ -2389,6 +2418,20 @@ body.vc-fullscreen-mode.vc-host-only-mode .video-grid .video-tile:not(.vc-hoston
   /* Class schedule cards: fully stacked */
   .class-schedule-card { flex-direction:column; align-items:flex-start; }
   .class-time-block { min-width:auto; width:100%; }
+
+  /* Video conference: host screen fills most of viewport on small phones */
+  .video-grid.vc-host-focus-mode .video-tile.host-tile {
+    min-height:65vh; border-radius:0; margin:0 -12px; width:calc(100% + 24px);
+  }
+  .video-grid.vc-host-focus-mode .video-tile.local {
+    width:80px; bottom:6px; right:6px; border-radius:6px;
+  }
+  .video-grid.vc-screen-share-mode .video-tile.screen-share {
+    min-height:60vh; margin:0 -12px; width:calc(100% + 24px); border-radius:0;
+  }
+  .video-grid.vc-screen-share-mode .video-tile.local {
+    width:70px;
+  }
 }
 
 /* ============================== C.E.S.T.I.S LMS CHAT ============================== */
@@ -6526,7 +6569,7 @@ function buildAdminPages() {
     <div style="display:flex;gap:12px;margin-bottom:18px;flex-wrap:wrap;"><button class="btn btn-primary" onclick="openModal('createClassSessionModal')">+ New Class Session</button><button class="btn btn-secondary" onclick="document.getElementById('vc-join-code')?.focus();showToast('Enter a room code below and click Join to connect')">Join Existing Class</button><button class="btn btn-primary" style="background:var(--purple);" onclick="openModal('createAdminMeetingModal')">+ Schedule Admin Meeting</button></div>
     <div class="card" id="videoClassList"><div class="card-header"><h3>Active & Scheduled Classes</h3></div><div class="table-wrapper"><table><thead><tr><th>Class</th><th>Instructor</th><th>Time</th><th>Students</th><th>Status</th><th>Action</th></tr></thead><tbody id="adminAllSessionsList">
       ${classSessions.length > 0 ? classSessions.map(cs =>
-        '<tr><td><strong>'+cs.name+'</strong></td><td>'+(cs.instructor||'—')+'</td><td>'+(cs.time||'—')+' - '+(cs.endTime||'—')+'</td><td>'+(cs.students||'—')+'</td><td><span class="badge badge-blue"><span class="badge-dot"></span>Scheduled</span></td><td><button class="btn btn-sm btn-primary" onclick="enterVideoRoom(\''+cs.name.replace(/'/g,"\\'")+'\',\'admin\')">Join</button></td></tr>'
+        '<tr><td><strong>'+cs.name+'</strong></td><td>'+(cs.instructor||'—')+'</td><td>'+(cs.time||'—')+' - '+(cs.endTime||'—')+'</td><td>'+(cs.students||'—')+'</td><td><span class="badge badge-blue"><span class="badge-dot"></span>Scheduled</span>'+(cs.roomCode?'<div style="font-family:monospace;font-size:10px;color:var(--accent);margin-top:2px;">Room: '+cs.roomCode+'</div>':'')+'</td><td><button class="btn btn-sm btn-primary" onclick="enterVideoRoom(\''+cs.name.replace(/'/g,"\\'")+'\',\'admin\',\''+(cs.roomCode||'')+'\')">Join</button></td></tr>'
       ).join('') : '<tr><td colspan="6" style="text-align:center;color:var(--text-muted);padding:24px;">No class sessions scheduled. Create a new session above.</td></tr>'}
     </tbody></table></div></div>
     <div class="card" style="margin-top:18px;"><div class="card-header"><h3>My Scheduled Sessions</h3><span style="font-size:12px;color:var(--text-muted);">Custom created sessions</span></div><div class="table-wrapper"><table><thead><tr><th>Class</th><th>Created By</th><th>Date & Time</th><th>Duration</th><th>Status</th><th>Action</th></tr></thead><tbody id="adminClassSessionsList"></tbody></table></div></div>
@@ -8460,7 +8503,7 @@ function generateRoomCode() {
 
 function sanitizePeerId(str) { return str.replace(/[^a-zA-Z0-9-]/g, ''); }
 
-function enterVideoRoom(title, role) {
+function enterVideoRoom(title, role, roomCode) {
   const listId = role==='admin' ? 'videoClassList' : role==='adminstaff' ? 'asVideoContent' : role==='instructor' ? 'iVideoClassList' : 'sVideoClassList';
   const containerId = role==='admin' ? 'videoRoom' : role==='adminstaff' ? 'asVideoRoom' : role==='instructor' ? 'iVideoRoom' : 'sVideoRoom';
   var listEl = document.getElementById(listId);
@@ -8473,10 +8516,14 @@ function enterVideoRoom(title, role) {
   vcCurrentRole = role;
   vcCurrentUserName = userName;
 
+  // Escape roomCode for use in onclick attributes
+  var escapedRoomCode = roomCode ? roomCode.replace(/'/g,"\\'") : '';
+
   room.innerHTML = `
     <div style="display:flex;align-items:center;gap:12px;margin-bottom:24px;">
       <button class="btn btn-secondary btn-sm" onclick="exitVideoRoom('${role}')">&#8592; Back</button>
       <h3 style="font-family:'Playfair Display',serif;">${title}</h3>
+      ${roomCode ? '<div style="font-family:monospace;font-size:13px;color:var(--accent);background:var(--accent-dim);padding:4px 12px;border-radius:6px;">Room: '+roomCode+'</div>' : ''}
     </div>
     <div class="vc-lobby">
       <div class="vc-lobby-preview">
@@ -8503,8 +8550,8 @@ function enterVideoRoom(title, role) {
       ` : ''}
       ${role !== 'student' ? `
         <div style="text-align:center;">
-          <div style="font-size:13px;color:var(--text-muted);margin-bottom:8px;">Start a new session for this class</div>
-          <button class="btn btn-primary" onclick="vcCreateRoom('${title.replace(/'/g,"\\'")}','${role}')">Create Room</button>
+          <div style="font-size:13px;color:var(--text-muted);margin-bottom:8px;">${roomCode ? 'Start this scheduled session' : 'Start a new session for this class'}</div>
+          <button class="btn btn-primary" onclick="vcCreateRoom('${title.replace(/'/g,"\\'")}','${role}','${escapedRoomCode}')">${roomCode ? 'Start Session (Room: '+roomCode+')' : 'Create Room'}</button>
         </div>
         <div class="vc-divider">or join existing</div>
       ` : ''}
@@ -8513,6 +8560,7 @@ function enterVideoRoom(title, role) {
         <div style="display:flex;gap:8px;align-items:center;justify-content:center;">
           <input type="text" class="form-control" id="vc-join-code" placeholder="ABC123" maxlength="6"
             style="font-family:monospace;font-size:20px;letter-spacing:4px;text-align:center;text-transform:uppercase;width:200px;"
+            ${roomCode && role==='student' ? 'value="'+roomCode+'"' : ''}
             onkeyup="this.value=this.value.toUpperCase();if(event.key==='Enter')vcJoinRoom('${title.replace(/'/g,"\\'")}','${role}')">
           <button class="btn btn-primary" onclick="vcJoinRoom('${title.replace(/'/g,"\\'")}','${role}')">Join</button>
         </div>
@@ -8562,8 +8610,8 @@ function vcUpdateStatus(type, message) {
 }
 
 // ── Create Room (Host) ──
-async function vcCreateRoom(title, role) {
-  currentRoomCode = generateRoomCode();
+async function vcCreateRoom(title, role, scheduledCode) {
+  currentRoomCode = (scheduledCode && scheduledCode.length >= 4) ? scheduledCode : generateRoomCode();
   isRoomHost = true;
   activeHostRoom = {code: currentRoomCode, title: title, role: role};
   vcUpdateStatus('connecting', 'Creating room...');
@@ -9476,8 +9524,10 @@ async function vcToggleScreen() {
     screenStream.getTracks().forEach(function(t){t.stop();});
     screenStream = null;
     btn.classList.remove('active');
-    if(localStream && localStream.getVideoTracks()[0]) {
+    // Restore camera track for all peers
+    if(localStream && localStream.getVideoTracks().length > 0) {
       var camTrack = localStream.getVideoTracks()[0];
+      camTrack.enabled = true;
       vcReplaceVideoTrackForAll(camTrack);
     }
     var lv = document.getElementById('vc-local-video');
@@ -9487,16 +9537,16 @@ async function vcToggleScreen() {
     return;
   }
   try {
-    screenStream = await navigator.mediaDevices.getDisplayMedia({video:true, audio:false});
+    screenStream = await navigator.mediaDevices.getDisplayMedia({video:{cursor:'always'}, audio:true});
     btn.classList.add('active');
     var sTrack = screenStream.getVideoTracks()[0];
     vcReplaceVideoTrackForAll(sTrack);
     var lv = document.getElementById('vc-local-video');
     if(lv) { lv.srcObject = screenStream; lv.parentElement.classList.remove('local'); }
-    // Notify peers that screen is being shared
+    // Notify peers FIRST so they switch to screen-share layout before track arrives
     vcBroadcastData({type:'screen-share-started', peerId: rtcPeer ? rtcPeer.id : '', name: vcCurrentUserName});
     sTrack.onended = function() { vcToggleScreen(); };
-  } catch(err) { /* user cancelled */ }
+  } catch(err) { console.warn('Screen share cancelled or failed:', err); }
 }
 
 // Helper: Replace video track in all peer media connections
@@ -9504,17 +9554,63 @@ function vcReplaceVideoTrackForAll(newTrack) {
   Object.keys(peerConnections).forEach(function(pid) {
     var mc = peerConnections[pid].media;
     if(!mc) return;
-    // PeerJS exposes the underlying RTCPeerConnection
-    var pc = mc.peerConnection || (mc._pc) || null;
+    // PeerJS exposes the underlying RTCPeerConnection via multiple possible paths
+    var pc = mc.peerConnection || mc._peerConnection || mc._pc || (mc.provider && mc.provider.peerConnection) || null;
+    if(!pc && mc.open !== undefined) {
+      // Try accessing through PeerJS internals
+      var keys = Object.keys(mc);
+      for(var k = 0; k < keys.length; k++) {
+        var val = mc[keys[k]];
+        if(val && val instanceof RTCPeerConnection) { pc = val; break; }
+      }
+    }
     if(pc && pc.getSenders) {
       var sender = pc.getSenders().find(function(s){return s.track && s.track.kind==='video';});
       if(sender) {
         sender.replaceTrack(newTrack).catch(function(err) {
           console.warn('Failed to replace track for', pid, err);
+          // Fallback: close and re-call with new stream
+          vcReCallPeerWithScreen(pid, newTrack);
         });
+      } else {
+        // No video sender exists (connection was made without video) — need to renegotiate
+        console.warn('No video sender for', pid, '— re-calling with screen track');
+        vcReCallPeerWithScreen(pid, newTrack);
       }
+    } else {
+      console.warn('No RTCPeerConnection found for', pid, '— re-calling');
+      vcReCallPeerWithScreen(pid, newTrack);
     }
   });
+}
+
+// Fallback: Close existing media call and re-establish with a stream that includes the new track
+function vcReCallPeerWithScreen(peerId, videoTrack) {
+  if(!rtcPeer || rtcPeer.destroyed) return;
+  // Build a stream with the new video track + local audio
+  var newStream = new MediaStream();
+  newStream.addTrack(videoTrack);
+  if(localStream) {
+    localStream.getAudioTracks().forEach(function(t) { newStream.addTrack(t); });
+  }
+  // Close old media connection
+  if(peerConnections[peerId] && peerConnections[peerId].media) {
+    try { peerConnections[peerId].media.close(); } catch(e) {}
+  }
+  // Re-call the peer with the screen stream
+  var call = rtcPeer.call(peerId, newStream);
+  if(!call) return;
+  call.on('stream', function(rs) {
+    if(!peerConnections[peerId]) peerConnections[peerId] = {};
+    peerConnections[peerId].media = call;
+    peerConnections[peerId].stream = rs;
+    vcAddVideo(peerId, rs, peerNames[peerId] || 'Participant');
+  });
+  call.on('close', function() { vcRemoveVideo(peerId); });
+  call.on('error', function(err) { console.warn('Re-call to', peerId, 'failed:', err); });
+  // Update local reference
+  if(!peerConnections[peerId]) peerConnections[peerId] = {};
+  peerConnections[peerId].media = call;
 }
 
 // Helper: Broadcast data message to all connected peers
@@ -9549,8 +9645,13 @@ function vcEnterScreenShareView(sharingPeerId) {
     }
   });
   var shareTile = document.getElementById('vc-tile-' + safeId);
-  if (shareTile) shareTile.classList.add('screen-share');
+  if (shareTile) {
+    shareTile.classList.add('screen-share');
+    shareTile.style.display = '';
+  }
   grid.classList.add('vc-screen-share-mode');
+  // Remove host-focus layout so screen-share layout takes over cleanly
+  grid.classList.remove('vc-host-focus-mode');
 }
 
 // Restore the normal multi-tile grid when screen sharing ends.
@@ -9571,6 +9672,11 @@ function vcExitScreenShareView() {
     tile.classList.remove('screen-share');
   });
   grid.classList.remove('vc-screen-share-mode');
+
+  // Restore host-focus mode for participants
+  if (!isRoomHost) {
+    grid.classList.add('vc-host-focus-mode');
+  }
 
   // If the sharer's video tile exists, force a refresh on its video element
   // to avoid showing a frozen last-frame of the screen share
@@ -10234,6 +10340,7 @@ function createClassSession() {
     duration: duration,
     type: type,
     location: location,
+    roomCode: generateRoomCode(),
     status: 'scheduled',
     createdBy: currentRole === 'instructor' ? currentInstructor?.name : 'Admin',
     createdAt: new Date().toISOString()
@@ -10280,7 +10387,8 @@ function renderInstructorClassSessions() {
       '<div style="flex:1;"><div style="font-size:14px;font-weight:600;">' + s.name + '</div>' +
         '<div style="font-size:12px;color:var(--text-muted);">' + s.date + ' &bull; ' + s.duration + 'min &bull; ' + s.location + '</div></div>' +
       '<span class="badge badge-blue">' + (typeLabels[s.type]||s.type) + '</span>' +
-      '<button class="btn btn-sm btn-primary" onclick="enterVideoRoom(\'' + escapedName + '\',\'instructor\')" style="margin-right:6px;">Join</button>' +
+      '<button class="btn btn-sm btn-primary" onclick="enterVideoRoom(\'' + escapedName + '\',\'instructor\',\'' + (s.roomCode||'') + '\')" style="margin-right:6px;">Join</button>' +
+      (s.roomCode ? '<span style="font-family:monospace;font-size:11px;color:var(--accent);margin-right:6px;" title="Room code for this session">'+s.roomCode+'</span>' : '') +
       '<button class="btn btn-sm btn-danger" onclick="deleteClassSession(\''+s.id+'\')">Delete</button>' +
     '</div>';
   }).join('');
@@ -10296,7 +10404,7 @@ function renderAdminClassSessions() {
     container.innerHTML = classSessions.map(s => {
       const timeStr = s.time ? new Date('2000-01-01T'+s.time).toLocaleTimeString([],{hour:'numeric',minute:'2-digit'}) : s.time;
       const escapedName = s.name.replace(/'/g,"\\'");
-      return '<tr><td><strong>' + s.name + '</strong></td><td>' + (s.createdBy||'Admin') + '</td><td>' + s.date + ' ' + timeStr + '</td><td>' + s.duration + 'min</td><td><span class="badge badge-blue">Scheduled</span></td><td><button class="btn btn-sm btn-primary" onclick="enterVideoRoom(\'' + escapedName + '\',\'admin\')" style="margin-right:6px;">Join</button><button class="btn btn-sm btn-danger" onclick="deleteClassSession(\''+s.id+'\')">Delete</button></td></tr>';
+      return '<tr><td><strong>' + s.name + '</strong></td><td>' + (s.createdBy||'Admin') + '</td><td>' + s.date + ' ' + timeStr + '</td><td>' + s.duration + 'min</td><td><span class="badge badge-blue">Scheduled</span>' + (s.roomCode ? '<div style="font-family:monospace;font-size:10px;color:var(--accent);margin-top:2px;">Room: '+s.roomCode+'</div>' : '') + '</td><td><button class="btn btn-sm btn-primary" onclick="enterVideoRoom(\'' + escapedName + '\',\'admin\',\'' + (s.roomCode||'') + '\')" style="margin-right:6px;">Join</button><button class="btn btn-sm btn-danger" onclick="deleteClassSession(\''+s.id+'\')">Delete</button></td></tr>';
     }).join('');
   }
 
@@ -10308,7 +10416,7 @@ function renderAdminClassSessions() {
     } else {
       allList.innerHTML = classSessions.map(function(cs) {
         var escapedName = cs.name.replace(/'/g,"\\'");
-        return '<tr><td><strong>'+cs.name+'</strong></td><td>'+(cs.instructor||cs.createdBy||'—')+'</td><td>'+(cs.time||'—')+' - '+(cs.endTime||'—')+'</td><td>'+(cs.students||'—')+'</td><td><span class="badge badge-blue"><span class="badge-dot"></span>Scheduled</span></td><td><button class="btn btn-sm btn-primary" onclick="enterVideoRoom(\''+escapedName+'\',\'admin\')">Join</button></td></tr>';
+        return '<tr><td><strong>'+cs.name+'</strong></td><td>'+(cs.instructor||cs.createdBy||'—')+'</td><td>'+(cs.time||'—')+' - '+(cs.endTime||'—')+'</td><td>'+(cs.students||'—')+'</td><td><span class="badge badge-blue"><span class="badge-dot"></span>Scheduled</span>'+(cs.roomCode?'<div style="font-family:monospace;font-size:10px;color:var(--accent);margin-top:2px;">Room: '+cs.roomCode+'</div>':'')+'</td><td><button class="btn btn-sm btn-primary" onclick="enterVideoRoom(\''+escapedName+'\',\'admin\',\''+(cs.roomCode||'')+'\')">Join</button></td></tr>';
       }).join('');
     }
   }
@@ -10341,6 +10449,7 @@ function createAdminMeeting() {
     date: date,
     time: time,
     duration: duration,
+    roomCode: generateRoomCode(),
     status: 'scheduled',
     createdBy: currentLoggedInUser ? currentLoggedInUser.name : 'Admin',
     createdAt: new Date().toISOString()
@@ -10376,9 +10485,9 @@ function renderAdminMeetingsList() {
           '<td>' + (m.createdBy || 'Admin') + '</td>' +
           '<td>' + m.date + ' ' + timeStr + '</td>' +
           '<td>' + m.duration + 'min</td>' +
-          '<td><span class="badge badge-purple"><span class="badge-dot"></span>Admin Only</span></td>' +
+          '<td><span class="badge badge-purple"><span class="badge-dot"></span>Admin Only</span>' + (m.roomCode ? '<div style="font-family:monospace;font-size:10px;color:var(--accent);margin-top:2px;">Room: '+m.roomCode+'</div>' : '') + '</td>' +
           '<td>' +
-            '<button class="btn btn-sm btn-primary" onclick="enterVideoRoom(\'' + escapedTitle + '\',\'admin\')" style="margin-right:6px;">Join</button>' +
+            '<button class="btn btn-sm btn-primary" onclick="enterVideoRoom(\'' + escapedTitle + '\',\'admin\',\'' + (m.roomCode||'') + '\')" style="margin-right:6px;">Join</button>' +
             '<button class="btn btn-sm btn-danger" onclick="deleteAdminMeeting(\'' + m.id + '\')">Delete</button>' +
           '</td>' +
         '</tr>';
@@ -10400,7 +10509,7 @@ function renderAdminMeetingsList() {
           '<td>' + (m.createdBy || 'Admin') + '</td>' +
           '<td>' + m.date + ' ' + timeStr + '</td>' +
           '<td>' + m.duration + 'min</td>' +
-          '<td><button class="btn btn-sm btn-primary" onclick="enterVideoRoom(\'' + escapedTitle + '\',\'adminstaff\')">Join</button></td>' +
+          '<td>' + (m.roomCode ? '<span style="font-family:monospace;font-size:10px;color:var(--accent);margin-right:6px;">'+m.roomCode+'</span>' : '') + '<button class="btn btn-sm btn-primary" onclick="enterVideoRoom(\'' + escapedTitle + '\',\'adminstaff\',\'' + (m.roomCode||'') + '\')">Join</button></td>' +
         '</tr>';
       }).join('');
     }
