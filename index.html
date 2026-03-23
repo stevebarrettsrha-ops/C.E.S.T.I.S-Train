@@ -761,6 +761,21 @@ textarea.form-control { resize:vertical; min-height:80px; }
 }
 .modal-close:hover { background:rgba(255,255,255,0.06); color:var(--text-primary); }
 
+/* Edit profile picture & status sections */
+.edit-profile-pic-section {
+  display:flex; align-items:center; gap:16px; margin-bottom:18px;
+  padding-bottom:16px; border-bottom:1px solid var(--border);
+}
+.edit-profile-pic-preview {
+  width:72px; height:72px; min-width:72px; border-radius:50%;
+  background:var(--bg-input); display:flex; align-items:center; justify-content:center;
+  font-size:28px; font-weight:700; color:var(--accent); overflow:hidden;
+  border:3px solid var(--border-light); position:relative;
+}
+.edit-profile-pic-preview img { width:100%; height:100%; object-fit:cover; border-radius:50%; }
+.edit-profile-status-row { display:flex; gap:12px; margin-bottom:4px; }
+.edit-profile-status-row .form-group { margin-bottom:12px; }
+
 .pipeline { display:flex; gap:2px; margin:20px 0; }
 .pipeline-stage {
   flex:1; text-align:center; padding:14px 8px;
@@ -969,12 +984,24 @@ body.vc-fullscreen-mode .vc-conference-body .vc-side-panel .card {
 }
 /* Hide side panel when in host-only view */
 body.vc-fullscreen-mode.vc-host-only-mode .vc-conference-body .vc-side-panel { display:none; }
-body.vc-fullscreen-mode.vc-host-only-mode .video-grid { display:flex; align-items:center; justify-content:center; }
-body.vc-fullscreen-mode.vc-host-only-mode .video-grid .video-tile { display:none !important; }
-body.vc-fullscreen-mode.vc-host-only-mode .video-grid .video-tile.host-tile { display:flex !important; width:100%; height:100%; max-height:calc(100vh - 140px); aspect-ratio:16/9; }
-body.vc-fullscreen-mode.vc-host-only-mode .video-grid .video-tile.local { display:none !important; }
-/* For host in host-only mode: show only their own tile */
-body.vc-fullscreen-mode.vc-host-only-mode.vc-is-host .video-grid .video-tile.local { display:flex !important; width:100%; height:100%; max-height:calc(100vh - 140px); aspect-ratio:16/9; }
+body.vc-fullscreen-mode.vc-host-only-mode .video-grid {
+  display:flex; align-items:center; justify-content:center; padding:0 !important;
+}
+body.vc-fullscreen-mode.vc-host-only-mode .video-grid .video-tile.vc-hostonly-visible {
+  display:flex !important; width:100%; height:100%; max-height:calc(100vh - 140px);
+  aspect-ratio:16/9; flex:1;
+}
+body.vc-fullscreen-mode.vc-host-only-mode .video-grid .video-tile:not(.vc-hostonly-visible) {
+  display:none !important;
+}
+.vc-waiting-host {
+  display:flex; flex-direction:column; align-items:center; justify-content:center;
+  gap:16px; color:var(--text-muted); font-size:15px; flex:1;
+}
+.vc-waiting-host .vc-waiting-icon {
+  width:80px; height:80px; border-radius:50%; background:rgba(255,255,255,0.08);
+  display:flex; align-items:center; justify-content:center; font-size:36px;
+}
 
 /* View mode toggle button styling */
 .vc-view-toggle {
@@ -997,6 +1024,63 @@ body.vc-fullscreen-mode.vc-host-only-mode.vc-is-host .video-grid .video-tile.loc
 }
 @media(max-width:900px) {
   .vc-lobby-preview { width:100%; }
+  /* Fullscreen conference responsive: stack side panel below video */
+  body.vc-fullscreen-mode .vc-conference-body {
+    flex-direction:column;
+  }
+  body.vc-fullscreen-mode .vc-conference-body .vc-side-panel {
+    width:100%; border-left:none; border-top:1px solid var(--border);
+    max-height:40vh; flex-shrink:0;
+  }
+  body.vc-fullscreen-mode .vc-conference-body .vc-main-video-area {
+    min-height:0; flex:1;
+  }
+  body.vc-fullscreen-mode .vc-conference-body .vc-side-panel .chat-panel {
+    height:auto; min-height:120px;
+  }
+  body.vc-fullscreen-mode .vc-conference-header {
+    padding:6px 10px; gap:6px;
+  }
+  body.vc-fullscreen-mode .vc-conference-header > div {
+    gap:6px !important;
+  }
+  /* Compact view toggle on small screens */
+  .vc-view-btn { padding:4px 7px; font-size:10px; }
+  /* Compact host controls */
+  .vc-host-btn { padding:4px 8px; font-size:10px; }
+  #vc-host-bar { padding:6px 10px !important; gap:6px !important; }
+  /* Stack video controls more tightly */
+  body.vc-fullscreen-mode .vc-conference-body .video-controls {
+    padding:8px 10px; gap:8px; flex-wrap:wrap;
+  }
+  body.vc-fullscreen-mode .vc-conference-body .video-grid {
+    padding:4px;
+  }
+  .video-grid { grid-template-columns:repeat(auto-fit,minmax(140px,1fr)); gap:8px; }
+}
+@media(max-width:560px) {
+  /* Very small screens: hide side panel by default in fullscreen, add toggle */
+  body.vc-fullscreen-mode .vc-conference-body .vc-side-panel {
+    display:none;
+  }
+  body.vc-fullscreen-mode.vc-show-sidepanel .vc-conference-body .vc-side-panel {
+    display:flex; position:fixed; top:0; left:0; right:0; bottom:0;
+    max-height:100vh; z-index:200; width:100%;
+    background:var(--bg-primary); flex-direction:column;
+  }
+  body.vc-fullscreen-mode.vc-show-sidepanel .vc-sidepanel-close { display:block !important; }
+  body.vc-fullscreen-mode .vc-conference-header {
+    padding:4px 8px;
+  }
+  .vc-view-toggle { display:none; }
+  /* Show compact view switcher via dropdown instead */
+  .vc-view-toggle-mobile { display:flex !important; }
+  body.vc-fullscreen-mode .vc-conference-body .video-controls .vc-btn {
+    width:40px; height:40px; font-size:15px;
+  }
+  body.vc-fullscreen-mode .vc-conference-body .video-controls .vc-end-all-btn {
+    font-size:10px !important; padding:6px 10px !important;
+  }
 }
 
 .toast {
@@ -2942,14 +3026,34 @@ body.vc-fullscreen-mode.vc-host-only-mode.vc-is-host .video-grid .video-tile.loc
 
 /* Responsive */
 @media(max-width:768px) {
-  .lms-chat-container { flex-direction:column; height:calc(100vh - var(--topbar-h) - 32px); border-radius:0; }
-  .lms-chat-sidebar { width:100%; min-width:100%; }
+  .lms-chat-container {
+    flex-direction:column; height:calc(100vh - var(--topbar-h) - 32px);
+    border-radius:0; border:none;
+  }
+  .lms-chat-sidebar {
+    width:100%; min-width:100%; flex:1; min-height:0;
+    border-right:none; border-bottom:1px solid var(--border);
+  }
   .lms-chat-sidebar.chat-open { display:none; }
-  .lms-chat-main { display:none; }
+  .lms-chat-main { display:none; flex:1; min-height:0; }
   .lms-chat-main.chat-open { display:flex; }
   .lms-chat-main-header-left .back-btn { display:flex; }
   .lms-chat-info-panel.open { width:100%; min-width:100%; }
   .lms-chat-msg { max-width:85%; }
+  .lms-chat-sidebar-header { padding:12px 14px; }
+  .lms-chat-sidebar-header h3 { font-size:15px; }
+  .lms-chat-search { padding:8px 12px; }
+  .lms-chat-item { padding:10px 12px; gap:10px; }
+  .lms-chat-avatar { width:42px; height:42px; min-width:42px; font-size:17px; }
+  .lms-chat-input-area { padding:10px 12px; gap:6px; }
+  .lms-chat-input-area .msg-input { font-size:14px; }
+  .lms-chat-messages { padding:12px; }
+}
+@media(max-width:480px) {
+  .lms-chat-container { height:calc(100vh - var(--topbar-h) - 16px); }
+  .lms-chat-sidebar-actions button { width:32px; height:32px; font-size:14px; }
+  .lms-chat-header-actions button { width:34px; height:34px; font-size:14px; }
+  .lms-chat-main-header { padding:10px 12px; }
 }
 
 /* ============================== ADMIN DUTY REGISTER ============================== */
@@ -3513,12 +3617,13 @@ body.vc-fullscreen-mode.vc-host-only-mode.vc-is-host .video-grid .video-tile.loc
     </div>
     <nav class="sidebar-nav" id="sidebarNav"></nav>
     <div class="sidebar-footer">
-      <div class="sidebar-user">
+      <div class="sidebar-user" onclick="openAccountProfileEdit()" style="cursor:pointer;" title="Click to edit your profile">
         <div class="sidebar-user-avatar" id="sidebarAvatar" style="background:linear-gradient(135deg,var(--accent),var(--orange));">A</div>
         <div class="sidebar-user-info">
           <div class="name" id="sidebarUserName">Admin</div>
           <div class="role" id="sidebarUserRole">Administrator</div>
         </div>
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:14px;height:14px;color:var(--text-muted);flex-shrink:0;"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
       </div>
     </div>
   </aside>
@@ -3934,10 +4039,26 @@ body.vc-fullscreen-mode.vc-host-only-mode.vc-is-host .video-grid .video-tile.loc
 
 <!-- EDIT STUDENT PROFILE MODAL -->
 <div class="modal-overlay" id="editStudentProfileModal">
-  <div class="modal">
-    <div class="modal-header"><h3>Edit Profile</h3><button class="modal-close" onclick="closeModal('editStudentProfileModal')">✕</button></div>
-    <div class="form-group"><label>Full Name</label><input type="text" class="form-control" id="editProfileName" disabled></div>
+  <div class="modal" style="max-width:480px;">
+    <div class="modal-header"><h3>Edit Profile</h3><button class="modal-close" onclick="closeModal('editStudentProfileModal')">&#x2715;</button></div>
+    <div class="edit-profile-pic-section">
+      <div class="edit-profile-pic-preview" id="editStuPicPreview"></div>
+      <div>
+        <button class="btn btn-secondary btn-sm" onclick="document.getElementById('editStuPicInput').click()">Change Photo</button>
+        <button class="btn btn-sm" style="color:var(--text-muted);font-size:11px;" onclick="profilePicRemove('editStuPicPreview','student')">Remove</button>
+        <input type="file" id="editStuPicInput" accept="image/*" style="display:none;" onchange="profilePicPreview(this,'editStuPicPreview','student')">
+      </div>
+    </div>
+    <div class="form-group"><label>Full Name</label><input type="text" class="form-control" id="editProfileName" placeholder="Your full name"></div>
     <div class="form-group"><label>Student ID</label><input type="text" class="form-control" id="editProfileId" disabled></div>
+    <div class="edit-profile-status-row">
+      <div class="form-group" style="flex:1;"><label>Status</label>
+        <select class="form-control" id="editStuStatus"><option value="online">Online</option><option value="away">Away</option><option value="offline">Offline</option></select>
+      </div>
+      <div class="form-group" style="flex:2;"><label>Status Message</label>
+        <input type="text" class="form-control" id="editStuStatusMsg" placeholder="What's on your mind?">
+      </div>
+    </div>
     <div class="form-group"><label>Email</label><input type="email" class="form-control" id="editProfileEmail" placeholder="your.email@student.heartlms.edu.jm"></div>
     <div class="form-group"><label>Phone</label><input type="tel" class="form-control" id="editProfilePhone" placeholder="+1 (876) 000-0000"></div>
     <div class="form-group"><label>Emergency Contact Name</label><input type="text" class="form-control" id="editProfileEmergencyName" placeholder="Parent / Guardian name"></div>
@@ -3951,10 +4072,26 @@ body.vc-fullscreen-mode.vc-host-only-mode.vc-is-host .video-grid .video-tile.loc
 
 <!-- EDIT INSTRUCTOR PROFILE MODAL -->
 <div class="modal-overlay" id="editInstructorProfileModal">
-  <div class="modal">
-    <div class="modal-header"><h3>Edit Profile</h3><button class="modal-close" onclick="closeModal('editInstructorProfileModal')">✕</button></div>
-    <div class="form-group"><label>Full Name</label><input type="text" class="form-control" id="editInsProfileName" disabled></div>
+  <div class="modal" style="max-width:480px;">
+    <div class="modal-header"><h3>Edit Profile</h3><button class="modal-close" onclick="closeModal('editInstructorProfileModal')">&#x2715;</button></div>
+    <div class="edit-profile-pic-section">
+      <div class="edit-profile-pic-preview" id="editInsPicPreview"></div>
+      <div>
+        <button class="btn btn-secondary btn-sm" onclick="document.getElementById('editInsPicInput').click()">Change Photo</button>
+        <button class="btn btn-sm" style="color:var(--text-muted);font-size:11px;" onclick="profilePicRemove('editInsPicPreview','instructor')">Remove</button>
+        <input type="file" id="editInsPicInput" accept="image/*" style="display:none;" onchange="profilePicPreview(this,'editInsPicPreview','instructor')">
+      </div>
+    </div>
+    <div class="form-group"><label>Full Name</label><input type="text" class="form-control" id="editInsProfileName" placeholder="Your full name"></div>
     <div class="form-group"><label>Staff ID</label><input type="text" class="form-control" id="editInsProfileId" disabled></div>
+    <div class="edit-profile-status-row">
+      <div class="form-group" style="flex:1;"><label>Status</label>
+        <select class="form-control" id="editInsStatus"><option value="online">Online</option><option value="away">Away</option><option value="offline">Offline</option></select>
+      </div>
+      <div class="form-group" style="flex:2;"><label>Status Message</label>
+        <input type="text" class="form-control" id="editInsStatusMsg" placeholder="What's on your mind?">
+      </div>
+    </div>
     <div class="form-group"><label>Email</label><input type="email" class="form-control" id="editInsProfileEmail" placeholder="your.email@heartlms.edu.jm"></div>
     <div class="form-group"><label>Phone</label><input type="tel" class="form-control" id="editInsProfilePhone" placeholder="+1 (876) 000-0000"></div>
     <div class="form-group"><label>Specialization</label><input type="text" class="form-control" id="editInsProfileSpecialization" placeholder="e.g. Engine Repair & Diagnostics"></div>
@@ -3962,6 +4099,37 @@ body.vc-fullscreen-mode.vc-host-only-mode.vc-is-host .video-grid .video-tile.loc
     <div style="display:flex;gap:10px;justify-content:flex-end;margin-top:20px;">
       <button class="btn btn-secondary" onclick="closeModal('editInstructorProfileModal')">Cancel</button>
       <button class="btn btn-primary" onclick="saveInstructorProfile()">Save Profile</button>
+    </div>
+  </div>
+</div>
+
+<!-- EDIT ACCOUNT PROFILE MODAL (Admin, Admin Staff, CMC) -->
+<div class="modal-overlay" id="editAccountProfileModal">
+  <div class="modal" style="max-width:480px;">
+    <div class="modal-header"><h3>Edit Profile</h3><button class="modal-close" onclick="closeModal('editAccountProfileModal')">&#x2715;</button></div>
+    <div class="edit-profile-pic-section">
+      <div class="edit-profile-pic-preview" id="editAcctPicPreview"></div>
+      <div>
+        <button class="btn btn-secondary btn-sm" onclick="document.getElementById('editAcctPicInput').click()">Change Photo</button>
+        <button class="btn btn-sm" style="color:var(--text-muted);font-size:11px;" onclick="profilePicRemove('editAcctPicPreview','account')">Remove</button>
+        <input type="file" id="editAcctPicInput" accept="image/*" style="display:none;" onchange="profilePicPreview(this,'editAcctPicPreview','account')">
+      </div>
+    </div>
+    <div class="form-group"><label>Full Name</label><input type="text" class="form-control" id="editAcctName" placeholder="Your full name"></div>
+    <div class="form-group"><label>User ID</label><input type="text" class="form-control" id="editAcctId" disabled></div>
+    <div class="edit-profile-status-row">
+      <div class="form-group" style="flex:1;"><label>Status</label>
+        <select class="form-control" id="editAcctStatus"><option value="online">Online</option><option value="away">Away</option><option value="offline">Offline</option></select>
+      </div>
+      <div class="form-group" style="flex:2;"><label>Status Message</label>
+        <input type="text" class="form-control" id="editAcctStatusMsg" placeholder="What's on your mind?">
+      </div>
+    </div>
+    <div class="form-group"><label>Email</label><input type="email" class="form-control" id="editAcctEmail" placeholder="your.email@heartlms.edu.jm"></div>
+    <div class="form-group"><label>Phone</label><input type="tel" class="form-control" id="editAcctPhone" placeholder="+1 (876) 000-0000"></div>
+    <div style="display:flex;gap:10px;justify-content:flex-end;margin-top:20px;">
+      <button class="btn btn-secondary" onclick="closeModal('editAccountProfileModal')">Cancel</button>
+      <button class="btn btn-primary" onclick="saveAccountProfile()">Save Profile</button>
     </div>
   </div>
 </div>
@@ -5469,6 +5637,11 @@ function handleStudentClick() {
       studentMatch = createStudentDataForAccount(userAccount);
     }
     currentStudent = studentMatch;
+    // Apply any saved profile edits back to the student data object
+    var savedStuProfile = studentProfiles[studentMatch.id];
+    if(savedStuProfile) {
+      if(savedStuProfile.name) { studentMatch.name = savedStuProfile.name; userAccount.name = savedStuProfile.name; }
+    }
     currentLoggedInUser = userAccount;
     enterApp('student');
   } catch(err) { console.error('handleStudentClick error:', err); alert('Error: ' + err.message); }
@@ -5506,6 +5679,7 @@ function handleInstructorClick() {
     // Apply any saved profile edits back to the instructor data object
     var savedInsProfile = instructorProfiles[insMatch.id];
     if(savedInsProfile) {
+      if(savedInsProfile.name) { insMatch.name = savedInsProfile.name; userAccount.name = savedInsProfile.name; }
       if(savedInsProfile.email) insMatch.email = savedInsProfile.email;
       if(savedInsProfile.phone) insMatch.phone = savedInsProfile.phone;
       if(savedInsProfile.specialization) insMatch.specialization = savedInsProfile.specialization;
@@ -5636,6 +5810,15 @@ function enterApp(role) {
     updateNotificationDot();
     setTimeout(animateAllCounters, 100);
 
+    // Show profile picture in sidebar if user has one in LMS Chat
+    if(currentLoggedInUser && typeof lmsChatProfiles !== 'undefined') {
+      var cp = lmsChatProfiles[currentLoggedInUser.id];
+      if(cp && cp.profilePic) {
+        var sa = document.getElementById('sidebarAvatar');
+        if(sa) { sa.innerHTML = '<img src="'+cp.profilePic+'" style="width:100%;height:100%;object-fit:cover;border-radius:50%;">'; sa.style.overflow = 'hidden'; }
+      }
+    }
+
     // Set session expiry and start periodic check
     setSessionExpiry();
     startSessionExpiryCheck();
@@ -5706,6 +5889,8 @@ function handleGmailProfile(profile, role) {
       var studentMatch = students.find(function(s) { return s.name === existing.name || s.id === existing.studentDataId; });
       if(!studentMatch) studentMatch = createStudentDataForAccount(existing);
       currentStudent = studentMatch;
+      var savedSP = studentProfiles[studentMatch.id];
+      if(savedSP && savedSP.name) { studentMatch.name = savedSP.name; existing.name = savedSP.name; }
       currentLoggedInUser = existing;
       enterApp('student');
     } else if(existing.role === 'instructor') {
@@ -8816,6 +9001,7 @@ function vcOnData(raw, fromId) {
         var unshareTile = document.getElementById('vc-tile-'+sanitizePeerId(msg.peerId));
         if(unshareTile) { unshareTile.classList.remove('screen-share'); }
       }
+      showToast((msg.name || 'Host') + ' stopped sharing their screen');
       vcExitScreenShareView();
       break;
     case 'permission-update':
@@ -8946,6 +9132,7 @@ function vcShowConference(title, role) {
               : showHostControls
                 ? `<button class="vc-btn" id="vc-rec-btn" onclick="vcToggleRecord()" title="Record Session">&#x23FA;&#xFE0F;</button>`
                 : `<button class="vc-btn" id="vc-rec-btn" onclick="vcToggleRecord()" title="Record Session (requires host permission)" style="opacity:0.5;">&#x23FA;&#xFE0F;</button>`}
+            <button class="vc-btn" id="vc-chat-toggle-btn" onclick="vcToggleSidePanel()" title="Toggle Chat & Participants">&#x1F4AC;</button>
             <button class="vc-btn danger" onclick="exitVideoRoom('${role}')" title="Leave Call">&#x1F4DE;</button>
             ${showHostControls
               ? `<button class="vc-btn danger vc-end-all-btn" onclick="vcEndMeetingForAll()" title="End Meeting for All" style="font-size:11px;width:auto;border-radius:8px;padding:8px 14px;">End All</button>`
@@ -8953,6 +9140,9 @@ function vcShowConference(title, role) {
           </div>
         </div>
         <div class="vc-side-panel">
+          <div class="vc-sidepanel-close" onclick="vcToggleSidePanel()" style="display:none;padding:8px 12px;text-align:right;flex-shrink:0;border-bottom:1px solid var(--border);">
+            <button class="btn btn-secondary btn-sm">&#x2715; Close</button>
+          </div>
           <div class="chat-panel">
             <h4 style="font-size:14px;margin-bottom:12px;font-family:'Playfair Display',serif;">Class Chat</h4>
             <div class="chat-messages" id="chatMsgs-${role}">
@@ -9017,16 +9207,67 @@ function vcSetViewMode(mode) {
   // Reset mode classes
   body.classList.remove('vc-host-only-mode');
 
+  // Clear host-only visibility markers from all tiles
+  var grid = document.getElementById('vc-video-grid');
+  if(grid) {
+    grid.querySelectorAll('.video-tile').forEach(function(t){ t.classList.remove('vc-hostonly-visible'); });
+    // Remove waiting-for-host placeholder if it exists
+    var waitEl = grid.querySelector('.vc-waiting-host');
+    if(waitEl) waitEl.remove();
+  }
+
   if(mode === 'host-only') {
-    // Host screen only - fullscreen stays on, hide everything except host video
+    // Host screen only - fullscreen stays on, show only the host tile
     body.classList.add('vc-fullscreen-mode');
     body.classList.add('vc-host-only-mode');
+    vcApplyHostOnlyVisibility();
   } else if(mode === 'fullscreen') {
     // Full screen conference - like the Zoom reference image
     body.classList.add('vc-fullscreen-mode');
   } else if(mode === 'gallery') {
     // Gallery mode - restore sidebar, topbar, show everything
     body.classList.remove('vc-fullscreen-mode');
+  }
+}
+
+// Toggle side panel visibility (chat & participants) for small screens
+function vcToggleSidePanel() {
+  document.body.classList.toggle('vc-show-sidepanel');
+  var btn = document.getElementById('vc-chat-toggle-btn');
+  if(btn) {
+    btn.classList.toggle('active', document.body.classList.contains('vc-show-sidepanel'));
+  }
+}
+
+// Determine which tile to show in host-only mode and mark it visible
+function vcApplyHostOnlyVisibility() {
+  var grid = document.getElementById('vc-video-grid');
+  if(!grid) return;
+
+  // Clear previous markers
+  grid.querySelectorAll('.video-tile').forEach(function(t){ t.classList.remove('vc-hostonly-visible'); });
+
+  var targetTile = null;
+
+  if(isRoomHost) {
+    // Host user: show their own local tile
+    targetTile = document.getElementById('vc-tile-local');
+  } else {
+    // Participant: show the host's tile (has .host-tile class)
+    targetTile = grid.querySelector('.video-tile.host-tile');
+  }
+
+  if(targetTile) {
+    targetTile.classList.add('vc-hostonly-visible');
+  } else {
+    // Host tile hasn't arrived yet — show waiting placeholder
+    var existing = grid.querySelector('.vc-waiting-host');
+    if(!existing) {
+      var wait = document.createElement('div');
+      wait.className = 'vc-waiting-host';
+      wait.innerHTML = '<div class="vc-waiting-icon">&#x1F3A5;</div><div>Waiting for host to connect...</div>';
+      grid.appendChild(wait);
+    }
   }
 }
 
@@ -9108,6 +9349,11 @@ function vcAddVideo(peerId, stream, name) {
       tile.style.display = 'none';
       tile.dataset.hiddenByHostView = '1';
     }
+  }
+
+  // If currently in host-only mode, update visibility
+  if (vcCurrentViewMode === 'host-only') {
+    vcApplyHostOnlyVisibility();
   }
 
   // If this tile is the active screen-sharer (e.g. late joiner receives host tile
@@ -9287,7 +9533,7 @@ async function vcToggleScreen() {
     var lv = document.getElementById('vc-local-video');
     if(lv && localStream) { lv.srcObject = localStream; lv.parentElement.classList.add('local'); }
     // Notify peers that screen share stopped
-    vcBroadcastData({type:'screen-share-stopped', peerId: rtcPeer ? rtcPeer.id : ''});
+    vcBroadcastData({type:'screen-share-stopped', peerId: rtcPeer ? rtcPeer.id : '', name: vcCurrentUserName});
     return;
   }
   try {
@@ -9410,6 +9656,7 @@ function vcEnterScreenShareView(sharingPeerId) {
 
 // Restore the normal multi-tile grid when screen sharing ends.
 function vcExitScreenShareView() {
+  var prevSharingPeerId = vcScreenSharingPeerId;
   vcScreenSharingPeerId = null;
   var grid = document.getElementById('vc-video-grid');
   if (!grid) return;
@@ -9425,9 +9672,29 @@ function vcExitScreenShareView() {
     tile.classList.remove('screen-share');
   });
   grid.classList.remove('vc-screen-share-mode');
+
   // Restore host-focus mode for participants
   if (!isRoomHost) {
     grid.classList.add('vc-host-focus-mode');
+  }
+
+  // If the sharer's video tile exists, force a refresh on its video element
+  // to avoid showing a frozen last-frame of the screen share
+  if (prevSharingPeerId) {
+    var safeId = sanitizePeerId(prevSharingPeerId);
+    var vid = document.getElementById('vc-vid-' + safeId);
+    if (vid && vid.srcObject) {
+      // Re-assign the stream to force the video element to pick up the replaced track
+      var stream = vid.srcObject;
+      vid.srcObject = null;
+      vid.srcObject = stream;
+      vid.play().catch(function(){});
+    }
+  }
+
+  // Re-apply current view mode to restore correct layout
+  if (vcCurrentViewMode === 'host-only') {
+    vcApplyHostOnlyVisibility();
   }
 }
 
@@ -10005,7 +10272,7 @@ function vcEndMeetingForAll() {
 // ── Exit / Cleanup ──
 function exitVideoRoom(role) {
   // Restore normal layout - exit fullscreen conference mode
-  document.body.classList.remove('vc-fullscreen-mode', 'vc-host-only-mode', 'vc-is-host');
+  document.body.classList.remove('vc-fullscreen-mode', 'vc-host-only-mode', 'vc-is-host', 'vc-show-sidepanel');
   vcCurrentViewMode = 'fullscreen';
 
   // Stop recording if active
@@ -10840,11 +11107,95 @@ function renderStudentDriveResources() {
   container.innerHTML = html;
 }
 
+// ============================== SHARED PROFILE PIC HELPERS ==============================
+var _pendingProfilePics = { student: null, instructor: null, account: null };
+
+function profilePicPreview(input, previewId, type) {
+  var file = input.files[0];
+  if(!file) return;
+  if(file.size > 2 * 1024 * 1024) { showToast('Image must be under 2 MB'); return; }
+  var reader = new FileReader();
+  reader.onload = function(e) {
+    var preview = document.getElementById(previewId);
+    if(preview) preview.innerHTML = '<img src="'+e.target.result+'">';
+    _pendingProfilePics[type] = e.target.result;
+  };
+  reader.readAsDataURL(file);
+  input.value = '';
+}
+
+function profilePicRemove(previewId, type) {
+  var preview = document.getElementById(previewId);
+  if(preview) preview.innerHTML = '';
+  _pendingProfilePics[type] = '__remove__';
+}
+
+function profilePicLoadPreview(previewId, userId, name) {
+  var preview = document.getElementById(previewId);
+  if(!preview) return;
+  var chatProfile = (typeof lmsChatProfiles !== 'undefined') ? lmsChatProfiles[userId] : null;
+  if(chatProfile && chatProfile.profilePic) {
+    preview.innerHTML = '<img src="'+chatProfile.profilePic+'">';
+  } else {
+    var initials = name ? name.split(' ').map(function(n){ return n[0]; }).join('').substring(0,2).toUpperCase() : '?';
+    preview.innerHTML = initials;
+  }
+}
+
+// Sync profile pic and status to lmsChatProfiles so other users see it in LMS Chat
+function syncProfileToLmsChat(userId, name, role, programme, picType) {
+  if(typeof lmsChatProfiles === 'undefined') return;
+  if(!lmsChatProfiles[userId]) lmsChatProfiles[userId] = {};
+  var cp = lmsChatProfiles[userId];
+  cp.name = name;
+  cp.role = role;
+  cp.programme = programme || '';
+
+  // Handle profile picture
+  var pendingPic = _pendingProfilePics[picType];
+  if(pendingPic === '__remove__') {
+    delete cp.profilePic;
+  } else if(pendingPic) {
+    cp.profilePic = pendingPic;
+  }
+  _pendingProfilePics[picType] = null;
+
+  // Read status fields based on type
+  var statusId = picType === 'student' ? 'editStuStatus' : picType === 'instructor' ? 'editInsStatus' : 'editAcctStatus';
+  var statusMsgId = picType === 'student' ? 'editStuStatusMsg' : picType === 'instructor' ? 'editInsStatusMsg' : 'editAcctStatusMsg';
+  var statusEl = document.getElementById(statusId);
+  var statusMsgEl = document.getElementById(statusMsgId);
+  if(statusEl) cp.status = statusEl.value;
+  if(statusMsgEl) cp.statusMsg = statusMsgEl.value.trim();
+
+  // Save and sync
+  if(typeof saveLmsChatData === 'function') saveLmsChatData();
+  if(typeof lmsChatSyncToDrive === 'function') lmsChatSyncToDrive();
+}
+
+// Update sidebar avatar to show profile picture if available
+function updateSidebarAvatar(userId, name) {
+  var el = document.getElementById('sidebarUserName');
+  if(el) el.textContent = name;
+  var avatar = document.getElementById('sidebarAvatar');
+  if(!avatar) return;
+  var chatProfile = (typeof lmsChatProfiles !== 'undefined') ? lmsChatProfiles[userId] : null;
+  if(chatProfile && chatProfile.profilePic) {
+    avatar.innerHTML = '<img src="'+chatProfile.profilePic+'" style="width:100%;height:100%;object-fit:cover;border-radius:50%;">';
+    avatar.style.overflow = 'hidden';
+  } else {
+    var initials = name.split(' ').map(function(n){ return n[0]; }).join('').substring(0,2).toUpperCase();
+    avatar.innerHTML = '';
+    avatar.textContent = initials;
+  }
+}
+
 // ============================== STUDENT PROFILE FUNCTIONS ==============================
 function openEditStudentProfile() {
   const s = currentStudent;
   if(!s) return;
   const profile = studentProfiles[s.id] || {};
+  var chatProfile = (typeof lmsChatProfiles !== 'undefined' && lmsChatProfiles[currentLoggedInUser?.id]) ? lmsChatProfiles[currentLoggedInUser.id] : {};
   var firstName = s.name.split(' ')[0] || '';
   var lastName = s.name.split(' ').slice(1).join(' ') || '';
 
@@ -10854,6 +11205,15 @@ function openEditStudentProfile() {
   document.getElementById('editProfilePhone').value = profile.phone || '';
   document.getElementById('editProfileEmergencyName').value = profile.emergencyName || '';
   document.getElementById('editProfileEmergencyPhone').value = profile.emergencyPhone || '';
+
+  // Load profile pic preview and status
+  _pendingProfilePics.student = null;
+  profilePicLoadPreview('editStuPicPreview', currentLoggedInUser?.id, s.name);
+  var statusSel = document.getElementById('editStuStatus');
+  var statusMsg = document.getElementById('editStuStatusMsg');
+  if(statusSel) statusSel.value = chatProfile.status || 'online';
+  if(statusMsg) statusMsg.value = chatProfile.statusMsg || '';
+
   openModal('editStudentProfileModal');
 }
 
@@ -10861,14 +11221,27 @@ function saveStudentProfile() {
   const s = currentStudent;
   if(!s) return;
 
+  const newName = document.getElementById('editProfileName')?.value?.trim();
   const email = document.getElementById('editProfileEmail')?.value?.trim();
   const phone = document.getElementById('editProfilePhone')?.value?.trim();
   const emergencyName = document.getElementById('editProfileEmergencyName')?.value?.trim();
   const emergencyPhone = document.getElementById('editProfileEmergencyPhone')?.value?.trim();
 
+  if(!newName) { showToast('Please enter your name'); return; }
   if(!email) { showToast('Please enter an email address'); return; }
 
+  // Update name in student data object, userAccounts, and students array
+  if(newName !== s.name) {
+    s.name = newName;
+    if(currentLoggedInUser) currentLoggedInUser.name = newName;
+    var acct = userAccounts.find(function(u){ return u.id === currentLoggedInUser.id; });
+    if(acct) acct.name = newName;
+    var stu = students.find(function(st){ return st.id === s.id; });
+    if(stu) stu.name = newName;
+  }
+
   studentProfiles[s.id] = {
+    name: newName,
     email: email,
     phone: phone,
     emergencyName: emergencyName,
@@ -10876,15 +11249,19 @@ function saveStudentProfile() {
     updatedAt: new Date().toISOString()
   };
 
+  // Sync profile pic and status to LMS Chat
+  syncProfileToLmsChat(currentLoggedInUser?.id, newName, 'student', s.course, 'student');
+
   saveState();
   closeModal('editStudentProfileModal');
   showToast('Profile updated successfully');
 
-  // Update the displayed profile info if visible
-  var emailEl = document.getElementById('sProfileEmail');
-  var phoneEl = document.getElementById('sProfilePhone');
-  if(emailEl) emailEl.textContent = email;
-  if(phoneEl) phoneEl.textContent = phone || 'Not provided';
+  // Update sidebar with name and profile pic
+  updateSidebarAvatar(currentLoggedInUser?.id, newName);
+
+  // Re-render the student profile page to reflect changes
+  buildStudentPages();
+  showPage('s-profile');
 }
 
 // ============================== INSTRUCTOR PROFILE FUNCTIONS ==============================
@@ -10892,6 +11269,7 @@ function openEditInstructorProfile() {
   const ins = currentInstructor;
   if(!ins) return;
   const profile = instructorProfiles[ins.id] || {};
+  var chatProfile = (typeof lmsChatProfiles !== 'undefined' && lmsChatProfiles[currentLoggedInUser?.id]) ? lmsChatProfiles[currentLoggedInUser.id] : {};
 
   document.getElementById('editInsProfileName').value = ins.name;
   document.getElementById('editInsProfileId').value = ins.id;
@@ -10899,6 +11277,15 @@ function openEditInstructorProfile() {
   document.getElementById('editInsProfilePhone').value = profile.phone || ins.phone || '';
   document.getElementById('editInsProfileSpecialization').value = profile.specialization || ins.specialization || '';
   document.getElementById('editInsProfileBio').value = profile.bio || '';
+
+  // Load profile pic preview and status
+  _pendingProfilePics.instructor = null;
+  profilePicLoadPreview('editInsPicPreview', currentLoggedInUser?.id, ins.name);
+  var statusSel = document.getElementById('editInsStatus');
+  var statusMsg = document.getElementById('editInsStatusMsg');
+  if(statusSel) statusSel.value = chatProfile.status || 'online';
+  if(statusMsg) statusMsg.value = chatProfile.statusMsg || '';
+
   openModal('editInstructorProfileModal');
 }
 
@@ -10906,14 +11293,25 @@ function saveInstructorProfile() {
   const ins = currentInstructor;
   if(!ins) return;
 
+  const newName = document.getElementById('editInsProfileName')?.value?.trim();
   const email = document.getElementById('editInsProfileEmail')?.value?.trim();
   const phone = document.getElementById('editInsProfilePhone')?.value?.trim();
   const specialization = document.getElementById('editInsProfileSpecialization')?.value?.trim();
   const bio = document.getElementById('editInsProfileBio')?.value?.trim();
 
+  if(!newName) { showToast('Please enter your name'); return; }
   if(!email) { showToast('Please enter an email address'); return; }
 
+  // Update name in instructor data, userAccounts, and instructorData array
+  if(newName !== ins.name) {
+    ins.name = newName;
+    if(currentLoggedInUser) currentLoggedInUser.name = newName;
+    var acct = userAccounts.find(function(u){ return u.id === currentLoggedInUser.id; });
+    if(acct) acct.name = newName;
+  }
+
   instructorProfiles[ins.id] = {
+    name: newName,
     email: email,
     phone: phone,
     specialization: specialization,
@@ -10926,13 +11324,104 @@ function saveInstructorProfile() {
   if(phone) ins.phone = phone;
   if(specialization) ins.specialization = specialization;
 
+  // Sync profile pic and status to LMS Chat
+  syncProfileToLmsChat(currentLoggedInUser?.id, newName, 'instructor', ins.course, 'instructor');
+
   saveState();
   closeModal('editInstructorProfileModal');
   showToast('Profile updated successfully');
 
+  // Update sidebar with name and profile pic
+  updateSidebarAvatar(currentLoggedInUser?.id, newName);
+
   // Re-render the instructor profile page to reflect changes
   buildInstructorPages();
   showPage('i-profile');
+}
+
+// ============================== SHARED PROFILE EDIT (Admin, Admin Staff, CMC) ==============================
+function openAccountProfileEdit() {
+  var user = currentLoggedInUser;
+  if(!user) return;
+  // If the user is a student or instructor, redirect to their specific profile edit
+  if(user.role === 'student') { openEditStudentProfile(); return; }
+  if(user.role === 'instructor') { openEditInstructorProfile(); return; }
+  var chatProfile = (typeof lmsChatProfiles !== 'undefined' && lmsChatProfiles[user.id]) ? lmsChatProfiles[user.id] : {};
+
+  document.getElementById('editAcctName').value = user.name || '';
+  document.getElementById('editAcctId').value = user.id || '';
+  document.getElementById('editAcctEmail').value = user.email || '';
+  document.getElementById('editAcctPhone').value = user.phone || '';
+
+  // Load profile pic preview and status
+  _pendingProfilePics.account = null;
+  profilePicLoadPreview('editAcctPicPreview', user.id, user.name);
+  var statusSel = document.getElementById('editAcctStatus');
+  var statusMsg = document.getElementById('editAcctStatusMsg');
+  if(statusSel) statusSel.value = chatProfile.status || 'online';
+  if(statusMsg) statusMsg.value = chatProfile.statusMsg || '';
+
+  openModal('editAccountProfileModal');
+}
+
+function saveAccountProfile() {
+  var user = currentLoggedInUser;
+  if(!user) return;
+
+  var newName = document.getElementById('editAcctName')?.value?.trim();
+  var email = document.getElementById('editAcctEmail')?.value?.trim();
+  var phone = document.getElementById('editAcctPhone')?.value?.trim();
+
+  if(!newName) { showToast('Please enter your name'); return; }
+
+  // Update the userAccounts entry
+  var acct = userAccounts.find(function(u){ return u.id === user.id; });
+  if(acct) {
+    acct.name = newName;
+    if(email) acct.email = email;
+    if(phone) acct.phone = phone;
+  }
+  user.name = newName;
+  if(email) user.email = email;
+  if(phone) user.phone = phone;
+
+  // Sync profile pic and status to LMS Chat
+  syncProfileToLmsChat(user.id, newName, user.role, user.programme || '', 'account');
+
+  saveState();
+  closeModal('editAccountProfileModal');
+  showToast('Profile updated successfully');
+
+  // Update sidebar with name and profile pic
+  updateSidebarAvatar(user.id, newName);
+
+  // Re-render the current role's profile page
+  var role = user.role || currentRole;
+  if(role === 'adminstaff') {
+    // Re-render admin staff pages to reflect changes
+    var mc = document.getElementById('mainContent');
+    if(mc) {
+      // Find and update the profile name element
+      var pName = document.getElementById('asProfileName');
+      if(pName) pName.textContent = newName;
+    }
+  } else if(role === 'cmc') {
+    var cmcName = document.getElementById('cmcProfileName');
+    if(cmcName) cmcName.textContent = newName;
+  }
+}
+
+// ============================== SIDEBAR NAME HELPER ==============================
+function vcUpdateSidebarName(name) {
+  var userId = currentLoggedInUser ? currentLoggedInUser.id : null;
+  if(userId) { updateSidebarAvatar(userId, name); return; }
+  var el = document.getElementById('sidebarUserName');
+  if(el) el.textContent = name;
+  var avatar = document.getElementById('sidebarAvatar');
+  if(avatar) {
+    var initials = name.split(' ').map(function(n){ return n[0]; }).join('').substring(0,2).toUpperCase();
+    avatar.textContent = initials;
+  }
 }
 
 // ============================== SYSTEM SETTINGS FUNCTIONS ==============================
@@ -16178,6 +16667,8 @@ async function studentLightSync(uname, pw) {
       studentMatch = createStudentDataForAccount(userAccount);
     }
     currentStudent = studentMatch;
+    var savedSP2 = studentProfiles[studentMatch.id];
+    if(savedSP2 && savedSP2.name) { studentMatch.name = savedSP2.name; userAccount.name = savedSP2.name; }
     currentLoggedInUser = userAccount;
     enterApp('student');
 
@@ -19600,8 +20091,9 @@ function buildAdminStaffPages() {
   html += '<section class="page" id="page-as-profile">' +
     '<div class="card" style="max-width:600px;margin:0 auto;text-align:center;padding:40px;">' +
       '<div style="width:80px;height:80px;border-radius:50%;background:linear-gradient(135deg,var(--purple),#8e44ad);display:flex;align-items:center;justify-content:center;font-size:28px;font-weight:700;margin:0 auto 16px;">'+pInitials+'</div>' +
-      '<h3 style="font-size:20px;margin-bottom:4px;">'+user.name+'</h3>' +
-      '<p style="color:var(--text-muted);font-size:13px;margin-bottom:20px;">Administrative Staff</p>' +
+      '<h3 style="font-size:20px;margin-bottom:4px;" id="asProfileName">'+user.name+'</h3>' +
+      '<p style="color:var(--text-muted);font-size:13px;margin-bottom:4px;">Administrative Staff</p>' +
+      '<button class="btn btn-secondary btn-sm" style="margin-bottom:16px;" onclick="openAccountProfileEdit()">Edit Profile</button>' +
       '<div style="text-align:left;max-width:400px;margin:0 auto;">' +
         '<div style="display:flex;justify-content:space-between;padding:10px 0;border-bottom:1px solid var(--border);"><span style="color:var(--text-muted);font-size:13px;">User ID</span><span style="font-size:13px;">'+user.id+'</span></div>' +
         '<div style="display:flex;justify-content:space-between;padding:10px 0;border-bottom:1px solid var(--border);"><span style="color:var(--text-muted);font-size:13px;">Username</span><span style="font-size:13px;">'+user.username+'</span></div>' +
@@ -20725,8 +21217,9 @@ function buildCmcPages() {
   html += '<div style="display:flex;align-items:center;gap:16px;margin-bottom:16px;">';
   html += '<div style="width:64px;height:64px;border-radius:50%;background:linear-gradient(135deg,var(--teal),#16a085);display:flex;align-items:center;justify-content:center;font-size:24px;font-weight:700;color:#fff;">' +
     (user.name.split(' ').map(function(n){return n[0];}).join('').substring(0,2)) + '</div>';
-  html += '<div><h3 style="margin:0;font-size:18px;">' + user.name + '</h3>';
-  html += '<p style="margin:4px 0 0;font-size:13px;color:var(--text-muted);">CMC Board Member</p></div></div>';
+  html += '<div><h3 style="margin:0;font-size:18px;" id="cmcProfileName">' + user.name + '</h3>';
+  html += '<p style="margin:4px 0 0;font-size:13px;color:var(--text-muted);">CMC Board Member</p>';
+  html += '<button class="btn btn-secondary btn-sm" style="margin-top:8px;" onclick="openAccountProfileEdit()">Edit Profile</button></div></div>';
   html += '<div style="font-size:13px;color:var(--text-secondary);line-height:1.8;">';
   html += '<div><strong>Username:</strong> ' + (user.username||'--') + '</div>';
   html += '<div><strong>Email:</strong> ' + (user.email||'--') + '</div>';
