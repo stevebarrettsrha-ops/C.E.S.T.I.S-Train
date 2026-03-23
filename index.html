@@ -889,7 +889,10 @@ textarea.form-control { resize:vertical; min-height:80px; }
 }
 .video-tile.screen-share {
   grid-column:1/-1; aspect-ratio:auto; min-height:300px;
-  border:2px solid var(--blue);
+  border:2px solid var(--blue); background:#000;
+}
+.video-tile.screen-share video {
+  object-fit:contain !important; background:#000;
 }
 /* Participant screen-share view: grid becomes flex column so the screen tile dominates */
 .video-grid.vc-screen-share-mode {
@@ -907,7 +910,10 @@ textarea.form-control { resize:vertical; min-height:80px; }
   display:flex; flex-direction:column; gap:12px; position:relative;
 }
 .video-grid.vc-host-focus-mode .video-tile.host-tile {
-  flex:1; min-height:400px; aspect-ratio:16/9; border:2px solid var(--blue);
+  flex:1; min-height:400px; aspect-ratio:16/9; border:2px solid var(--blue); background:#000;
+}
+.video-grid.vc-host-focus-mode .video-tile.host-tile video {
+  object-fit:contain; background:#000;
 }
 .video-grid.vc-host-focus-mode .video-tile.local {
   position:absolute; bottom:12px; right:12px; width:180px; aspect-ratio:16/9;
@@ -9160,8 +9166,10 @@ async function vcToggleScreen() {
     screenStream.getTracks().forEach(function(t){t.stop();});
     screenStream = null;
     btn.classList.remove('active');
-    if(localStream && localStream.getVideoTracks()[0]) {
+    // Restore camera track for all peers
+    if(localStream && localStream.getVideoTracks().length > 0) {
       var camTrack = localStream.getVideoTracks()[0];
+      camTrack.enabled = true;
       vcReplaceVideoTrackForAll(camTrack);
     }
     var lv = document.getElementById('vc-local-video');
@@ -9171,16 +9179,16 @@ async function vcToggleScreen() {
     return;
   }
   try {
-    screenStream = await navigator.mediaDevices.getDisplayMedia({video:true, audio:false});
+    screenStream = await navigator.mediaDevices.getDisplayMedia({video:{cursor:'always'}, audio:true});
     btn.classList.add('active');
     var sTrack = screenStream.getVideoTracks()[0];
     vcReplaceVideoTrackForAll(sTrack);
     var lv = document.getElementById('vc-local-video');
     if(lv) { lv.srcObject = screenStream; lv.parentElement.classList.remove('local'); }
-    // Notify peers that screen is being shared
+    // Notify peers FIRST so they switch to screen-share layout before track arrives
     vcBroadcastData({type:'screen-share-started', peerId: rtcPeer ? rtcPeer.id : '', name: vcCurrentUserName});
     sTrack.onended = function() { vcToggleScreen(); };
-  } catch(err) { /* user cancelled */ }
+  } catch(err) { console.warn('Screen share cancelled or failed:', err); }
 }
 
 // Helper: Replace video track in all peer media connections
@@ -9188,17 +9196,63 @@ function vcReplaceVideoTrackForAll(newTrack) {
   Object.keys(peerConnections).forEach(function(pid) {
     var mc = peerConnections[pid].media;
     if(!mc) return;
-    // PeerJS exposes the underlying RTCPeerConnection
-    var pc = mc.peerConnection || (mc._pc) || null;
+    // PeerJS exposes the underlying RTCPeerConnection via multiple possible paths
+    var pc = mc.peerConnection || mc._peerConnection || mc._pc || (mc.provider && mc.provider.peerConnection) || null;
+    if(!pc && mc.open !== undefined) {
+      // Try accessing through PeerJS internals
+      var keys = Object.keys(mc);
+      for(var k = 0; k < keys.length; k++) {
+        var val = mc[keys[k]];
+        if(val && val instanceof RTCPeerConnection) { pc = val; break; }
+      }
+    }
     if(pc && pc.getSenders) {
       var sender = pc.getSenders().find(function(s){return s.track && s.track.kind==='video';});
       if(sender) {
         sender.replaceTrack(newTrack).catch(function(err) {
           console.warn('Failed to replace track for', pid, err);
+          // Fallback: close and re-call with new stream
+          vcReCallPeerWithScreen(pid, newTrack);
         });
+      } else {
+        // No video sender exists (connection was made without video) — need to renegotiate
+        console.warn('No video sender for', pid, '— re-calling with screen track');
+        vcReCallPeerWithScreen(pid, newTrack);
       }
+    } else {
+      console.warn('No RTCPeerConnection found for', pid, '— re-calling');
+      vcReCallPeerWithScreen(pid, newTrack);
     }
   });
+}
+
+// Fallback: Close existing media call and re-establish with a stream that includes the new track
+function vcReCallPeerWithScreen(peerId, videoTrack) {
+  if(!rtcPeer || rtcPeer.destroyed) return;
+  // Build a stream with the new video track + local audio
+  var newStream = new MediaStream();
+  newStream.addTrack(videoTrack);
+  if(localStream) {
+    localStream.getAudioTracks().forEach(function(t) { newStream.addTrack(t); });
+  }
+  // Close old media connection
+  if(peerConnections[peerId] && peerConnections[peerId].media) {
+    try { peerConnections[peerId].media.close(); } catch(e) {}
+  }
+  // Re-call the peer with the screen stream
+  var call = rtcPeer.call(peerId, newStream);
+  if(!call) return;
+  call.on('stream', function(rs) {
+    if(!peerConnections[peerId]) peerConnections[peerId] = {};
+    peerConnections[peerId].media = call;
+    peerConnections[peerId].stream = rs;
+    vcAddVideo(peerId, rs, peerNames[peerId] || 'Participant');
+  });
+  call.on('close', function() { vcRemoveVideo(peerId); });
+  call.on('error', function(err) { console.warn('Re-call to', peerId, 'failed:', err); });
+  // Update local reference
+  if(!peerConnections[peerId]) peerConnections[peerId] = {};
+  peerConnections[peerId].media = call;
 }
 
 // Helper: Broadcast data message to all connected peers
@@ -9233,8 +9287,13 @@ function vcEnterScreenShareView(sharingPeerId) {
     }
   });
   var shareTile = document.getElementById('vc-tile-' + safeId);
-  if (shareTile) shareTile.classList.add('screen-share');
+  if (shareTile) {
+    shareTile.classList.add('screen-share');
+    shareTile.style.display = '';
+  }
   grid.classList.add('vc-screen-share-mode');
+  // Remove host-focus layout so screen-share layout takes over cleanly
+  grid.classList.remove('vc-host-focus-mode');
 }
 
 // Restore the normal multi-tile grid when screen sharing ends.
@@ -9254,6 +9313,10 @@ function vcExitScreenShareView() {
     tile.classList.remove('screen-share');
   });
   grid.classList.remove('vc-screen-share-mode');
+  // Restore host-focus mode for participants
+  if (!isRoomHost) {
+    grid.classList.add('vc-host-focus-mode');
+  }
 }
 
 function vcToggleHand() {
