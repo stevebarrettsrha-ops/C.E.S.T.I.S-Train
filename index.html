@@ -761,6 +761,21 @@ textarea.form-control { resize:vertical; min-height:80px; }
 }
 .modal-close:hover { background:rgba(255,255,255,0.06); color:var(--text-primary); }
 
+/* Edit profile picture & status sections */
+.edit-profile-pic-section {
+  display:flex; align-items:center; gap:16px; margin-bottom:18px;
+  padding-bottom:16px; border-bottom:1px solid var(--border);
+}
+.edit-profile-pic-preview {
+  width:72px; height:72px; min-width:72px; border-radius:50%;
+  background:var(--bg-input); display:flex; align-items:center; justify-content:center;
+  font-size:28px; font-weight:700; color:var(--accent); overflow:hidden;
+  border:3px solid var(--border-light); position:relative;
+}
+.edit-profile-pic-preview img { width:100%; height:100%; object-fit:cover; border-radius:50%; }
+.edit-profile-status-row { display:flex; gap:12px; margin-bottom:4px; }
+.edit-profile-status-row .form-group { margin-bottom:12px; }
+
 .pipeline { display:flex; gap:2px; margin:20px 0; }
 .pipeline-stage {
   flex:1; text-align:center; padding:14px 8px;
@@ -3961,10 +3976,26 @@ body.vc-fullscreen-mode.vc-host-only-mode .video-grid .video-tile:not(.vc-hoston
 
 <!-- EDIT STUDENT PROFILE MODAL -->
 <div class="modal-overlay" id="editStudentProfileModal">
-  <div class="modal">
-    <div class="modal-header"><h3>Edit Profile</h3><button class="modal-close" onclick="closeModal('editStudentProfileModal')">✕</button></div>
+  <div class="modal" style="max-width:480px;">
+    <div class="modal-header"><h3>Edit Profile</h3><button class="modal-close" onclick="closeModal('editStudentProfileModal')">&#x2715;</button></div>
+    <div class="edit-profile-pic-section">
+      <div class="edit-profile-pic-preview" id="editStuPicPreview"></div>
+      <div>
+        <button class="btn btn-secondary btn-sm" onclick="document.getElementById('editStuPicInput').click()">Change Photo</button>
+        <button class="btn btn-sm" style="color:var(--text-muted);font-size:11px;" onclick="profilePicRemove('editStuPicPreview','student')">Remove</button>
+        <input type="file" id="editStuPicInput" accept="image/*" style="display:none;" onchange="profilePicPreview(this,'editStuPicPreview','student')">
+      </div>
+    </div>
     <div class="form-group"><label>Full Name</label><input type="text" class="form-control" id="editProfileName" placeholder="Your full name"></div>
     <div class="form-group"><label>Student ID</label><input type="text" class="form-control" id="editProfileId" disabled></div>
+    <div class="edit-profile-status-row">
+      <div class="form-group" style="flex:1;"><label>Status</label>
+        <select class="form-control" id="editStuStatus"><option value="online">Online</option><option value="away">Away</option><option value="offline">Offline</option></select>
+      </div>
+      <div class="form-group" style="flex:2;"><label>Status Message</label>
+        <input type="text" class="form-control" id="editStuStatusMsg" placeholder="What's on your mind?">
+      </div>
+    </div>
     <div class="form-group"><label>Email</label><input type="email" class="form-control" id="editProfileEmail" placeholder="your.email@student.heartlms.edu.jm"></div>
     <div class="form-group"><label>Phone</label><input type="tel" class="form-control" id="editProfilePhone" placeholder="+1 (876) 000-0000"></div>
     <div class="form-group"><label>Emergency Contact Name</label><input type="text" class="form-control" id="editProfileEmergencyName" placeholder="Parent / Guardian name"></div>
@@ -3978,10 +4009,26 @@ body.vc-fullscreen-mode.vc-host-only-mode .video-grid .video-tile:not(.vc-hoston
 
 <!-- EDIT INSTRUCTOR PROFILE MODAL -->
 <div class="modal-overlay" id="editInstructorProfileModal">
-  <div class="modal">
-    <div class="modal-header"><h3>Edit Profile</h3><button class="modal-close" onclick="closeModal('editInstructorProfileModal')">✕</button></div>
+  <div class="modal" style="max-width:480px;">
+    <div class="modal-header"><h3>Edit Profile</h3><button class="modal-close" onclick="closeModal('editInstructorProfileModal')">&#x2715;</button></div>
+    <div class="edit-profile-pic-section">
+      <div class="edit-profile-pic-preview" id="editInsPicPreview"></div>
+      <div>
+        <button class="btn btn-secondary btn-sm" onclick="document.getElementById('editInsPicInput').click()">Change Photo</button>
+        <button class="btn btn-sm" style="color:var(--text-muted);font-size:11px;" onclick="profilePicRemove('editInsPicPreview','instructor')">Remove</button>
+        <input type="file" id="editInsPicInput" accept="image/*" style="display:none;" onchange="profilePicPreview(this,'editInsPicPreview','instructor')">
+      </div>
+    </div>
     <div class="form-group"><label>Full Name</label><input type="text" class="form-control" id="editInsProfileName" placeholder="Your full name"></div>
     <div class="form-group"><label>Staff ID</label><input type="text" class="form-control" id="editInsProfileId" disabled></div>
+    <div class="edit-profile-status-row">
+      <div class="form-group" style="flex:1;"><label>Status</label>
+        <select class="form-control" id="editInsStatus"><option value="online">Online</option><option value="away">Away</option><option value="offline">Offline</option></select>
+      </div>
+      <div class="form-group" style="flex:2;"><label>Status Message</label>
+        <input type="text" class="form-control" id="editInsStatusMsg" placeholder="What's on your mind?">
+      </div>
+    </div>
     <div class="form-group"><label>Email</label><input type="email" class="form-control" id="editInsProfileEmail" placeholder="your.email@heartlms.edu.jm"></div>
     <div class="form-group"><label>Phone</label><input type="tel" class="form-control" id="editInsProfilePhone" placeholder="+1 (876) 000-0000"></div>
     <div class="form-group"><label>Specialization</label><input type="text" class="form-control" id="editInsProfileSpecialization" placeholder="e.g. Engine Repair & Diagnostics"></div>
@@ -3995,10 +4042,26 @@ body.vc-fullscreen-mode.vc-host-only-mode .video-grid .video-tile:not(.vc-hoston
 
 <!-- EDIT ACCOUNT PROFILE MODAL (Admin, Admin Staff, CMC) -->
 <div class="modal-overlay" id="editAccountProfileModal">
-  <div class="modal">
+  <div class="modal" style="max-width:480px;">
     <div class="modal-header"><h3>Edit Profile</h3><button class="modal-close" onclick="closeModal('editAccountProfileModal')">&#x2715;</button></div>
+    <div class="edit-profile-pic-section">
+      <div class="edit-profile-pic-preview" id="editAcctPicPreview"></div>
+      <div>
+        <button class="btn btn-secondary btn-sm" onclick="document.getElementById('editAcctPicInput').click()">Change Photo</button>
+        <button class="btn btn-sm" style="color:var(--text-muted);font-size:11px;" onclick="profilePicRemove('editAcctPicPreview','account')">Remove</button>
+        <input type="file" id="editAcctPicInput" accept="image/*" style="display:none;" onchange="profilePicPreview(this,'editAcctPicPreview','account')">
+      </div>
+    </div>
     <div class="form-group"><label>Full Name</label><input type="text" class="form-control" id="editAcctName" placeholder="Your full name"></div>
     <div class="form-group"><label>User ID</label><input type="text" class="form-control" id="editAcctId" disabled></div>
+    <div class="edit-profile-status-row">
+      <div class="form-group" style="flex:1;"><label>Status</label>
+        <select class="form-control" id="editAcctStatus"><option value="online">Online</option><option value="away">Away</option><option value="offline">Offline</option></select>
+      </div>
+      <div class="form-group" style="flex:2;"><label>Status Message</label>
+        <input type="text" class="form-control" id="editAcctStatusMsg" placeholder="What's on your mind?">
+      </div>
+    </div>
     <div class="form-group"><label>Email</label><input type="email" class="form-control" id="editAcctEmail" placeholder="your.email@heartlms.edu.jm"></div>
     <div class="form-group"><label>Phone</label><input type="tel" class="form-control" id="editAcctPhone" placeholder="+1 (876) 000-0000"></div>
     <div style="display:flex;gap:10px;justify-content:flex-end;margin-top:20px;">
@@ -5683,6 +5746,15 @@ function enterApp(role) {
     if(bellBtn) bellBtn.onclick = function(e) { e.stopPropagation(); toggleNotifications(); };
     updateNotificationDot();
     setTimeout(animateAllCounters, 100);
+
+    // Show profile picture in sidebar if user has one in LMS Chat
+    if(currentLoggedInUser && typeof lmsChatProfiles !== 'undefined') {
+      var cp = lmsChatProfiles[currentLoggedInUser.id];
+      if(cp && cp.profilePic) {
+        var sa = document.getElementById('sidebarAvatar');
+        if(sa) { sa.innerHTML = '<img src="'+cp.profilePic+'" style="width:100%;height:100%;object-fit:cover;border-radius:50%;">'; sa.style.overflow = 'hidden'; }
+      }
+    }
 
     // Set session expiry and start periodic check
     setSessionExpiry();
@@ -10906,11 +10978,95 @@ function renderStudentDriveResources() {
   container.innerHTML = html;
 }
 
+// ============================== SHARED PROFILE PIC HELPERS ==============================
+var _pendingProfilePics = { student: null, instructor: null, account: null };
+
+function profilePicPreview(input, previewId, type) {
+  var file = input.files[0];
+  if(!file) return;
+  if(file.size > 2 * 1024 * 1024) { showToast('Image must be under 2 MB'); return; }
+  var reader = new FileReader();
+  reader.onload = function(e) {
+    var preview = document.getElementById(previewId);
+    if(preview) preview.innerHTML = '<img src="'+e.target.result+'">';
+    _pendingProfilePics[type] = e.target.result;
+  };
+  reader.readAsDataURL(file);
+  input.value = '';
+}
+
+function profilePicRemove(previewId, type) {
+  var preview = document.getElementById(previewId);
+  if(preview) preview.innerHTML = '';
+  _pendingProfilePics[type] = '__remove__';
+}
+
+function profilePicLoadPreview(previewId, userId, name) {
+  var preview = document.getElementById(previewId);
+  if(!preview) return;
+  var chatProfile = (typeof lmsChatProfiles !== 'undefined') ? lmsChatProfiles[userId] : null;
+  if(chatProfile && chatProfile.profilePic) {
+    preview.innerHTML = '<img src="'+chatProfile.profilePic+'">';
+  } else {
+    var initials = name ? name.split(' ').map(function(n){ return n[0]; }).join('').substring(0,2).toUpperCase() : '?';
+    preview.innerHTML = initials;
+  }
+}
+
+// Sync profile pic and status to lmsChatProfiles so other users see it in LMS Chat
+function syncProfileToLmsChat(userId, name, role, programme, picType) {
+  if(typeof lmsChatProfiles === 'undefined') return;
+  if(!lmsChatProfiles[userId]) lmsChatProfiles[userId] = {};
+  var cp = lmsChatProfiles[userId];
+  cp.name = name;
+  cp.role = role;
+  cp.programme = programme || '';
+
+  // Handle profile picture
+  var pendingPic = _pendingProfilePics[picType];
+  if(pendingPic === '__remove__') {
+    delete cp.profilePic;
+  } else if(pendingPic) {
+    cp.profilePic = pendingPic;
+  }
+  _pendingProfilePics[picType] = null;
+
+  // Read status fields based on type
+  var statusId = picType === 'student' ? 'editStuStatus' : picType === 'instructor' ? 'editInsStatus' : 'editAcctStatus';
+  var statusMsgId = picType === 'student' ? 'editStuStatusMsg' : picType === 'instructor' ? 'editInsStatusMsg' : 'editAcctStatusMsg';
+  var statusEl = document.getElementById(statusId);
+  var statusMsgEl = document.getElementById(statusMsgId);
+  if(statusEl) cp.status = statusEl.value;
+  if(statusMsgEl) cp.statusMsg = statusMsgEl.value.trim();
+
+  // Save and sync
+  if(typeof saveLmsChatData === 'function') saveLmsChatData();
+  if(typeof lmsChatSyncToDrive === 'function') lmsChatSyncToDrive();
+}
+
+// Update sidebar avatar to show profile picture if available
+function updateSidebarAvatar(userId, name) {
+  var el = document.getElementById('sidebarUserName');
+  if(el) el.textContent = name;
+  var avatar = document.getElementById('sidebarAvatar');
+  if(!avatar) return;
+  var chatProfile = (typeof lmsChatProfiles !== 'undefined') ? lmsChatProfiles[userId] : null;
+  if(chatProfile && chatProfile.profilePic) {
+    avatar.innerHTML = '<img src="'+chatProfile.profilePic+'" style="width:100%;height:100%;object-fit:cover;border-radius:50%;">';
+    avatar.style.overflow = 'hidden';
+  } else {
+    var initials = name.split(' ').map(function(n){ return n[0]; }).join('').substring(0,2).toUpperCase();
+    avatar.innerHTML = '';
+    avatar.textContent = initials;
+  }
+}
+
 // ============================== STUDENT PROFILE FUNCTIONS ==============================
 function openEditStudentProfile() {
   const s = currentStudent;
   if(!s) return;
   const profile = studentProfiles[s.id] || {};
+  var chatProfile = (typeof lmsChatProfiles !== 'undefined' && lmsChatProfiles[currentLoggedInUser?.id]) ? lmsChatProfiles[currentLoggedInUser.id] : {};
   var firstName = s.name.split(' ')[0] || '';
   var lastName = s.name.split(' ').slice(1).join(' ') || '';
 
@@ -10920,6 +11076,15 @@ function openEditStudentProfile() {
   document.getElementById('editProfilePhone').value = profile.phone || '';
   document.getElementById('editProfileEmergencyName').value = profile.emergencyName || '';
   document.getElementById('editProfileEmergencyPhone').value = profile.emergencyPhone || '';
+
+  // Load profile pic preview and status
+  _pendingProfilePics.student = null;
+  profilePicLoadPreview('editStuPicPreview', currentLoggedInUser?.id, s.name);
+  var statusSel = document.getElementById('editStuStatus');
+  var statusMsg = document.getElementById('editStuStatusMsg');
+  if(statusSel) statusSel.value = chatProfile.status || 'online';
+  if(statusMsg) statusMsg.value = chatProfile.statusMsg || '';
+
   openModal('editStudentProfileModal');
 }
 
@@ -10955,12 +11120,15 @@ function saveStudentProfile() {
     updatedAt: new Date().toISOString()
   };
 
+  // Sync profile pic and status to LMS Chat
+  syncProfileToLmsChat(currentLoggedInUser?.id, newName, 'student', s.course, 'student');
+
   saveState();
   closeModal('editStudentProfileModal');
   showToast('Profile updated successfully');
 
-  // Update sidebar name
-  vcUpdateSidebarName(newName);
+  // Update sidebar with name and profile pic
+  updateSidebarAvatar(currentLoggedInUser?.id, newName);
 
   // Re-render the student profile page to reflect changes
   buildStudentPages();
@@ -10972,6 +11140,7 @@ function openEditInstructorProfile() {
   const ins = currentInstructor;
   if(!ins) return;
   const profile = instructorProfiles[ins.id] || {};
+  var chatProfile = (typeof lmsChatProfiles !== 'undefined' && lmsChatProfiles[currentLoggedInUser?.id]) ? lmsChatProfiles[currentLoggedInUser.id] : {};
 
   document.getElementById('editInsProfileName').value = ins.name;
   document.getElementById('editInsProfileId').value = ins.id;
@@ -10979,6 +11148,15 @@ function openEditInstructorProfile() {
   document.getElementById('editInsProfilePhone').value = profile.phone || ins.phone || '';
   document.getElementById('editInsProfileSpecialization').value = profile.specialization || ins.specialization || '';
   document.getElementById('editInsProfileBio').value = profile.bio || '';
+
+  // Load profile pic preview and status
+  _pendingProfilePics.instructor = null;
+  profilePicLoadPreview('editInsPicPreview', currentLoggedInUser?.id, ins.name);
+  var statusSel = document.getElementById('editInsStatus');
+  var statusMsg = document.getElementById('editInsStatusMsg');
+  if(statusSel) statusSel.value = chatProfile.status || 'online';
+  if(statusMsg) statusMsg.value = chatProfile.statusMsg || '';
+
   openModal('editInstructorProfileModal');
 }
 
@@ -11017,12 +11195,15 @@ function saveInstructorProfile() {
   if(phone) ins.phone = phone;
   if(specialization) ins.specialization = specialization;
 
+  // Sync profile pic and status to LMS Chat
+  syncProfileToLmsChat(currentLoggedInUser?.id, newName, 'instructor', ins.course, 'instructor');
+
   saveState();
   closeModal('editInstructorProfileModal');
   showToast('Profile updated successfully');
 
-  // Update sidebar name
-  vcUpdateSidebarName(newName);
+  // Update sidebar with name and profile pic
+  updateSidebarAvatar(currentLoggedInUser?.id, newName);
 
   // Re-render the instructor profile page to reflect changes
   buildInstructorPages();
@@ -11036,10 +11217,21 @@ function openAccountProfileEdit() {
   // If the user is a student or instructor, redirect to their specific profile edit
   if(user.role === 'student') { openEditStudentProfile(); return; }
   if(user.role === 'instructor') { openEditInstructorProfile(); return; }
+  var chatProfile = (typeof lmsChatProfiles !== 'undefined' && lmsChatProfiles[user.id]) ? lmsChatProfiles[user.id] : {};
+
   document.getElementById('editAcctName').value = user.name || '';
   document.getElementById('editAcctId').value = user.id || '';
   document.getElementById('editAcctEmail').value = user.email || '';
   document.getElementById('editAcctPhone').value = user.phone || '';
+
+  // Load profile pic preview and status
+  _pendingProfilePics.account = null;
+  profilePicLoadPreview('editAcctPicPreview', user.id, user.name);
+  var statusSel = document.getElementById('editAcctStatus');
+  var statusMsg = document.getElementById('editAcctStatusMsg');
+  if(statusSel) statusSel.value = chatProfile.status || 'online';
+  if(statusMsg) statusMsg.value = chatProfile.statusMsg || '';
+
   openModal('editAccountProfileModal');
 }
 
@@ -11064,12 +11256,15 @@ function saveAccountProfile() {
   if(email) user.email = email;
   if(phone) user.phone = phone;
 
+  // Sync profile pic and status to LMS Chat
+  syncProfileToLmsChat(user.id, newName, user.role, user.programme || '', 'account');
+
   saveState();
   closeModal('editAccountProfileModal');
   showToast('Profile updated successfully');
 
-  // Update sidebar name
-  vcUpdateSidebarName(newName);
+  // Update sidebar with name and profile pic
+  updateSidebarAvatar(user.id, newName);
 
   // Re-render the current role's profile page
   var role = user.role || currentRole;
@@ -11089,6 +11284,8 @@ function saveAccountProfile() {
 
 // ============================== SIDEBAR NAME HELPER ==============================
 function vcUpdateSidebarName(name) {
+  var userId = currentLoggedInUser ? currentLoggedInUser.id : null;
+  if(userId) { updateSidebarAvatar(userId, name); return; }
   var el = document.getElementById('sidebarUserName');
   if(el) el.textContent = name;
   var avatar = document.getElementById('sidebarAvatar');
