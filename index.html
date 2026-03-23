@@ -963,12 +963,24 @@ body.vc-fullscreen-mode .vc-conference-body .vc-side-panel .card {
 }
 /* Hide side panel when in host-only view */
 body.vc-fullscreen-mode.vc-host-only-mode .vc-conference-body .vc-side-panel { display:none; }
-body.vc-fullscreen-mode.vc-host-only-mode .video-grid { display:flex; align-items:center; justify-content:center; }
-body.vc-fullscreen-mode.vc-host-only-mode .video-grid .video-tile { display:none !important; }
-body.vc-fullscreen-mode.vc-host-only-mode .video-grid .video-tile.host-tile { display:flex !important; width:100%; height:100%; max-height:calc(100vh - 140px); aspect-ratio:16/9; }
-body.vc-fullscreen-mode.vc-host-only-mode .video-grid .video-tile.local { display:none !important; }
-/* For host in host-only mode: show only their own tile */
-body.vc-fullscreen-mode.vc-host-only-mode.vc-is-host .video-grid .video-tile.local { display:flex !important; width:100%; height:100%; max-height:calc(100vh - 140px); aspect-ratio:16/9; }
+body.vc-fullscreen-mode.vc-host-only-mode .video-grid {
+  display:flex; align-items:center; justify-content:center; padding:0 !important;
+}
+body.vc-fullscreen-mode.vc-host-only-mode .video-grid .video-tile.vc-hostonly-visible {
+  display:flex !important; width:100%; height:100%; max-height:calc(100vh - 140px);
+  aspect-ratio:16/9; flex:1;
+}
+body.vc-fullscreen-mode.vc-host-only-mode .video-grid .video-tile:not(.vc-hostonly-visible) {
+  display:none !important;
+}
+.vc-waiting-host {
+  display:flex; flex-direction:column; align-items:center; justify-content:center;
+  gap:16px; color:var(--text-muted); font-size:15px; flex:1;
+}
+.vc-waiting-host .vc-waiting-icon {
+  width:80px; height:80px; border-radius:50%; background:rgba(255,255,255,0.08);
+  display:flex; align-items:center; justify-content:center; font-size:36px;
+}
 
 /* View mode toggle button styling */
 .vc-view-toggle {
@@ -8969,16 +8981,58 @@ function vcSetViewMode(mode) {
   // Reset mode classes
   body.classList.remove('vc-host-only-mode');
 
+  // Clear host-only visibility markers from all tiles
+  var grid = document.getElementById('vc-video-grid');
+  if(grid) {
+    grid.querySelectorAll('.video-tile').forEach(function(t){ t.classList.remove('vc-hostonly-visible'); });
+    // Remove waiting-for-host placeholder if it exists
+    var waitEl = grid.querySelector('.vc-waiting-host');
+    if(waitEl) waitEl.remove();
+  }
+
   if(mode === 'host-only') {
-    // Host screen only - fullscreen stays on, hide everything except host video
+    // Host screen only - fullscreen stays on, show only the host tile
     body.classList.add('vc-fullscreen-mode');
     body.classList.add('vc-host-only-mode');
+    vcApplyHostOnlyVisibility();
   } else if(mode === 'fullscreen') {
     // Full screen conference - like the Zoom reference image
     body.classList.add('vc-fullscreen-mode');
   } else if(mode === 'gallery') {
     // Gallery mode - restore sidebar, topbar, show everything
     body.classList.remove('vc-fullscreen-mode');
+  }
+}
+
+// Determine which tile to show in host-only mode and mark it visible
+function vcApplyHostOnlyVisibility() {
+  var grid = document.getElementById('vc-video-grid');
+  if(!grid) return;
+
+  // Clear previous markers
+  grid.querySelectorAll('.video-tile').forEach(function(t){ t.classList.remove('vc-hostonly-visible'); });
+
+  var targetTile = null;
+
+  if(isRoomHost) {
+    // Host user: show their own local tile
+    targetTile = document.getElementById('vc-tile-local');
+  } else {
+    // Participant: show the host's tile (has .host-tile class)
+    targetTile = grid.querySelector('.video-tile.host-tile');
+  }
+
+  if(targetTile) {
+    targetTile.classList.add('vc-hostonly-visible');
+  } else {
+    // Host tile hasn't arrived yet — show waiting placeholder
+    var existing = grid.querySelector('.vc-waiting-host');
+    if(!existing) {
+      var wait = document.createElement('div');
+      wait.className = 'vc-waiting-host';
+      wait.innerHTML = '<div class="vc-waiting-icon">&#x1F3A5;</div><div>Waiting for host to connect...</div>';
+      grid.appendChild(wait);
+    }
   }
 }
 
@@ -9060,6 +9114,11 @@ function vcAddVideo(peerId, stream, name) {
       tile.style.display = 'none';
       tile.dataset.hiddenByHostView = '1';
     }
+  }
+
+  // If currently in host-only mode, update visibility
+  if (vcCurrentViewMode === 'host-only') {
+    vcApplyHostOnlyVisibility();
   }
 
   // If this tile is the active screen-sharer (e.g. late joiner receives host tile
