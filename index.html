@@ -19086,6 +19086,8 @@ function lmsChatToggleVideo() {
 // ============================================
 // INITIALIZE CHAT ON PAGE SHOW
 // ============================================
+var lmsChatCallPollInterval = null;
+
 function lmsChatOnPageShow(prefix) {
   initLmsChatData();
   lmsChatActiveRoom = null;
@@ -19121,8 +19123,6 @@ function lmsChatOnPageShow(prefix) {
     localStorage.setItem('voctrain_chatProfiles', JSON.stringify(lmsChatProfiles));
   } catch(e) {}
 }
-
-var lmsChatCallPollInterval = null;
 
 // Check if any rooms have active calls and show notification
 function lmsChatCheckForActiveCalls() {
