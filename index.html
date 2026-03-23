@@ -19527,11 +19527,14 @@ function adrGetFilteredTasks() {
     });
   }
 
-  // Sort: overdue first, then by priority, then by deadline
+  // Sort: pending_review first (for admin), then overdue, then by priority, then by deadline
   var priorityOrder = {urgent:0, high:1, medium:2, low:3};
   tasks.sort(function(a,b) {
     if(a.status === 'completed' && b.status !== 'completed') return 1;
     if(a.status !== 'completed' && b.status === 'completed') return -1;
+    // Pending review tasks float to top so admin can act on them
+    if(a.status === 'pending_review' && b.status !== 'pending_review') return -1;
+    if(a.status !== 'pending_review' && b.status === 'pending_review') return 1;
     var aOD = adrIsOverdue(a) ? 0 : 1;
     var bOD = adrIsOverdue(b) ? 0 : 1;
     if(aOD !== bOD) return aOD - bOD;
@@ -20719,6 +20722,8 @@ function asRenderDuties() {
   tasks.sort(function(a,b) {
     if(a.status === 'completed' && b.status !== 'completed') return 1;
     if(a.status !== 'completed' && b.status === 'completed') return -1;
+    if(a.status === 'pending_review' && b.status !== 'pending_review') return -1;
+    if(a.status !== 'pending_review' && b.status === 'pending_review') return 1;
     var aOD = adrIsOverdue(a) ? 0 : 1;
     var bOD = adrIsOverdue(b) ? 0 : 1;
     if(aOD !== bOD) return aOD - bOD;
@@ -20820,6 +20825,8 @@ function iRenderDuties() {
   tasks.sort(function(a,b) {
     if(a.status === 'completed' && b.status !== 'completed') return 1;
     if(a.status !== 'completed' && b.status === 'completed') return -1;
+    if(a.status === 'pending_review' && b.status !== 'pending_review') return -1;
+    if(a.status !== 'pending_review' && b.status === 'pending_review') return 1;
     var aOD = adrIsOverdue(a) ? 0 : 1;
     var bOD = adrIsOverdue(b) ? 0 : 1;
     if(aOD !== bOD) return aOD - bOD;
