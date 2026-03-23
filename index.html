@@ -1003,6 +1003,63 @@ body.vc-fullscreen-mode.vc-host-only-mode .video-grid .video-tile:not(.vc-hoston
 }
 @media(max-width:900px) {
   .vc-lobby-preview { width:100%; }
+  /* Fullscreen conference responsive: stack side panel below video */
+  body.vc-fullscreen-mode .vc-conference-body {
+    flex-direction:column;
+  }
+  body.vc-fullscreen-mode .vc-conference-body .vc-side-panel {
+    width:100%; border-left:none; border-top:1px solid var(--border);
+    max-height:40vh; flex-shrink:0;
+  }
+  body.vc-fullscreen-mode .vc-conference-body .vc-main-video-area {
+    min-height:0; flex:1;
+  }
+  body.vc-fullscreen-mode .vc-conference-body .vc-side-panel .chat-panel {
+    height:auto; min-height:120px;
+  }
+  body.vc-fullscreen-mode .vc-conference-header {
+    padding:6px 10px; gap:6px;
+  }
+  body.vc-fullscreen-mode .vc-conference-header > div {
+    gap:6px !important;
+  }
+  /* Compact view toggle on small screens */
+  .vc-view-btn { padding:4px 7px; font-size:10px; }
+  /* Compact host controls */
+  .vc-host-btn { padding:4px 8px; font-size:10px; }
+  #vc-host-bar { padding:6px 10px !important; gap:6px !important; }
+  /* Stack video controls more tightly */
+  body.vc-fullscreen-mode .vc-conference-body .video-controls {
+    padding:8px 10px; gap:8px; flex-wrap:wrap;
+  }
+  body.vc-fullscreen-mode .vc-conference-body .video-grid {
+    padding:4px;
+  }
+  .video-grid { grid-template-columns:repeat(auto-fit,minmax(140px,1fr)); gap:8px; }
+}
+@media(max-width:560px) {
+  /* Very small screens: hide side panel by default in fullscreen, add toggle */
+  body.vc-fullscreen-mode .vc-conference-body .vc-side-panel {
+    display:none;
+  }
+  body.vc-fullscreen-mode.vc-show-sidepanel .vc-conference-body .vc-side-panel {
+    display:flex; position:fixed; top:0; left:0; right:0; bottom:0;
+    max-height:100vh; z-index:200; width:100%;
+    background:var(--bg-primary); flex-direction:column;
+  }
+  body.vc-fullscreen-mode.vc-show-sidepanel .vc-sidepanel-close { display:block !important; }
+  body.vc-fullscreen-mode .vc-conference-header {
+    padding:4px 8px;
+  }
+  .vc-view-toggle { display:none; }
+  /* Show compact view switcher via dropdown instead */
+  .vc-view-toggle-mobile { display:flex !important; }
+  body.vc-fullscreen-mode .vc-conference-body .video-controls .vc-btn {
+    width:40px; height:40px; font-size:15px;
+  }
+  body.vc-fullscreen-mode .vc-conference-body .video-controls .vc-end-all-btn {
+    font-size:10px !important; padding:6px 10px !important;
+  }
 }
 
 .toast {
@@ -8910,6 +8967,7 @@ function vcShowConference(title, role) {
               : showHostControls
                 ? `<button class="vc-btn" id="vc-rec-btn" onclick="vcToggleRecord()" title="Record Session">&#x23FA;&#xFE0F;</button>`
                 : `<button class="vc-btn" id="vc-rec-btn" onclick="vcToggleRecord()" title="Record Session (requires host permission)" style="opacity:0.5;">&#x23FA;&#xFE0F;</button>`}
+            <button class="vc-btn" id="vc-chat-toggle-btn" onclick="vcToggleSidePanel()" title="Toggle Chat & Participants">&#x1F4AC;</button>
             <button class="vc-btn danger" onclick="exitVideoRoom('${role}')" title="Leave Call">&#x1F4DE;</button>
             ${showHostControls
               ? `<button class="vc-btn danger vc-end-all-btn" onclick="vcEndMeetingForAll()" title="End Meeting for All" style="font-size:11px;width:auto;border-radius:8px;padding:8px 14px;">End All</button>`
@@ -8917,6 +8975,9 @@ function vcShowConference(title, role) {
           </div>
         </div>
         <div class="vc-side-panel">
+          <div class="vc-sidepanel-close" onclick="vcToggleSidePanel()" style="display:none;padding:8px 12px;text-align:right;flex-shrink:0;border-bottom:1px solid var(--border);">
+            <button class="btn btn-secondary btn-sm">&#x2715; Close</button>
+          </div>
           <div class="chat-panel">
             <h4 style="font-size:14px;margin-bottom:12px;font-family:'Playfair Display',serif;">Class Chat</h4>
             <div class="chat-messages" id="chatMsgs-${role}">
@@ -9001,6 +9062,15 @@ function vcSetViewMode(mode) {
   } else if(mode === 'gallery') {
     // Gallery mode - restore sidebar, topbar, show everything
     body.classList.remove('vc-fullscreen-mode');
+  }
+}
+
+// Toggle side panel visibility (chat & participants) for small screens
+function vcToggleSidePanel() {
+  document.body.classList.toggle('vc-show-sidepanel');
+  var btn = document.getElementById('vc-chat-toggle-btn');
+  if(btn) {
+    btn.classList.toggle('active', document.body.classList.contains('vc-show-sidepanel'));
   }
 }
 
@@ -9959,7 +10029,7 @@ function vcEndMeetingForAll() {
 // ── Exit / Cleanup ──
 function exitVideoRoom(role) {
   // Restore normal layout - exit fullscreen conference mode
-  document.body.classList.remove('vc-fullscreen-mode', 'vc-host-only-mode', 'vc-is-host');
+  document.body.classList.remove('vc-fullscreen-mode', 'vc-host-only-mode', 'vc-is-host', 'vc-show-sidepanel');
   vcCurrentViewMode = 'fullscreen';
 
   // Stop recording if active
