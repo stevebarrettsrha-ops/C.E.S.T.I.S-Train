@@ -3172,6 +3172,7 @@ body.vc-fullscreen-mode.vc-host-only-mode .video-grid .video-tile:not(.vc-hoston
 .adr-task-card.adr-urgent { border-left:3px solid #e74c3c; }
 .adr-task-card.adr-high { border-left:3px solid var(--orange); }
 .adr-task-card.adr-completed { border-left:3px solid var(--green); opacity:0.85; }
+.adr-task-card.adr-pending-review { border-left:3px solid var(--orange); background:rgba(243,156,18,0.03); }
 
 .adr-task-check {
   width:22px; height:22px; border-radius:50%; border:2px solid var(--text-muted);
@@ -3180,6 +3181,7 @@ body.vc-fullscreen-mode.vc-host-only-mode .video-grid .video-tile:not(.vc-hoston
 }
 .adr-task-check:hover { border-color:var(--green); }
 .adr-task-check.checked { background:var(--green); border-color:var(--green); color:#fff; font-size:12px; }
+.adr-task-check.pending-review { background:var(--orange); border-color:var(--orange); color:#fff; font-size:10px; }
 
 .adr-task-body { flex:1; min-width:0; }
 .adr-task-title { font-size:14px; font-weight:600; margin-bottom:4px; }
@@ -6400,6 +6402,9 @@ function buildInstructorSidebar() {
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg>Gradebook</div>
     <div class="nav-item" data-page="i-resources" onclick="showPage('i-resources')">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/></svg>Resources</div>
+    <div class="nav-section-label">Tasks</div>
+    <div class="nav-item" data-page="i-duties" onclick="showPage('i-duties')" style="position:relative;">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 5H7a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V7a2 2 0 0 0-2-2h-2"/><rect x="9" y="3" width="6" height="4" rx="1"/><path d="M9 14l2 2 4-4"/></svg>My Assigned Tasks<span id="iDutyTasksBadge" class="nav-badge" style="display:none;position:absolute;right:12px;top:50%;transform:translateY(-50%);background:var(--red);color:#fff;border-radius:10px;font-size:10px;padding:1px 6px;min-width:18px;text-align:center;">0</span></div>
     <div class="nav-section-label">Communication</div>
     <div class="nav-item" data-page="i-announcements" onclick="showPage('i-announcements')">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 17H2a3 3 0 0 0 3-3V9a7 7 0 0 1 14 0v5a3 3 0 0 0 3 3zm-8.27 4a2 2 0 0 1-3.46 0"/></svg>Announcements</div>
@@ -6469,7 +6474,7 @@ function showPage(pageId) {
     's-profile':'My Profile','s-calendar':'My Calendar',
     'i-dashboard':'Instructor Dashboard','i-classes':'My Classes','i-students':'My Students',
     'i-attendance':'Class Attendance','i-gradebook':'Gradebook','i-resources':'Course Resources',
-    'i-announcements':'Announcements','i-calendar':'Calendar','i-profile':'My Profile',
+    'i-duties':'My Assigned Tasks','i-announcements':'Announcements','i-calendar':'Calendar','i-profile':'My Profile',
     'lms-chat':'C.E.S.T.I.S LMS Chat','s-lms-chat':'C.E.S.T.I.S LMS Chat','i-lms-chat':'C.E.S.T.I.S LMS Chat',
     'admin-duty-register':'Admin Duty Register',
     'support-messages':'Support Messages','as-support-messages':'Support Messages',
@@ -6487,6 +6492,7 @@ function showPage(pageId) {
   if(pageId === 'support-messages' || pageId === 'as-support-messages') renderSupportMessagesPage();
   if(pageId === 'admin-duty-register') adrOnPageShow();
   if(pageId === 'as-duties') asOnDutiesPageShow();
+  if(pageId === 'i-duties') iOnDutiesPageShow();
   if(pageId === 'verify-users') renderVerifyUsersPage();
   if(pageId === 'a-resources') renderAdminResources();
   if(pageId === 's-resources') renderStudentDriveResources();
@@ -7326,10 +7332,11 @@ function buildAdminPages() {
         <div class="adr-tab" onclick="adrSwitchTab(this,'daily')">Daily</div>
         <div class="adr-tab" onclick="adrSwitchTab(this,'weekly')">Weekly</div>
         <div class="adr-tab" onclick="adrSwitchTab(this,'monthly')">Monthly</div>
-        <div class="adr-tab" onclick="adrSwitchTab(this,'completed')">Completed</div>
+        <div class="adr-tab" onclick="adrSwitchTab(this,'pending_review')">Awaiting Review</div>
+        <div class="adr-tab" onclick="adrSwitchTab(this,'completed')">Verified Complete</div>
       </div>
       <div class="adr-filters">
-        <select class="form-control" id="adrFilterStaff" onchange="adrRenderTasks()" style="width:200px;"><option value="all">All Staff</option></select>
+        <select class="form-control" id="adrFilterStaff" onchange="adrRenderTasks()" style="width:200px;"><option value="all">All Staff &amp; Instructors</option></select>
         <select class="form-control" id="adrFilterPriority" onchange="adrRenderTasks()" style="width:160px;"><option value="all">All Priorities</option><option value="urgent">Urgent</option><option value="high">High</option><option value="medium">Medium</option><option value="low">Low</option></select>
         <input type="text" class="form-control" id="adrSearchTasks" placeholder="Search tasks..." onkeyup="adrRenderTasks()" style="width:220px;">
       </div>
@@ -7340,8 +7347,8 @@ function buildAdminPages() {
   <!-- ADMIN DUTY REGISTER MODALS -->
   <div class="modal-overlay" id="adrAssignTaskModal">
     <div class="modal" style="max-width:620px;">
-      <div class="modal-header"><h3>Assign Task to Admin Staff</h3><button class="modal-close" onclick="closeModal('adrAssignTaskModal')">&times;</button></div>
-      <div class="form-group"><label>Assign To</label><select class="form-control" id="adrTaskAssignee"><option value="">-- Select Staff --</option></select></div>
+      <div class="modal-header"><h3>Assign Task to Staff / Instructor</h3><button class="modal-close" onclick="closeModal('adrAssignTaskModal')">&times;</button></div>
+      <div class="form-group"><label>Assign To</label><select class="form-control" id="adrTaskAssignee"><option value="">-- Select Staff / Instructor --</option></select></div>
       <div class="form-group"><label>Task Title</label><input type="text" class="form-control" id="adrTaskTitle" placeholder="Enter task title"></div>
       <div class="form-group"><label>Task Description</label><textarea class="form-control" id="adrTaskDesc" rows="3" placeholder="Describe the task in detail..."></textarea></div>
       <div class="grid-2col">
@@ -8333,6 +8340,29 @@ function buildInstructorPages() {
         </div>
         <div class="lms-chat-info-body" id="instructorChatInfoBody"></div>
       </div>
+    </div>
+  </section>
+
+  <!-- ASSIGNED TASKS (Instructor) -->
+  <section class="page" id="page-i-duties">
+    <div class="adr-header-bar"><div class="adr-header-left">
+      <h3 style="font-family:'Playfair Display',serif;font-size:20px;">My Assigned Tasks</h3>
+      <span class="adr-subtitle">View and complete tasks assigned by the Administrator</span>
+    </div></div>
+    <div id="iDutyBoard">
+      <div class="adr-tabs" id="iDutyTabs">
+        <div class="adr-tab active" onclick="iSwitchDutyTab(this,'all')">All Tasks</div>
+        <div class="adr-tab" onclick="iSwitchDutyTab(this,'daily')">Daily</div>
+        <div class="adr-tab" onclick="iSwitchDutyTab(this,'weekly')">Weekly</div>
+        <div class="adr-tab" onclick="iSwitchDutyTab(this,'monthly')">Monthly</div>
+        <div class="adr-tab" onclick="iSwitchDutyTab(this,'pending_review')">Awaiting Review</div>
+        <div class="adr-tab" onclick="iSwitchDutyTab(this,'completed')">Verified Complete</div>
+      </div>
+      <div class="adr-filters">
+        <select class="form-control" id="iDutyPriority" onchange="iRenderDuties()" style="width:160px;"><option value="all">All Priorities</option><option value="urgent">Urgent</option><option value="high">High</option><option value="medium">Medium</option><option value="low">Low</option></select>
+        <input type="text" class="form-control" id="iDutySearch" placeholder="Search tasks..." onkeyup="iRenderDuties()" style="width:220px;">
+      </div>
+      <div class="adr-task-list" id="iDutyList"></div>
     </div>
   </section>
 
@@ -19260,6 +19290,10 @@ function adrGetAdminStaff() {
   return userAccounts.filter(function(u) { return (u.role === 'admin' || u.role === 'adminstaff') && u.status === 'active'; });
 }
 
+function adrGetAssignableStaff() {
+  return userAccounts.filter(function(u) { return (u.role === 'admin' || u.role === 'adminstaff' || u.role === 'instructor') && u.status === 'active'; });
+}
+
 function adrIsSystemAdmin() {
   // The first admin account (USR-001) is System Administrator; any admin role user is a system admin
   if(!currentLoggedInUser) return true; // direct admin login = sys admin
@@ -19301,12 +19335,25 @@ function adrSaveData() {
 }
 
 function adrPopulateStaffDropdowns() {
-  var staff = adrGetAdminStaff();
-  var opts = '<option value="">-- Select Staff --</option>';
-  var filterOpts = '<option value="all">All Staff</option>';
-  staff.forEach(function(s) {
-    opts += '<option value="'+s.id+'">'+s.name+'</option>';
-    filterOpts += '<option value="'+s.id+'">'+s.name+'</option>';
+  var assignable = adrGetAssignableStaff();
+  var allStaff = adrGetAssignableStaff();
+  var opts = '<option value="">-- Select Staff/Instructor --</option>';
+  var filterOpts = '<option value="all">All Staff & Instructors</option>';
+  var adminGroup = assignable.filter(function(s){ return s.role === 'admin' || s.role === 'adminstaff'; });
+  var instructorGroup = assignable.filter(function(s){ return s.role === 'instructor'; });
+  if(adminGroup.length > 0) {
+    opts += '<optgroup label="Admin Staff">';
+    adminGroup.forEach(function(s) { opts += '<option value="'+s.id+'">'+s.name+'</option>'; });
+    opts += '</optgroup>';
+  }
+  if(instructorGroup.length > 0) {
+    opts += '<optgroup label="Instructors">';
+    instructorGroup.forEach(function(s) { opts += '<option value="'+s.id+'">'+s.name+'</option>'; });
+    opts += '</optgroup>';
+  }
+  allStaff.forEach(function(s) {
+    var roleLabel = s.role === 'instructor' ? ' (Instructor)' : '';
+    filterOpts += '<option value="'+s.id+'">'+s.name+roleLabel+'</option>';
   });
   var assignEl = document.getElementById('adrTaskAssignee');
   var filterEl = document.getElementById('adrFilterStaff');
@@ -19322,7 +19369,7 @@ function adrOnPageShow() {
 
   if(isSysAdmin) {
     if(assignBtn) assignBtn.style.display = '';
-    if(viewToggle) { viewToggle.style.display = ''; viewToggle.textContent = adrViewMode === 'admin' ? 'View My Tasks' : 'View All Staff'; }
+    if(viewToggle) { viewToggle.style.display = ''; viewToggle.textContent = adrViewMode === 'admin' ? 'View My Tasks' : 'View All Staff & Instructors'; }
     if(adrViewMode === 'admin') {
       if(staffSection) staffSection.style.display = '';
       adrRenderStaffCards();
@@ -19350,28 +19397,31 @@ function adrToggleView() {
 function adrRenderPerfOverview() {
   var el = document.getElementById('adrPerfOverview');
   if(!el) return;
-  var staff = adrGetAdminStaff();
+  var staff = adrGetAssignableStaff();
   var totalTasks = adrTasks.length;
   var completed = adrTasks.filter(function(t){ return t.status === 'completed'; }).length;
-  var overdue = adrTasks.filter(function(t){ return t.status !== 'completed' && adrIsOverdue(t); }).length;
+  var pendingReview = adrTasks.filter(function(t){ return t.status === 'pending_review'; }).length;
+  var overdue = adrTasks.filter(function(t){ return t.status !== 'completed' && t.status !== 'pending_review' && adrIsOverdue(t); }).length;
   var pending = adrTasks.filter(function(t){ return t.status === 'pending' || t.status === 'acknowledged'; }).length;
   el.innerHTML =
-    '<div class="adr-perf-card"><div class="adr-pc-val" style="color:var(--blue);">'+staff.length+'</div><div class="adr-pc-label">Admin Staff</div></div>' +
+    '<div class="adr-perf-card"><div class="adr-pc-val" style="color:var(--blue);">'+staff.length+'</div><div class="adr-pc-label">Staff & Instructors</div></div>' +
     '<div class="adr-perf-card"><div class="adr-pc-val" style="color:var(--accent);">'+totalTasks+'</div><div class="adr-pc-label">Total Tasks</div></div>' +
-    '<div class="adr-perf-card"><div class="adr-pc-val" style="color:var(--green);">'+completed+'</div><div class="adr-pc-label">Completed</div></div>' +
+    '<div class="adr-perf-card"><div class="adr-pc-val" style="color:var(--green);">'+completed+'</div><div class="adr-pc-label">Verified Complete</div></div>' +
+    '<div class="adr-perf-card"><div class="adr-pc-val" style="color:var(--orange);">'+pendingReview+'</div><div class="adr-pc-label">Awaiting Review</div></div>' +
     '<div class="adr-perf-card"><div class="adr-pc-val" style="color:var(--red);">'+overdue+'</div><div class="adr-pc-label">Overdue</div></div>' +
     '<div class="adr-perf-card"><div class="adr-pc-val" style="color:var(--purple);">'+pending+'</div><div class="adr-pc-label">In Progress</div></div>';
 }
 
 function adrGetStaffPerformance(userId) {
   var tasks = adrTasks.filter(function(t){ return t.assigneeId === userId; });
-  if(tasks.length === 0) return { score:0, total:0, completed:0, onTime:0, overdue:0, pending:0 };
+  if(tasks.length === 0) return { score:0, total:0, completed:0, onTime:0, overdue:0, pending:0, pendingReview:0 };
   var completed = tasks.filter(function(t){ return t.status === 'completed'; });
   var onTime = completed.filter(function(t){ return !t.completedLate; });
-  var overdue = tasks.filter(function(t){ return t.status !== 'completed' && adrIsOverdue(t); });
-  var pending = tasks.filter(function(t){ return t.status !== 'completed' && !adrIsOverdue(t); });
+  var pendingReview = tasks.filter(function(t){ return t.status === 'pending_review'; });
+  var overdue = tasks.filter(function(t){ return t.status !== 'completed' && t.status !== 'pending_review' && adrIsOverdue(t); });
+  var pending = tasks.filter(function(t){ return t.status !== 'completed' && t.status !== 'pending_review' && !adrIsOverdue(t); });
   var score = tasks.length > 0 ? Math.round((onTime.length / tasks.length) * 100) : 0;
-  return { score:score, total:tasks.length, completed:completed.length, onTime:onTime.length, overdue:overdue.length, pending:pending.length };
+  return { score:score, total:tasks.length, completed:completed.length, onTime:onTime.length, overdue:overdue.length, pending:pending.length, pendingReview:pendingReview.length };
 }
 
 function adrGetBadge(score) {
@@ -19384,9 +19434,9 @@ function adrGetBadge(score) {
 function adrRenderStaffCards() {
   var el = document.getElementById('adrStaffGrid');
   if(!el) return;
-  var staff = adrGetAdminStaff();
+  var staff = adrGetAssignableStaff();
   if(staff.length === 0) {
-    el.innerHTML = '<div class="adr-empty-state"><h4>No Admin Staff Found</h4><p>Add admin user accounts in Settings to get started.</p></div>';
+    el.innerHTML = '<div class="adr-empty-state"><h4>No Staff or Instructors Found</h4><p>Add user accounts in Settings to get started.</p></div>';
     return;
   }
   var html = '';
@@ -19397,13 +19447,14 @@ function adrRenderStaffCards() {
     var colors = ['linear-gradient(135deg,var(--accent),var(--orange))','linear-gradient(135deg,var(--blue),var(--teal))','linear-gradient(135deg,var(--green),#16a085)','linear-gradient(135deg,var(--purple),#8e44ad)','linear-gradient(135deg,var(--red),#c0392b)'];
     var colorIdx = Math.abs(s.id.split('').reduce(function(a,c){ return a + c.charCodeAt(0); },0)) % colors.length;
     var perfColor = perf.score >= 85 ? 'var(--green)' : perf.score >= 65 ? 'var(--accent)' : perf.score >= 40 ? 'var(--orange)' : 'var(--red)';
+    var roleLabel = s.role === 'admin' ? 'System Administrator' : s.role === 'instructor' ? 'Instructor' : 'Administrative Staff';
 
     html += '<div class="adr-staff-card" onclick="adrShowStaffDetail(\''+s.id+'\')">' +
       '<div class="adr-staff-card-header">' +
         '<div class="adr-staff-avatar" style="background:'+colors[colorIdx]+';">'+initials+'</div>' +
         '<div class="adr-staff-info">' +
           '<div class="adr-staff-name">'+s.name+'</div>' +
-          '<div class="adr-staff-role">'+((s.role === 'admin') ? 'System Administrator' : 'Administrative Staff')+'</div>' +
+          '<div class="adr-staff-role">'+roleLabel+'</div>' +
           '<div class="adr-staff-badge-row"><span class="adr-badge '+badge.cls+'">'+badge.icon+' '+badge.label+'</span></div>' +
         '</div>' +
       '</div>' +
@@ -19433,7 +19484,7 @@ function adrSwitchTab(tabEl, tab) {
 }
 
 function adrIsOverdue(task) {
-  if(task.status === 'completed') return false;
+  if(task.status === 'completed' || task.status === 'pending_review') return false;
   var now = new Date();
   var dl = new Date(task.deadline);
   return now > dl;
@@ -19458,7 +19509,8 @@ function adrGetFilteredTasks() {
   else if(tab === 'weekly') tasks = tasks.filter(function(t){ return t.taskType === 'weekly'; });
   else if(tab === 'monthly') tasks = tasks.filter(function(t){ return t.taskType === 'monthly'; });
   else if(tab === 'completed') tasks = tasks.filter(function(t){ return t.status === 'completed'; });
-  else tasks = tasks.filter(function(t){ return t.status !== 'completed'; }); // 'all' shows active tasks
+  else if(tab === 'pending_review') tasks = tasks.filter(function(t){ return t.status === 'pending_review'; });
+  else tasks = tasks.filter(function(t){ return t.status !== 'completed'; }); // 'all' shows active tasks (including pending_review)
 
   // Staff filter (for admin view)
   if(staffFilter !== 'all') tasks = tasks.filter(function(t){ return t.assigneeId === staffFilter; });
@@ -19500,7 +19552,7 @@ function adrRenderTasks() {
   if(tasks.length === 0) {
     el.innerHTML = '<div class="adr-empty-state">' +
       '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M9 5H7a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V7a2 2 0 0 0-2-2h-2"/><rect x="9" y="3" width="6" height="4" rx="1"/><path d="M9 14l2 2 4-4"/></svg>' +
-      '<h4>No Tasks Found</h4><p>'+( adrIsSystemAdmin() ? 'Click "Assign Task" to create a new task for your admin staff.' : 'You have no tasks assigned at this time.')+'</p></div>';
+      '<h4>No Tasks Found</h4><p>'+( adrIsSystemAdmin() ? 'Click "Assign Task" to create a new task for staff or instructors.' : 'You have no tasks assigned at this time.')+'</p></div>';
     return;
   }
 
@@ -19510,25 +19562,31 @@ function adrRenderTasks() {
   tasks.forEach(function(task) {
     var isOverdue = adrIsOverdue(task);
     var isCompleted = task.status === 'completed';
+    var isPendingReview = task.status === 'pending_review';
     var cardCls = 'adr-task-card';
     if(isCompleted) cardCls += ' adr-completed';
+    else if(isPendingReview) cardCls += ' adr-pending-review';
     else if(isOverdue) cardCls += ' adr-overdue';
     else if(task.priority === 'urgent') cardCls += ' adr-urgent';
     else if(task.priority === 'high') cardCls += ' adr-high';
 
     var deadlineStr = adrFormatDeadline(task.deadline);
-    var deadlineCls = isOverdue && !isCompleted ? 'adr-task-deadline overdue' : 'adr-task-deadline';
+    var deadlineCls = isOverdue && !isCompleted && !isPendingReview ? 'adr-task-deadline overdue' : 'adr-task-deadline';
 
     var commentsCount = task.comments ? task.comments.length : 0;
 
+    var checkClass = isCompleted ? 'checked' : isPendingReview ? 'pending-review' : '';
+    var checkIcon = isCompleted ? '\u2713' : isPendingReview ? '\uD83D\uDD0D' : '';
+
     html += '<div class="'+cardCls+'" onclick="adrOpenTaskDetail(\''+task.id+'\')">' +
-      '<div class="adr-task-check '+(isCompleted?'checked':'')+'" onclick="event.stopPropagation();adrToggleComplete(\''+task.id+'\')">'+(isCompleted?'\u2713':'')+'</div>' +
+      '<div class="adr-task-check '+checkClass+'" onclick="event.stopPropagation();adrToggleComplete(\''+task.id+'\')">' + checkIcon + '</div>' +
       '<div class="adr-task-body">' +
         '<div class="adr-task-title">'+(isCompleted?'<s>':'')+task.title+(isCompleted?'</s>':'')+'</div>' +
         '<div class="adr-task-meta">' +
           '<span class="adr-task-tag adr-tag-'+task.priority+'">'+task.priority.toUpperCase()+'</span>' +
           '<span class="adr-task-tag adr-tag-'+task.taskType+'">'+task.taskType.toUpperCase()+'</span>' +
-          '<span class="'+deadlineCls+'">'+(isOverdue && !isCompleted ? '\u26A0 OVERDUE \u2014 ' : '\uD83D\uDCC5 ')+deadlineStr+'</span>' +
+          (isPendingReview ? '<span class="adr-task-tag" style="background:rgba(243,156,18,0.15);color:var(--orange);">\uD83D\uDD0D AWAITING REVIEW</span>' : '') +
+          '<span class="'+deadlineCls+'">'+(isOverdue && !isCompleted && !isPendingReview ? '\u26A0 OVERDUE \u2014 ' : '\uD83D\uDCC5 ')+deadlineStr+'</span>' +
           (isSysAdmin || adrViewMode === 'admin' ? '<span class="adr-task-assignee">\uD83D\uDC64 '+task.assigneeName+'</span>' : '') +
           (commentsCount > 0 ? '<span class="adr-task-deadline">\uD83D\uDCAC '+commentsCount+' comment'+(commentsCount>1?'s':'')+'</span>' : '') +
           (task.status === 'acknowledged' ? '<span class="adr-task-tag adr-tag-weekly">\u2713 Acknowledged</span>' : '') +
@@ -19536,9 +19594,10 @@ function adrRenderTasks() {
         '</div>' +
       '</div>' +
       '<div class="adr-task-actions">' +
-        (!isCompleted && task.assigneeId === currentUid && task.status !== 'acknowledged' && task.taskType === 'weekly' ?
+        (isPendingReview && isSysAdmin ? '<button class="adr-ack-btn" onclick="event.stopPropagation();adrToggleComplete(\''+task.id+'\')" title="Verify Complete" style="background:rgba(46,204,113,0.15);color:var(--green);">\u2705 Verify</button>' : '') +
+        (!isCompleted && !isPendingReview && task.assigneeId === currentUid && task.status !== 'acknowledged' && task.taskType === 'weekly' ?
           '<button class="adr-ack-btn" onclick="event.stopPropagation();adrAcknowledgeTask(\''+task.id+'\')" title="Acknowledge">\u2713 Ack</button>' : '') +
-        (isSysAdmin && !isCompleted ? '<button onclick="event.stopPropagation();adrOpenExtendTime(\''+task.id+'\')" title="Extend Time">\u23F0</button>' : '') +
+        (isSysAdmin && !isCompleted && !isPendingReview ? '<button onclick="event.stopPropagation();adrOpenExtendTime(\''+task.id+'\')" title="Extend Time">\u23F0</button>' : '') +
         '<button onclick="event.stopPropagation();adrOpenTaskDetail(\''+task.id+'\')" title="Details">\uD83D\uDD0D</button>' +
       '</div>' +
     '</div>';
@@ -19579,7 +19638,7 @@ function adrSubmitTask() {
   var deadlineTime = document.getElementById('adrTaskDeadlineTime').value;
   var fileInput = document.getElementById('adrTaskFile');
 
-  if(!assigneeId) { alert('Please select a staff member.'); return; }
+  if(!assigneeId) { alert('Please select a staff member or instructor.'); return; }
   if(!title) { alert('Please enter a task title.'); return; }
   if(!deadlineDate) { alert('Please set a deadline date.'); return; }
 
@@ -19599,7 +19658,7 @@ function adrSubmitTask() {
     deadline: deadline,
     originalDeadline: deadline,
     createdAt: new Date().toISOString(),
-    status: 'pending', // pending, acknowledged, completed
+    status: 'pending', // pending, acknowledged, pending_review, completed
     completedAt: null,
     completedLate: false,
     comments: [],
@@ -19633,7 +19692,14 @@ function adrSubmitTask() {
 function adrFinishTaskSubmit(task) {
   closeModal('adrAssignTaskModal');
   showToast('Task assigned to ' + task.assigneeName + '!');
-  addNotification('New ' + task.taskType + ' task assigned: "' + task.title + '" (' + task.priority.toUpperCase() + ' priority)', 'info', '\uD83D\uDCCB', ['admin']);
+  addNotification('New ' + task.taskType + ' task assigned: "' + task.title + '" to ' + task.assigneeName + ' (' + task.priority.toUpperCase() + ' priority)', 'info', '\uD83D\uDCCB', ['admin']);
+
+  // Notify the assignee directly
+  var assignee = userAccounts.find(function(u){ return u.id === task.assigneeId; });
+  if(assignee) {
+    addNotificationForUser('You have been assigned a new ' + task.taskType + ' task: "' + task.title + '" (' + task.priority.toUpperCase() + ' priority). Deadline: ' + adrFormatDeadline(task.deadline), 'info', '\uD83D\uDCCB', task.assigneeId, assignee.role);
+  }
+
   adrRenderTasks();
   if(adrViewMode === 'admin') {
     adrRenderStaffCards();
@@ -19646,32 +19712,106 @@ function adrToggleComplete(taskId) {
   var task = adrTasks.find(function(t){ return t.id === taskId; });
   if(!task) return;
 
+  var isSysAdmin = adrIsSystemAdmin();
+
   if(task.status === 'completed') {
-    // Uncomplete
+    // Only admin can uncomplete a verified task
+    if(!isSysAdmin) {
+      alert('Only the Administrator can change a verified completed task.');
+      return;
+    }
     task.status = task.acknowledged ? 'acknowledged' : 'pending';
     task.completedAt = null;
     task.completedLate = false;
-  } else {
-    // Complete
-    task.status = 'completed';
-    task.completedAt = new Date().toISOString();
-    task.completedLate = adrIsOverdue(task);
+    task.verifiedAt = null;
+    task.verifiedBy = null;
+    showToast('Task verification revoked.');
+  } else if(task.status === 'pending_review') {
+    if(isSysAdmin) {
+      // Admin verifies the task as truly completed
+      task.status = 'completed';
+      task.verifiedAt = new Date().toISOString();
+      task.verifiedBy = adrGetCurrentUserName();
+      task.completedLate = new Date(task.submittedForReviewAt || task.completedAt) > new Date(task.deadline);
 
-    // Notify system admin
-    if(task.assigneeId !== 'USR-001') {
-      addNotification(task.assigneeName + ' completed task: "' + task.title + '"' + (task.completedLate ? ' (LATE)' : ' (On Time)'), task.completedLate ? 'warning' : 'success', task.completedLate ? '\u26A0\uFE0F' : '\u2705', ['admin']);
+      // Notify the assignee that their task was verified as completed
+      var assigneeRole = (userAccounts.find(function(u){ return u.id === task.assigneeId; }) || {}).role || 'adminstaff';
+      addNotificationForUser('Your task "' + task.title + '" has been verified as completed by the Administrator. \u2705', 'success', '\u2705', task.assigneeId, assigneeRole);
+      addNotification('Task "' + task.title + '" verified as completed for ' + task.assigneeName + (task.completedLate ? ' (LATE)' : ' (On Time)'), task.completedLate ? 'warning' : 'success', task.completedLate ? '\u26A0\uFE0F' : '\u2705', ['admin']);
+      showToast('Task verified as completed!');
+    } else {
+      // Non-admin cannot toggle a task that is pending review
+      alert('This task is pending Administrator review. Please wait for verification.');
+      return;
     }
-    showToast('Task marked as completed!');
+  } else {
+    if(isSysAdmin) {
+      // Admin can directly mark as completed (verified)
+      task.status = 'completed';
+      task.completedAt = new Date().toISOString();
+      task.completedLate = adrIsOverdue(task);
+      task.verifiedAt = new Date().toISOString();
+      task.verifiedBy = adrGetCurrentUserName();
+      showToast('Task marked as verified complete!');
+    } else {
+      // Non-admin submits task for review (pending_review)
+      task.status = 'pending_review';
+      task.completedAt = new Date().toISOString();
+      task.submittedForReviewAt = new Date().toISOString();
+      task.completedLate = adrIsOverdue(task);
+
+      // Notify admin that this task needs review
+      addNotification('\uD83D\uDD0D ' + task.assigneeName + ' submitted task for review: "' + task.title + '"' + (task.completedLate ? ' (LATE)' : ' (On Time)') + ' \u2014 Please verify completion.', task.completedLate ? 'warning' : 'info', '\uD83D\uDD0D', ['admin']);
+      showToast('Task submitted for Administrator review!');
+    }
   }
 
   adrSaveData();
   adrRenderTasks();
   if(typeof asRenderDuties === 'function') asRenderDuties();
+  if(typeof iRenderDuties === 'function') iRenderDuties();
   if(adrViewMode === 'admin') {
     adrRenderStaffCards();
     adrRenderPerfOverview();
   }
   adrUpdateBadge();
+}
+
+function adrRejectCompletion(taskId) {
+  var task = adrTasks.find(function(t){ return t.id === taskId; });
+  if(!task || !adrIsSystemAdmin()) return;
+
+  var reason = prompt('Reason for rejecting this task completion (optional):');
+  task.status = task.acknowledged ? 'acknowledged' : 'pending';
+  task.completedAt = null;
+  task.completedLate = false;
+  task.submittedForReviewAt = null;
+
+  // Add a comment explaining the rejection
+  if(!task.comments) task.comments = [];
+  task.comments.push({
+    id: 'CMT-' + Date.now(),
+    author: adrGetCurrentUserName(),
+    authorId: adrGetCurrentUserId(),
+    text: '\u274C Task completion rejected by Administrator.' + (reason ? ' Reason: ' + reason : '') + ' Please review and resubmit.',
+    timestamp: new Date().toISOString()
+  });
+
+  // Notify the assignee
+  var assigneeRole = (userAccounts.find(function(u){ return u.id === task.assigneeId; }) || {}).role || 'adminstaff';
+  addNotificationForUser('Your task "' + task.title + '" completion was rejected by the Administrator.' + (reason ? ' Reason: ' + reason : '') + ' Please review and resubmit.', 'warning', '\u274C', task.assigneeId, assigneeRole);
+  showToast('Task completion rejected. Assignee has been notified.');
+
+  adrSaveData();
+  adrRenderTasks();
+  if(typeof asRenderDuties === 'function') asRenderDuties();
+  if(typeof iRenderDuties === 'function') iRenderDuties();
+  if(adrViewMode === 'admin') {
+    adrRenderStaffCards();
+    adrRenderPerfOverview();
+  }
+  adrUpdateBadge();
+  closeModal('adrTaskDetailModal');
 }
 
 function adrAcknowledgeTask(taskId) {
@@ -19693,15 +19833,18 @@ function adrOpenTaskDetail(taskId) {
 
   var isSysAdmin = adrIsSystemAdmin();
   var isMyTask = task.assigneeId === adrGetCurrentUserId();
-  var isOverdue = adrIsOverdue(task) && task.status !== 'completed';
+  var isOverdue = adrIsOverdue(task) && task.status !== 'completed' && task.status !== 'pending_review';
   var perf = adrGetStaffPerformance(task.assigneeId);
   var badge = adrGetBadge(perf.score);
 
   document.getElementById('adrDetailTitle').textContent = task.title;
 
+  var statusColor = task.status === 'completed' ? 'var(--green)' : task.status === 'pending_review' ? 'var(--orange)' : isOverdue ? 'var(--red)' : 'var(--accent)';
+  var statusText = task.status === 'completed' ? '\u2705 Verified Complete' : task.status === 'pending_review' ? '\uD83D\uDD0D Awaiting Admin Review' : isOverdue ? '\u26A0\uFE0F Overdue' : task.status === 'acknowledged' ? '\u2713 Acknowledged' : '\u23F3 Pending';
+
   var html = '<div class="adr-detail-grid">' +
     '<div class="adr-detail-item"><div class="adr-detail-label">Assigned To</div><div class="adr-detail-val">' + task.assigneeName + '</div></div>' +
-    '<div class="adr-detail-item"><div class="adr-detail-label">Status</div><div class="adr-detail-val" style="color:'+(task.status==='completed'?'var(--green)':isOverdue?'var(--red)':'var(--accent)')+';">'+(task.status==='completed'?'\u2705 Completed':isOverdue?'\u26A0\uFE0F Overdue':task.status==='acknowledged'?'\u2713 Acknowledged':'\u23F3 Pending')+'</div></div>' +
+    '<div class="adr-detail-item"><div class="adr-detail-label">Status</div><div class="adr-detail-val" style="color:'+statusColor+';">'+statusText+'</div></div>' +
     '<div class="adr-detail-item"><div class="adr-detail-label">Priority</div><div class="adr-detail-val"><span class="adr-task-tag adr-tag-'+task.priority+'">'+task.priority.toUpperCase()+'</span></div></div>' +
     '<div class="adr-detail-item"><div class="adr-detail-label">Type</div><div class="adr-detail-val"><span class="adr-task-tag adr-tag-'+task.taskType+'">'+task.taskType.toUpperCase()+'</span></div></div>' +
     '<div class="adr-detail-item"><div class="adr-detail-label">Deadline</div><div class="adr-detail-val'+(isOverdue?' overdue':'')+'">'+adrFormatDeadline(task.deadline)+'</div></div>' +
@@ -19711,6 +19854,26 @@ function adrOpenTaskDetail(taskId) {
   // Description
   if(task.description) {
     html += '<div style="margin-bottom:16px;"><div style="font-size:12px;color:var(--text-muted);margin-bottom:4px;">Description</div><div style="font-size:13px;color:var(--text-secondary);line-height:1.6;padding:12px;background:var(--bg-input);border-radius:var(--radius-sm);">'+task.description+'</div></div>';
+  }
+
+  // Verified info
+  if(task.status === 'completed' && task.verifiedBy) {
+    html += '<div style="margin-bottom:16px;padding:12px;background:rgba(46,204,113,0.1);border:1px solid rgba(46,204,113,0.3);border-radius:var(--radius-sm);font-size:13px;color:var(--green);">' +
+      '\u2705 <strong>Verified as completed</strong> by '+task.verifiedBy+' on '+new Date(task.verifiedAt).toLocaleDateString('en-US',{month:'short',day:'numeric',year:'numeric',hour:'2-digit',minute:'2-digit'})+'</div>';
+  }
+
+  // Pending Review - Admin verify/reject buttons
+  if(task.status === 'pending_review' && isSysAdmin) {
+    html += '<div style="margin-bottom:16px;padding:16px;background:rgba(243,156,18,0.1);border:1px solid rgba(243,156,18,0.3);border-radius:var(--radius-sm);">' +
+      '<div style="font-size:13px;color:var(--orange);margin-bottom:12px;font-weight:600;">\uD83D\uDD0D Task Submitted for Review</div>' +
+      '<div style="font-size:12px;color:var(--text-secondary);margin-bottom:12px;">'+task.assigneeName+' has marked this task as completed on '+ new Date(task.submittedForReviewAt || task.completedAt).toLocaleDateString('en-US',{month:'short',day:'numeric',year:'numeric',hour:'2-digit',minute:'2-digit'})+'. Please review and verify.</div>' +
+      '<div style="display:flex;gap:10px;">' +
+        '<button class="btn btn-primary" onclick="adrToggleComplete(\''+task.id+'\');closeModal(\'adrTaskDetailModal\');" style="flex:1;padding:10px;font-size:14px;background:var(--green);border-color:var(--green);">\u2705 Verify as Completed</button>' +
+        '<button class="btn btn-primary" onclick="adrRejectCompletion(\''+task.id+'\');" style="flex:1;padding:10px;font-size:14px;background:var(--red);border-color:var(--red);">\u274C Reject &amp; Send Back</button>' +
+      '</div></div>';
+  } else if(task.status === 'pending_review' && isMyTask) {
+    html += '<div style="margin-bottom:16px;padding:12px;background:rgba(243,156,18,0.1);border:1px solid rgba(243,156,18,0.3);border-radius:var(--radius-sm);font-size:13px;color:var(--orange);">' +
+      '\u23F3 <strong>Awaiting Administrator Review</strong> \u2014 You submitted this task for review on '+new Date(task.submittedForReviewAt || task.completedAt).toLocaleDateString('en-US',{month:'short',day:'numeric',year:'numeric',hour:'2-digit',minute:'2-digit'})+'. The Administrator will verify completion.</div>';
   }
 
   // Performance Scale
@@ -19738,7 +19901,7 @@ function adrOpenTaskDetail(taskId) {
   }
 
   // Completion file upload (for assigned staff)
-  if(isMyTask && task.status !== 'completed') {
+  if(isMyTask && task.status !== 'completed' && task.status !== 'pending_review') {
     html += '<div style="margin-bottom:16px;"><div style="font-size:12px;color:var(--text-muted);margin-bottom:6px;">Upload Completed Work</div>' +
       '<div class="adr-file-upload-area" onclick="document.getElementById(\'adrCompletionFile\').click()">' +
         (task.completionFileName ? '\uD83D\uDCC4 '+task.completionFileName+' (uploaded) \u2014 Click to replace' : '\uD83D\uDCC1 Click to upload your completed work') +
@@ -19922,7 +20085,7 @@ function adrStartNotificationTimers() {
 function adrCheckHourlyReminders() {
   var now = new Date();
   adrTasks.forEach(function(task) {
-    if(task.status === 'completed') return;
+    if(task.status === 'completed' || task.status === 'pending_review') return;
 
     // Daily tasks: remind every hour if not completed and past deadline
     if(task.taskType === 'daily' && adrIsOverdue(task)) {
@@ -19955,7 +20118,7 @@ function adrCheckLoginNotifications() {
 
   // Monthly tasks: notify on login each day
   adrTasks.forEach(function(task) {
-    if(task.status === 'completed') return;
+    if(task.status === 'completed' || task.status === 'pending_review') return;
     if(task.assigneeId !== currentUid) return;
 
     if(task.taskType === 'monthly') {
@@ -19982,9 +20145,24 @@ function adrUpdateBadge() {
   var badge = document.getElementById('dutyTasksBadge');
   if(!badge) return;
   var currentUid = adrGetCurrentUserId();
+  var isSysAdmin = adrIsSystemAdmin();
   var pendingCount = adrTasks.filter(function(t) {
-    return t.status !== 'completed' && (adrIsSystemAdmin() || t.assigneeId === currentUid);
+    if(t.status === 'completed') return false;
+    if(isSysAdmin) {
+      // For admin, show pending_review tasks as priority badge items
+      return true;
+    }
+    return t.assigneeId === currentUid;
   }).length;
+  // Also count pending_review for instructor badge
+  var iBadge = document.getElementById('iDutyTasksBadge');
+  if(iBadge) {
+    var iCount = adrTasks.filter(function(t) {
+      return t.status !== 'completed' && t.assigneeId === currentUid;
+    }).length;
+    if(iCount > 0) { iBadge.style.display = ''; iBadge.textContent = iCount; }
+    else { iBadge.style.display = 'none'; }
+  }
   if(pendingCount > 0) {
     badge.style.display = '';
     badge.textContent = pendingCount;
@@ -20213,7 +20391,8 @@ function buildAdminStaffPages() {
         '<div class="adr-tab" onclick="asSwitchDutyTab(this,\'daily\')">Daily</div>' +
         '<div class="adr-tab" onclick="asSwitchDutyTab(this,\'weekly\')">Weekly</div>' +
         '<div class="adr-tab" onclick="asSwitchDutyTab(this,\'monthly\')">Monthly</div>' +
-        '<div class="adr-tab" onclick="asSwitchDutyTab(this,\'completed\')">Completed</div>' +
+        '<div class="adr-tab" onclick="asSwitchDutyTab(this,\'pending_review\')">Awaiting Review</div>' +
+        '<div class="adr-tab" onclick="asSwitchDutyTab(this,\'completed\')">Verified Complete</div>' +
       '</div>' +
       '<div class="adr-filters">' +
         '<select class="form-control" id="asDutyPriority" onchange="asRenderDuties()" style="width:160px;"><option value="all">All Priorities</option><option value="urgent">Urgent</option><option value="high">High</option><option value="medium">Medium</option><option value="low">Low</option></select>' +
@@ -20526,6 +20705,7 @@ function asRenderDuties() {
   else if(tab === 'weekly') tasks = tasks.filter(function(t){ return t.taskType === 'weekly'; });
   else if(tab === 'monthly') tasks = tasks.filter(function(t){ return t.taskType === 'monthly'; });
   else if(tab === 'completed') tasks = tasks.filter(function(t){ return t.status === 'completed'; });
+  else if(tab === 'pending_review') tasks = tasks.filter(function(t){ return t.status === 'pending_review'; });
   else tasks = tasks.filter(function(t){ return t.status !== 'completed'; });
 
   if(priorityFilter !== 'all') tasks = tasks.filter(function(t){ return t.priority === priorityFilter; });
@@ -20556,24 +20736,31 @@ function asRenderDuties() {
   tasks.forEach(function(task) {
     var isOverdue = adrIsOverdue(task);
     var isCompleted = task.status === 'completed';
+    var isPendingReview = task.status === 'pending_review';
     var cardCls = 'adr-task-card';
     if(isCompleted) cardCls += ' adr-completed';
+    else if(isPendingReview) cardCls += ' adr-pending-review';
     else if(isOverdue) cardCls += ' adr-overdue';
     else if(task.priority === 'urgent') cardCls += ' adr-urgent';
     else if(task.priority === 'high') cardCls += ' adr-high';
 
     var deadlineStr = adrFormatDeadline(task.deadline);
-    var deadlineCls = isOverdue && !isCompleted ? 'adr-task-deadline overdue' : 'adr-task-deadline';
+    var deadlineCls = isOverdue && !isCompleted && !isPendingReview ? 'adr-task-deadline overdue' : 'adr-task-deadline';
     var commentsCount = task.comments ? task.comments.length : 0;
 
+    var checkClass = isCompleted ? 'checked' : isPendingReview ? 'pending-review' : '';
+    var checkIcon = isCompleted ? '\u2713' : isPendingReview ? '\uD83D\uDD0D' : '';
+
     htmlOut += '<div class="'+cardCls+'" onclick="adrOpenTaskDetail(\''+task.id+'\')">' +
-      '<div class="adr-task-check '+(isCompleted?'checked':'')+'" onclick="event.stopPropagation();adrToggleComplete(\''+task.id+'\')">'+(isCompleted?'\u2713':'')+'</div>' +
+      '<div class="adr-task-check '+checkClass+'" onclick="event.stopPropagation();adrToggleComplete(\''+task.id+'\')">' + checkIcon + '</div>' +
       '<div class="adr-task-body">' +
         '<div class="adr-task-title">'+(isCompleted?'<s>':'')+task.title+(isCompleted?'</s>':'')+'</div>' +
         '<div class="adr-task-meta">' +
           '<span class="adr-task-tag adr-tag-'+task.priority+'">'+task.priority.toUpperCase()+'</span>' +
           '<span class="adr-task-tag adr-tag-'+task.taskType+'">'+task.taskType.toUpperCase()+'</span>' +
-          '<span class="'+deadlineCls+'">'+(isOverdue && !isCompleted ? '\u26A0 OVERDUE \u2014 ' : '\uD83D\uDCC5 ')+deadlineStr+'</span>' +
+          (isPendingReview ? '<span class="adr-task-tag" style="background:rgba(243,156,18,0.15);color:var(--orange);">\uD83D\uDD0D AWAITING REVIEW</span>' : '') +
+          (isCompleted ? '<span class="adr-task-tag" style="background:rgba(46,204,113,0.15);color:var(--green);">\u2705 VERIFIED</span>' : '') +
+          '<span class="'+deadlineCls+'">'+(isOverdue && !isCompleted && !isPendingReview ? '\u26A0 OVERDUE \u2014 ' : '\uD83D\uDCC5 ')+deadlineStr+'</span>' +
           (commentsCount > 0 ? '<span class="adr-task-deadline">\uD83D\uDCAC '+commentsCount+' comment'+(commentsCount>1?'s':'')+'</span>' : '') +
           (task.status === 'acknowledged' ? '<span class="adr-task-tag adr-tag-weekly">\u2713 Acknowledged</span>' : '') +
           (task.fileName ? '<span class="adr-task-deadline">\uD83D\uDCCE File attached</span>' : '') +
@@ -20581,7 +20768,108 @@ function asRenderDuties() {
         '</div>' +
       '</div>' +
       '<div class="adr-task-actions">' +
-        (!isCompleted && task.status !== 'acknowledged' && task.taskType === 'weekly' ?
+        (!isCompleted && !isPendingReview && task.status !== 'acknowledged' && task.taskType === 'weekly' ?
+          '<button class="adr-ack-btn" onclick="event.stopPropagation();adrAcknowledgeTask(\''+task.id+'\')" title="Acknowledge">\u2713 Ack</button>' : '') +
+        '<button onclick="event.stopPropagation();adrOpenTaskDetail(\''+task.id+'\')" title="Details">\uD83D\uDD0D</button>' +
+      '</div>' +
+    '</div>';
+  });
+  el.innerHTML = htmlOut;
+}
+
+// ---- Instructor Duty Page Functions ----
+var iDutyCurrentTab = 'all';
+
+function iSwitchDutyTab(tabEl, tab) {
+  iDutyCurrentTab = tab;
+  document.querySelectorAll('#iDutyTabs .adr-tab').forEach(function(t){ t.classList.remove('active'); });
+  tabEl.classList.add('active');
+  iRenderDuties();
+}
+
+function iOnDutiesPageShow() {
+  iRenderDuties();
+  adrUpdateBadge();
+}
+
+function iRenderDuties() {
+  var el = document.getElementById('iDutyList');
+  if(!el) return;
+  var uid = adrGetCurrentUserId();
+  var tab = iDutyCurrentTab;
+  var priorityFilter = document.getElementById('iDutyPriority') ? document.getElementById('iDutyPriority').value : 'all';
+  var search = document.getElementById('iDutySearch') ? document.getElementById('iDutySearch').value.toLowerCase().trim() : '';
+
+  var tasks = adrTasks.filter(function(t){ return t.assigneeId === uid; });
+
+  if(tab === 'daily') tasks = tasks.filter(function(t){ return t.taskType === 'daily'; });
+  else if(tab === 'weekly') tasks = tasks.filter(function(t){ return t.taskType === 'weekly'; });
+  else if(tab === 'monthly') tasks = tasks.filter(function(t){ return t.taskType === 'monthly'; });
+  else if(tab === 'completed') tasks = tasks.filter(function(t){ return t.status === 'completed'; });
+  else if(tab === 'pending_review') tasks = tasks.filter(function(t){ return t.status === 'pending_review'; });
+  else tasks = tasks.filter(function(t){ return t.status !== 'completed'; });
+
+  if(priorityFilter !== 'all') tasks = tasks.filter(function(t){ return t.priority === priorityFilter; });
+  if(search) {
+    tasks = tasks.filter(function(t){
+      return t.title.toLowerCase().indexOf(search) !== -1 || t.description.toLowerCase().indexOf(search) !== -1;
+    });
+  }
+
+  var priorityOrder = {urgent:0, high:1, medium:2, low:3};
+  tasks.sort(function(a,b) {
+    if(a.status === 'completed' && b.status !== 'completed') return 1;
+    if(a.status !== 'completed' && b.status === 'completed') return -1;
+    var aOD = adrIsOverdue(a) ? 0 : 1;
+    var bOD = adrIsOverdue(b) ? 0 : 1;
+    if(aOD !== bOD) return aOD - bOD;
+    return (priorityOrder[a.priority]||2) - (priorityOrder[b.priority]||2);
+  });
+
+  if(tasks.length === 0) {
+    el.innerHTML = '<div class="adr-empty-state">' +
+      '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M9 5H7a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V7a2 2 0 0 0-2-2h-2"/><rect x="9" y="3" width="6" height="4" rx="1"/><path d="M9 14l2 2 4-4"/></svg>' +
+      '<h4>No Tasks Found</h4><p>You have no tasks matching this filter.</p></div>';
+    return;
+  }
+
+  var htmlOut = '';
+  tasks.forEach(function(task) {
+    var isOverdue = adrIsOverdue(task);
+    var isCompleted = task.status === 'completed';
+    var isPendingReview = task.status === 'pending_review';
+    var cardCls = 'adr-task-card';
+    if(isCompleted) cardCls += ' adr-completed';
+    else if(isPendingReview) cardCls += ' adr-pending-review';
+    else if(isOverdue) cardCls += ' adr-overdue';
+    else if(task.priority === 'urgent') cardCls += ' adr-urgent';
+    else if(task.priority === 'high') cardCls += ' adr-high';
+
+    var deadlineStr = adrFormatDeadline(task.deadline);
+    var deadlineCls = isOverdue && !isCompleted && !isPendingReview ? 'adr-task-deadline overdue' : 'adr-task-deadline';
+    var commentsCount = task.comments ? task.comments.length : 0;
+
+    var checkClass = isCompleted ? 'checked' : isPendingReview ? 'pending-review' : '';
+    var checkIcon = isCompleted ? '\u2713' : isPendingReview ? '\uD83D\uDD0D' : '';
+
+    htmlOut += '<div class="'+cardCls+'" onclick="adrOpenTaskDetail(\''+task.id+'\')">' +
+      '<div class="adr-task-check '+checkClass+'" onclick="event.stopPropagation();adrToggleComplete(\''+task.id+'\')">' + checkIcon + '</div>' +
+      '<div class="adr-task-body">' +
+        '<div class="adr-task-title">'+(isCompleted?'<s>':'')+task.title+(isCompleted?'</s>':'')+'</div>' +
+        '<div class="adr-task-meta">' +
+          '<span class="adr-task-tag adr-tag-'+task.priority+'">'+task.priority.toUpperCase()+'</span>' +
+          '<span class="adr-task-tag adr-tag-'+task.taskType+'">'+task.taskType.toUpperCase()+'</span>' +
+          (isPendingReview ? '<span class="adr-task-tag" style="background:rgba(243,156,18,0.15);color:var(--orange);">\uD83D\uDD0D AWAITING REVIEW</span>' : '') +
+          (isCompleted ? '<span class="adr-task-tag" style="background:rgba(46,204,113,0.15);color:var(--green);">\u2705 VERIFIED</span>' : '') +
+          '<span class="'+deadlineCls+'">'+(isOverdue && !isCompleted && !isPendingReview ? '\u26A0 OVERDUE \u2014 ' : '\uD83D\uDCC5 ')+deadlineStr+'</span>' +
+          (commentsCount > 0 ? '<span class="adr-task-deadline">\uD83D\uDCAC '+commentsCount+' comment'+(commentsCount>1?'s':'')+'</span>' : '') +
+          (task.status === 'acknowledged' ? '<span class="adr-task-tag adr-tag-weekly">\u2713 Acknowledged</span>' : '') +
+          (task.fileName ? '<span class="adr-task-deadline">\uD83D\uDCCE File attached</span>' : '') +
+          '<span class="adr-task-deadline">Assigned by: '+task.assignedBy+'</span>' +
+        '</div>' +
+      '</div>' +
+      '<div class="adr-task-actions">' +
+        (!isCompleted && !isPendingReview && task.status !== 'acknowledged' && task.taskType === 'weekly' ?
           '<button class="adr-ack-btn" onclick="event.stopPropagation();adrAcknowledgeTask(\''+task.id+'\')" title="Acknowledge">\u2713 Ack</button>' : '') +
         '<button onclick="event.stopPropagation();adrOpenTaskDetail(\''+task.id+'\')" title="Details">\uD83D\uDD0D</button>' +
       '</div>' +
