@@ -18502,6 +18502,121 @@ function lmsChatToggleMute() {
   }
 }
 
+// ── PeerJS config (same STUN/TURN as video conference) ──
+var LMS_CHAT_ICE_SERVERS = [
+  {urls:'stun:stun.l.google.com:19302'},
+  {urls:'stun:stun1.l.google.com:19302'},
+  {urls:'turn:openrelay.metered.ca:80', username:'openrelayproject', credential:'openrelayproject'},
+  {urls:'turn:openrelay.metered.ca:443', username:'openrelayproject', credential:'openrelayproject'}
+];
+var lmsChatPeerConnections = {}; // {peerId: {media: call, stream: remoteStream}}
+
+// Generate a unique PeerJS ID for LMS Chat calls
+function lmsChatCallPeerId(roomId, userId) {
+  return 'lms-' + roomId.replace(/[^a-zA-Z0-9-]/g,'') + '-' + userId.replace(/[^a-zA-Z0-9-]/g,'');
+}
+
+// Add a remote participant's video/audio tile to the call UI
+function lmsChatAddRemoteStream(peerId, stream, name, isVideo) {
+  var safeId = peerId.replace(/[^a-zA-Z0-9-]/g,'_');
+  var existing = document.getElementById('lms-remote-'+safeId);
+  if(existing) {
+    var v = existing.querySelector('video');
+    if(v) { v.srcObject = stream; v.play().catch(function(){}); }
+    return;
+  }
+  if(isVideo) {
+    var grid = document.getElementById('lmsVideoGrid');
+    if(grid) {
+      var tile = document.createElement('div');
+      tile.className = 'video-tile';
+      tile.id = 'lms-remote-'+safeId;
+      tile.innerHTML = '<video autoplay playsinline></video><div class="tile-name">'+name+'</div>';
+      grid.appendChild(tile);
+      var vid = tile.querySelector('video');
+      if(vid) { vid.srcObject = stream; vid.play().catch(function(){}); }
+    }
+  } else {
+    // Voice call: create hidden audio element for remote stream
+    var audio = document.createElement('audio');
+    audio.id = 'lms-remote-'+safeId;
+    audio.autoplay = true;
+    audio.srcObject = stream;
+    audio.play().catch(function(){});
+    document.body.appendChild(audio);
+    // Update status to show connected participant
+    var statusEl = document.getElementById('lmsCallStatus');
+    if(statusEl) statusEl.textContent = 'LMS Voice Call - ' + name + ' connected';
+  }
+}
+
+// Remove a remote participant's tile/audio
+function lmsChatRemoveRemoteStream(peerId) {
+  var safeId = peerId.replace(/[^a-zA-Z0-9-]/g,'_');
+  var el = document.getElementById('lms-remote-'+safeId);
+  if(el) {
+    var v = el.querySelector('video');
+    if(v) v.srcObject = null;
+    el.remove();
+  }
+}
+
+// Handle incoming PeerJS call (when someone calls us)
+function lmsChatHandleIncomingCall(call) {
+  call.answer(lmsChatLocalStream || new MediaStream());
+  var peerId = call.peer;
+  call.on('stream', function(remoteStream) {
+    if(!lmsChatPeerConnections[peerId]) lmsChatPeerConnections[peerId] = {};
+    lmsChatPeerConnections[peerId].media = call;
+    lmsChatPeerConnections[peerId].stream = remoteStream;
+    // Resolve name from peerId
+    var peerName = lmsChatResolvePeerName(peerId);
+    lmsChatAddRemoteStream(peerId, remoteStream, peerName, lmsChatCallState === 'video');
+  });
+  call.on('close', function() {
+    lmsChatRemoveRemoteStream(peerId);
+    delete lmsChatPeerConnections[peerId];
+  });
+  call.on('error', function() {
+    lmsChatRemoveRemoteStream(peerId);
+    delete lmsChatPeerConnections[peerId];
+  });
+}
+
+// Call an existing participant via PeerJS
+function lmsChatCallPeer(targetPeerId, name) {
+  if(!lmsChatPeer || !lmsChatLocalStream) return;
+  var call = lmsChatPeer.call(targetPeerId, lmsChatLocalStream);
+  if(!call) return;
+  call.on('stream', function(remoteStream) {
+    if(!lmsChatPeerConnections[targetPeerId]) lmsChatPeerConnections[targetPeerId] = {};
+    lmsChatPeerConnections[targetPeerId].media = call;
+    lmsChatPeerConnections[targetPeerId].stream = remoteStream;
+    lmsChatAddRemoteStream(targetPeerId, remoteStream, name, lmsChatCallState === 'video');
+  });
+  call.on('close', function() {
+    lmsChatRemoveRemoteStream(targetPeerId);
+    delete lmsChatPeerConnections[targetPeerId];
+  });
+  call.on('error', function() {
+    lmsChatRemoveRemoteStream(targetPeerId);
+    delete lmsChatPeerConnections[targetPeerId];
+  });
+}
+
+// Resolve a user name from a PeerJS ID
+function lmsChatResolvePeerName(peerId) {
+  // peerId format: lms-roomId-userId
+  var parts = peerId.split('-');
+  var userId = parts[parts.length - 1];
+  // Try full userId match (may contain hyphens like USR-001)
+  for(var i = 0; i < userAccounts.length; i++) {
+    var uid = userAccounts[i].id.replace(/[^a-zA-Z0-9-]/g,'');
+    if(peerId.endsWith(uid)) return userAccounts[i].name;
+  }
+  return 'Participant';
+}
+
 // ── Unified call initiation (voice or video) ──
 function lmsChatInitiateCall(callType) {
   if(!lmsChatActiveRoom) return;
@@ -18519,6 +18634,11 @@ function lmsChatInitiateCall(callType) {
     participants: [user.id]
   };
 
+  lmsChatCallSeconds = 0;
+  lmsChatCallState = callType;
+  lmsChatCallRoomId = lmsChatActiveRoom;
+  lmsChatPeerConnections = {};
+
   // Create call overlay
   var overlay = document.getElementById('lmsChatCallOverlay');
   if(!overlay) {
@@ -18527,10 +18647,6 @@ function lmsChatInitiateCall(callType) {
     overlay.className = 'lms-call-overlay';
     document.body.appendChild(overlay);
   }
-
-  lmsChatCallSeconds = 0;
-  lmsChatCallState = callType;
-  lmsChatCallRoomId = lmsChatActiveRoom;
 
   if(isVideo) {
     overlay.innerHTML =
@@ -18566,10 +18682,30 @@ function lmsChatInitiateCall(callType) {
     lmsChatLocalStream = stream;
     if(isVideo) {
       var vid = document.getElementById('lmsLocalVideo');
-      if(vid) vid.srcObject = stream;
+      if(vid) { vid.srcObject = stream; vid.play().catch(function(){}); }
     }
-    document.getElementById('lmsCallStatus').textContent = (isVideo ? 'LMS Video Call' : 'LMS Voice Call') + ' - Connected';
 
+    // Create PeerJS peer and listen for incoming calls from joiners
+    var myPeerId = lmsChatCallPeerId(lmsChatActiveRoom, user.id);
+    lmsChatPeer = new Peer(myPeerId, { config: { iceServers: LMS_CHAT_ICE_SERVERS } });
+
+    lmsChatPeer.on('open', function() {
+      document.getElementById('lmsCallStatus').textContent = (isVideo ? 'LMS Video Call' : 'LMS Voice Call') + ' - Connected';
+    });
+    lmsChatPeer.on('call', function(incomingCall) {
+      lmsChatHandleIncomingCall(incomingCall);
+    });
+    lmsChatPeer.on('error', function(err) {
+      console.warn('LMS Chat PeerJS error:', err.type, err);
+      if(err.type === 'unavailable-id') {
+        // Peer ID already taken, append random suffix
+        var retryId = myPeerId + '-' + Math.random().toString(36).substr(2,4);
+        lmsChatPeer = new Peer(retryId, { config: { iceServers: LMS_CHAT_ICE_SERVERS } });
+        lmsChatPeer.on('call', function(c) { lmsChatHandleIncomingCall(c); });
+      }
+    });
+
+    // Start call timer
     lmsChatCallTimer = setInterval(function() {
       lmsChatCallSeconds++;
       var m = Math.floor(lmsChatCallSeconds/60).toString().padStart(2,'0');
@@ -18600,7 +18736,6 @@ function lmsChatInitiateCall(callType) {
   }).catch(function(err) {
     document.getElementById('lmsCallStatus').textContent = (isVideo ? 'Camera/microphone' : 'Microphone') + ' access denied';
     console.error(callType + ' call error:', err);
-    // Clear active call on failure
     delete room.activeCall;
     lmsChatCallState = null;
   });
@@ -18738,15 +18873,55 @@ function lmsChatJoinCall(roomId, callType) {
 
   overlay.classList.add('active');
 
+  lmsChatPeerConnections = {};
+
   var mediaConstraints = isVideo ? {audio:true, video:true} : {audio:true};
   navigator.mediaDevices.getUserMedia(mediaConstraints).then(function(stream) {
     lmsChatLocalStream = stream;
     if(isVideo) {
       var vid = document.getElementById('lmsLocalVideo');
-      if(vid) vid.srcObject = stream;
+      if(vid) { vid.srcObject = stream; vid.play().catch(function(){}); }
     }
-    document.getElementById('lmsCallStatus').textContent = (isVideo ? 'LMS Video Call' : 'LMS Voice Call') + ' - Connected';
 
+    // Create PeerJS peer and connect to all existing participants
+    var myPeerId = lmsChatCallPeerId(roomId, user.id);
+    lmsChatPeer = new Peer(myPeerId, { config: { iceServers: LMS_CHAT_ICE_SERVERS } });
+
+    lmsChatPeer.on('open', function() {
+      document.getElementById('lmsCallStatus').textContent = (isVideo ? 'LMS Video Call' : 'LMS Voice Call') + ' - Connected';
+
+      // Call each existing participant in the call
+      var existingParticipants = room.activeCall.participants.filter(function(pid){ return pid !== user.id; });
+      existingParticipants.forEach(function(participantId) {
+        var targetPeerId = lmsChatCallPeerId(roomId, participantId);
+        var pName = userAccounts.find(function(u){ return u.id === participantId; });
+        lmsChatCallPeer(targetPeerId, pName ? pName.name : 'Participant');
+      });
+    });
+
+    // Listen for incoming calls from future joiners
+    lmsChatPeer.on('call', function(incomingCall) {
+      lmsChatHandleIncomingCall(incomingCall);
+    });
+
+    lmsChatPeer.on('error', function(err) {
+      console.warn('LMS Chat PeerJS join error:', err.type, err);
+      if(err.type === 'unavailable-id') {
+        var retryId = myPeerId + '-' + Math.random().toString(36).substr(2,4);
+        lmsChatPeer = new Peer(retryId, { config: { iceServers: LMS_CHAT_ICE_SERVERS } });
+        lmsChatPeer.on('open', function() {
+          var existing = room.activeCall.participants.filter(function(pid){ return pid !== user.id; });
+          existing.forEach(function(pid) {
+            var tId = lmsChatCallPeerId(roomId, pid);
+            var pn = userAccounts.find(function(u){ return u.id === pid; });
+            lmsChatCallPeer(tId, pn ? pn.name : 'Participant');
+          });
+        });
+        lmsChatPeer.on('call', function(c) { lmsChatHandleIncomingCall(c); });
+      }
+    });
+
+    // Start call timer
     lmsChatCallTimer = setInterval(function() {
       lmsChatCallSeconds++;
       var m = Math.floor(lmsChatCallSeconds/60).toString().padStart(2,'0');
@@ -18829,6 +19004,17 @@ function lmsChatRenderCallBanner(prefix) {
 function lmsChatEndCall() {
   if(lmsChatCallTimer) { clearInterval(lmsChatCallTimer); lmsChatCallTimer = null; }
   if(lmsChatLocalStream) { lmsChatLocalStream.getTracks().forEach(function(t){t.stop();}); lmsChatLocalStream = null; }
+
+  // Close all PeerJS connections and clean up remote streams
+  Object.keys(lmsChatPeerConnections).forEach(function(pid) {
+    if(lmsChatPeerConnections[pid].stream) {
+      lmsChatPeerConnections[pid].stream.getTracks().forEach(function(t){t.stop();});
+    }
+    if(lmsChatPeerConnections[pid].media) lmsChatPeerConnections[pid].media.close();
+    lmsChatRemoveRemoteStream(pid);
+  });
+  lmsChatPeerConnections = {};
+  if(lmsChatPeer) { lmsChatPeer.destroy(); lmsChatPeer = null; }
 
   var callRoomId = lmsChatCallRoomId || lmsChatActiveRoom;
 
