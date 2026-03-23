@@ -16600,7 +16600,7 @@ async function studentLightSync(uname, pw) {
 
     // Step 2: Find and read the backup file from Google Drive
     var folderId = typeof GOOGLE_DRIVE_CONFIG !== 'undefined' ? GOOGLE_DRIVE_CONFIG.FOLDER_ID : '1lNpI00Et1BN5c4eaV5WfQwuQVhCMBtv8';
-    var backupFileName = typeof GOOGLE_DRIVE_CONFIG !== 'undefined' && GOOGLE_DRIVE_CONFIG.BACKUP_FILE ? GOOGLE_DRIVE_CONFIG.BACKUP_FILE : 'CESTIS_LMS_BACKUP.json';
+    var backupFileName = typeof GOOGLE_DRIVE_CONFIG !== 'undefined' && GOOGLE_DRIVE_CONFIG.BACKUP_FILE_NAME ? GOOGLE_DRIVE_CONFIG.BACKUP_FILE_NAME : 'CESTIS_LMS_BACKUP.json';
 
     var searchUrl = 'https://www.googleapis.com/drive/v3/files?q=' +
       encodeURIComponent("'" + folderId + "' in parents and name='" + backupFileName + "' and trashed=false") +
@@ -16785,7 +16785,7 @@ async function studentPushRegistration(newUserAccount) {
     var backupData = await downloadResp.json();
 
     // Step 3: Merge the new account into the cloud backup data
-    var cloudAccounts = backupData.userAccounts || backupData.data && backupData.data.userAccounts || [];
+    var cloudAccounts = backupData.userAccounts || (backupData.data && backupData.data.userAccounts) || [];
     var isWrapped = !!backupData.data; // backup may be wrapped in { data: {...} }
     var accountList = isWrapped ? backupData.data.userAccounts : backupData.userAccounts;
     if (!accountList) accountList = [];
@@ -16905,7 +16905,7 @@ async function studentRefreshCertData() {
     }
 
     var folderId = typeof GOOGLE_DRIVE_CONFIG !== 'undefined' ? GOOGLE_DRIVE_CONFIG.FOLDER_ID : '1lNpI00Et1BN5c4eaV5WfQwuQVhCMBtv8';
-    var backupFileName = typeof GOOGLE_DRIVE_CONFIG !== 'undefined' && GOOGLE_DRIVE_CONFIG.BACKUP_FILE ? GOOGLE_DRIVE_CONFIG.BACKUP_FILE : 'CESTIS_LMS_BACKUP.json';
+    var backupFileName = typeof GOOGLE_DRIVE_CONFIG !== 'undefined' && GOOGLE_DRIVE_CONFIG.BACKUP_FILE_NAME ? GOOGLE_DRIVE_CONFIG.BACKUP_FILE_NAME : 'CESTIS_LMS_BACKUP.json';
 
     var searchUrl = 'https://www.googleapis.com/drive/v3/files?q=' +
       encodeURIComponent("'" + folderId + "' in parents and name='" + backupFileName + "' and trashed=false") +
@@ -20531,7 +20531,7 @@ function asRenderDuties() {
   if(priorityFilter !== 'all') tasks = tasks.filter(function(t){ return t.priority === priorityFilter; });
   if(search) {
     tasks = tasks.filter(function(t){
-      return t.title.toLowerCase().indexOf(search) !== -1 || t.description.toLowerCase().indexOf(search) !== -1;
+      return t.title.toLowerCase().indexOf(search) !== -1 || (t.description || '').toLowerCase().indexOf(search) !== -1;
     });
   }
 
@@ -21515,7 +21515,7 @@ function buildCmcPages() {
     });
   }
   var topStudents = students.slice().map(function(s) {
-    var examAvg = studentExamAvg[s.id] ? Math.round(studentExamAvg[s.id].total / studentExamAvg[s.id].count) : 0;
+    var examAvg = studentExamAvg[s.id] && studentExamAvg[s.id].count > 0 ? Math.round(studentExamAvg[s.id].total / studentExamAvg[s.id].count) : 0;
     var att = studentAttPct[s.id] !== undefined ? studentAttPct[s.id] : (parseFloat(s.attendance)||0);
     return {name:s.name, course:s.course, examAvg:examAvg, att:att, stage:s.stage};
   }).sort(function(a,b){ return b.examAvg - a.examAvg; }).slice(0,10);
@@ -22859,6 +22859,7 @@ function cmcFilterChecks() {
 
 async function cmcSaveSnapshot() {
   if(!googleAccessToken) return;
+  try {
   var snapshot = {
     timestamp: new Date().toISOString(),
     savedBy: currentLoggedInUser ? currentLoggedInUser.name : 'CMC User',
@@ -22900,6 +22901,10 @@ async function cmcSaveSnapshot() {
     await fetch('https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart', {
       method: 'POST', headers: { 'Authorization': 'Bearer ' + googleAccessToken }, body: form
     });
+  }
+  } catch(e) {
+    console.error('[CMC] Failed to save snapshot:', e);
+    showToast('Failed to save snapshot. Please try again.');
   }
 }
 
