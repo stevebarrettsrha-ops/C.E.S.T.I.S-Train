@@ -15076,6 +15076,7 @@ async function browseBackupFiles() {
   const menu = document.getElementById('cloudDropdownMenu');
   menu.classList.remove('show');
 
+  revalidateCloudSync();
   if (!isCloudConnected || !googleAccessToken) {
     alert('Please connect to Google Drive first to browse backup files.');
     return;
@@ -15114,6 +15115,8 @@ async function browseBackupFiles() {
 // FEATURE 1: SAVE TO CLOUD
 // ============================================
 async function saveToCloud() {
+  // Revalidate token from localStorage in case page was restored from bfcache or tab was backgrounded
+  revalidateCloudSync();
   if (!isCloudConnected || !googleAccessToken) {
     alert('Please connect to Google Drive first');
     return;
@@ -15277,6 +15280,8 @@ async function saveToCloud() {
 // FEATURE 2: SYNC FROM CLOUD
 // ============================================
 async function syncFromCloud() {
+  // Revalidate token from localStorage in case page was restored from bfcache or tab was backgrounded
+  revalidateCloudSync();
   if (!isCloudConnected || !googleAccessToken) {
     alert('Please connect to Google Drive first');
     return;
@@ -15396,10 +15401,16 @@ async function syncFromCloud() {
 
     const backupTime = new Date(backupData.timestamp).toLocaleString();
     const savedByInfo = backupData.savedBy ? `\nLast saved by: ${backupData.savedBy}` : '';
-    alert(`✅ Data synced from cloud successfully!\n\nBackup was created: ${backupTime}${savedByInfo}\n\n💡 The page will reload to reflect the updated data.`);
+    alert(`✅ Data synced from cloud successfully!\n\nBackup was created: ${backupTime}${savedByInfo}`);
 
-    // Reload page to reflect all synced data
-    location.reload();
+    // Refresh current dashboard in-place instead of reloading the entire page
+    try {
+      if (currentRole === 'admin') { buildAdminPages(); showPage('dashboard'); }
+      else if (currentRole === 'instructor') { buildInstructorPages(); showPage('i-dashboard'); }
+      else if (currentRole === 'student') { buildStudentPages(); showPage('s-dashboard'); }
+      else if (currentRole === 'adminstaff') { buildAdminStaffPages(); showPage('as-dashboard'); }
+      else if (currentRole === 'cmc') { buildCmcPages(); showPage('cmc-dashboard'); setTimeout(cmcLoadAllData, 300); }
+    } catch(e) { console.warn('[SyncFromCloud] Dashboard refresh error:', e); }
 
   } catch (error) {
     console.error('Error syncing from cloud:', error);
@@ -15418,6 +15429,8 @@ async function syncFromCloud() {
 // FEATURE 3: MERGE FROM CLOUD
 // ============================================
 async function mergeFromCloud() {
+  // Revalidate token from localStorage in case page was restored from bfcache or tab was backgrounded
+  revalidateCloudSync();
   if (!isCloudConnected || !googleAccessToken) {
     alert('Please connect to Google Drive first');
     return;
@@ -15782,7 +15795,6 @@ async function mergeFromCloud() {
       summary += '\n💡 No new data found — your local data already contains everything from the cloud.';
     } else {
       summary += '\n💡 Tip: Save to Cloud to push the merged data back for other users.';
-      summary += '\n\nThe page will reload to reflect the merged data.';
     }
 
     const savedByInfo = backupData.savedBy ? `\nCloud backup was saved by: ${backupData.savedBy}` : '';
@@ -15790,9 +15802,15 @@ async function mergeFromCloud() {
 
     alert(summary);
 
-    // Reload if data was actually merged
+    // Refresh current dashboard in-place instead of reloading the entire page
     if (totalAdded > 0) {
-      location.reload();
+      try {
+        if (currentRole === 'admin') { buildAdminPages(); showPage('dashboard'); }
+        else if (currentRole === 'instructor') { buildInstructorPages(); showPage('i-dashboard'); }
+        else if (currentRole === 'student') { buildStudentPages(); showPage('s-dashboard'); }
+        else if (currentRole === 'adminstaff') { buildAdminStaffPages(); showPage('as-dashboard'); }
+        else if (currentRole === 'cmc') { buildCmcPages(); showPage('cmc-dashboard'); setTimeout(cmcLoadAllData, 300); }
+      } catch(e) { console.warn('[MergeFromCloud] Dashboard refresh error:', e); }
     }
 
   } catch (error) {
@@ -16270,6 +16288,8 @@ async function silentMergeFromBackup(fileId) {
 
 // Auto-sync from ALL Google Drive folders on login (silent, non-destructive merge)
 async function autoSyncOnLogin() {
+  // Revalidate token in case it was refreshed or expired since login started
+  revalidateCloudSync();
   if (!isCloudConnected || !googleAccessToken) {
     console.log('[AutoSync] Not connected to Google Drive — skipping auto-sync');
     return;
@@ -16831,6 +16851,54 @@ function loginPageGoogleAuth() {
     }
   }, 600);
 })();
+
+// ============================================
+// RE-VALIDATE CLOUD SYNC ON PAGE RESTORE / TAB FOCUS
+// Handles bfcache restoration (back/forward navigation) and tab switching
+// so users can sync immediately after navigating to the page without refreshing
+// ============================================
+function revalidateCloudSync() {
+  var savedToken = localStorage.getItem('schoolDashboardGoogleAccessToken');
+  var savedExpiry = localStorage.getItem('schoolDashboardGoogleTokenExpiry');
+  if (savedToken && savedExpiry && new Date(savedExpiry) > new Date()) {
+    if (!isCloudConnected || googleAccessToken !== savedToken) {
+      googleAccessToken = savedToken;
+      isCloudConnected = true;
+      updateCloudUI(true);
+      console.log('[CloudSync] Token revalidated on page restore/focus');
+    }
+  } else if (isCloudConnected) {
+    // Token expired — clear stale state so user is prompted to reconnect
+    googleAccessToken = null;
+    isCloudConnected = false;
+    updateCloudUI(false);
+    console.log('[CloudSync] Token expired — cleared stale connection state');
+  }
+  // Re-initialize Google Identity Services client if needed
+  if (!googleTokenClient) {
+    initGoogleAuth();
+  }
+}
+
+// Handle bfcache restoration — browser back/forward navigation
+window.addEventListener('pageshow', function(event) {
+  if (event.persisted) {
+    console.log('[CloudSync] Page restored from bfcache — revalidating');
+    revalidateCloudSync();
+    // If on the landing page and not yet synced, trigger auto-sync
+    var landingPage = document.getElementById('landingPage');
+    if (landingPage && landingPage.style.display !== 'none' && isCloudConnected && googleAccessToken && !loginSyncCompleted) {
+      loginPageSync();
+    }
+  }
+});
+
+// Handle tab focus/visibility changes — revalidate token when user returns to tab
+document.addEventListener('visibilitychange', function() {
+  if (document.visibilityState === 'visible') {
+    revalidateCloudSync();
+  }
+});
 
 // ============================================
 // STUDENT LIGHT SYNC — Fetch only user accounts & student data from cloud
