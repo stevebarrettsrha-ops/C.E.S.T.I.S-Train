@@ -5105,7 +5105,7 @@ loadUserAccounts();
 // Removes legacy hardcoded demo data that was persisted to localStorage/cloud before
 // the production-ready update. Runs once, then sets a version flag.
 (function purgeLegacyDemoData() {
-  var CURRENT_DATA_VERSION = 3;
+  var CURRENT_DATA_VERSION = 4;
   var savedVersion = parseInt(localStorage.getItem('voctrain_dataVersion')) || 0;
   if (savedVersion >= CURRENT_DATA_VERSION) return; // Already purged
 
@@ -5116,9 +5116,16 @@ loadUserAccounts();
   for (var i = 0; i < 80; i++) demoStudentIds['STU-' + String(2026000 + i)] = true;
   students = students.filter(function(s) { return !demoStudentIds[s.id]; });
 
-  // 2. Remove demo exams (EXAM-001 through EXAM-012)
+  // 2. Remove demo exams (EXAM-001 through EXAM-012 by ID, plus known test exam titles)
   var demoExamIds = {'EXAM-001':1,'EXAM-002':1,'EXAM-003':1,'EXAM-004':1,'EXAM-005':1,'EXAM-006':1,'EXAM-007':1,'EXAM-008':1,'EXAM-009':1,'EXAM-010':1,'EXAM-011':1,'EXAM-012':1};
-  exams = exams.filter(function(e) { return !demoExamIds[e.id]; });
+  var demoExamTitles = {
+    'Welding Final Assessment':1,'Welding Level 2 — Final Theory':1,
+    'Electrical Installation L3 — Safety':1,'Business Admin L1 — Midterm':1,
+    'Cosmetology L1 — Practical Theory':1,'Plumbing L2 — Pipe Systems':1,
+    'Carpentry — Joints & Framing':1,'Beauty Therapy — Skin Analysis':1,
+    'Data Operations — Spreadsheets':1
+  };
+  exams = exams.filter(function(e) { return !demoExamIds[e.id] && !demoExamTitles[e.title]; });
 
   // 3. Remove demo announcements (IDs 1 through 10)
   announcements = announcements.filter(function(a) { return typeof a.id !== 'number' || a.id > 10; });
@@ -5138,8 +5145,13 @@ loadUserAccounts();
   instructorData = instructorData.filter(function(ins) { return !demoInstructorIds[ins.id]; });
 
   // 7. Remove exam results linked to demo exams or demo students
+  var purgedExamIds = {};
+  exams.forEach(function(e) { purgedExamIds[e.id] = true; });
   examResults = examResults.filter(function(r) {
-    return !demoExamIds[r.examId] && !demoStudentIds[r.studentId];
+    if (demoExamIds[r.examId] || demoStudentIds[r.studentId]) return false;
+    // Also remove results for exams that were just purged by title
+    if (r.examId && !purgedExamIds[r.examId] && !exams.some(function(e) { return e.id === r.examId; })) return false;
+    return true;
   });
 
   // 8. Clear notifications that reference demo data
@@ -15393,7 +15405,9 @@ async function syncFromCloud() {
     }
 
     if (backupData.data.exams) {
-      exams = backupData.data.exams;
+      var _testExamIds = {'EXAM-001':1,'EXAM-002':1,'EXAM-003':1,'EXAM-004':1,'EXAM-005':1,'EXAM-006':1,'EXAM-007':1,'EXAM-008':1,'EXAM-009':1,'EXAM-010':1,'EXAM-011':1,'EXAM-012':1};
+      var _testExamTitles = {'Welding Final Assessment':1,'Welding Level 2 \u2014 Final Theory':1,'Electrical Installation L3 \u2014 Safety':1,'Business Admin L1 \u2014 Midterm':1,'Cosmetology L1 \u2014 Practical Theory':1,'Plumbing L2 \u2014 Pipe Systems':1,'Carpentry \u2014 Joints & Framing':1,'Beauty Therapy \u2014 Skin Analysis':1,'Data Operations \u2014 Spreadsheets':1};
+      exams = backupData.data.exams.filter(function(e) { return !_testExamIds[e.id] && !_testExamTitles[e.title]; });
     }
 
     if (backupData.data.announcements) {
@@ -15533,10 +15547,11 @@ async function mergeFromCloud() {
 
     let mergeStats = { usersAdded: 0, studentsAdded: 0, examsAdded: 0, announcementsAdded: 0, eventsAdded: 0 };
 
-    // Legacy demo data IDs to exclude from merges (purged in data version 3)
+    // Legacy demo data IDs to exclude from merges (purged in data version 4)
     var _demoStudentIds = {};
     for (var _di = 0; _di < 80; _di++) _demoStudentIds['STU-' + String(2026000 + _di)] = true;
     var _demoExamIds = {'EXAM-001':1,'EXAM-002':1,'EXAM-003':1,'EXAM-004':1,'EXAM-005':1,'EXAM-006':1,'EXAM-007':1,'EXAM-008':1,'EXAM-009':1,'EXAM-010':1,'EXAM-011':1,'EXAM-012':1};
+    var _demoExamTitles = {'Welding Final Assessment':1,'Welding Level 2 \u2014 Final Theory':1,'Electrical Installation L3 \u2014 Safety':1,'Business Admin L1 \u2014 Midterm':1,'Cosmetology L1 \u2014 Practical Theory':1,'Plumbing L2 \u2014 Pipe Systems':1,'Carpentry \u2014 Joints & Framing':1,'Beauty Therapy \u2014 Skin Analysis':1,'Data Operations \u2014 Spreadsheets':1};
     var _demoAnnIds = {1:1,2:1,3:1,4:1,5:1,6:1,7:1,8:1,9:1,10:1};
     var _demoEventTitles = {'Welding L2 Final Theory':1,'Electrical Safety Class':1,'Business Admin Midterm':1,'Cosmetology Practical':1,'Workshop Portfolio Due':1,'Staff Meeting':1,'Final Project Due':1,'Plumbing L2 Pipe Systems':1,'Guest Lecture: Industry Trends':1,'Carpentry Joints Exam':1,'Budget Review Meeting':1,'Instructor Evaluation Deadline':1,'Curriculum Workshop':1,'Student ID Collection':1};
     var _demoInstructorIds = {};
@@ -15574,7 +15589,8 @@ async function mergeFromCloud() {
     if (backupData.data.exams) {
       const localExamKeys = exams.map(e => (e.title + '|' + e.course).toLowerCase());
       backupData.data.exams.forEach(cloudExam => {
-        if (_demoExamIds[cloudExam.id]) return; // Skip legacy demo data
+        if (_demoExamIds[cloudExam.id]) return; // Skip legacy demo data by ID
+        if (_demoExamTitles[cloudExam.title]) return; // Skip test exams by title
         const key = (cloudExam.title + '|' + cloudExam.course).toLowerCase();
         if (!localExamKeys.includes(key)) {
           exams.push(cloudExam);
@@ -15927,9 +15943,10 @@ async function silentMergeFromBackup(fileId) {
 
     let changed = false;
 
-    // Legacy demo data IDs to exclude from merges
+    // Legacy demo data IDs and titles to exclude from merges
     var _ds = {}; for (var _i = 0; _i < 80; _i++) _ds['STU-' + String(2026000 + _i)] = true;
     var _de = {'EXAM-001':1,'EXAM-002':1,'EXAM-003':1,'EXAM-004':1,'EXAM-005':1,'EXAM-006':1,'EXAM-007':1,'EXAM-008':1,'EXAM-009':1,'EXAM-010':1,'EXAM-011':1,'EXAM-012':1};
+    var _det = {'Welding Final Assessment':1,'Welding Level 2 \u2014 Final Theory':1,'Electrical Installation L3 \u2014 Safety':1,'Business Admin L1 \u2014 Midterm':1,'Cosmetology L1 \u2014 Practical Theory':1,'Plumbing L2 \u2014 Pipe Systems':1,'Carpentry \u2014 Joints & Framing':1,'Beauty Therapy \u2014 Skin Analysis':1,'Data Operations \u2014 Spreadsheets':1};
     var _da = {1:1,2:1,3:1,4:1,5:1,6:1,7:1,8:1,9:1,10:1};
     var _dt = {'Welding L2 Final Theory':1,'Electrical Safety Class':1,'Business Admin Midterm':1,'Cosmetology Practical':1,'Workshop Portfolio Due':1,'Staff Meeting':1,'Final Project Due':1,'Plumbing L2 Pipe Systems':1,'Guest Lecture: Industry Trends':1,'Carpentry Joints Exam':1,'Budget Review Meeting':1,'Instructor Evaluation Deadline':1,'Curriculum Workshop':1,'Student ID Collection':1};
     var _du = {'USR-002':1,'USR-003':1,'USR-004':1,'USR-005':1,'USR-006':1,'USR-007':1,'USR-008':1,'USR-009':1,'USR-010':1};
@@ -15982,6 +15999,7 @@ async function silentMergeFromBackup(fileId) {
       const localExamKeys = exams.map(e => (e.title + '|' + e.course).toLowerCase());
       backupData.data.exams.forEach(cloudExam => {
         if (_de[cloudExam.id]) return;
+        if (_det[cloudExam.title]) return; // Skip test exams by title
         const key = (cloudExam.title + '|' + cloudExam.course).toLowerCase();
         if (!localExamKeys.includes(key)) {
           exams.push(cloudExam);
