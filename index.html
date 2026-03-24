@@ -7148,10 +7148,7 @@ function buildAdminPages() {
     </div>
     <div class="grid-2col">
       <div class="card"><div class="card-header"><h3>Attendance Heatmap</h3></div><div id="attendanceHeatmap"></div></div>
-      <div class="card"><div class="card-header"><h3>Gender Distribution</h3></div><div style="display:flex;align-items:center;justify-content:center;gap:32px;padding:20px;">
-        <div style="text-align:center;"><div style="width:80px;height:80px;border-radius:50%;background:var(--blue-dim);display:flex;align-items:center;justify-content:center;font-size:32px;margin:0 auto 8px;">\u2642</div><div style="font-size:20px;font-weight:700;font-family:'Playfair Display',serif;">52%</div><div style="font-size:12px;color:var(--text-muted);">Male</div></div>
-        <div style="text-align:center;"><div style="width:80px;height:80px;border-radius:50%;background:var(--purple-dim);display:flex;align-items:center;justify-content:center;font-size:32px;margin:0 auto 8px;">\u2640</div><div style="font-size:20px;font-weight:700;font-family:'Playfair Display',serif;">48%</div><div style="font-size:12px;color:var(--text-muted);">Female</div></div>
-      </div></div>
+      <div class="card"><div class="card-header"><h3>Gender Distribution</h3></div><div id="genderDistContainer" style="display:flex;align-items:center;justify-content:center;gap:32px;padding:20px;"></div></div>
     </div>
   </section>
 
@@ -7500,6 +7497,7 @@ function buildAdminPages() {
   renderEnrollmentBars();
   renderGaugeChart();
   renderAttendanceHeatmap();
+  renderGenderDist();
   renderAttendancePage();
   renderAnnouncements();
   renderCalendar();
@@ -13332,9 +13330,27 @@ function filterCerts() { renderCerts(document.getElementById('certFilter')?.valu
 function markCollected(idx) { students[idx].certCollected=true;students[idx].stage='collected';students[idx].progress=100;filterCerts();updatePipelineCounts();renderCertStats();showToast(`Certificate collected: ${students[idx].name}`);addNotification('Certificate collected: ' + students[idx].name + ' — ' + students[idx].course, 'cert', null, ['admin']);saveState(); }
 
 function renderPassRates() {
-  const progs=[{name:'Welding',rate:82},{name:'Electrical',rate:76},{name:'Cosmetology',rate:88},{name:'Business Admin',rate:71},{name:'Auto Mechanics',rate:79},{name:'Hospitality',rate:90},{name:'IT',rate:72},{name:'Plumbing',rate:84}];
   const el = document.getElementById('passRateChart');
   if(!el) return;
+  // Compute pass rates dynamically from student data per training centre
+  var progs = [];
+  skillAreas.forEach(function(sk) {
+    var courseStudents = students.filter(function(s) {
+      return s.course && (s.course.toLowerCase() === sk.name.toLowerCase() ||
+        sk.name.toLowerCase().indexOf(s.course.toLowerCase().split(' ')[0]) !== -1 ||
+        s.course.toLowerCase().indexOf(sk.name.split(' ')[0].toLowerCase()) !== -1);
+    });
+    if (courseStudents.length === 0) return;
+    var passed = courseStudents.filter(function(s) { return s.stage === 'certified' || s.stage === 'collected' || parseFloat(s.gpa) >= 2.0; }).length;
+    var rate = Math.round(passed / courseStudents.length * 100);
+    // Truncate long names for display
+    var displayName = sk.name.length > 15 ? sk.name.substring(0, 13) + '...' : sk.name;
+    progs.push({name: displayName, rate: rate});
+  });
+  if (progs.length === 0) {
+    el.innerHTML = '<div style="text-align:center;padding:20px;color:var(--text-muted);font-size:13px;">No student data available to compute pass rates.</div>';
+    return;
+  }
   el.innerHTML = progs.map(p=>`<div style="display:flex;align-items:center;gap:12px;"><div style="width:100px;font-size:12px;color:var(--text-secondary);text-align:right;">${p.name}</div><div class="progress-bar" style="flex:1;height:10px;"><div class="fill" style="width:${p.rate}%;background:${p.rate>=80?'var(--green)':p.rate>=70?'var(--accent)':'var(--red)'};border-radius:5px;"></div></div><div style="width:40px;font-size:12px;font-weight:700;color:${p.rate>=80?'var(--green)':p.rate>=70?'var(--accent)':'var(--red)'};">${p.rate}%</div></div>`).join('');
 }
 
@@ -13356,11 +13372,26 @@ function renderCertStats() {
 function renderReportStats() {
   const el = document.getElementById('reportStats');
   if(!el) return;
+  // Compute overall pass rate from student data
+  const passedStudents = students.filter(function(s) { return s.stage === 'certified' || s.stage === 'collected' || parseFloat(s.gpa) >= 2.0; });
+  const overallPassRate = students.length ? Math.round(passedStudents.length / students.length * 100) : 0;
+  // Compute average months to certification from students who have certDate
+  var totalMonths = 0; var certCount = 0;
+  students.forEach(function(s) {
+    if (s.certDate && s.createdAt) {
+      var start = new Date(s.createdAt); var end = new Date(s.certDate);
+      if (!isNaN(start) && !isNaN(end) && end > start) {
+        totalMonths += (end - start) / (1000 * 60 * 60 * 24 * 30.44);
+        certCount++;
+      }
+    }
+  });
+  const avgMonthsToCert = certCount > 0 ? (totalMonths / certCount).toFixed(1) : '0';
   const avgAtt = students.length ? Math.round(students.reduce((a,s)=>a+s.attendance,0)/students.length) : 0;
   const dropoutRate = students.length ? (students.filter(s=>s.stage==='incomplete').length/students.length*100).toFixed(1) : 0;
   el.innerHTML = `
-    <div class="stat-card"><div class="stat-icon" style="background:var(--green-dim);color:var(--green);">\uD83D\uDCCA</div><div class="stat-value" data-count="76" data-suffix="%">0</div><div class="stat-label">Overall Pass Rate</div></div>
-    <div class="stat-card"><div class="stat-icon" style="background:var(--accent-dim);color:var(--accent);">\u23F1\uFE0F</div><div class="stat-value" data-count="4.2">0</div><div class="stat-label">Avg. Months to Cert</div></div>
+    <div class="stat-card"><div class="stat-icon" style="background:var(--green-dim);color:var(--green);">\uD83D\uDCCA</div><div class="stat-value" data-count="${overallPassRate}" data-suffix="%">0</div><div class="stat-label">Overall Pass Rate</div></div>
+    <div class="stat-card"><div class="stat-icon" style="background:var(--accent-dim);color:var(--accent);">\u23F1\uFE0F</div><div class="stat-value" data-count="${avgMonthsToCert}">0</div><div class="stat-label">Avg. Months to Cert</div></div>
     <div class="stat-card"><div class="stat-icon" style="background:var(--blue-dim);color:var(--blue);">\uD83D\uDCC8</div><div class="stat-value" data-count="${avgAtt}" data-suffix="%">0</div><div class="stat-label">Attendance Rate</div></div>
     <div class="stat-card"><div class="stat-icon" style="background:var(--red-dim);color:var(--red);">\u26A0\uFE0F</div><div class="stat-value" data-count="${dropoutRate}" data-suffix="%">0</div><div class="stat-label">Dropout Rate</div></div>
   `;
@@ -13436,6 +13467,31 @@ function renderAttendanceHeatmap() {
     html += '</div>';
   });
   html += `<div style="display:flex;gap:4px;margin-top:8px;font-size:10px;color:var(--text-muted);">${days.map(d=>`<div style="flex:1;text-align:center;">${d}</div>`).join('')}</div>`;
+  el.innerHTML = html;
+}
+
+function renderGenderDist() {
+  var el = document.getElementById('genderDistContainer');
+  if (!el) return;
+  // Count students by gender field (if available)
+  var male = 0; var female = 0; var other = 0;
+  students.forEach(function(s) {
+    var g = (s.gender || '').toLowerCase();
+    if (g === 'male' || g === 'm') male++;
+    else if (g === 'female' || g === 'f') female++;
+    else other++;
+  });
+  var total = students.length || 1;
+  if (male === 0 && female === 0 && other === total) {
+    // No gender data available — show message
+    el.innerHTML = '<div style="text-align:center;padding:20px;color:var(--text-muted);font-size:13px;">Gender data not available.<br>Add a gender field to student records to see this chart.</div>';
+    return;
+  }
+  var malePct = Math.round(male / total * 100);
+  var femalePct = Math.round(female / total * 100);
+  var html = '';
+  html += '<div style="text-align:center;"><div style="width:80px;height:80px;border-radius:50%;background:var(--blue-dim);display:flex;align-items:center;justify-content:center;font-size:32px;margin:0 auto 8px;">\u2642</div><div style="font-size:20px;font-weight:700;font-family:\'Playfair Display\',serif;">' + malePct + '%</div><div style="font-size:12px;color:var(--text-muted);">Male</div></div>';
+  html += '<div style="text-align:center;"><div style="width:80px;height:80px;border-radius:50%;background:var(--purple-dim);display:flex;align-items:center;justify-content:center;font-size:32px;margin:0 auto 8px;">\u2640</div><div style="font-size:20px;font-weight:700;font-family:\'Playfair Display\',serif;">' + femalePct + '%</div><div style="font-size:12px;color:var(--text-muted);">Female</div></div>';
   el.innerHTML = html;
 }
 
