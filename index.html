@@ -6698,6 +6698,8 @@ function buildAdminPages() {
     </div>
     <!-- Exam Results Detail View (shown when clicking Results on a completed exam) -->
     <div id="examResultsView" style="display:none;"></div>
+    <!-- Admin Exam Preview/Test View -->
+    <div id="adminExamPreviewView" style="display:none;"></div>
   </section>
 
   <!-- IMPORT EXAM PAGE -->
@@ -8415,6 +8417,7 @@ function buildInstructorPages() {
       </div>
     </div>
     <div id="iExamResultsView" style="display:none;"></div>
+    <div id="iAdminExamPreviewView" style="display:none;"></div>
   </section>
   `;
 
@@ -12648,9 +12651,11 @@ function viewExamDetail(idx) {
   var statusBadge = '<span class="badge '+(e.status==='upcoming'?'badge-blue':e.status==='active'?'badge-red':'badge-green')+'"><span class="badge-dot"></span>'+statusLabel+'</span>';
 
   var canEdit = currentRole === 'admin' || (currentInstructor && e.createdBy === currentInstructor.id);
+  var canTest = canEdit && hasQuestions;
   var html = '<div style="display:flex;align-items:center;gap:12px;margin-bottom:20px;">' +
     '<button class="btn btn-secondary" onclick="backToExamList()">&larr; Back to Exams</button>' +
     '<h3 style="flex:1;">'+e.title+'</h3>' +
+    (canTest ? '<button class="btn btn-sm" style="background:var(--green);color:#fff;border:none;border-radius:var(--radius-sm);cursor:pointer;" onclick="previewExam('+idx+')">&#9654; Test Exam</button>' : '') +
     (canEdit ? '<button class="btn btn-sm btn-primary" onclick="editExam('+idx+')">Edit Exam</button>' : '') +
     '</div>';
 
@@ -12710,6 +12715,64 @@ function viewExamDetail(idx) {
   }
 
   view.innerHTML = html;
+}
+
+// Admin/Instructor exam preview — test the exam as if you were a student
+var _isExamPreviewMode = false;
+function previewExam(idx) {
+  var e = exams[idx];
+  if (!e) return;
+  if (!e.questionData || e.questionData.length === 0) { alert('This exam has no questions yet.'); return; }
+
+  if (!confirm('Test "' + e.title + '" as a student would see it?\n\nDuration: ' + e.duration + ' minutes\nQuestions: ' + e.questionData.length + '\nPass Mark: ' + e.passMark + '%\n\nResults will NOT be saved — this is a preview only.')) return;
+
+  _isExamPreviewMode = true;
+
+  // Build session (same as student)
+  var questions = JSON.parse(JSON.stringify(e.questionData));
+  if (e.shuffleQuestions) {
+    for (var i = questions.length - 1; i > 0; i--) { var j = Math.floor(Math.random() * (i + 1)); var t = questions[i]; questions[i] = questions[j]; questions[j] = t; }
+  }
+
+  currentExamSession = {
+    examId: e.id,
+    examIdx: idx,
+    title: e.title + ' (PREVIEW)',
+    duration: e.duration,
+    passMark: e.passMark,
+    questions: questions,
+    answers: new Array(questions.length).fill(null),
+    flagged: new Array(questions.length).fill(false),
+    startTime: Date.now(),
+    timeRemaining: e.duration * 60
+  };
+
+  // Hide exam list/detail views, show preview container
+  var isInstructor = currentRole === 'instructor' && document.getElementById('iExamResultsView');
+  var listView = document.getElementById(isInstructor ? 'iExamListView' : 'examListView');
+  var detailView = document.getElementById(isInstructor ? 'iExamResultsView' : 'examResultsView');
+  var previewView = document.getElementById(isInstructor ? 'iAdminExamPreviewView' : 'adminExamPreviewView');
+  if (listView) listView.style.display = 'none';
+  if (detailView) detailView.style.display = 'none';
+  if (previewView) previewView.style.display = 'block';
+
+  // Render using the standard student exam-taking UI
+  renderExamTaking();
+  startExamTimer();
+}
+
+function endExamPreview() {
+  if (examTimerInterval) clearInterval(examTimerInterval);
+  _isExamPreviewMode = false;
+  currentExamSession = null;
+  localStorage.removeItem('voctrain_examInProgress');
+  // Restore views
+  var isInstructor = currentRole === 'instructor' && document.getElementById('iExamResultsView');
+  var listView = document.getElementById(isInstructor ? 'iExamListView' : 'examListView');
+  var previewView = document.getElementById(isInstructor ? 'iAdminExamPreviewView' : 'adminExamPreviewView');
+  if (previewView) previewView.style.display = 'none';
+  if (listView) listView.style.display = 'block';
+  showToast('Exam preview ended');
 }
 
 function editExam(idx) {
@@ -13059,10 +13122,17 @@ function updateExamTimerDisplay() {
 function renderExamTaking() {
   var s = currentExamSession;
   if(!s) return;
-  var takingView = document.getElementById('studentExamTakingView');
+  var takingView = _isExamPreviewMode
+    ? (document.getElementById('iAdminExamPreviewView') || document.getElementById('adminExamPreviewView'))
+    : document.getElementById('studentExamTakingView');
+  if(!takingView) return;
   var answered = s.answers.filter(function(a){return a!==null;}).length;
 
   var html = '<div class="exam-taking">';
+  // Preview mode banner
+  if(_isExamPreviewMode) {
+    html += '<div style="background:var(--accent-dim);color:var(--accent);padding:10px 16px;border-radius:var(--radius-sm);margin-bottom:12px;font-size:13px;font-weight:600;display:flex;align-items:center;gap:8px;">&#9888;&#65039; PREVIEW MODE — Results will not be saved. <button class="btn btn-sm btn-secondary" onclick="endExamPreview()" style="margin-left:auto;">Exit Preview</button></div>';
+  }
   // Timer bar
   html += '<div class="exam-timer-bar"><div style="flex:1;"><h3 style="font-size:16px;margin-bottom:2px;">'+s.title+'</h3><div style="font-size:12px;color:var(--text-muted);">'+s.questions.length+' Questions &bull; Pass Mark: '+s.passMark+'%</div></div>';
   html += '<div class="exam-timer"><span class="timer-icon">⏱</span><span class="timer-value" id="examTimerValue">--:--</span></div></div>';
@@ -13242,6 +13312,41 @@ function submitExam() {
     submittedAt: new Date().toISOString(),
     timeTaken: Math.floor((Date.now()-s.startTime)/1000)
   };
+
+  // In preview mode, don't save results — just display them
+  if(_isExamPreviewMode) {
+    _isExamPreviewMode = false;
+    currentExamSession = null;
+    localStorage.removeItem('voctrain_examInProgress');
+
+    // Show preview results in the admin preview container
+    var isInstructor = currentRole === 'instructor' && document.getElementById('iExamResultsView');
+    var previewView = document.getElementById(isInstructor ? 'iAdminExamPreviewView' : 'adminExamPreviewView');
+    if(previewView) {
+      var rHtml = '<div style="max-width:700px;margin:0 auto;">';
+      rHtml += '<div style="background:var(--accent-dim);color:var(--accent);padding:10px 16px;border-radius:var(--radius-sm);margin-bottom:16px;font-size:13px;font-weight:600;">&#9888;&#65039; PREVIEW RESULTS — No data was saved.</div>';
+      rHtml += '<div class="card" style="text-align:center;padding:40px;">';
+      rHtml += '<div style="font-size:64px;margin-bottom:12px;">'+(result.passed?'&#127942;':'&#128221;')+'</div>';
+      rHtml += '<h2 style="font-size:28px;margin-bottom:8px;color:'+(result.passed?'var(--green)':'var(--red)')+';">'+result.score+'%</h2>';
+      rHtml += '<p style="color:var(--text-muted);margin-bottom:16px;">'+result.correctCount+' / '+result.totalQuestions+' correct &bull; '+(result.passed?'PASSED':'NOT PASSED'+(result.needsReview?' ('+result.pendingCount+' need manual grading)':''))+'</p>';
+      // Show answer breakdown
+      rHtml += '<div style="text-align:left;margin-top:20px;">';
+      gradedResults.forEach(function(g,gi) {
+        var icon = g.isCorrect === true ? '&#10004;' : g.isCorrect === false ? '&#10008;' : '&#8943;';
+        var color = g.isCorrect === true ? 'var(--green)' : g.isCorrect === false ? 'var(--red)' : 'var(--accent)';
+        rHtml += '<div style="padding:8px 12px;border-bottom:1px solid var(--border);display:flex;align-items:center;gap:10px;">';
+        rHtml += '<span style="color:'+color+';font-weight:700;font-size:14px;">'+icon+'</span>';
+        rHtml += '<span style="font-size:13px;flex:1;">Q'+(gi+1)+': '+g.questionText.substring(0,80)+(g.questionText.length>80?'...':'')+'</span>';
+        rHtml += '<span style="font-size:12px;color:'+color+';font-weight:600;">'+g.earnedPoints+'/'+g.points+'</span>';
+        rHtml += '</div>';
+      });
+      rHtml += '</div>';
+      rHtml += '<button class="btn btn-primary" style="margin-top:24px;" onclick="endExamPreview()">Back to Exams</button>';
+      rHtml += '</div></div>';
+      previewView.innerHTML = rHtml;
+    }
+    return;
+  }
 
   examResults.push(result);
 
