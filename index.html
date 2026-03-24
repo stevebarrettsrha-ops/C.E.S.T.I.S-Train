@@ -3804,6 +3804,7 @@ body.vc-fullscreen-mode.vc-host-only-mode .video-grid .video-tile:not(.vc-hoston
     <div class="form-group"><label>Full Name</label><input type="text" class="form-control" id="newStudentName" placeholder="e.g. John Smith"></div>
     <div class="form-group"><label>Email</label><input type="email" class="form-control" id="newStudentEmail" placeholder="e.g. john@email.com"></div>
     <div class="form-group"><label>Programme</label><select class="form-control" id="newStudentCourse"></select></div>
+    <div class="form-group"><label>Gender</label><select class="form-control" id="newStudentGender"><option value="">— Select —</option><option value="Male">Male</option><option value="Female">Female</option></select></div>
     <div class="form-group"><label>Starting Stage</label><select class="form-control" id="newStudentStage"><option value="testing">Testing</option><option value="interview">Interview</option><option value="training">In Training</option></select></div>
     <div style="display:flex;gap:10px;justify-content:flex-end;margin-top:20px;"><button class="btn btn-secondary" onclick="closeModal('addStudentModal')">Cancel</button><button class="btn btn-primary" onclick="addStudent()">Add Student</button></div>
   </div>
@@ -3865,6 +3866,7 @@ body.vc-fullscreen-mode.vc-host-only-mode .video-grid .video-tile:not(.vc-hoston
     <div class="form-group"><label>Full Name</label><input type="text" class="form-control" id="editStudentName"></div>
     <div class="form-group"><label>Email</label><input type="email" class="form-control" id="editStudentEmail" placeholder="e.g. john@email.com"></div>
     <div class="form-group"><label>Programme</label><select class="form-control" id="editStudentCourse"></select></div>
+    <div class="form-group"><label>Gender</label><select class="form-control" id="editStudentGender"><option value="">— Select —</option><option value="Male">Male</option><option value="Female">Female</option></select></div>
     <div class="form-group"><label>Instructor</label><input type="text" class="form-control" id="editStudentInstructor"></div>
     <div class="form-group"><label>Attendance (%)</label><input type="number" class="form-control" id="editStudentAttendance" min="0" max="100"></div>
     <div class="form-group"><label>GPA</label><input type="text" class="form-control" id="editStudentGPA"></div>
@@ -4110,6 +4112,7 @@ body.vc-fullscreen-mode.vc-host-only-mode .video-grid .video-tile:not(.vc-hoston
         <input type="text" class="form-control" id="editStuStatusMsg" placeholder="What's on your mind?">
       </div>
     </div>
+    <div class="form-group"><label>Gender</label><select class="form-control" id="editProfileGender"><option value="">— Select —</option><option value="Male">Male</option><option value="Female">Female</option></select></div>
     <div class="form-group"><label>Email</label><input type="email" class="form-control" id="editProfileEmail" placeholder="your.email@student.heartlms.edu.jm"></div>
     <div class="form-group"><label>Phone</label><input type="tel" class="form-control" id="editProfilePhone" placeholder="+1 (876) 000-0000"></div>
     <div class="form-group"><label>Emergency Contact Name</label><input type="text" class="form-control" id="editProfileEmergencyName" placeholder="Parent / Guardian name"></div>
@@ -6107,6 +6110,8 @@ function createStudentDataForAccount(userAccount) {
     assignments: 0,
     assignmentsTotal: 10,
     gpa: '0.0',
+    gender: '',
+    createdAt: new Date().toISOString().split('T')[0],
     instructor: instructorData.find(function(ins){ return ins.course === userAccount.programme; }) ? instructorData.find(function(ins){ return ins.course === userAccount.programme; }).name : instructorData[0].name
   };
   students.push(newStudent);
@@ -7781,12 +7786,16 @@ function buildStudentPages() {
         ${(function(){
           const myResults = (examResults||[]).filter(r => r.studentId === s.id);
           if(myResults.length === 0) {
-            return exams.filter(e => e.course === s.course && e.status === 'completed').map(e =>
-              '<div class="class-schedule-card" style="border-left:3px solid var(--green);">' +
-              '<div class="class-time-block" style="background:var(--green-dim);"><div class="time" style="font-size:13px;">'+e.date.split('-').slice(1).join('/')+'</div><div class="period">'+e.time+'</div></div>' +
-              '<div style="flex:1;"><div style="font-size:14px;font-weight:600;">'+e.title+'</div><div style="font-size:12px;color:var(--text-muted);">Score: <strong style="color:var(--green);">'+(s.score||'82%')+'</strong> &nbsp;•&nbsp; Class Average: '+(e.passRate||'—')+'</div></div>' +
-              '<span class="badge badge-green"><span class="badge-dot"></span>Passed</span></div>'
-            ).join('') || '<p style="color:var(--text-muted);padding:16px;">No past exams yet.</p>';
+            var completedForCourse = exams.filter(e => e.course === s.course && e.status === 'completed');
+            if(completedForCourse.length === 0) {
+              return '<p style="color:var(--text-muted);padding:16px;">No past exams yet.</p>';
+            }
+            return completedForCourse.map(e =>
+              '<div class="class-schedule-card" style="border-left:3px solid var(--text-muted);">' +
+              '<div class="class-time-block"><div class="time" style="font-size:13px;">'+e.date.split('-').slice(1).join('/')+'</div><div class="period">'+e.time+'</div></div>' +
+              '<div style="flex:1;"><div style="font-size:14px;font-weight:600;">'+e.title+'</div><div style="font-size:12px;color:var(--text-muted);">Class Average: '+(e.passRate||'—')+'</div></div>' +
+              '<span class="badge badge-amber">Not Taken</span></div>'
+            ).join('');
           }
           return myResults.map(r => {
             const ex = exams.find(e => e.id === r.examId) || {};
@@ -11330,6 +11339,7 @@ function openEditStudentProfile() {
 
   document.getElementById('editProfileName').value = s.name;
   document.getElementById('editProfileId').value = s.id;
+  document.getElementById('editProfileGender').value = s.gender || '';
   document.getElementById('editProfileEmail').value = profile.email || (firstName.toLowerCase() + '.' + lastName.toLowerCase() + '@student.heartlms.edu.jm');
   document.getElementById('editProfilePhone').value = profile.phone || '';
   document.getElementById('editProfileEmergencyName').value = profile.emergencyName || '';
@@ -11359,13 +11369,18 @@ function saveStudentProfile() {
   if(!newName) { showToast('Please enter your name'); return; }
   if(!email) { showToast('Please enter an email address'); return; }
 
+  // Update gender on the student record
+  var newGender = (document.getElementById('editProfileGender')?.value || '').trim();
+  var stu = students.find(function(st){ return st.id === s.id; });
+  if(stu) stu.gender = newGender;
+  s.gender = newGender;
+
   // Update name in student data object, userAccounts, and students array
   if(newName !== s.name) {
     s.name = newName;
     if(currentLoggedInUser) currentLoggedInUser.name = newName;
     var acct = userAccounts.find(function(u){ return u.id === currentLoggedInUser.id; });
     if(acct) acct.name = newName;
-    var stu = students.find(function(st){ return st.id === s.id; });
     if(stu) stu.name = newName;
   }
 
@@ -11730,6 +11745,7 @@ function openEditStudent(idx) {
   document.getElementById('editStudentName').value = s.name;
   var profile = studentProfiles[s.id] || {};
   document.getElementById('editStudentEmail').value = profile.email || '';
+  document.getElementById('editStudentGender').value = s.gender || '';
   document.getElementById('editStudentInstructor').value = s.instructor || '';
   document.getElementById('editStudentAttendance').value = s.attendance || 0;
   document.getElementById('editStudentGPA').value = s.gpa || '0.0';
@@ -11764,6 +11780,7 @@ function saveEditStudent() {
     s.id = newId;
   }
   s.name = name;
+  s.gender = document.getElementById('editStudentGender').value || '';
   s.course = document.getElementById('editStudentCourse').value;
   s.instructor = document.getElementById('editStudentInstructor').value.trim();
   s.attendance = parseInt(document.getElementById('editStudentAttendance').value) || 0;
@@ -11810,8 +11827,9 @@ function addStudent() {
   if(!name){alert('Please enter a name');return;}
   var selectedCourse = document.getElementById('newStudentCourse').value;
   var assignedInstructor = (instructorData.find(function(ins){return ins.course === selectedCourse;})||{}).name || '';
-  students.unshift({id:generateStudentId(),name,stage:document.getElementById('newStudentStage').value,course:selectedCourse,score:'',progress:10,certNo:null,certDate:null,certCollected:false,attendance:0,assignments:0,assignmentsTotal:8,gpa:'0.0',instructor:assignedInstructor});
-  closeModal('addStudentModal');filterStudents();updatePipelineCounts();showToast(`${name} added!`);document.getElementById('newStudentName').value='';
+  var gender = document.getElementById('newStudentGender').value || '';
+  students.unshift({id:generateStudentId(),name,stage:document.getElementById('newStudentStage').value,course:selectedCourse,score:'',progress:10,certNo:null,certDate:null,certCollected:false,attendance:0,assignments:0,assignmentsTotal:8,gpa:'0.0',instructor:assignedInstructor,gender:gender,createdAt:new Date().toISOString().split('T')[0]});
+  closeModal('addStudentModal');filterStudents();updatePipelineCounts();showToast(`${name} added!`);document.getElementById('newStudentName').value='';document.getElementById('newStudentGender').value='';
   addNotification('New student enrolled: ' + name + ' — ' + document.getElementById('newStudentCourse').value, 'student', null, ['admin','instructor']);
   saveState();
 
@@ -12251,6 +12269,7 @@ function renderExams(filter) {
       actionBtns += '<button class="btn btn-sm btn-secondary" style="margin-left:4px;" onclick="viewExamResults('+idx+')">Results ('+resultsForExam.length+')</button>' +
         '<button class="btn btn-sm btn-secondary" style="margin-left:4px;" onclick="editExam('+idx+')" title="Edit exam">Edit</button>';
     }
+    actionBtns += '<button class="btn btn-sm" style="margin-left:4px;background:#e74c3c;color:#fff;border:none;border-radius:var(--radius-sm);cursor:pointer;" onclick="deleteExam('+idx+')" title="Delete exam">✕</button>';
     return '<tr><td><strong>'+e.title+'</strong>'+(hasQuestions?'<br><span style="font-size:11px;color:var(--green);">✓ Questions added</span>':'')+'</td><td>'+e.course+'</td><td>'+e.date+' @ '+e.time+'</td><td>'+e.duration+' min</td><td>'+qCount+'</td><td><span class="badge '+(e.status==='upcoming'?'badge-blue':e.status==='active'?'badge-red':'badge-green')+'"><span class="badge-dot"></span>'+(e.status==='active'?'In Progress':e.status==='completed'?'Completed ✓':'Scheduled')+'</span>'+(e.passRate?'<br><span style="font-size:11px;color:var(--text-muted);">Pass: '+e.passRate+'</span>':'')+'</td><td>'+actionBtns+'</td></tr>';
   }).join('');
 }
@@ -12315,6 +12334,9 @@ function renderInstructorExams(filter) {
       if(isOwner) {
         actionBtns += '<button class="btn btn-sm btn-secondary" style="margin-left:4px;" onclick="editExam('+idx+')" title="Edit exam">Edit</button>';
       }
+    }
+    if(isOwner) {
+      actionBtns += '<button class="btn btn-sm" style="margin-left:4px;background:#e74c3c;color:#fff;border:none;border-radius:var(--radius-sm);cursor:pointer;" onclick="deleteExam('+idx+')" title="Delete exam">✕</button>';
     }
     return '<tr><td><strong>'+e.title+'</strong>'+(hasQuestions?'<br><span style="font-size:11px;color:var(--green);">✓ Questions added</span>':'')+createdByLabel+'</td><td>'+e.course+'</td><td>'+e.date+' @ '+e.time+'</td><td>'+e.duration+' min</td><td>'+qCount+'</td><td><span class="badge '+(e.status==='upcoming'?'badge-blue':e.status==='active'?'badge-red':'badge-green')+'"><span class="badge-dot"></span>'+(e.status==='active'?'In Progress':e.status==='completed'?'Completed ✓':'Scheduled')+'</span>'+(e.passRate?'<br><span style="font-size:11px;color:var(--text-muted);">Pass: '+e.passRate+'</span>':'')+'</td><td>'+actionBtns+'</td></tr>';
   }).join('') || '<tr><td colspan="7" style="text-align:center;color:var(--text-muted);padding:24px;">No '+filter+' exams'+(courseFilter?' for '+courseFilter:'')+'</td></tr>';
@@ -12531,6 +12553,24 @@ function completeExam(idx) {
   showToast('Exam "'+e.title+'" marked as completed');
   addNotification('Exam completed: "' + e.title + '"' + (exams[idx].passRate ? ' — pass rate: ' + exams[idx].passRate : ''), 'exam', null, ['admin','instructor']);
   saveState();
+}
+
+function deleteExam(idx) {
+  var e = exams[idx];
+  if (!e) return;
+  var resultsCount = examResults.filter(function(r) { return r.examId === e.id; }).length;
+  var msg = 'Are you sure you want to delete "' + e.title + '"?';
+  if (resultsCount > 0) {
+    msg += '\n\nThis exam has ' + resultsCount + ' student result(s) that will also be deleted.';
+  }
+  if (!confirm(msg)) return;
+  var examId = e.id;
+  exams.splice(idx, 1);
+  // Remove associated exam results
+  examResults = examResults.filter(function(r) { return r.examId !== examId; });
+  saveState();
+  renderExams('upcoming');
+  showToast('Exam "' + e.title + '" deleted');
 }
 
 function viewExamResults(idx) {
@@ -14777,6 +14817,8 @@ async function syncStudentsFromFeeSystem() {
         assignments: 0,
         assignmentsTotal: 10,
         gpa: '0.0',
+        gender: '',
+        createdAt: new Date().toISOString().split('T')[0],
         instructor: assignedInstructor
       });
 
