@@ -3804,6 +3804,7 @@ body.vc-fullscreen-mode.vc-host-only-mode .video-grid .video-tile:not(.vc-hoston
     <div class="form-group"><label>Full Name</label><input type="text" class="form-control" id="newStudentName" placeholder="e.g. John Smith"></div>
     <div class="form-group"><label>Email</label><input type="email" class="form-control" id="newStudentEmail" placeholder="e.g. john@email.com"></div>
     <div class="form-group"><label>Programme</label><select class="form-control" id="newStudentCourse"></select></div>
+    <div class="form-group"><label>Gender</label><select class="form-control" id="newStudentGender"><option value="">— Select —</option><option value="Male">Male</option><option value="Female">Female</option></select></div>
     <div class="form-group"><label>Starting Stage</label><select class="form-control" id="newStudentStage"><option value="testing">Testing</option><option value="interview">Interview</option><option value="training">In Training</option></select></div>
     <div style="display:flex;gap:10px;justify-content:flex-end;margin-top:20px;"><button class="btn btn-secondary" onclick="closeModal('addStudentModal')">Cancel</button><button class="btn btn-primary" onclick="addStudent()">Add Student</button></div>
   </div>
@@ -3865,6 +3866,7 @@ body.vc-fullscreen-mode.vc-host-only-mode .video-grid .video-tile:not(.vc-hoston
     <div class="form-group"><label>Full Name</label><input type="text" class="form-control" id="editStudentName"></div>
     <div class="form-group"><label>Email</label><input type="email" class="form-control" id="editStudentEmail" placeholder="e.g. john@email.com"></div>
     <div class="form-group"><label>Programme</label><select class="form-control" id="editStudentCourse"></select></div>
+    <div class="form-group"><label>Gender</label><select class="form-control" id="editStudentGender"><option value="">— Select —</option><option value="Male">Male</option><option value="Female">Female</option></select></div>
     <div class="form-group"><label>Instructor</label><input type="text" class="form-control" id="editStudentInstructor"></div>
     <div class="form-group"><label>Attendance (%)</label><input type="number" class="form-control" id="editStudentAttendance" min="0" max="100"></div>
     <div class="form-group"><label>GPA</label><input type="text" class="form-control" id="editStudentGPA"></div>
@@ -4110,6 +4112,7 @@ body.vc-fullscreen-mode.vc-host-only-mode .video-grid .video-tile:not(.vc-hoston
         <input type="text" class="form-control" id="editStuStatusMsg" placeholder="What's on your mind?">
       </div>
     </div>
+    <div class="form-group"><label>Gender</label><select class="form-control" id="editProfileGender"><option value="">— Select —</option><option value="Male">Male</option><option value="Female">Female</option></select></div>
     <div class="form-group"><label>Email</label><input type="email" class="form-control" id="editProfileEmail" placeholder="your.email@student.heartlms.edu.jm"></div>
     <div class="form-group"><label>Phone</label><input type="tel" class="form-control" id="editProfilePhone" placeholder="+1 (876) 000-0000"></div>
     <div class="form-group"><label>Emergency Contact Name</label><input type="text" class="form-control" id="editProfileEmergencyName" placeholder="Parent / Guardian name"></div>
@@ -6107,6 +6110,8 @@ function createStudentDataForAccount(userAccount) {
     assignments: 0,
     assignmentsTotal: 10,
     gpa: '0.0',
+    gender: '',
+    createdAt: new Date().toISOString().split('T')[0],
     instructor: instructorData.find(function(ins){ return ins.course === userAccount.programme; }) ? instructorData.find(function(ins){ return ins.course === userAccount.programme; }).name : instructorData[0].name
   };
   students.push(newStudent);
@@ -11334,6 +11339,7 @@ function openEditStudentProfile() {
 
   document.getElementById('editProfileName').value = s.name;
   document.getElementById('editProfileId').value = s.id;
+  document.getElementById('editProfileGender').value = s.gender || '';
   document.getElementById('editProfileEmail').value = profile.email || (firstName.toLowerCase() + '.' + lastName.toLowerCase() + '@student.heartlms.edu.jm');
   document.getElementById('editProfilePhone').value = profile.phone || '';
   document.getElementById('editProfileEmergencyName').value = profile.emergencyName || '';
@@ -11363,13 +11369,18 @@ function saveStudentProfile() {
   if(!newName) { showToast('Please enter your name'); return; }
   if(!email) { showToast('Please enter an email address'); return; }
 
+  // Update gender on the student record
+  var newGender = (document.getElementById('editProfileGender')?.value || '').trim();
+  var stu = students.find(function(st){ return st.id === s.id; });
+  if(stu) stu.gender = newGender;
+  s.gender = newGender;
+
   // Update name in student data object, userAccounts, and students array
   if(newName !== s.name) {
     s.name = newName;
     if(currentLoggedInUser) currentLoggedInUser.name = newName;
     var acct = userAccounts.find(function(u){ return u.id === currentLoggedInUser.id; });
     if(acct) acct.name = newName;
-    var stu = students.find(function(st){ return st.id === s.id; });
     if(stu) stu.name = newName;
   }
 
@@ -11734,6 +11745,7 @@ function openEditStudent(idx) {
   document.getElementById('editStudentName').value = s.name;
   var profile = studentProfiles[s.id] || {};
   document.getElementById('editStudentEmail').value = profile.email || '';
+  document.getElementById('editStudentGender').value = s.gender || '';
   document.getElementById('editStudentInstructor').value = s.instructor || '';
   document.getElementById('editStudentAttendance').value = s.attendance || 0;
   document.getElementById('editStudentGPA').value = s.gpa || '0.0';
@@ -11768,6 +11780,7 @@ function saveEditStudent() {
     s.id = newId;
   }
   s.name = name;
+  s.gender = document.getElementById('editStudentGender').value || '';
   s.course = document.getElementById('editStudentCourse').value;
   s.instructor = document.getElementById('editStudentInstructor').value.trim();
   s.attendance = parseInt(document.getElementById('editStudentAttendance').value) || 0;
@@ -11814,8 +11827,9 @@ function addStudent() {
   if(!name){alert('Please enter a name');return;}
   var selectedCourse = document.getElementById('newStudentCourse').value;
   var assignedInstructor = (instructorData.find(function(ins){return ins.course === selectedCourse;})||{}).name || '';
-  students.unshift({id:generateStudentId(),name,stage:document.getElementById('newStudentStage').value,course:selectedCourse,score:'',progress:10,certNo:null,certDate:null,certCollected:false,attendance:0,assignments:0,assignmentsTotal:8,gpa:'0.0',instructor:assignedInstructor});
-  closeModal('addStudentModal');filterStudents();updatePipelineCounts();showToast(`${name} added!`);document.getElementById('newStudentName').value='';
+  var gender = document.getElementById('newStudentGender').value || '';
+  students.unshift({id:generateStudentId(),name,stage:document.getElementById('newStudentStage').value,course:selectedCourse,score:'',progress:10,certNo:null,certDate:null,certCollected:false,attendance:0,assignments:0,assignmentsTotal:8,gpa:'0.0',instructor:assignedInstructor,gender:gender,createdAt:new Date().toISOString().split('T')[0]});
+  closeModal('addStudentModal');filterStudents();updatePipelineCounts();showToast(`${name} added!`);document.getElementById('newStudentName').value='';document.getElementById('newStudentGender').value='';
   addNotification('New student enrolled: ' + name + ' — ' + document.getElementById('newStudentCourse').value, 'student', null, ['admin','instructor']);
   saveState();
 
@@ -14803,6 +14817,8 @@ async function syncStudentsFromFeeSystem() {
         assignments: 0,
         assignmentsTotal: 10,
         gpa: '0.0',
+        gender: '',
+        createdAt: new Date().toISOString().split('T')[0],
         instructor: assignedInstructor
       });
 
