@@ -7781,12 +7781,16 @@ function buildStudentPages() {
         ${(function(){
           const myResults = (examResults||[]).filter(r => r.studentId === s.id);
           if(myResults.length === 0) {
-            return exams.filter(e => e.course === s.course && e.status === 'completed').map(e =>
-              '<div class="class-schedule-card" style="border-left:3px solid var(--green);">' +
-              '<div class="class-time-block" style="background:var(--green-dim);"><div class="time" style="font-size:13px;">'+e.date.split('-').slice(1).join('/')+'</div><div class="period">'+e.time+'</div></div>' +
-              '<div style="flex:1;"><div style="font-size:14px;font-weight:600;">'+e.title+'</div><div style="font-size:12px;color:var(--text-muted);">Score: <strong style="color:var(--green);">'+(s.score||'82%')+'</strong> &nbsp;•&nbsp; Class Average: '+(e.passRate||'—')+'</div></div>' +
-              '<span class="badge badge-green"><span class="badge-dot"></span>Passed</span></div>'
-            ).join('') || '<p style="color:var(--text-muted);padding:16px;">No past exams yet.</p>';
+            var completedForCourse = exams.filter(e => e.course === s.course && e.status === 'completed');
+            if(completedForCourse.length === 0) {
+              return '<p style="color:var(--text-muted);padding:16px;">No past exams yet.</p>';
+            }
+            return completedForCourse.map(e =>
+              '<div class="class-schedule-card" style="border-left:3px solid var(--text-muted);">' +
+              '<div class="class-time-block"><div class="time" style="font-size:13px;">'+e.date.split('-').slice(1).join('/')+'</div><div class="period">'+e.time+'</div></div>' +
+              '<div style="flex:1;"><div style="font-size:14px;font-weight:600;">'+e.title+'</div><div style="font-size:12px;color:var(--text-muted);">Class Average: '+(e.passRate||'—')+'</div></div>' +
+              '<span class="badge badge-amber">Not Taken</span></div>'
+            ).join('');
           }
           return myResults.map(r => {
             const ex = exams.find(e => e.id === r.examId) || {};
@@ -12251,6 +12255,7 @@ function renderExams(filter) {
       actionBtns += '<button class="btn btn-sm btn-secondary" style="margin-left:4px;" onclick="viewExamResults('+idx+')">Results ('+resultsForExam.length+')</button>' +
         '<button class="btn btn-sm btn-secondary" style="margin-left:4px;" onclick="editExam('+idx+')" title="Edit exam">Edit</button>';
     }
+    actionBtns += '<button class="btn btn-sm" style="margin-left:4px;background:#e74c3c;color:#fff;border:none;border-radius:var(--radius-sm);cursor:pointer;" onclick="deleteExam('+idx+')" title="Delete exam">✕</button>';
     return '<tr><td><strong>'+e.title+'</strong>'+(hasQuestions?'<br><span style="font-size:11px;color:var(--green);">✓ Questions added</span>':'')+'</td><td>'+e.course+'</td><td>'+e.date+' @ '+e.time+'</td><td>'+e.duration+' min</td><td>'+qCount+'</td><td><span class="badge '+(e.status==='upcoming'?'badge-blue':e.status==='active'?'badge-red':'badge-green')+'"><span class="badge-dot"></span>'+(e.status==='active'?'In Progress':e.status==='completed'?'Completed ✓':'Scheduled')+'</span>'+(e.passRate?'<br><span style="font-size:11px;color:var(--text-muted);">Pass: '+e.passRate+'</span>':'')+'</td><td>'+actionBtns+'</td></tr>';
   }).join('');
 }
@@ -12315,6 +12320,9 @@ function renderInstructorExams(filter) {
       if(isOwner) {
         actionBtns += '<button class="btn btn-sm btn-secondary" style="margin-left:4px;" onclick="editExam('+idx+')" title="Edit exam">Edit</button>';
       }
+    }
+    if(isOwner) {
+      actionBtns += '<button class="btn btn-sm" style="margin-left:4px;background:#e74c3c;color:#fff;border:none;border-radius:var(--radius-sm);cursor:pointer;" onclick="deleteExam('+idx+')" title="Delete exam">✕</button>';
     }
     return '<tr><td><strong>'+e.title+'</strong>'+(hasQuestions?'<br><span style="font-size:11px;color:var(--green);">✓ Questions added</span>':'')+createdByLabel+'</td><td>'+e.course+'</td><td>'+e.date+' @ '+e.time+'</td><td>'+e.duration+' min</td><td>'+qCount+'</td><td><span class="badge '+(e.status==='upcoming'?'badge-blue':e.status==='active'?'badge-red':'badge-green')+'"><span class="badge-dot"></span>'+(e.status==='active'?'In Progress':e.status==='completed'?'Completed ✓':'Scheduled')+'</span>'+(e.passRate?'<br><span style="font-size:11px;color:var(--text-muted);">Pass: '+e.passRate+'</span>':'')+'</td><td>'+actionBtns+'</td></tr>';
   }).join('') || '<tr><td colspan="7" style="text-align:center;color:var(--text-muted);padding:24px;">No '+filter+' exams'+(courseFilter?' for '+courseFilter:'')+'</td></tr>';
@@ -12531,6 +12539,24 @@ function completeExam(idx) {
   showToast('Exam "'+e.title+'" marked as completed');
   addNotification('Exam completed: "' + e.title + '"' + (exams[idx].passRate ? ' — pass rate: ' + exams[idx].passRate : ''), 'exam', null, ['admin','instructor']);
   saveState();
+}
+
+function deleteExam(idx) {
+  var e = exams[idx];
+  if (!e) return;
+  var resultsCount = examResults.filter(function(r) { return r.examId === e.id; }).length;
+  var msg = 'Are you sure you want to delete "' + e.title + '"?';
+  if (resultsCount > 0) {
+    msg += '\n\nThis exam has ' + resultsCount + ' student result(s) that will also be deleted.';
+  }
+  if (!confirm(msg)) return;
+  var examId = e.id;
+  exams.splice(idx, 1);
+  // Remove associated exam results
+  examResults = examResults.filter(function(r) { return r.examId !== examId; });
+  saveState();
+  renderExams('upcoming');
+  showToast('Exam "' + e.title + '" deleted');
 }
 
 function viewExamResults(idx) {
