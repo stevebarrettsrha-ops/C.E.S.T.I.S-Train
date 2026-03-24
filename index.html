@@ -11814,6 +11814,8 @@ function addStudent() {
 function renderSkills() {
   const grid = document.getElementById('skillsGrid');
   if(!grid) return;
+  // Refresh material/student counts from live data before rendering
+  updateSkillAreaCounts();
   var isAdmin = currentRole === 'admin';
   grid.innerHTML = skillAreas.map(function(s) {
     var adminBtns = isAdmin ? '<div style="display:flex;gap:6px;margin-top:8px;justify-content:center;" onclick="event.stopPropagation()"><button class="btn btn-sm btn-secondary" onclick="openEditCentre('+s.id+')" style="font-size:11px;padding:3px 8px;">✎ Edit</button><button class="btn btn-sm" style="background:#e74c3c;color:#fff;font-size:11px;padding:3px 8px;border:none;border-radius:var(--radius-sm);cursor:pointer;" onclick="openDeleteCentre('+s.id+')">✕ Delete</button></div>' : '';
@@ -11825,10 +11827,69 @@ function showSkillDetail(id) {
   document.getElementById('trainingOverview').style.display='none';
   const d = document.getElementById('skillDetailPage');
   d.style.display='block';
-  const mats = [{t:'📹 Video Lectures',items:['Introduction','Safety & PPE','Core Techniques Pt.1','Core Techniques Pt.2','Advanced Methods']},{t:'📄 Study Guides',items:['Syllabus','Theory Handbook','Assessment Guide','Exam Notes']},{t:'📝 Worksheets',items:['Exercise Set 1','Exercise Set 2','Self-Assessment','Revision Qs']},{t:'📊 Rubrics',items:['Practical Rubric','Exam Blueprint','Portfolio Requirements']}];
+
+  // Filter driveResources that belong to this training centre's course
+  var courseResources = driveResources.filter(function(r) {
+    if (!r.course) return false;
+    return r.course.toLowerCase() === skill.name.toLowerCase() ||
+      skill.name.toLowerCase().indexOf(r.course.toLowerCase().split(' ')[0]) !== -1 ||
+      r.course.toLowerCase().indexOf(skill.name.split(' ')[0].toLowerCase()) !== -1;
+  });
+
+  // Group resources by category
+  var catConfig = [
+    {key:'video', label:'📹 Video Lectures', icon:'📹'},
+    {key:'document', label:'📄 Study Guides & Documents', icon:'📄'},
+    {key:'worksheet', label:'📝 Worksheets', icon:'📝'}
+  ];
+
+  // Compute pass rate from students enrolled in this course
+  var courseStudents = students.filter(function(s) {
+    return s.course && (s.course.toLowerCase() === skill.name.toLowerCase() ||
+      skill.name.toLowerCase().indexOf(s.course.toLowerCase().split(' ')[0]) !== -1);
+  });
+  var passRate = courseStudents.length > 0
+    ? Math.round(courseStudents.filter(function(s) { return s.stage === 'certified' || s.stage === 'collected' || parseFloat(s.gpa) >= 2.0; }).length / courseStudents.length * 100)
+    : 0;
+
+  var materialsHtml = '';
+  var hasAnyResources = false;
+  catConfig.forEach(function(cat) {
+    var items = courseResources.filter(function(r) { return r.category === cat.key; });
+    if (items.length === 0) return;
+    hasAnyResources = true;
+    materialsHtml += '<div class="card"><div class="card-header"><h3>' + cat.label + '</h3><span style="font-size:12px;color:var(--text-muted);">' + items.length + ' item' + (items.length !== 1 ? 's' : '') + '</span></div><ul class="material-list">';
+    items.forEach(function(r) {
+      var dateStr = r.uploadedAt ? 'Added ' + new Date(r.uploadedAt).toLocaleDateString() : '';
+      var openBtn = '';
+      if (r.url) {
+        openBtn = '<button class="btn btn-sm btn-secondary" onclick="window.open(\'' + r.url.replace(/'/g, "\\'") + '\',\'_blank\')">' + (r.category === 'video' ? '▶ Play' : 'Open') + '</button>';
+      }
+      materialsHtml += '<li class="material-item">' +
+        '<div class="material-icon" style="background:' + skill.color + '22;color:' + skill.color + ';">' + cat.icon + '</div>' +
+        '<div style="flex:1;">' +
+          '<div style="font-size:13.5px;font-weight:600;">' + r.name + '</div>' +
+          '<div style="font-size:11px;color:var(--text-muted);">' +
+            (r.resourceId ? '<span style="background:var(--accent-dim);color:var(--accent);padding:1px 8px;border-radius:10px;font-size:10px;font-weight:700;font-family:monospace;margin-right:6px;">' + r.resourceId + '</span>' : '') +
+            (r.format ? r.format + ' &bull; ' : '') + dateStr +
+            (r.description ? ' &bull; ' + r.description : '') +
+          '</div>' +
+        '</div>' + openBtn + '</li>';
+    });
+    materialsHtml += '</ul></div>';
+  });
+
+  if (!hasAnyResources) {
+    materialsHtml = '<div class="card" style="text-align:center;padding:40px;">' +
+      '<div style="font-size:48px;opacity:0.3;margin-bottom:12px;">📁</div>' +
+      '<h3 style="color:var(--text-muted);margin-bottom:8px;">No Resources Yet</h3>' +
+      '<p style="color:var(--text-muted);font-size:13px;">Resources added in the Resource Manager for "' + skill.name + '" will appear here.</p>' +
+      '</div>';
+  }
+
   d.innerHTML = `<div style="display:flex;align-items:center;gap:16px;margin-bottom:24px;"><button style="background:rgba(255,255,255,0.06);border:1px solid var(--border-light);color:var(--text-secondary);width:36px;height:36px;border-radius:var(--radius-sm);display:flex;align-items:center;justify-content:center;cursor:pointer;" onclick="backToSkills()">←</button><div class="skill-icon" style="background:${skill.color}22;color:${skill.color};width:48px;height:48px;border-radius:12px;display:flex;align-items:center;justify-content:center;font-size:22px;">${skill.icon}</div><div><h2 style="font-size:22px;">${skill.name}</h2><p style="font-size:13px;color:var(--text-muted);">${skill.desc}</p></div></div>
-  <div class="stats-grid stats-grid-4" style="margin-bottom:24px;"><div class="stat-card"><div class="stat-value" style="font-size:22px;">${skill.students}</div><div class="stat-label">Students</div></div><div class="stat-card"><div class="stat-value" style="font-size:22px;">${skill.materials}</div><div class="stat-label">Materials</div></div><div class="stat-card"><div class="stat-value" style="font-size:22px;">L1-3</div><div class="stat-label">Levels</div></div><div class="stat-card"><div class="stat-value" style="font-size:22px;">78%</div><div class="stat-label">Pass Rate</div></div></div>
-  ${mats.map(mt=>`<div class="card"><div class="card-header"><h3>${mt.t}</h3></div><ul class="material-list">${mt.items.map(item=>`<li class="material-item"><div class="material-icon" style="background:${skill.color}22;color:${skill.color};">${mt.t.split(' ')[0]}</div><div style="flex:1;"><div style="font-size:13.5px;">${item}</div><div style="font-size:11px;color:var(--text-muted);">Updated ${Math.floor(Math.random()*14)+1} days ago</div></div><button class="btn btn-sm btn-secondary">Open</button></li>`).join('')}</ul></div>`).join('')}`;
+  <div class="stats-grid stats-grid-4" style="margin-bottom:24px;"><div class="stat-card"><div class="stat-value" style="font-size:22px;">${skill.students}</div><div class="stat-label">Students</div></div><div class="stat-card"><div class="stat-value" style="font-size:22px;">${courseResources.length}</div><div class="stat-label">Materials</div></div><div class="stat-card"><div class="stat-value" style="font-size:22px;">L1-3</div><div class="stat-label">Levels</div></div><div class="stat-card"><div class="stat-value" style="font-size:22px;">${passRate}%</div><div class="stat-label">Pass Rate</div></div></div>
+  ${materialsHtml}`;
 }
 function backToSkills() { document.getElementById('trainingOverview').style.display='block'; document.getElementById('skillDetailPage').style.display='none'; }
 
