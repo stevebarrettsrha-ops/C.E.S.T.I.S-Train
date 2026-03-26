@@ -11346,41 +11346,95 @@ function renderInstructorCustomResources() {
   const catLabels = {video:'Video Lectures',guide:'Study Guides & Handbooks',worksheet:'Worksheets & Assignments',rubric:'Assessment Rubrics'};
   const catIcons = {video:'📹',guide:'📄',worksheet:'📝',rubric:'📊'};
 
+  // Also get admin-uploaded drive resources for this instructor's course
+  var adminResources = driveResources.filter(function(r) {
+    if (!r.course || !ins?.course) return false;
+    return r.course === ins.course ||
+      ins.course.toLowerCase().indexOf(r.course.toLowerCase().split(' ')[0]) !== -1 ||
+      r.course.toLowerCase().indexOf(ins.course.toLowerCase().split(' ')[0]) !== -1;
+  });
+
   var iNoResMsg = document.getElementById('instructorNoResourcesMsg');
-  if(myResources.length === 0) {
+  if(myResources.length === 0 && adminResources.length === 0) {
     container.innerHTML = '';
     if(iNoResMsg) iNoResMsg.style.display = '';
     return;
   }
   if(iNoResMsg) iNoResMsg.style.display = 'none';
 
-  // Group by category
-  const grouped = {};
-  myResources.forEach(function(r) {
-    var key = r.category || 'guide';
-    if(!grouped[key]) grouped[key] = [];
-    grouped[key].push(r);
-  });
-
   var html = '';
-  Object.keys(grouped).forEach(function(cat) {
-    html += '<div class="card" style="margin-bottom:12px;">' +
-      '<div class="card-header"><h3>' + (catIcons[cat]||'📁') + ' ' + (catLabels[cat]||cat) + ' (Custom)</h3><span style="font-size:12px;color:var(--text-muted);">' + grouped[cat].length + ' items</span></div>' +
-      '<ul class="material-list">';
-    grouped[cat].forEach(function(r) {
-      var icon = r.isFolder ? '📁' : (catIcons[r.category]||'📄');
-      var dateStr = r.createdAt ? new Date(r.createdAt).toLocaleDateString() : 'Recently';
-      html += '<li class="material-item">' +
-        '<div class="material-icon" style="background:var(--accent-dim);color:var(--accent);">' + icon + '</div>' +
-        '<div style="flex:1;"><div style="font-size:13.5px;">' + r.name + '</div>' +
-        '<div style="font-size:11px;color:var(--text-muted);">Added ' + dateStr + ' &bull; ' + r.type + (r.description && r.description !== 'Folder' ? ' &bull; ' + r.description : '') + '</div></div>';
-      if(r.url) {
-        html += '<button class="btn btn-sm btn-secondary" onclick="window.open(\'' + r.url.replace(/'/g,"\\'") + '\',\'_blank\')">' + (r.type==='Video'?'▶ Play':'Open') + '</button>';
-      }
-      html += '<button class="btn btn-sm btn-danger" style="margin-left:4px;" onclick="deleteResource(\'' + r.id + '\')">✕</button></li>';
+
+  // Render admin-uploaded drive resources first
+  if (adminResources.length > 0) {
+    var adminCatIcons = { video:'📹', document:'📄', worksheet:'📝' };
+    var adminCatLabels = { video:'Video Lectures', document:'Documents', worksheet:'Worksheets' };
+    var adminGrouped = {};
+    adminResources.forEach(function(r) {
+      var key = r.category || 'document';
+      if (!adminGrouped[key]) adminGrouped[key] = [];
+      adminGrouped[key].push(r);
     });
-    html += '</ul></div>';
-  });
+
+    html += '<div style="margin-bottom:16px;"><h3 style="font-size:15px;color:var(--text-secondary);margin-bottom:10px;">📚 Admin-Uploaded Resources <span style="font-size:12px;font-weight:400;color:var(--accent);background:var(--accent-dim);padding:2px 10px;border-radius:10px;margin-left:6px;">' + adminResources.length + ' items</span></h3>';
+    Object.keys(adminGrouped).forEach(function(cat) {
+      html += '<div class="card" style="margin-bottom:12px;border-left:3px solid var(--accent);">' +
+        '<div class="card-header"><h3>' + (adminCatIcons[cat]||'📁') + ' ' + (adminCatLabels[cat]||cat) + ' <span style="font-size:11px;font-weight:400;color:var(--accent);background:var(--accent-dim);padding:2px 8px;border-radius:10px;margin-left:6px;">☁ Drive</span></h3><span style="font-size:12px;color:var(--text-muted);">' + adminGrouped[cat].length + ' items</span></div>' +
+        '<ul class="material-list">';
+      adminGrouped[cat].forEach(function(r) {
+        var dateStr = r.uploadedAt ? new Date(r.uploadedAt).toLocaleDateString() : 'Recently';
+        html += '<li class="material-item">' +
+          '<div class="material-icon" style="background:var(--accent-dim);color:var(--accent);">' + (adminCatIcons[r.category]||'📄') + '</div>' +
+          '<div style="flex:1;">' +
+            '<div style="font-size:13.5px;">' + r.name + '</div>' +
+            '<div style="font-size:11px;color:var(--text-muted);">' +
+              '<span style="background:var(--accent-dim);color:var(--accent);padding:1px 6px;border-radius:8px;font-size:10px;font-weight:700;font-family:monospace;margin-right:4px;">' + r.resourceId + '</span>' +
+              (adminCatLabels[r.category]||r.category) + ' &bull; ' + r.format + ' &bull; Added ' + dateStr +
+              (r.description ? ' &bull; ' + r.description : '') +
+            '</div>' +
+          '</div>';
+        if (r.url) {
+          html += '<button class="btn btn-sm btn-secondary" onclick="window.open(\'' + r.url.replace(/'/g, "\\'") + '\',\'_blank\')">' + (r.category==='video'?'▶ Play':'Open') + '</button>';
+        }
+        html += '</li>';
+      });
+      html += '</ul></div>';
+    });
+    html += '</div>';
+  }
+
+  // Render instructor's own custom resources
+  if (myResources.length > 0) {
+    // Group by category
+    const grouped = {};
+    myResources.forEach(function(r) {
+      var key = r.category || 'guide';
+      if(!grouped[key]) grouped[key] = [];
+      grouped[key].push(r);
+    });
+
+    if (adminResources.length > 0) {
+      html += '<h3 style="font-size:15px;color:var(--text-secondary);margin-bottom:10px;">📝 My Uploaded Resources <span style="font-size:12px;font-weight:400;color:var(--green);background:var(--green-dim);padding:2px 10px;border-radius:10px;margin-left:6px;">' + myResources.length + ' items</span></h3>';
+    }
+
+    Object.keys(grouped).forEach(function(cat) {
+      html += '<div class="card" style="margin-bottom:12px;">' +
+        '<div class="card-header"><h3>' + (catIcons[cat]||'📁') + ' ' + (catLabels[cat]||cat) + ' (Custom)</h3><span style="font-size:12px;color:var(--text-muted);">' + grouped[cat].length + ' items</span></div>' +
+        '<ul class="material-list">';
+      grouped[cat].forEach(function(r) {
+        var icon = r.isFolder ? '📁' : (catIcons[r.category]||'📄');
+        var dateStr = r.createdAt ? new Date(r.createdAt).toLocaleDateString() : 'Recently';
+        html += '<li class="material-item">' +
+          '<div class="material-icon" style="background:var(--accent-dim);color:var(--accent);">' + icon + '</div>' +
+          '<div style="flex:1;"><div style="font-size:13.5px;">' + r.name + '</div>' +
+          '<div style="font-size:11px;color:var(--text-muted);">Added ' + dateStr + ' &bull; ' + r.type + (r.description && r.description !== 'Folder' ? ' &bull; ' + r.description : '') + '</div></div>';
+        if(r.url) {
+          html += '<button class="btn btn-sm btn-secondary" onclick="window.open(\'' + r.url.replace(/'/g,"\\'") + '\',\'_blank\')">' + (r.type==='Video'?'▶ Play':'Open') + '</button>';
+        }
+        html += '<button class="btn btn-sm btn-danger" style="margin-left:4px;" onclick="deleteResource(\'' + r.id + '\')">✕</button></li>';
+      });
+      html += '</ul></div>';
+    });
+  }
 
   container.innerHTML = html;
 }
@@ -11643,14 +11697,15 @@ function renderAdminResources() {
     return true;
   });
 
-  // Update stats
+  // Update stats (include both admin drive and instructor resources)
+  var allRes = driveResources.concat(instructorResources);
   var el;
-  el = document.getElementById('arStatTotal'); if(el) el.textContent = driveResources.length;
-  el = document.getElementById('arStatVideos'); if(el) el.textContent = driveResources.filter(r=>r.category==='video').length;
-  el = document.getElementById('arStatDocs'); if(el) el.textContent = driveResources.filter(r=>r.category==='document').length;
-  el = document.getElementById('arStatWorksheets'); if(el) el.textContent = driveResources.filter(r=>r.category==='worksheet').length;
+  el = document.getElementById('arStatTotal'); if(el) el.textContent = allRes.length;
+  el = document.getElementById('arStatVideos'); if(el) el.textContent = allRes.filter(r=>r.category==='video').length;
+  el = document.getElementById('arStatDocs'); if(el) el.textContent = allRes.filter(r=>r.category==='document'||r.category==='guide').length;
+  el = document.getElementById('arStatWorksheets'); if(el) el.textContent = allRes.filter(r=>r.category==='worksheet').length;
 
-  if (filtered.length === 0) {
+  if (filtered.length === 0 && instructorResources.length === 0) {
     container.innerHTML = '<div class="card" style="text-align:center;padding:40px;"><div style="font-size:48px;opacity:0.3;margin-bottom:12px;">📁</div><h3 style="color:var(--text-muted);margin-bottom:8px;">No Resources Found</h3><p style="color:var(--text-muted);font-size:13px;">Click "+ Upload Resource to Drive" to add your first resource.</p></div>';
     return;
   }
@@ -11698,6 +11753,55 @@ function renderAdminResources() {
     html += '</ul></div>';
   });
 
+  // Also render instructor-uploaded resources
+  var instrRes = instructorResources.filter(function(r) {
+    if (filterCourse !== 'all' && r.course !== filterCourse) return false;
+    if (filterType !== 'all' && r.category !== filterType) return false;
+    if (searchTerm && r.name.toLowerCase().indexOf(searchTerm) === -1 && (r.description||'').toLowerCase().indexOf(searchTerm) === -1) return false;
+    return true;
+  });
+
+  if (instrRes.length > 0) {
+    var instrCatIcons = {video:'📹',guide:'📄',worksheet:'📝',rubric:'📊'};
+    var instrCatLabels = {video:'Video',guide:'Document',worksheet:'Worksheet',rubric:'Assessment'};
+    html += '<div style="margin-top:24px;padding-top:16px;border-top:2px solid var(--border);"><h3 style="font-size:15px;color:var(--text-secondary);margin-bottom:12px;">👩‍🏫 Instructor-Uploaded Resources <span style="font-size:12px;font-weight:400;color:var(--green);background:var(--green-dim);padding:2px 10px;border-radius:10px;margin-left:6px;">' + instrRes.length + ' items</span></h3>';
+
+    // Group instructor resources by course
+    var instrGrouped = {};
+    instrRes.forEach(function(r) {
+      var key = r.course || 'Uncategorized';
+      if (!instrGrouped[key]) instrGrouped[key] = [];
+      instrGrouped[key].push(r);
+    });
+
+    Object.keys(instrGrouped).sort().forEach(function(courseName) {
+      var items = instrGrouped[courseName];
+      var sk = courseSkill(courseName);
+      html += '<div class="card" style="margin-bottom:16px;border-left:3px solid var(--green);">' +
+        '<div class="card-header"><h3>' + sk.icon + ' ' + courseName + ' <span style="font-size:11px;font-weight:400;color:var(--green);background:var(--green-dim);padding:2px 8px;border-radius:10px;margin-left:6px;">Instructor</span></h3><span style="font-size:12px;color:var(--text-muted);">' + items.length + ' resource' + (items.length!==1?'s':'') + '</span></div>' +
+        '<ul class="material-list">';
+      items.forEach(function(r) {
+        var dateStr = r.createdAt ? new Date(r.createdAt).toLocaleDateString() : 'Recently';
+        html += '<li class="material-item">' +
+          '<div class="material-icon" style="background:var(--green-dim);color:var(--green);">' + (instrCatIcons[r.category]||'📁') + '</div>' +
+          '<div style="flex:1;">' +
+            '<div style="font-size:13.5px;font-weight:600;">' + r.name + '</div>' +
+            '<div style="font-size:11px;color:var(--text-muted);">' +
+              (instrCatLabels[r.category]||r.category) + ' &bull; ' + (r.type||'') + ' &bull; Added ' + dateStr +
+              ' &bull; By: ' + (r.createdBy||'Instructor') +
+              (r.description && r.description !== 'Folder' ? ' &bull; ' + r.description : '') +
+            '</div>' +
+          '</div>';
+        if (r.url) {
+          html += '<button class="btn btn-sm btn-secondary" onclick="window.open(\'' + r.url.replace(/'/g, "\\'") + '\',\'_blank\')">' + (r.type==='Video'?'▶ Play':'Open') + '</button>';
+        }
+        html += '</li>';
+      });
+      html += '</ul></div>';
+    });
+    html += '</div>';
+  }
+
   container.innerHTML = html;
 }
 
@@ -11740,21 +11844,32 @@ function renderStudentDriveResources() {
 
   var searchTerm = (document.getElementById('sResSearch')?.value || '').toLowerCase().trim();
 
-  // Get resources for this student's course
-  var myResources = driveResources.filter(function(r) {
-    // Match by course — try matching the student's course to the resource's course
-    var courseMatch = false;
-    if (r.course && s.course) {
-      courseMatch = s.course.toLowerCase().indexOf(r.course.toLowerCase().split(' ')[0]) !== -1 || r.course.toLowerCase().indexOf(s.course.toLowerCase().split(' ')[0]) !== -1 || r.course === s.course;
-    }
-    if (!courseMatch) return false;
+  // Helper to match course names
+  function courseMatches(resCourse, studentCourse) {
+    if (!resCourse || !studentCourse) return false;
+    return studentCourse.toLowerCase().indexOf(resCourse.toLowerCase().split(' ')[0]) !== -1 ||
+      resCourse.toLowerCase().indexOf(studentCourse.toLowerCase().split(' ')[0]) !== -1 ||
+      resCourse === studentCourse;
+  }
+
+  // Get admin drive resources for this student's course
+  var myDriveResources = driveResources.filter(function(r) {
+    if (!courseMatches(r.course, s.course)) return false;
     if (_sResFilter !== 'all' && r.category !== _sResFilter) return false;
     if (searchTerm && r.name.toLowerCase().indexOf(searchTerm) === -1 && r.resourceId.toLowerCase().indexOf(searchTerm) === -1) return false;
     return true;
   });
 
+  // Get instructor-uploaded resources for this student's course
+  var myInstructorResources = instructorResources.filter(function(r) {
+    if (!courseMatches(r.course, s.course)) return false;
+    if (_sResFilter !== 'all' && r.category !== _sResFilter) return false;
+    if (searchTerm && r.name.toLowerCase().indexOf(searchTerm) === -1) return false;
+    return true;
+  });
+
   var noResMsg = document.getElementById('studentNoResourcesMsg');
-  if (myResources.length === 0) {
+  if (myDriveResources.length === 0 && myInstructorResources.length === 0) {
     container.innerHTML = '';
     if (noResMsg) noResMsg.style.display = '';
     return;
@@ -11762,39 +11877,75 @@ function renderStudentDriveResources() {
   if (noResMsg) noResMsg.style.display = 'none';
 
   var sk = skillAreas.find(function(sk) { return s.course.toLowerCase().indexOf(sk.name.split(' ')[0].toLowerCase()) !== -1; }) || skillAreas[0];
-  var catIcons = { video:'📹', document:'📄', worksheet:'📝' };
-  var catLabels = { video:'Video Lectures', document:'Documents', worksheet:'Worksheets' };
-
-  // Group by category
-  var grouped = {};
-  myResources.forEach(function(r) {
-    var key = r.category || 'document';
-    if (!grouped[key]) grouped[key] = [];
-    grouped[key].push(r);
-  });
+  var catIcons = { video:'📹', document:'📄', worksheet:'📝', guide:'📄', rubric:'📊' };
+  var catLabels = { video:'Video Lectures', document:'Documents', worksheet:'Worksheets', guide:'Study Guides', rubric:'Assessments' };
 
   var html = '';
-  Object.keys(grouped).forEach(function(cat) {
-    html += '<div class="card" style="margin-bottom:12px;border-left:3px solid var(--accent);">' +
-      '<div class="card-header"><h3>' + (catIcons[cat]||'📁') + ' ' + (catLabels[cat]||cat) + ' <span style="font-size:12px;font-weight:400;color:var(--accent);background:var(--accent-dim);padding:2px 10px;border-radius:10px;margin-left:6px;">☁ Drive</span></h3><span style="font-size:12px;color:var(--text-muted);">' + grouped[cat].length + ' items</span></div>' +
-      '<ul class="material-list">';
-    grouped[cat].forEach(function(r) {
-      html += '<li class="material-item">' +
-        '<div class="material-icon" style="background:' + sk.color + '22;color:' + sk.color + ';">' + (catIcons[r.category]||'📄') + '</div>' +
-        '<div style="flex:1;">' +
-          '<div style="font-size:13.5px;">' + r.name + '</div>' +
-          '<div style="font-size:11px;color:var(--text-muted);">' +
-            '<span style="background:var(--accent-dim);color:var(--accent);padding:1px 6px;border-radius:8px;font-size:10px;font-weight:700;font-family:monospace;margin-right:4px;">' + r.resourceId + '</span>' +
-            'Course material &bull; ' + r.format +
-          '</div>' +
-        '</div>';
-      if (r.url) {
-        html += '<button class="btn btn-sm btn-secondary" onclick="window.open(\'' + r.url.replace(/'/g, "\\'") + '\',\'_blank\')">' + (r.category==='video'?'▶ Play':'Download') + '</button>';
-      }
-      html += '</li>';
+
+  // Render admin drive resources
+  if (myDriveResources.length > 0) {
+    var grouped = {};
+    myDriveResources.forEach(function(r) {
+      var key = r.category || 'document';
+      if (!grouped[key]) grouped[key] = [];
+      grouped[key].push(r);
     });
-    html += '</ul></div>';
-  });
+
+    Object.keys(grouped).forEach(function(cat) {
+      html += '<div class="card" style="margin-bottom:12px;border-left:3px solid var(--accent);">' +
+        '<div class="card-header"><h3>' + (catIcons[cat]||'📁') + ' ' + (catLabels[cat]||cat) + ' <span style="font-size:12px;font-weight:400;color:var(--accent);background:var(--accent-dim);padding:2px 10px;border-radius:10px;margin-left:6px;">☁ Drive</span></h3><span style="font-size:12px;color:var(--text-muted);">' + grouped[cat].length + ' items</span></div>' +
+        '<ul class="material-list">';
+      grouped[cat].forEach(function(r) {
+        html += '<li class="material-item">' +
+          '<div class="material-icon" style="background:' + sk.color + '22;color:' + sk.color + ';">' + (catIcons[r.category]||'📄') + '</div>' +
+          '<div style="flex:1;">' +
+            '<div style="font-size:13.5px;">' + r.name + '</div>' +
+            '<div style="font-size:11px;color:var(--text-muted);">' +
+              '<span style="background:var(--accent-dim);color:var(--accent);padding:1px 6px;border-radius:8px;font-size:10px;font-weight:700;font-family:monospace;margin-right:4px;">' + r.resourceId + '</span>' +
+              'Course material &bull; ' + r.format +
+            '</div>' +
+          '</div>';
+        if (r.url) {
+          html += '<button class="btn btn-sm btn-secondary" onclick="window.open(\'' + r.url.replace(/'/g, "\\'") + '\',\'_blank\')">' + (r.category==='video'?'▶ Play':'Download') + '</button>';
+        }
+        html += '</li>';
+      });
+      html += '</ul></div>';
+    });
+  }
+
+  // Render instructor-uploaded resources
+  if (myInstructorResources.length > 0) {
+    var instrGrouped = {};
+    myInstructorResources.forEach(function(r) {
+      var key = r.category || 'guide';
+      if (!instrGrouped[key]) instrGrouped[key] = [];
+      instrGrouped[key].push(r);
+    });
+
+    Object.keys(instrGrouped).forEach(function(cat) {
+      html += '<div class="card" style="margin-bottom:12px;border-left:3px solid var(--green);">' +
+        '<div class="card-header"><h3>' + (catIcons[cat]||'📁') + ' ' + (catLabels[cat]||cat) + ' <span style="font-size:12px;font-weight:400;color:var(--green);background:var(--green-dim);padding:2px 10px;border-radius:10px;margin-left:6px;">👩‍🏫 Instructor</span></h3><span style="font-size:12px;color:var(--text-muted);">' + instrGrouped[cat].length + ' items</span></div>' +
+        '<ul class="material-list">';
+      instrGrouped[cat].forEach(function(r) {
+        var dateStr = r.createdAt ? new Date(r.createdAt).toLocaleDateString() : 'Recently';
+        html += '<li class="material-item">' +
+          '<div class="material-icon" style="background:var(--green-dim);color:var(--green);">' + (catIcons[r.category]||'📄') + '</div>' +
+          '<div style="flex:1;">' +
+            '<div style="font-size:13.5px;">' + r.name + '</div>' +
+            '<div style="font-size:11px;color:var(--text-muted);">' +
+              (r.type||'Resource') + ' &bull; Added ' + dateStr +
+              (r.description && r.description !== 'Folder' ? ' &bull; ' + r.description : '') +
+            '</div>' +
+          '</div>';
+        if (r.url) {
+          html += '<button class="btn btn-sm btn-secondary" onclick="window.open(\'' + r.url.replace(/'/g, "\\'") + '\',\'_blank\')">' + (r.type==='Video'?'▶ Play':'Download') + '</button>';
+        }
+        html += '</li>';
+      });
+      html += '</ul></div>';
+    });
+  }
 
   container.innerHTML = html;
 }
