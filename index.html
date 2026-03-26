@@ -9251,14 +9251,34 @@ async function vcStartCameraPreview() {
 function toggleLobbyDevice(kind) {
   if(!localStream) return;
   const btn = document.getElementById(kind==='audio' ? 'vc-lobby-mic' : 'vc-lobby-cam');
-  const tracks = kind==='audio' ? localStream.getAudioTracks() : localStream.getVideoTracks();
-  tracks.forEach(t => t.enabled = !t.enabled);
-  btn.classList.toggle('active');
-  if(kind==='video') {
+  if(kind==='audio') {
+    const tracks = localStream.getAudioTracks();
+    tracks.forEach(t => t.enabled = !t.enabled);
+    btn.classList.toggle('active');
+  } else {
+    // Video: fully stop track to release camera hardware (turn off light)
     const vid = document.getElementById('vc-preview');
     const ph = document.getElementById('vc-preview-ph');
-    if(vid) vid.style.display = tracks[0]?.enabled ? '' : 'none';
-    if(ph) { ph.style.display = tracks[0]?.enabled ? 'none' : 'flex'; ph.innerHTML = '<div style="text-align:center;color:var(--text-muted);"><div style="font-size:48px;">&#x1F4F7;</div><div>Camera off</div></div>'; }
+    const existingTracks = localStream.getVideoTracks();
+    if(existingTracks.length > 0 && existingTracks[0].readyState === 'live') {
+      // Camera is on — stop it
+      existingTracks.forEach(function(t) { t.stop(); localStream.removeTrack(t); });
+      btn.classList.remove('active');
+      if(vid) vid.style.display = 'none';
+      if(ph) { ph.style.display = 'flex'; ph.innerHTML = '<div style="text-align:center;color:var(--text-muted);"><div style="font-size:48px;">&#x1F4F7;</div><div>Camera off</div></div>'; }
+    } else {
+      // Camera is off — re-acquire
+      navigator.mediaDevices.getUserMedia({video:{width:{ideal:1280},height:{ideal:720},facingMode:'user'}}).then(function(vidStream) {
+        var newTrack = vidStream.getVideoTracks()[0];
+        localStream.addTrack(newTrack);
+        if(vid) { vid.srcObject = localStream; vid.style.display = ''; vid.play().catch(function(){}); }
+        if(ph) ph.style.display = 'none';
+        btn.classList.add('active');
+      }).catch(function(err) {
+        console.warn('Could not re-acquire camera:', err);
+        if(ph) { ph.style.display = 'flex'; ph.innerHTML = '<div style="text-align:center;color:var(--text-muted);"><div style="font-size:48px;">&#x1F6AB;</div><div>Camera unavailable</div></div>'; }
+      });
+    }
   }
 }
 
@@ -10134,13 +10154,14 @@ function vcToggleMic() {
 }
 
 function vcToggleCam() {
+  var btn = document.getElementById('vc-cam-btn');
+  var lv = document.getElementById('vc-local-video');
+
   if(!localStream) {
     // Try to acquire video if we don't have a stream yet
-    navigator.mediaDevices.getUserMedia({video:{width:{ideal:1280},height:{ideal:720},facingMode:'user'}}).then(function(stream) {
+    navigator.mediaDevices.getUserMedia({video:{width:{ideal:1280},height:{ideal:720},facingMode:'user'},audio:{echoCancellation:true,noiseSuppression:true,autoGainControl:true}}).then(function(stream) {
       localStream = stream;
-      var lv = document.getElementById('vc-local-video');
-      if(lv) { lv.srcObject = localStream; lv.play().catch(function(){}); }
-      var btn = document.getElementById('vc-cam-btn');
+      if(lv) { lv.srcObject = localStream; lv.style.opacity = '1'; lv.play().catch(function(){}); }
       if(btn) btn.classList.add('active');
       showToast('Camera connected');
     }).catch(function(err) {
@@ -10148,27 +10169,29 @@ function vcToggleCam() {
     });
     return;
   }
-  var btn = document.getElementById('vc-cam-btn');
+
   var tracks = localStream.getVideoTracks();
-  if(tracks.length === 0) {
-    // No video track — try to add one
+  var hasLiveVideo = tracks.length > 0 && tracks[0].readyState === 'live';
+
+  if(hasLiveVideo) {
+    // Camera is on — fully stop the track to release hardware (turn off camera light)
+    tracks.forEach(function(t) { t.stop(); localStream.removeTrack(t); });
+    if(btn) btn.classList.remove('active');
+    if(lv) lv.style.opacity = '0.15';
+    showToast('Camera off');
+  } else {
+    // Camera is off — re-acquire a new video track
     navigator.mediaDevices.getUserMedia({video:{width:{ideal:1280},height:{ideal:720},facingMode:'user'}}).then(function(vidStream) {
       var newTrack = vidStream.getVideoTracks()[0];
       localStream.addTrack(newTrack);
       vcReplaceVideoTrackForAll(newTrack);
-      var lv = document.getElementById('vc-local-video');
-      if(lv) { lv.srcObject = localStream; lv.play().catch(function(){}); lv.style.opacity = '1'; }
+      if(lv) { lv.srcObject = localStream; lv.style.opacity = '1'; lv.play().catch(function(){}); }
       if(btn) btn.classList.add('active');
-      showToast('Camera connected');
+      showToast('Camera on');
     }).catch(function(err) {
-      showToast('Could not access camera');
+      showToast('Could not access camera: ' + (err.name === 'NotAllowedError' ? 'Permission denied' : err.message));
     });
-    return;
   }
-  tracks.forEach(function(t){t.enabled=!t.enabled;});
-  if(btn) btn.classList.toggle('active');
-  var lv = document.getElementById('vc-local-video');
-  if(lv) lv.style.opacity = tracks[0] && tracks[0].enabled ? '1' : '0.15';
 }
 
 async function vcToggleScreen() {
