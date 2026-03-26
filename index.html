@@ -3993,9 +3993,45 @@ body.vc-fullscreen-mode.vc-host-only-mode .video-grid .video-tile:not(.vc-hoston
       <div class="form-group"><label>Weight (%)</label><input type="number" class="form-control" id="assignWeight" value="10" min="1" max="100"></div>
     </div>
     <div class="form-group"><label>Instructions</label><textarea class="form-control" id="assignInstructions" placeholder="Assignment instructions for students..."></textarea></div>
+    <div class="form-group"><label>Attach Documents (optional)</label>
+      <div style="border:2px dashed var(--border);border-radius:var(--radius);padding:16px;text-align:center;cursor:pointer;" onclick="document.getElementById('assignFileInput').click()">
+        <div style="font-size:24px;margin-bottom:4px;">📎</div>
+        <div style="font-size:13px;color:var(--text-muted);">Click to attach PDF, DOC, XLSX, or other files</div>
+        <input type="file" id="assignFileInput" multiple accept=".pdf,.doc,.docx,.xls,.xlsx,.ppt,.pptx,.txt,.zip,.jpg,.png" style="display:none;" onchange="assignFileSelected(this)">
+      </div>
+      <div id="assignFileList" style="margin-top:8px;"></div>
+    </div>
+    <div class="form-group">
+      <label style="display:flex;align-items:center;gap:8px;cursor:pointer;">
+        <input type="checkbox" id="assignRequireSubmission" checked>
+        <span style="font-size:13px;">Require students to upload a submission</span>
+      </label>
+    </div>
     <div style="display:flex;gap:10px;justify-content:flex-end;margin-top:20px;">
       <button class="btn btn-secondary" onclick="closeModal('createAssignmentModal')">Cancel</button>
       <button class="btn btn-primary" onclick="createAssignment()">Create Assignment</button>
+    </div>
+  </div>
+</div>
+
+<!-- STUDENT SUBMISSION MODAL -->
+<div class="modal-overlay" id="submitAssignmentModal">
+  <div class="modal">
+    <div class="modal-header"><h3>Submit Assignment</h3><button class="modal-close" onclick="closeModal('submitAssignmentModal')">✕</button></div>
+    <input type="hidden" id="submitAssignId">
+    <div id="submitAssignTitle" style="font-size:15px;font-weight:600;margin-bottom:12px;"></div>
+    <div class="form-group"><label>Upload Your Work</label>
+      <div style="border:2px dashed var(--border);border-radius:var(--radius);padding:16px;text-align:center;cursor:pointer;" onclick="document.getElementById('submitFileInput').click()">
+        <div style="font-size:24px;margin-bottom:4px;">📤</div>
+        <div style="font-size:13px;color:var(--text-muted);">Click to upload your completed document(s)</div>
+        <input type="file" id="submitFileInput" multiple accept=".pdf,.doc,.docx,.xls,.xlsx,.ppt,.pptx,.txt,.zip,.jpg,.png" style="display:none;" onchange="submitFileSelected(this)">
+      </div>
+      <div id="submitFileList" style="margin-top:8px;"></div>
+    </div>
+    <div class="form-group"><label>Comment (optional)</label><textarea class="form-control" id="submitComment" placeholder="Add a note for your instructor..." rows="2"></textarea></div>
+    <div style="display:flex;gap:10px;justify-content:flex-end;margin-top:20px;">
+      <button class="btn btn-secondary" onclick="closeModal('submitAssignmentModal')">Cancel</button>
+      <button class="btn btn-primary" onclick="submitStudentAssignment()">Submit</button>
     </div>
   </div>
 </div>
@@ -4430,6 +4466,7 @@ let currentAttendanceDate = new Date().toISOString().split('T')[0];
 let classSessions = [];
 let adminMeetings = []; // Admin-only meetings (admin + admin staff)
 let instructorAssignments = [];
+let assignmentSubmissions = []; // Student submissions for assignments
 let instructorResources = [];
 let driveResources = []; // Admin-managed resources uploaded to Google Drive
 let studentProfiles = {};
@@ -4903,6 +4940,7 @@ function clearAllSessionData() {
   classSessions = [];
   adminMeetings = [];
   instructorAssignments = [];
+  assignmentSubmissions = [];
   instructorResources = [];
   driveResources = [];
   studentProfiles = {};
@@ -4942,6 +4980,7 @@ function saveState() {
     localStorage.setItem('voctrain_classSessions', JSON.stringify(classSessions));
     localStorage.setItem('voctrain_adminMeetings', JSON.stringify(adminMeetings));
     localStorage.setItem('voctrain_assignments', JSON.stringify(instructorAssignments));
+    localStorage.setItem('voctrain_submissions', JSON.stringify(assignmentSubmissions));
     localStorage.setItem('voctrain_resources', JSON.stringify(instructorResources));
     localStorage.setItem('voctrain_driveResources', JSON.stringify(driveResources));
     localStorage.setItem('voctrain_studentProfiles', JSON.stringify(studentProfiles));
@@ -4977,6 +5016,7 @@ function loadState() {
     const at = localStorage.getItem('voctrain_attendance');
     const cs = localStorage.getItem('voctrain_classSessions');
     const ia = localStorage.getItem('voctrain_assignments');
+    const asub = localStorage.getItem('voctrain_submissions');
     const ir = localStorage.getItem('voctrain_resources');
     const sp = localStorage.getItem('voctrain_studentProfiles');
     const ss = localStorage.getItem('voctrain_systemSettings');
@@ -4990,6 +5030,7 @@ function loadState() {
     var am = localStorage.getItem('voctrain_adminMeetings');
     if(am) adminMeetings = JSON.parse(am);
     if(ia) instructorAssignments = JSON.parse(ia);
+    if(asub) assignmentSubmissions = JSON.parse(asub);
     if(ir) instructorResources = JSON.parse(ir);
     const dr = localStorage.getItem('voctrain_driveResources');
     if(dr) driveResources = JSON.parse(dr);
@@ -6338,6 +6379,8 @@ function buildAdminSidebar() {
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/></svg>Training Centres</div>
     <div class="nav-item" data-page="a-resources" onclick="showPage('a-resources')">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/></svg>Resource Manager</div>
+    <div class="nav-item" data-page="a-assignments" onclick="showPage('a-assignments')">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 5H7a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V7a2 2 0 0 0-2-2h-2"/><rect x="9" y="3" width="6" height="4" rx="1"/><line x1="9" y1="12" x2="15" y2="12"/><line x1="9" y1="16" x2="13" y2="16"/></svg>Assignments</div>
     <div class="nav-item" data-page="exams" onclick="showPage('exams')">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg>Online Exams</div>
     <div class="nav-item" data-page="import-exam" onclick="showPage('import-exam')">
@@ -6514,8 +6557,10 @@ function showPage(pageId) {
   if(pageId === 'i-duties') iOnDutiesPageShow();
   if(pageId === 'verify-users') renderVerifyUsersPage();
   if(pageId === 'a-resources') renderAdminResources();
+  if(pageId === 'a-assignments') renderAdminAssignments();
   if(pageId === 'exams' || pageId === 'i-exams') renderInstructorExams();
   if(pageId === 's-resources') renderStudentDriveResources();
+  if(pageId === 's-progress') renderStudentAssignments();
   if(pageId === 'lms-chat') lmsChatOnPageShow('admin');
   if(pageId === 's-lms-chat') lmsChatOnPageShow('student');
   if(pageId === 'i-lms-chat') lmsChatOnPageShow('instructor');
@@ -7208,6 +7253,23 @@ function buildAdminPages() {
     <div id="adminResourcesList"></div>
   </section>
 
+  <!-- ADMIN ASSIGNMENTS ACTIVITY PAGE -->
+  <section class="page" id="page-a-assignments">
+    <div style="display:flex;gap:12px;margin-bottom:18px;flex-wrap:wrap;align-items:center;">
+      <select class="form-control" id="aAssignFilterCourse" style="width:220px;" onchange="renderAdminAssignments()">
+        <option value="all">All Programmes</option>
+      </select>
+      <input type="text" class="form-control" id="aAssignSearch" placeholder="Search assignments..." style="width:240px;" oninput="renderAdminAssignments()">
+    </div>
+    <div class="stats-grid stats-grid-4" style="margin-bottom:18px;">
+      <div class="stat-card"><div class="stat-icon" style="background:var(--blue-dim);color:var(--blue);">📋</div><div class="stat-value" id="aAssignStatTotal">0</div><div class="stat-label">Total Assignments</div></div>
+      <div class="stat-card"><div class="stat-icon" style="background:var(--green-dim);color:var(--green);">📤</div><div class="stat-value" id="aAssignStatSubmissions">0</div><div class="stat-label">Submissions</div></div>
+      <div class="stat-card"><div class="stat-icon" style="background:var(--accent-dim);color:var(--accent);">⭐</div><div class="stat-value" id="aAssignStatGraded">0</div><div class="stat-label">Graded</div></div>
+      <div class="stat-card"><div class="stat-icon" style="background:var(--red-dim);color:var(--red);">⏳</div><div class="stat-value" id="aAssignStatPending">0</div><div class="stat-label">Pending Review</div></div>
+    </div>
+    <div id="adminAssignmentsList"></div>
+  </section>
+
   <!-- SUPPORT MESSAGES PAGE -->
   <section class="page" id="page-support-messages">
     <div class="um-stats" id="supportStatsBar"></div>
@@ -7691,30 +7753,10 @@ function buildStudentPages() {
       }).join('')}
     </div>
 
-    <!-- Assignments -->
+    <!-- Assignments (dynamic from instructor-created assignments) -->
     <div class="card">
-      <div class="card-header"><h3>Assignments</h3><span style="font-size:13px;color:var(--text-muted);">${s.assignments}/${s.assignmentsTotal} completed</span></div>
-      <div class="table-wrapper"><table><thead><tr><th>Assignment</th><th>Due Date</th><th>Score</th><th>Status</th></tr></thead><tbody>
-        ${(function(){
-          var studentResults = examResults.filter(function(r){ return r.studentId === s.id; });
-          var assignmentList = [
-            {t:'Safety Assessment Quiz',d:'Feb 3',st:'graded'},
-            {t:'Tool Identification Test',d:'Feb 6',st:'graded'},
-            {t:'Theory Worksheet #1',d:'Feb 8',st:'graded'},
-            {t:'Practical Report #1',d:'Feb 10',st:'graded'},
-            {t:'Mid-Term Examination',d:'Feb 13',st:'graded'},
-            {t:'Practical Report #2',d:'Feb 17',st:'submitted'},
-            {t:'Workshop Portfolio',d:'Feb 22',st:'pending'},
-            {t:'Final Project',d:'Mar 5',st:'pending'}
-          ];
-          return assignmentList.map(function(a,i){
-            var matchResult = studentResults.find(function(r){ return r.examTitle && r.examTitle.toLowerCase().indexOf(a.t.split(' ')[0].toLowerCase()) !== -1; });
-            var sc = a.st === 'graded' ? (matchResult ? matchResult.score + '%' : (s.score || '\u2014')) : '\u2014';
-            if(a.t === 'Mid-Term Examination' && !matchResult) sc = s.score || '\u2014';
-            return '<tr><td>'+a.t+'</td><td>'+a.d+'</td><td style="font-weight:600;'+(sc!=='\u2014'?'color:var(--green)':'')+'">'+sc+'</td><td><span class="badge '+(a.st==='graded'?'badge-green':a.st==='submitted'?'badge-blue':'badge-amber')+'">'+(a.st==='graded'?'\u2713 Graded':a.st==='submitted'?'Submitted':'Pending')+'</span></td></tr>';
-          }).join('');
-        })()}
-      </tbody></table></div>
+      <div class="card-header"><h3>My Assignments</h3><span id="sAssignmentCount" style="font-size:13px;color:var(--text-muted);"></span></div>
+      <div id="studentAssignmentsList"></div>
     </div>
   </section>
 
@@ -7988,6 +8030,7 @@ function buildStudentPages() {
     document.getElementById('mainContent').innerHTML = '<div class="card" style="margin:40px;padding:40px;text-align:center;"><h3>Error loading student portal</h3><p style="color:var(--text-muted);margin-top:8px;">'+err.message+'</p><button class="btn btn-primary" style="margin-top:16px;" onclick="logout()">Go Back</button></div>';
   }
   renderStudentCalendar();
+  renderStudentAssignments();
 }
 
 // ============================== BUILD INSTRUCTOR PAGES ==============================
@@ -10709,6 +10752,42 @@ function deleteAdminMeeting(id) {
 }
 
 // ============================== ASSIGNMENT FUNCTIONS ==============================
+var _assignPendingFiles = [];
+
+function assignFileSelected(input) {
+  var listEl = document.getElementById('assignFileList');
+  if (!listEl) return;
+  for (var i = 0; i < input.files.length; i++) {
+    _assignPendingFiles.push(input.files[i]);
+  }
+  assignRenderFileList();
+}
+
+function assignRemovePendingFile(idx) {
+  _assignPendingFiles.splice(idx, 1);
+  assignRenderFileList();
+}
+
+function assignRenderFileList() {
+  var listEl = document.getElementById('assignFileList');
+  if (!listEl) return;
+  if (_assignPendingFiles.length === 0) { listEl.innerHTML = ''; return; }
+  listEl.innerHTML = _assignPendingFiles.map(function(f, i) {
+    var size = f.size < 1024 ? f.size + ' B' : f.size < 1048576 ? (f.size/1024).toFixed(1) + ' KB' : (f.size/1048576).toFixed(1) + ' MB';
+    return '<div style="display:flex;align-items:center;gap:8px;padding:6px 10px;background:var(--bg-input);border-radius:var(--radius-sm);margin-bottom:4px;">' +
+      '<span style="font-size:16px;">📄</span><span style="flex:1;font-size:12px;">' + f.name + ' <span style="color:var(--text-muted);">(' + size + ')</span></span>' +
+      '<button class="btn btn-sm btn-danger" style="padding:2px 8px;font-size:11px;" onclick="assignRemovePendingFile(' + i + ')">✕</button></div>';
+  }).join('');
+}
+
+function fileToDataUrl(file) {
+  return new Promise(function(resolve) {
+    var reader = new FileReader();
+    reader.onload = function(e) { resolve({ name: file.name, size: file.size, type: file.type, dataUrl: e.target.result }); };
+    reader.readAsDataURL(file);
+  });
+}
+
 function createAssignment() {
   const title = document.getElementById('assignTitle')?.value?.trim();
   const type = document.getElementById('assignType')?.value;
@@ -10716,39 +10795,51 @@ function createAssignment() {
   const maxPoints = parseInt(document.getElementById('assignMaxPoints')?.value) || 100;
   const weight = parseInt(document.getElementById('assignWeight')?.value) || 10;
   const instructions = document.getElementById('assignInstructions')?.value?.trim();
+  const requireSubmission = document.getElementById('assignRequireSubmission')?.checked !== false;
 
   if(!title) { showToast('Please enter an assignment title'); return; }
   if(!dueDate) { showToast('Please select a due date'); return; }
 
   const ins = currentInstructor;
-  const assignment = {
-    id: 'ASN-' + Date.now(),
-    title: title,
-    type: type,
-    course: ins?.course || 'General',
-    dueDate: dueDate,
-    maxPoints: maxPoints,
-    weight: weight,
-    instructions: instructions || '',
-    createdBy: ins?.name || 'Instructor',
-    createdAt: new Date().toISOString(),
-    grades: {}
-  };
 
-  instructorAssignments.push(assignment);
-  saveState();
-  closeModal('createAssignmentModal');
-  showToast('Assignment "' + title + '" created successfully');
-  addNotification('New assignment created: "' + title + '"', 'exam', null, ['instructor']);
+  // Convert attached files to data URLs for localStorage persistence
+  var filePromises = _assignPendingFiles.map(function(f) { return fileToDataUrl(f); });
 
-  // Reset form
-  document.getElementById('assignTitle').value = '';
-  document.getElementById('assignDueDate').value = '';
-  document.getElementById('assignMaxPoints').value = '100';
-  document.getElementById('assignWeight').value = '10';
-  document.getElementById('assignInstructions').value = '';
+  Promise.all(filePromises).then(function(attachments) {
+    const assignment = {
+      id: 'ASN-' + Date.now(),
+      title: title,
+      type: type,
+      course: ins?.course || 'General',
+      dueDate: dueDate,
+      maxPoints: maxPoints,
+      weight: weight,
+      instructions: instructions || '',
+      attachments: attachments,
+      requireSubmission: requireSubmission,
+      createdBy: ins?.name || 'Instructor',
+      createdAt: new Date().toISOString(),
+      grades: {}
+    };
 
-  renderInstructorGradebook();
+    instructorAssignments.push(assignment);
+    saveState();
+    closeModal('createAssignmentModal');
+    showToast('Assignment "' + title + '" created successfully');
+    addNotification('New assignment: "' + title + '" for ' + assignment.course + ' — Due: ' + dueDate, 'exam', null, ['admin','instructor','student']);
+
+    // Reset form
+    document.getElementById('assignTitle').value = '';
+    document.getElementById('assignDueDate').value = '';
+    document.getElementById('assignMaxPoints').value = '100';
+    document.getElementById('assignWeight').value = '10';
+    document.getElementById('assignInstructions').value = '';
+    document.getElementById('assignFileInput').value = '';
+    _assignPendingFiles = [];
+    assignRenderFileList();
+
+    renderInstructorGradebook();
+  });
 }
 
 function renderInstructorGradebook() {
@@ -10757,24 +10848,375 @@ function renderInstructorGradebook() {
   const ins = currentInstructor;
   const myAssignments = instructorAssignments.filter(a => a.course === ins?.course || a.createdBy === ins?.name);
   const typeLabels = {quiz:'Quiz',test:'Test',report:'Report',portfolio:'Portfolio',worksheet:'Worksheet',exam:'Exam',project:'Project'};
+  const typeIcons = {quiz:'📝',test:'📋',report:'📄',portfolio:'📂',worksheet:'📝',exam:'📝',project:'🔧'};
 
   if(myAssignments.length === 0) {
     container.innerHTML = '<p style="color:var(--text-muted);padding:16px;">No custom assignments created yet. Click "+ New Assignment" to create one.</p>';
     return;
   }
 
-  container.innerHTML = '<div class="table-wrapper"><table><thead><tr><th>Assignment</th><th>Type</th><th>Due Date</th><th>Max Points</th><th>Weight</th><th>Actions</th></tr></thead><tbody>' +
-    myAssignments.map(a => {
-      return '<tr><td><strong>' + a.title + '</strong></td><td>' + (typeLabels[a.type]||a.type) + '</td><td>' + a.dueDate + '</td><td>' + a.maxPoints + '</td><td>' + a.weight + '%</td><td><button class="btn btn-sm btn-danger" onclick="deleteAssignment(\''+a.id+'\')">Delete</button></td></tr>';
-    }).join('') +
-  '</tbody></table></div>';
+  var html = '';
+  myAssignments.forEach(function(a) {
+    var subs = assignmentSubmissions.filter(function(sub) { return sub.assignmentId === a.id; });
+    var isPastDue = a.dueDate && new Date(a.dueDate) < new Date();
+    var statusBadge = isPastDue ? '<span class="badge badge-red">Past Due</span>' : '<span class="badge badge-green">Active</span>';
+    var attachCount = (a.attachments && a.attachments.length) || 0;
+
+    html += '<div class="card" style="margin-bottom:12px;border-left:3px solid var(--accent);">' +
+      '<div class="card-header" style="flex-wrap:wrap;gap:8px;">' +
+        '<div style="flex:1;"><h3 style="font-size:15px;">' + (typeIcons[a.type]||'📝') + ' ' + a.title + '</h3>' +
+          '<div style="font-size:11px;color:var(--text-muted);margin-top:2px;">' + (typeLabels[a.type]||a.type) + ' &bull; Due: ' + a.dueDate + ' &bull; ' + a.maxPoints + ' pts &bull; ' + a.weight + '% weight</div>' +
+        '</div>' +
+        '<div style="display:flex;gap:6px;align-items:center;">' + statusBadge +
+          '<span class="badge badge-blue">' + subs.length + ' submission' + (subs.length!==1?'s':'') + '</span>' +
+          '<button class="btn btn-sm btn-danger" onclick="deleteAssignment(\'' + a.id + '\')">Delete</button>' +
+        '</div>' +
+      '</div>';
+
+    // Show instructions
+    if (a.instructions) {
+      html += '<div style="padding:8px 16px;font-size:12px;color:var(--text-secondary);border-bottom:1px solid var(--border);"><strong>Instructions:</strong> ' + a.instructions + '</div>';
+    }
+
+    // Show attachments
+    if (attachCount > 0) {
+      html += '<div style="padding:8px 16px;border-bottom:1px solid var(--border);">' +
+        '<div style="font-size:12px;font-weight:600;color:var(--text-secondary);margin-bottom:4px;">📎 Attached Documents (' + attachCount + ')</div>';
+      a.attachments.forEach(function(att) {
+        var size = att.size < 1024 ? att.size + ' B' : att.size < 1048576 ? (att.size/1024).toFixed(1) + ' KB' : (att.size/1048576).toFixed(1) + ' MB';
+        html += '<div style="display:inline-flex;align-items:center;gap:6px;background:var(--bg-input);padding:4px 10px;border-radius:var(--radius-sm);margin:2px 4px 2px 0;font-size:12px;">' +
+          '📄 ' + att.name + ' <span style="color:var(--text-muted);">(' + size + ')</span>' +
+          '<a href="' + att.dataUrl + '" download="' + att.name + '" class="btn btn-sm" style="padding:1px 6px;font-size:10px;background:var(--accent-dim);color:var(--accent);border:none;">Download</a></div>';
+      });
+      html += '</div>';
+    }
+
+    // Show submissions
+    if (subs.length > 0) {
+      html += '<div style="padding:8px 16px;"><div style="font-size:12px;font-weight:600;color:var(--text-secondary);margin-bottom:6px;">Student Submissions</div>';
+      subs.forEach(function(sub) {
+        var st = students.find(function(s) { return s.id === sub.studentId; });
+        var dateStr = new Date(sub.submittedAt).toLocaleDateString();
+        var gradeHtml = '';
+        if (a.grades && a.grades[sub.studentId] !== undefined) {
+          gradeHtml = '<span class="badge badge-green">' + a.grades[sub.studentId] + '/' + a.maxPoints + '</span>';
+        } else {
+          gradeHtml = '<input type="number" class="form-control" style="width:60px;height:28px;font-size:12px;display:inline-block;" placeholder="—" min="0" max="' + a.maxPoints + '" id="grade-' + a.id + '-' + sub.studentId + '">' +
+            '<button class="btn btn-sm btn-primary" style="padding:2px 8px;font-size:11px;margin-left:4px;" onclick="gradeSubmission(\'' + a.id + '\',\'' + sub.studentId + '\')">Grade</button>';
+        }
+        html += '<div style="display:flex;align-items:center;gap:10px;padding:6px 0;border-bottom:1px solid var(--border);">' +
+          '<div style="flex:1;font-size:12px;"><strong>' + (st ? st.name : sub.studentId) + '</strong> &bull; Submitted ' + dateStr + '</div>';
+        if (sub.files && sub.files.length > 0) {
+          sub.files.forEach(function(f) {
+            html += '<a href="' + f.dataUrl + '" download="' + f.name + '" class="btn btn-sm btn-secondary" style="padding:2px 8px;font-size:11px;">📄 ' + f.name + '</a>';
+          });
+        }
+        if (sub.comment) {
+          html += '<span style="font-size:11px;color:var(--text-muted);" title="' + sub.comment + '">💬</span>';
+        }
+        html += '<div>' + gradeHtml + '</div></div>';
+      });
+      html += '</div>';
+    } else if (a.requireSubmission) {
+      html += '<div style="padding:12px 16px;text-align:center;color:var(--text-muted);font-size:12px;">No submissions yet</div>';
+    }
+
+    html += '</div>';
+  });
+
+  container.innerHTML = html;
+}
+
+function gradeSubmission(assignmentId, studentId) {
+  var input = document.getElementById('grade-' + assignmentId + '-' + studentId);
+  if (!input) return;
+  var score = parseInt(input.value);
+  var a = instructorAssignments.find(function(a) { return a.id === assignmentId; });
+  if (!a) return;
+  if (isNaN(score) || score < 0 || score > a.maxPoints) { showToast('Enter a valid score (0-' + a.maxPoints + ')'); return; }
+  if (!a.grades) a.grades = {};
+  a.grades[studentId] = score;
+  saveState();
+  var st = students.find(function(s) { return s.id === studentId; });
+  showToast('Graded ' + (st ? st.name : studentId) + ': ' + score + '/' + a.maxPoints);
+  addNotification((st ? st.name : 'Student') + ' graded ' + score + '/' + a.maxPoints + ' on "' + a.title + '"', 'grade', null, ['admin','instructor','student']);
+  renderInstructorGradebook();
 }
 
 function deleteAssignment(id) {
+  if (!confirm('Delete this assignment and all its submissions?')) return;
+  var a = instructorAssignments.find(function(a) { return a.id === id; });
   instructorAssignments = instructorAssignments.filter(a => a.id !== id);
+  assignmentSubmissions = assignmentSubmissions.filter(function(s) { return s.assignmentId !== id; });
   saveState();
   showToast('Assignment deleted');
+  if (a) addNotification('Assignment "' + a.title + '" was deleted', 'exam', null, ['admin','instructor','student']);
   renderInstructorGradebook();
+}
+
+// ============================== ADMIN ASSIGNMENTS VIEW ==============================
+function renderAdminAssignments() {
+  var container = document.getElementById('adminAssignmentsList');
+  if (!container) return;
+
+  // Populate course filter
+  var courseSel = document.getElementById('aAssignFilterCourse');
+  if (courseSel) {
+    var currentVal = courseSel.value || 'all';
+    var courses = [];
+    instructorAssignments.forEach(function(a) { if (a.course && courses.indexOf(a.course) === -1) courses.push(a.course); });
+    courseSel.innerHTML = '<option value="all">All Programmes</option>' + courses.map(function(c) { return '<option value="' + c + '">' + c + '</option>'; }).join('');
+    courseSel.value = currentVal;
+  }
+
+  var filterCourse = (document.getElementById('aAssignFilterCourse')?.value) || 'all';
+  var searchTerm = (document.getElementById('aAssignSearch')?.value || '').toLowerCase().trim();
+
+  var filtered = instructorAssignments.filter(function(a) {
+    if (filterCourse !== 'all' && a.course !== filterCourse) return false;
+    if (searchTerm && a.title.toLowerCase().indexOf(searchTerm) === -1 && (a.createdBy||'').toLowerCase().indexOf(searchTerm) === -1) return false;
+    return true;
+  });
+
+  // Stats
+  var totalSubs = assignmentSubmissions.length;
+  var gradedCount = 0;
+  var pendingCount = 0;
+  instructorAssignments.forEach(function(a) {
+    var subs = assignmentSubmissions.filter(function(s) { return s.assignmentId === a.id; });
+    subs.forEach(function(sub) {
+      if (a.grades && a.grades[sub.studentId] !== undefined) gradedCount++;
+      else pendingCount++;
+    });
+  });
+
+  var el;
+  el = document.getElementById('aAssignStatTotal'); if (el) el.textContent = instructorAssignments.length;
+  el = document.getElementById('aAssignStatSubmissions'); if (el) el.textContent = totalSubs;
+  el = document.getElementById('aAssignStatGraded'); if (el) el.textContent = gradedCount;
+  el = document.getElementById('aAssignStatPending'); if (el) el.textContent = pendingCount;
+
+  if (filtered.length === 0) {
+    container.innerHTML = '<div class="card" style="text-align:center;padding:40px;"><div style="font-size:48px;opacity:0.3;margin-bottom:12px;">📋</div><h3 style="color:var(--text-muted);margin-bottom:8px;">No Assignments Found</h3><p style="font-size:13px;color:var(--text-muted);">Instructors can create assignments from their Gradebook page.</p></div>';
+    return;
+  }
+
+  var typeLabels = {quiz:'Quiz',test:'Test',report:'Report',portfolio:'Portfolio',worksheet:'Worksheet',exam:'Exam',project:'Project'};
+  var typeIcons = {quiz:'📝',test:'📋',report:'📄',portfolio:'📂',worksheet:'📝',exam:'📝',project:'🔧'};
+
+  // Group by course
+  var grouped = {};
+  filtered.forEach(function(a) {
+    if (!grouped[a.course]) grouped[a.course] = [];
+    grouped[a.course].push(a);
+  });
+
+  var html = '';
+  Object.keys(grouped).sort().forEach(function(courseName) {
+    var items = grouped[courseName];
+    html += '<div class="card" style="margin-bottom:16px;border-left:3px solid var(--accent);">' +
+      '<div class="card-header"><h3>📚 ' + courseName + '</h3><span style="font-size:12px;color:var(--text-muted);">' + items.length + ' assignment' + (items.length !== 1 ? 's' : '') + '</span></div>';
+
+    items.forEach(function(a) {
+      var subs = assignmentSubmissions.filter(function(s) { return s.assignmentId === a.id; });
+      var gradedInThis = subs.filter(function(sub) { return a.grades && a.grades[sub.studentId] !== undefined; }).length;
+      var isPastDue = a.dueDate && new Date(a.dueDate) < new Date();
+      var attachCount = (a.attachments && a.attachments.length) || 0;
+
+      html += '<div class="material-item" style="flex-wrap:wrap;gap:8px;">' +
+        '<div class="material-icon" style="background:var(--accent-dim);color:var(--accent);">' + (typeIcons[a.type]||'📝') + '</div>' +
+        '<div style="flex:1;min-width:200px;">' +
+          '<div style="font-size:13.5px;font-weight:600;">' + a.title + '</div>' +
+          '<div style="font-size:11px;color:var(--text-muted);">' +
+            (typeLabels[a.type]||a.type) + ' &bull; Due: ' + a.dueDate + ' &bull; ' + a.maxPoints + ' pts &bull; By: ' + a.createdBy +
+            (attachCount > 0 ? ' &bull; 📎 ' + attachCount + ' file' + (attachCount!==1?'s':'') : '') +
+          '</div>' +
+        '</div>' +
+        '<div style="display:flex;gap:6px;align-items:center;">' +
+          (isPastDue ? '<span class="badge badge-red">Past Due</span>' : '<span class="badge badge-green">Active</span>') +
+          '<span class="badge badge-blue">' + subs.length + ' submitted</span>' +
+          '<span class="badge badge-' + (gradedInThis === subs.length && subs.length > 0 ? 'green' : 'amber') + '">' + gradedInThis + ' graded</span>' +
+        '</div>' +
+      '</div>';
+
+      // Show submissions summary
+      if (subs.length > 0) {
+        html += '<div style="padding:4px 16px 8px 56px;">';
+        subs.forEach(function(sub) {
+          var st = students.find(function(s) { return s.id === sub.studentId; });
+          var grade = (a.grades && a.grades[sub.studentId] !== undefined) ? a.grades[sub.studentId] + '/' + a.maxPoints : 'Pending';
+          var gradeColor = (a.grades && a.grades[sub.studentId] !== undefined) ? 'var(--green)' : 'var(--accent)';
+          html += '<div style="display:inline-flex;align-items:center;gap:4px;font-size:11px;background:var(--bg-input);padding:2px 8px;border-radius:10px;margin:2px;">' +
+            '<span style="font-weight:600;">' + (st ? st.name : sub.studentId) + '</span>' +
+            '<span style="color:' + gradeColor + ';">' + grade + '</span>';
+          if (sub.files && sub.files.length > 0) {
+            sub.files.forEach(function(f) {
+              html += '<a href="' + f.dataUrl + '" download="' + f.name + '" style="color:var(--blue);font-size:10px;" title="Download ' + f.name + '">📄</a>';
+            });
+          }
+          html += '</div>';
+        });
+        html += '</div>';
+      }
+    });
+
+    html += '</div>';
+  });
+
+  container.innerHTML = html;
+}
+
+// ============================== STUDENT ASSIGNMENT FUNCTIONS ==============================
+var _submitPendingFiles = [];
+
+function renderStudentAssignments() {
+  var container = document.getElementById('studentAssignmentsList');
+  var countEl = document.getElementById('sAssignmentCount');
+  if (!container) return;
+  var s = currentStudent;
+  if (!s) { container.innerHTML = ''; return; }
+
+  // Get assignments for this student's course
+  var myAssignments = instructorAssignments.filter(function(a) {
+    if (!a.course || !s.course) return false;
+    return a.course === s.course ||
+      s.course.toLowerCase().indexOf(a.course.toLowerCase().split(' ')[0]) !== -1 ||
+      a.course.toLowerCase().indexOf(s.course.toLowerCase().split(' ')[0]) !== -1;
+  });
+
+  var submittedCount = 0;
+  var gradedCount = 0;
+  myAssignments.forEach(function(a) {
+    var sub = assignmentSubmissions.find(function(sub) { return sub.assignmentId === a.id && sub.studentId === s.id; });
+    if (sub) submittedCount++;
+    if (a.grades && a.grades[s.id] !== undefined) gradedCount++;
+  });
+
+  if (countEl) countEl.textContent = gradedCount + ' graded / ' + submittedCount + ' submitted / ' + myAssignments.length + ' total';
+
+  if (myAssignments.length === 0) {
+    container.innerHTML = '<p style="color:var(--text-muted);padding:16px;text-align:center;">No assignments posted yet. Check back later.</p>';
+    return;
+  }
+
+  var typeIcons = {quiz:'📝',test:'📋',report:'📄',portfolio:'📂',worksheet:'📝',exam:'📝',project:'🔧'};
+  var typeLabels = {quiz:'Quiz',test:'Test',report:'Report',portfolio:'Portfolio',worksheet:'Worksheet',exam:'Exam',project:'Project'};
+
+  var html = '';
+  myAssignments.forEach(function(a) {
+    var mySub = assignmentSubmissions.find(function(sub) { return sub.assignmentId === a.id && sub.studentId === s.id; });
+    var myGrade = (a.grades && a.grades[s.id] !== undefined) ? a.grades[s.id] : null;
+    var isPastDue = a.dueDate && new Date(a.dueDate) < new Date();
+    var attachCount = (a.attachments && a.attachments.length) || 0;
+
+    var statusBadge = '';
+    if (myGrade !== null) {
+      var pct = Math.round(myGrade / a.maxPoints * 100);
+      statusBadge = '<span class="badge badge-green">Graded: ' + myGrade + '/' + a.maxPoints + ' (' + pct + '%)</span>';
+    } else if (mySub) {
+      statusBadge = '<span class="badge badge-blue">Submitted</span>';
+    } else if (isPastDue) {
+      statusBadge = '<span class="badge badge-red">Past Due</span>';
+    } else {
+      statusBadge = '<span class="badge badge-amber">Pending</span>';
+    }
+
+    html += '<div class="class-schedule-card" style="border-left:3px solid ' + (myGrade !== null ? 'var(--green)' : mySub ? 'var(--blue)' : isPastDue ? 'var(--red)' : 'var(--accent)') + ';margin-bottom:8px;">' +
+      '<div style="flex:1;">' +
+        '<div style="font-size:14px;font-weight:600;">' + (typeIcons[a.type]||'📝') + ' ' + a.title + '</div>' +
+        '<div style="font-size:12px;color:var(--text-muted);">' + (typeLabels[a.type]||a.type) + ' &bull; Due: ' + a.dueDate + ' &bull; ' + a.maxPoints + ' pts &bull; By: ' + a.createdBy + '</div>';
+
+    if (a.instructions) {
+      html += '<div style="font-size:12px;color:var(--text-secondary);margin-top:4px;">' + a.instructions + '</div>';
+    }
+
+    // Show attached documents from instructor
+    if (attachCount > 0) {
+      html += '<div style="margin-top:6px;">';
+      a.attachments.forEach(function(att) {
+        html += '<a href="' + att.dataUrl + '" download="' + att.name + '" style="display:inline-flex;align-items:center;gap:4px;background:var(--bg-input);padding:3px 8px;border-radius:var(--radius-sm);margin:2px 4px 2px 0;font-size:11px;color:var(--accent);text-decoration:none;">📄 ' + att.name + '</a>';
+      });
+      html += '</div>';
+    }
+
+    // Show own submission
+    if (mySub && mySub.files && mySub.files.length > 0) {
+      html += '<div style="margin-top:6px;font-size:11px;color:var(--text-muted);">Your submission: ';
+      mySub.files.forEach(function(f) {
+        html += '<a href="' + f.dataUrl + '" download="' + f.name + '" style="color:var(--blue);margin-right:6px;">📄 ' + f.name + '</a>';
+      });
+      html += '</div>';
+    }
+
+    html += '</div><div style="display:flex;flex-direction:column;gap:4px;align-items:flex-end;">' + statusBadge;
+
+    if (!mySub && a.requireSubmission) {
+      html += '<button class="btn btn-sm btn-primary" onclick="openSubmitAssignment(\'' + a.id + '\',\'' + a.title.replace(/'/g,"\\'") + '\')">Upload Submission</button>';
+    }
+
+    html += '</div></div>';
+  });
+
+  container.innerHTML = html;
+}
+
+function openSubmitAssignment(assignmentId, title) {
+  document.getElementById('submitAssignId').value = assignmentId;
+  document.getElementById('submitAssignTitle').textContent = title;
+  _submitPendingFiles = [];
+  var listEl = document.getElementById('submitFileList');
+  if (listEl) listEl.innerHTML = '';
+  document.getElementById('submitComment').value = '';
+  document.getElementById('submitFileInput').value = '';
+  openModal('submitAssignmentModal');
+}
+
+function submitFileSelected(input) {
+  for (var i = 0; i < input.files.length; i++) {
+    _submitPendingFiles.push(input.files[i]);
+  }
+  var listEl = document.getElementById('submitFileList');
+  if (!listEl) return;
+  listEl.innerHTML = _submitPendingFiles.map(function(f, i) {
+    var size = f.size < 1024 ? f.size + ' B' : f.size < 1048576 ? (f.size/1024).toFixed(1) + ' KB' : (f.size/1048576).toFixed(1) + ' MB';
+    return '<div style="display:flex;align-items:center;gap:8px;padding:6px 10px;background:var(--bg-input);border-radius:var(--radius-sm);margin-bottom:4px;">' +
+      '<span style="font-size:16px;">📄</span><span style="flex:1;font-size:12px;">' + f.name + ' <span style="color:var(--text-muted);">(' + size + ')</span></span>' +
+      '<button class="btn btn-sm btn-danger" style="padding:2px 8px;font-size:11px;" onclick="_submitPendingFiles.splice(' + i + ',1);submitFileSelected({files:[]})">✕</button></div>';
+  }).join('');
+}
+
+function submitStudentAssignment() {
+  var assignmentId = document.getElementById('submitAssignId').value;
+  var comment = (document.getElementById('submitComment')?.value || '').trim();
+  var s = currentStudent;
+  if (!s) { showToast('Student not found'); return; }
+  if (_submitPendingFiles.length === 0) { showToast('Please upload at least one file'); return; }
+
+  var a = instructorAssignments.find(function(a) { return a.id === assignmentId; });
+  if (!a) { showToast('Assignment not found'); return; }
+
+  var filePromises = _submitPendingFiles.map(function(f) { return fileToDataUrl(f); });
+
+  Promise.all(filePromises).then(function(files) {
+    var submission = {
+      id: 'SUB-' + Date.now(),
+      assignmentId: assignmentId,
+      studentId: s.id,
+      studentName: s.name,
+      course: s.course,
+      files: files,
+      comment: comment,
+      submittedAt: new Date().toISOString()
+    };
+
+    assignmentSubmissions.push(submission);
+    saveState();
+    closeModal('submitAssignmentModal');
+    _submitPendingFiles = [];
+    showToast('Assignment submitted successfully!');
+    addNotification(s.name + ' submitted work for "' + a.title + '"', 'exam', null, ['admin','instructor','student']);
+    renderStudentAssignments();
+  });
 }
 
 // ============================== RESOURCE FUNCTIONS ==============================
@@ -10804,7 +11246,7 @@ function uploadResource() {
   saveState();
   closeModal('uploadResourceModal');
   showToast('Resource "' + name + '" uploaded successfully');
-  addNotification('New resource uploaded: "' + name + '"', 'resource', null, ['instructor']);
+  addNotification('New resource uploaded: "' + name + '"', 'resource', null, ['admin','instructor','student']);
 
   // Reset form
   document.getElementById('resName').value = '';
@@ -13247,7 +13689,7 @@ function submitGrading() {
 
   closeGradingPanel();
   showToast('Grades saved! Final score: ' + result.score + '% — ' + (result.passed ? 'PASSED' : 'NOT PASSED'));
-  addNotification('Grading completed: ' + result.studentName + ' scored ' + result.score + '% — ' + (result.passed ? 'PASSED' : 'NOT PASSED'), result.passed ? 'grade' : 'warning', null, ['admin','instructor']);
+  addNotification('Grading completed: ' + result.studentName + ' scored ' + result.score + '% — ' + (result.passed ? 'PASSED' : 'NOT PASSED'), result.passed ? 'grade' : 'warning', null, ['admin','instructor','student']);
 
   // Refresh the results view if visible
   var examIdx = exams.indexOf(exam);
@@ -13568,7 +14010,7 @@ function submitExam() {
 
   localStorage.removeItem('voctrain_examInProgress');
   currentExamSession = null;
-  addNotification(result.studentName + ' scored ' + result.score + '% on ' + (exam ? exam.title : 'exam') + (result.passed ? ' — PASSED' : result.needsReview ? ' — pending review' : ' — NOT PASSED'), result.passed ? 'grade' : result.needsReview ? 'info' : 'warning', null, ['student','instructor']);
+  addNotification(result.studentName + ' scored ' + result.score + '% on ' + (exam ? exam.title : 'exam') + (result.passed ? ' — PASSED' : result.needsReview ? ' — pending review' : ' — NOT PASSED'), result.passed ? 'grade' : result.needsReview ? 'info' : 'warning', null, ['admin','instructor','student']);
   saveState();
 
   // Show results
