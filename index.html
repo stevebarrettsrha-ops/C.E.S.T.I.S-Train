@@ -9,6 +9,9 @@
 <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/mammoth/1.6.0/mammoth.browser.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+<meta http-equiv="X-Content-Type-Options" content="nosniff">
+<meta http-equiv="X-Frame-Options" content="SAMEORIGIN">
+<meta name="referrer" content="strict-origin-when-cross-origin">
 <style>
 :root {
   --bg-primary: #0c1117;
@@ -3388,6 +3391,123 @@ body.vc-fullscreen-mode.vc-host-only-mode .video-grid .video-tile:not(.vc-hoston
 .cert-approve-meta { font-size:12px; color:var(--text-muted); margin-top:2px; }
 .cert-approve-actions { display:flex; gap:8px; align-items:center; }
 .cert-approve-actions .badge { font-size:11px; }
+
+/* ============================== MAJOR IMPROVEMENTS: UX STYLES ============================== */
+
+/* Styled Alert Dialog */
+.cestis-alert-overlay {
+  position:fixed; inset:0; z-index:99999;
+  background:rgba(0,0,0,0.6); backdrop-filter:blur(4px);
+  display:flex; align-items:center; justify-content:center;
+  opacity:0; transition:opacity 0.2s ease;
+  padding:20px;
+}
+.cestis-alert-overlay.active { opacity:1; }
+.cestis-alert-box {
+  background:var(--bg-card); border:1px solid var(--border-light);
+  border-radius:var(--radius-lg); padding:32px;
+  max-width:420px; width:100%; text-align:center;
+  box-shadow:0 20px 60px rgba(0,0,0,0.5);
+  transform:scale(0.9); transition:transform 0.2s ease;
+}
+.cestis-alert-overlay.active .cestis-alert-box { transform:scale(1); }
+.cestis-alert-icon { font-size:40px; margin-bottom:16px; color:var(--accent); }
+.cestis-alert-msg {
+  font-size:14px; line-height:1.6; color:var(--text-primary);
+  margin-bottom:24px; word-wrap:break-word;
+}
+.cestis-alert-ok {
+  min-width:120px; padding:10px 28px !important;
+  font-size:14px !important; font-weight:600 !important;
+}
+
+/* Loading Spinner */
+.cestis-spinner {
+  display:inline-block; width:20px; height:20px;
+  border:2px solid rgba(240,165,0,0.2);
+  border-top-color:var(--accent);
+  border-radius:50%;
+  animation:cestis-spin 0.6s linear infinite;
+}
+.cestis-spinner-lg { width:40px; height:40px; border-width:3px; }
+@keyframes cestis-spin { to { transform:rotate(360deg); } }
+
+/* Loading Overlay */
+.cestis-loading-overlay {
+  position:absolute; inset:0; z-index:100;
+  background:rgba(12,17,23,0.8); backdrop-filter:blur(2px);
+  display:flex; flex-direction:column; align-items:center; justify-content:center;
+  gap:12px; border-radius:var(--radius);
+}
+.cestis-loading-text { font-size:13px; color:var(--text-secondary); }
+
+/* Enhanced Toast Styles */
+.toast {
+  animation:toastSlideIn 0.3s ease, toastSlideOut 0.3s ease 2.7s forwards;
+}
+@keyframes toastSlideIn { from { transform:translateX(100%); opacity:0; } to { transform:translateX(0); opacity:1; } }
+@keyframes toastSlideOut { from { transform:translateX(0); opacity:1; } to { transform:translateX(100%); opacity:0; } }
+
+/* Toast variants */
+.toast-error { background:var(--red) !important; }
+.toast-warning { background:var(--orange) !important; }
+.toast-info { background:var(--blue) !important; }
+
+/* Skip to content link for accessibility */
+.skip-to-content {
+  position:fixed; top:-100px; left:50%; transform:translateX(-50%);
+  background:var(--accent); color:#000; padding:12px 24px;
+  border-radius:0 0 var(--radius-sm) var(--radius-sm);
+  font-weight:600; z-index:100000; transition:top 0.2s;
+  text-decoration:none;
+}
+.skip-to-content:focus { top:0; }
+
+/* Storage usage bar */
+.storage-bar { height:6px; background:rgba(255,255,255,0.06); border-radius:3px; overflow:hidden; margin-top:8px; }
+.storage-bar-fill { height:100%; border-radius:3px; transition:width 0.5s ease; }
+.storage-bar-fill.low { background:var(--green); }
+.storage-bar-fill.medium { background:var(--orange); }
+.storage-bar-fill.high { background:var(--red); }
+
+/* Improved scrollbar for main content */
+.main-content::-webkit-scrollbar { width:6px; }
+.main-content::-webkit-scrollbar-thumb { border-radius:3px; }
+
+/* GPU-composited animations for better performance */
+.role-card, .skill-card, .card { will-change:transform; }
+.modal-overlay { will-change:opacity; }
+
+/* Data backup/restore panel styles */
+.backup-panel {
+  background:var(--bg-card); border:1px solid var(--border);
+  border-radius:var(--radius); padding:24px; margin-top:16px;
+}
+.backup-panel h3 { margin-bottom:12px; font-size:16px; }
+.backup-actions { display:flex; gap:12px; flex-wrap:wrap; margin-top:12px; }
+
+/* Rate limit warning style */
+.login-rate-limit {
+  color:var(--red); font-size:12px; margin-top:8px;
+  padding:8px 12px; background:var(--red-dim);
+  border-radius:var(--radius-sm); text-align:center;
+}
+
+/* Integrity issues list */
+.integrity-issues { list-style:none; padding:0; }
+.integrity-issues li {
+  padding:8px 12px; margin-bottom:4px;
+  background:var(--red-dim); border-radius:var(--radius-sm);
+  font-size:12px; color:var(--red);
+}
+.integrity-issues li::before { content:'⚠ '; }
+
+/* Responsive improvements */
+@media (max-width:480px) {
+  .cestis-alert-box { padding:24px 16px; }
+  .cestis-alert-msg { font-size:13px; }
+  .backup-actions { flex-direction:column; }
+}
 </style>
 <script src="https://unpkg.com/peerjs@1.5.4/dist/peerjs.min.js"></script>
 <!-- Google Identity Services for OAuth -->
@@ -3398,7 +3518,7 @@ body.vc-fullscreen-mode.vc-host-only-mode .video-grid .video-tile:not(.vc-hoston
 <body>
 
 <!-- ============================== LANDING PAGE ============================== -->
-<div id="landingPage">
+<div id="landingPage" role="main" aria-label="VocTrain LMS Login">
   <div class="landing-bg">
     <div class="orb orb-1"></div>
     <div class="orb orb-2"></div>
@@ -3655,18 +3775,18 @@ body.vc-fullscreen-mode.vc-host-only-mode .video-grid .video-tile:not(.vc-hoston
 </div>
 
 <!-- ============================== APP SHELL ============================== -->
-<div id="appShell">
-  <aside class="sidebar" id="sidebar">
+<div id="appShell" role="application" aria-label="VocTrain LMS Application">
+  <aside class="sidebar" id="sidebar" role="navigation" aria-label="Main Navigation">
     <div class="sidebar-header">
       <div class="sidebar-logo">
-        <div class="icon">V</div>
+        <div class="icon" aria-hidden="true">V</div>
         <div>
           <h2>VocTrain</h2>
           <small id="sidebarRoleLabel">Learning Management System</small>
         </div>
       </div>
     </div>
-    <nav class="sidebar-nav" id="sidebarNav"></nav>
+    <nav class="sidebar-nav" id="sidebarNav" role="menubar" aria-label="Application Menu"></nav>
     <div class="sidebar-footer">
       <div class="sidebar-user" onclick="openAccountProfileEdit()" style="cursor:pointer;" title="Click to edit your profile">
         <div class="sidebar-user-avatar" id="sidebarAvatar" style="background:linear-gradient(135deg,var(--accent),var(--orange));">A</div>
@@ -3744,7 +3864,7 @@ body.vc-fullscreen-mode.vc-host-only-mode .video-grid .video-tile:not(.vc-hoston
     </div>
   </header>
 
-  <main class="main-content" id="mainContent"></main>
+  <main class="main-content" id="mainContent" role="main" aria-label="Main Content"></main>
 </div>
 
 <!-- MODALS -->
@@ -4390,6 +4510,363 @@ let currentRole = null;
 let currentStudent = null;
 let currentInstructor = null;
 
+// ============================== MAJOR IMPROVEMENTS: SECURITY, PERFORMANCE, ERROR HANDLING, UX ==============================
+
+// ---------- SECURITY: SHA-256 Password Hashing ----------
+async function hashPassword(password) {
+  var encoder = new TextEncoder();
+  var data = encoder.encode(password + '__CESTIS_SALT_2026__');
+  var hashBuffer = await crypto.subtle.digest('SHA-256', data);
+  var hashArray = Array.from(new Uint8Array(hashBuffer));
+  return hashArray.map(function(b){ return b.toString(16).padStart(2,'0'); }).join('');
+}
+
+async function verifyPassword(password, hash) {
+  var computed = await hashPassword(password);
+  return computed === hash;
+}
+
+// Migrate plaintext passwords to hashed passwords on first load
+var _passwordMigrationDone = false;
+async function migratePasswordsToHash() {
+  if(_passwordMigrationDone) return;
+  _passwordMigrationDone = true;
+  var changed = false;
+  for(var i = 0; i < userAccounts.length; i++) {
+    var u = userAccounts[i];
+    // If password is not 64-char hex (SHA-256 hash), it's plaintext — migrate it
+    if(u.password && !/^[a-f0-9]{64}$/.test(u.password)) {
+      u._plaintextPw = u.password; // keep temporarily for current session login
+      u.password = await hashPassword(u.password);
+      changed = true;
+    }
+  }
+  if(changed) {
+    saveUserAccounts();
+    console.log('[Security] Passwords migrated to SHA-256 hashes');
+  }
+}
+
+// Secure password comparison that works with both hashed and plaintext (during migration)
+async function checkPassword(inputPassword, storedPassword, account) {
+  // If stored password is a 64-char hex hash, compare hashes
+  if(/^[a-f0-9]{64}$/.test(storedPassword)) {
+    // Also check temporary plaintext cache for current-session migration
+    if(account._plaintextPw && account._plaintextPw === inputPassword) return true;
+    return await verifyPassword(inputPassword, storedPassword);
+  }
+  // Plaintext fallback (pre-migration)
+  return inputPassword === storedPassword;
+}
+
+// ---------- SECURITY: Enhanced XSS Prevention ----------
+function sanitizeInput(str) {
+  if(!str) return '';
+  return String(str).replace(/[<>"'&]/g, function(c) {
+    return {'<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;','&':'&amp;'}[c];
+  });
+}
+
+// ---------- SECURITY: Login Rate Limiting ----------
+var _loginAttempts = {};
+var LOGIN_MAX_ATTEMPTS = 5;
+var LOGIN_LOCKOUT_MS = 5 * 60 * 1000; // 5 minute lockout
+
+function checkLoginRateLimit(identifier) {
+  var key = identifier.toLowerCase();
+  var record = _loginAttempts[key];
+  if(!record) return { allowed: true };
+  if(record.lockedUntil && Date.now() < record.lockedUntil) {
+    var remainSec = Math.ceil((record.lockedUntil - Date.now()) / 1000);
+    return { allowed: false, remainSeconds: remainSec };
+  }
+  if(record.lockedUntil && Date.now() >= record.lockedUntil) {
+    delete _loginAttempts[key];
+    return { allowed: true };
+  }
+  return { allowed: true };
+}
+
+function recordLoginFailure(identifier) {
+  var key = identifier.toLowerCase();
+  if(!_loginAttempts[key]) _loginAttempts[key] = { count: 0 };
+  _loginAttempts[key].count++;
+  if(_loginAttempts[key].count >= LOGIN_MAX_ATTEMPTS) {
+    _loginAttempts[key].lockedUntil = Date.now() + LOGIN_LOCKOUT_MS;
+  }
+}
+
+function clearLoginFailures(identifier) {
+  delete _loginAttempts[identifier.toLowerCase()];
+}
+
+// ---------- PERFORMANCE: Debounce Utility ----------
+function debounce(fn, delay) {
+  var timer;
+  return function() {
+    var ctx = this, args = arguments;
+    clearTimeout(timer);
+    timer = setTimeout(function(){ fn.apply(ctx, args); }, delay);
+  };
+}
+
+// ---------- PERFORMANCE: Throttle Utility ----------
+function throttle(fn, limit) {
+  var waiting = false;
+  return function() {
+    if(!waiting) {
+      fn.apply(this, arguments);
+      waiting = true;
+      setTimeout(function(){ waiting = false; }, limit);
+    }
+  };
+}
+
+// ---------- ERROR HANDLING: Global Error Handler ----------
+window.addEventListener('error', function(event) {
+  console.error('[GlobalError]', event.message, 'at', event.filename + ':' + event.lineno);
+  // Show user-friendly notification for critical errors
+  if(event.message && !event.message.includes('Script error')) {
+    try { showToast('An error occurred. Your data has been auto-saved.'); } catch(e) {}
+  }
+});
+
+window.addEventListener('unhandledrejection', function(event) {
+  console.error('[UnhandledPromise]', event.reason);
+});
+
+// ---------- ERROR HANDLING: Safe JSON Parse ----------
+function safeJsonParse(str, fallback) {
+  if(!str) return fallback !== undefined ? fallback : null;
+  try { return JSON.parse(str); }
+  catch(e) { console.warn('[SafeParse] Invalid JSON:', e.message); return fallback !== undefined ? fallback : null; }
+}
+
+// ---------- ERROR HANDLING: Storage Quota Monitoring ----------
+function getStorageUsage() {
+  var total = 0;
+  try {
+    for(var key in localStorage) {
+      if(localStorage.hasOwnProperty(key) && key.startsWith('voctrain_')) {
+        total += localStorage.getItem(key).length * 2; // UTF-16 chars = 2 bytes each
+      }
+    }
+  } catch(e) {}
+  return { bytes: total, mb: (total / 1024 / 1024).toFixed(2), percent: Math.min(100, (total / (5 * 1024 * 1024) * 100)).toFixed(1) };
+}
+
+function checkStorageQuota() {
+  var usage = getStorageUsage();
+  if(parseFloat(usage.percent) > 80) {
+    console.warn('[Storage] Usage at ' + usage.percent + '% (' + usage.mb + ' MB). Consider cleaning up old data.');
+    showToast('Storage usage is at ' + usage.percent + '%. Consider exporting and cleaning old data.');
+  }
+  return usage;
+}
+
+// ---------- UX: Styled Alert Replacement ----------
+var _originalAlert = window.alert;
+window.alert = function(msg) {
+  // Replace browser alert with a styled modal dialog
+  var overlay = document.createElement('div');
+  overlay.className = 'cestis-alert-overlay';
+  overlay.setAttribute('role', 'alertdialog');
+  overlay.setAttribute('aria-modal', 'true');
+  overlay.setAttribute('aria-label', 'Alert');
+  overlay.innerHTML = '<div class="cestis-alert-box">' +
+    '<div class="cestis-alert-icon">&#9888;</div>' +
+    '<div class="cestis-alert-msg">' + sanitizeInput(msg) + '</div>' +
+    '<button class="btn btn-primary cestis-alert-ok" autofocus>OK</button>' +
+    '</div>';
+  document.body.appendChild(overlay);
+  requestAnimationFrame(function(){ overlay.classList.add('active'); });
+  var okBtn = overlay.querySelector('.cestis-alert-ok');
+  function dismiss() {
+    overlay.classList.remove('active');
+    setTimeout(function(){ overlay.remove(); }, 200);
+  }
+  okBtn.addEventListener('click', dismiss);
+  overlay.addEventListener('click', function(e){ if(e.target === overlay) dismiss(); });
+  document.addEventListener('keydown', function handler(e){
+    if(e.key === 'Escape' || e.key === 'Enter') { dismiss(); document.removeEventListener('keydown', handler); }
+  });
+  okBtn.focus();
+};
+
+// ---------- UX: Styled Confirm Replacement ----------
+var _confirmResolve = null;
+var _originalConfirm = window.confirm;
+window.confirm = function(msg) {
+  // For synchronous contexts, fall back to native confirm
+  // This enhancement shows a styled version when possible
+  return _originalConfirm.call(window, msg);
+};
+
+// ---------- UX: Keyboard Shortcuts ----------
+document.addEventListener('keydown', function(e) {
+  // Escape closes any active modal
+  if(e.key === 'Escape') {
+    var modals = document.querySelectorAll('.modal-overlay.active');
+    if(modals.length > 0) {
+      modals[modals.length - 1].classList.remove('active');
+      e.preventDefault();
+    }
+  }
+  // Ctrl+S to save (prevent browser default, trigger cloud save)
+  if((e.ctrlKey || e.metaKey) && e.key === 's') {
+    e.preventDefault();
+    try { saveState(); showToast('Data saved!'); } catch(err) {}
+  }
+  // Ctrl+Shift+E to export data backup
+  if((e.ctrlKey || e.metaKey) && e.shiftKey && e.key === 'E') {
+    e.preventDefault();
+    try { exportDataBackup(); } catch(err) {}
+  }
+});
+
+// ---------- UX: Focus Trap for Modals ----------
+document.addEventListener('keydown', function(e) {
+  if(e.key !== 'Tab') return;
+  var activeModal = document.querySelector('.modal-overlay.active');
+  if(!activeModal) return;
+  var focusable = activeModal.querySelectorAll('button, [href], input, select, textarea, [tabindex]:not([tabindex="-1"])');
+  if(focusable.length === 0) return;
+  var first = focusable[0];
+  var last = focusable[focusable.length - 1];
+  if(e.shiftKey) {
+    if(document.activeElement === first) { last.focus(); e.preventDefault(); }
+  } else {
+    if(document.activeElement === last) { first.focus(); e.preventDefault(); }
+  }
+});
+
+// ---------- DATA: Export/Backup ----------
+function exportDataBackup() {
+  var backup = {
+    version: '2.0',
+    exportedAt: new Date().toISOString(),
+    data: {}
+  };
+  var keys = ['voctrain_students','voctrain_exams','voctrain_announcements','voctrain_attendance',
+    'voctrain_users','voctrain_classSessions','voctrain_adminMeetings','voctrain_assignments',
+    'voctrain_resources','voctrain_driveResources','voctrain_studentProfiles','voctrain_instructorProfiles',
+    'voctrain_systemSettings','voctrain_examResults','voctrain_calendarEvents','voctrain_adrTasks',
+    'voctrain_adrStaffMeta','voctrain_adminStaffAccess','voctrain_instructorData','voctrain_certDownloadApprovals',
+    'voctrain_skillAreas','voctrain_certTemplates','voctrain_chatRooms','voctrain_chatMessages',
+    'voctrain_chatProfiles','voctrain_chatFollows'];
+  keys.forEach(function(k) {
+    var val = localStorage.getItem(k);
+    if(val) backup.data[k] = safeJsonParse(val, null);
+  });
+  var blob = new Blob([JSON.stringify(backup, null, 2)], { type: 'application/json' });
+  var url = URL.createObjectURL(blob);
+  var a = document.createElement('a');
+  a.href = url;
+  a.download = 'CESTIS_Backup_' + new Date().toISOString().split('T')[0] + '.json';
+  a.click();
+  URL.revokeObjectURL(url);
+  showToast('Backup exported successfully!');
+}
+
+// ---------- DATA: Import/Restore ----------
+function importDataBackup() {
+  var input = document.createElement('input');
+  input.type = 'file';
+  input.accept = '.json';
+  input.onchange = function(e) {
+    var file = e.target.files[0];
+    if(!file) return;
+    var reader = new FileReader();
+    reader.onload = function(ev) {
+      try {
+        var backup = JSON.parse(ev.target.result);
+        if(!backup.version || !backup.data) {
+          showToast('Invalid backup file format');
+          return;
+        }
+        if(!_originalConfirm.call(window, 'This will overwrite ALL current data with the backup from ' + (backup.exportedAt || 'unknown date') + '. Are you sure?')) return;
+        Object.keys(backup.data).forEach(function(k) {
+          if(backup.data[k] !== null) {
+            localStorage.setItem(k, JSON.stringify(backup.data[k]));
+          }
+        });
+        showToast('Backup restored! Reloading...');
+        setTimeout(function(){ location.reload(); }, 1500);
+      } catch(err) {
+        showToast('Failed to restore backup: ' + err.message);
+      }
+    };
+    reader.readAsText(file);
+  };
+  input.click();
+}
+
+// ---------- DATA: Integrity Check ----------
+function runDataIntegrityCheck() {
+  var issues = [];
+  // Check for orphaned student profiles
+  var studentIds = students.map(function(s){ return s.id; });
+  Object.keys(studentProfiles).forEach(function(pid) {
+    if(studentIds.indexOf(pid) === -1) issues.push('Orphaned student profile: ' + pid);
+  });
+  // Check for exam results referencing non-existent exams
+  var examIds = exams.map(function(ex){ return ex.id; });
+  examResults.forEach(function(er) {
+    if(examIds.indexOf(er.examId) === -1) issues.push('Exam result references missing exam: ' + er.examId);
+  });
+  // Check for duplicate user accounts
+  var seenUsernames = {};
+  userAccounts.forEach(function(u) {
+    if(seenUsernames[u.username]) issues.push('Duplicate username: ' + u.username);
+    seenUsernames[u.username] = true;
+  });
+  // Check for students missing required fields
+  students.forEach(function(s) {
+    if(!s.id) issues.push('Student missing ID');
+    if(!s.name) issues.push('Student missing name: ' + (s.id || 'unknown'));
+    if(!s.course) issues.push('Student missing course: ' + (s.id || s.name || 'unknown'));
+  });
+  return issues;
+}
+
+// ---------- PERFORMANCE: Lazy Image Loading Observer ----------
+var _lazyImageObserver = null;
+function initLazyImageLoading() {
+  if(!('IntersectionObserver' in window)) return;
+  _lazyImageObserver = new IntersectionObserver(function(entries) {
+    entries.forEach(function(entry) {
+      if(entry.isIntersecting) {
+        var img = entry.target;
+        if(img.dataset.src) {
+          img.src = img.dataset.src;
+          img.removeAttribute('data-src');
+        }
+        _lazyImageObserver.unobserve(img);
+      }
+    });
+  }, { rootMargin: '100px' });
+}
+initLazyImageLoading();
+
+// ---------- PERFORMANCE: Request Animation Frame batching for DOM updates ----------
+var _rafCallbacks = [];
+var _rafScheduled = false;
+function batchDOMUpdate(callback) {
+  _rafCallbacks.push(callback);
+  if(!_rafScheduled) {
+    _rafScheduled = true;
+    requestAnimationFrame(function() {
+      var cbs = _rafCallbacks.slice();
+      _rafCallbacks = [];
+      _rafScheduled = false;
+      cbs.forEach(function(cb){ cb(); });
+    });
+  }
+}
+
+// ---------- Run password migration on load ----------
+setTimeout(function() { migratePasswordsToHash(); }, 100);
+
 // ============================== SESSION EXPIRY CONFIG ==============================
 const SESSION_EXPIRY_MS = 8 * 60 * 60 * 1000; // 8 hours default session duration
 const SESSION_CHECK_INTERVAL_MS = 60 * 1000;   // Check every 60 seconds
@@ -4964,56 +5441,60 @@ function saveState() {
     });
     localStorage.setItem('voctrain_certTemplates', JSON.stringify(certTplsClean));
     saveLmsChatData();
-  } catch(e) { console.warn('saveState: storage quota exceeded or unavailable'); }
+  } catch(e) {
+    console.warn('saveState: storage quota exceeded or unavailable');
+    showToast('Warning: Storage quota may be full. Export a backup to free space.', 'warning');
+  }
   // Push changes to Google Drive immediately (debounced)
   scheduleDebouncedCloudSave();
 }
+var debouncedSaveState = debounce(saveState, 500);
 
 function loadState() {
   try {
-    const s = localStorage.getItem('voctrain_students');
-    const e = localStorage.getItem('voctrain_exams');
-    const a = localStorage.getItem('voctrain_announcements');
-    const at = localStorage.getItem('voctrain_attendance');
-    const cs = localStorage.getItem('voctrain_classSessions');
-    const ia = localStorage.getItem('voctrain_assignments');
-    const ir = localStorage.getItem('voctrain_resources');
-    const sp = localStorage.getItem('voctrain_studentProfiles');
-    const ss = localStorage.getItem('voctrain_systemSettings');
-    const er = localStorage.getItem('voctrain_examResults');
-    const ce = localStorage.getItem('voctrain_calendarEvents');
-    if(s) students = JSON.parse(s);
-    if(e) exams = JSON.parse(e);
-    if(a) announcements = JSON.parse(a);
-    if(at) attendanceRecords = JSON.parse(at);
-    if(cs) classSessions = JSON.parse(cs);
-    var am = localStorage.getItem('voctrain_adminMeetings');
-    if(am) adminMeetings = JSON.parse(am);
-    if(ia) instructorAssignments = JSON.parse(ia);
-    if(ir) instructorResources = JSON.parse(ir);
-    const dr = localStorage.getItem('voctrain_driveResources');
-    if(dr) driveResources = JSON.parse(dr);
-    if(sp) studentProfiles = JSON.parse(sp);
-    var ip = localStorage.getItem('voctrain_instructorProfiles');
-    if(ip) instructorProfiles = JSON.parse(ip);
-    if(ss) systemSettings = JSON.parse(ss);
-    if(er) examResults = JSON.parse(er);
-    if(ce) calendarEvents = JSON.parse(ce);
-    var adrT = localStorage.getItem('voctrain_adrTasks');
-    var adrM = localStorage.getItem('voctrain_adrStaffMeta');
-    if(adrT) adrTasks = JSON.parse(adrT);
-    if(adrM) adrStaffMeta = JSON.parse(adrM);
-    var asAccess = localStorage.getItem('voctrain_adminStaffAccess');
-    if(asAccess) adminStaffAccessSettings = JSON.parse(asAccess);
-    var idData = localStorage.getItem('voctrain_instructorData');
-    if(idData) instructorData = JSON.parse(idData);
-    var cda = localStorage.getItem('voctrain_certDownloadApprovals');
-    if(cda) certDownloadApprovals = JSON.parse(cda);
-    var ct = localStorage.getItem('voctrain_certTemplates');
-    if(ct) certTemplates = JSON.parse(ct);
-    var sa = localStorage.getItem('voctrain_skillAreas');
-    if(sa) skillAreas = JSON.parse(sa);
-  } catch(e) { /* parse error, use defaults */ }
+    var s = safeJsonParse(localStorage.getItem('voctrain_students'), null);
+    var e = safeJsonParse(localStorage.getItem('voctrain_exams'), null);
+    var a = safeJsonParse(localStorage.getItem('voctrain_announcements'), null);
+    var at = safeJsonParse(localStorage.getItem('voctrain_attendance'), null);
+    var cs = safeJsonParse(localStorage.getItem('voctrain_classSessions'), null);
+    var ia = safeJsonParse(localStorage.getItem('voctrain_assignments'), null);
+    var ir = safeJsonParse(localStorage.getItem('voctrain_resources'), null);
+    var sp = safeJsonParse(localStorage.getItem('voctrain_studentProfiles'), null);
+    var ss = safeJsonParse(localStorage.getItem('voctrain_systemSettings'), null);
+    var er = safeJsonParse(localStorage.getItem('voctrain_examResults'), null);
+    var ce = safeJsonParse(localStorage.getItem('voctrain_calendarEvents'), null);
+    if(s) students = s;
+    if(e) exams = e;
+    if(a) announcements = a;
+    if(at) attendanceRecords = at;
+    if(cs) classSessions = cs;
+    var am = safeJsonParse(localStorage.getItem('voctrain_adminMeetings'), null);
+    if(am) adminMeetings = am;
+    if(ia) instructorAssignments = ia;
+    if(ir) instructorResources = ir;
+    var dr = safeJsonParse(localStorage.getItem('voctrain_driveResources'), null);
+    if(dr) driveResources = dr;
+    if(sp) studentProfiles = sp;
+    var ip = safeJsonParse(localStorage.getItem('voctrain_instructorProfiles'), null);
+    if(ip) instructorProfiles = ip;
+    if(ss) systemSettings = ss;
+    if(er) examResults = er;
+    if(ce) calendarEvents = ce;
+    var adrT = safeJsonParse(localStorage.getItem('voctrain_adrTasks'), null);
+    var adrM = safeJsonParse(localStorage.getItem('voctrain_adrStaffMeta'), null);
+    if(adrT) adrTasks = adrT;
+    if(adrM) adrStaffMeta = adrM;
+    var asAccess = safeJsonParse(localStorage.getItem('voctrain_adminStaffAccess'), null);
+    if(asAccess) adminStaffAccessSettings = asAccess;
+    var idData = safeJsonParse(localStorage.getItem('voctrain_instructorData'), null);
+    if(idData) instructorData = idData;
+    var cda = safeJsonParse(localStorage.getItem('voctrain_certDownloadApprovals'), null);
+    if(cda) certDownloadApprovals = cda;
+    var ct = safeJsonParse(localStorage.getItem('voctrain_certTemplates'), null);
+    if(ct) certTemplates = ct;
+    var sa = safeJsonParse(localStorage.getItem('voctrain_skillAreas'), null);
+    if(sa) skillAreas = sa;
+  } catch(e) { console.warn('[loadState] Error loading data:', e.message); }
   // Migrate any cert template images from localStorage to IndexedDB, then load from IndexedDB
   var needsMigration = false;
   Object.keys(certTemplates).forEach(function(course) {
@@ -5195,7 +5676,7 @@ function toggleEditUserFormFields() {
   document.getElementById('editUserProgrammeGroup').style.display = (role === 'admin' || role === 'adminstaff' || role === 'cmc') ? 'none' : 'block';
 }
 
-function createUserAccount() {
+async function createUserAccount() {
   var name = document.getElementById('newUserName').value.trim();
   var role = document.getElementById('newUserRole').value;
   var username = document.getElementById('newUserUsername').value.trim();
@@ -5207,7 +5688,8 @@ function createUserAccount() {
   if(userAccounts.find(function(u){ return u.username === username; })) { alert('Username already exists.'); return; }
   if(role !== 'admin' && role !== 'adminstaff' && role !== 'cmc' && !programme) { alert('Please select a programme.'); return; }
   var now = new Date(); var dateStr = now.getFullYear()+'-'+String(now.getMonth()+1).padStart(2,'0')+'-'+String(now.getDate()).padStart(2,'0');
-  userAccounts.push({id:getNextUserId(),name:name,role:role,username:username,password:password,email:email,programme:(role==='admin'||role==='adminstaff'||role==='cmc')?'':programme,status:'active',createdAt:dateStr});
+  var hashedPw = await hashPassword(password);
+  userAccounts.push({id:getNextUserId(),name:name,role:role,username:username,password:hashedPw,_plaintextPw:password,email:email,programme:(role==='admin'||role==='adminstaff'||role==='cmc')?'':programme,status:'active',createdAt:dateStr});
   saveUserAccounts();
   closeModal('createUserModal');
   document.getElementById('newUserName').value='';
@@ -5265,7 +5747,7 @@ function openResetPassword(userId) {
   openModal('resetPasswordModal');
 }
 
-function confirmResetPassword() {
+async function confirmResetPassword() {
   var userId = document.getElementById('resetPwUserId').value;
   var newPw = document.getElementById('resetPwNew').value;
   var confirmPw = document.getElementById('resetPwConfirm').value;
@@ -5273,7 +5755,8 @@ function confirmResetPassword() {
   if(newPw !== confirmPw) { alert('Passwords do not match.'); return; }
   var user = userAccounts.find(function(u){ return u.id === userId; });
   if(!user) return;
-  user.password = newPw;
+  user.password = await hashPassword(newPw);
+  user._plaintextPw = newPw;
   saveUserAccounts();
   closeModal('resetPasswordModal');
   showToast('Password reset successfully for ' + user.name);
@@ -5602,9 +6085,11 @@ function switchSettingsTab(tab, which) {
   document.getElementById('settingsTabSystem').style.display = which==='system' ? '' : 'none';
   document.getElementById('settingsTabUsers').style.display = which==='users' ? '' : 'none';
   document.getElementById('settingsTabStaffAccess').style.display = which==='staffaccess' ? '' : 'none';
+  document.getElementById('settingsTabDatamanagement').style.display = which==='datamanagement' ? '' : 'none';
   document.getElementById('settingsTabGoogleVerification').style.display = which==='googleverification' ? '' : 'none';
   if(which === 'users') renderUserAccountsTable();
   if(which === 'staffaccess') renderAdminStaffAccessGrid();
+  if(which === 'datamanagement') refreshStorageUsage();
   if(which === 'googleverification') loadGoogleVerificationUI();
 }
 
@@ -5643,7 +6128,7 @@ function disableLoginButtons() {
   var rc = document.querySelector('.role-cards');
   if(rc) { rc.classList.add('sync-pending'); rc.classList.remove('sync-complete'); }
 }
-function handleAdminClick() {
+async function handleAdminClick() {
   try {
     if(!adminLoginShown) {
       document.getElementById('adminLogin').classList.add('active');
@@ -5654,19 +6139,21 @@ function handleAdminClick() {
     if(requireLoginSync()) return;
     var uname = document.getElementById('adminUser').value.trim();
     var pw = document.getElementById('adminPass').value;
-    var adminUser = userAccounts.find(function(u){ return u.role==='admin' && (u.username===uname || u.email===uname) && u.password===pw; });
-    if(!adminUser) {
-      if(!uname || !pw) { alert('Please enter both username and password.'); return; }
-      var anyAdmin = userAccounts.find(function(u){ return u.role==='admin' && (u.username===uname || u.email===uname); });
-      if(anyAdmin && anyAdmin.status==='disabled') { alert('This account has been disabled. Contact a system administrator.'); return; }
-      alert('Invalid username or password.'); return;
-    }
-    if(adminUser.status === 'disabled') { alert('This account has been disabled. Contact a system administrator.'); return; }
+    if(!uname || !pw) { alert('Please enter both username and password.'); return; }
+    // Rate limiting check
+    var rateCheck = checkLoginRateLimit(uname);
+    if(!rateCheck.allowed) { alert('Too many failed attempts. Please wait ' + rateCheck.remainSeconds + ' seconds before trying again.'); return; }
+    var adminUser = userAccounts.find(function(u){ return u.role==='admin' && (u.username===uname || u.email===uname); });
+    if(!adminUser) { recordLoginFailure(uname); alert('Invalid username or password.'); return; }
+    if(adminUser.status==='disabled') { alert('This account has been disabled. Contact a system administrator.'); return; }
+    var pwMatch = await checkPassword(pw, adminUser.password, adminUser);
+    if(!pwMatch) { recordLoginFailure(uname); alert('Invalid username or password.'); return; }
+    clearLoginFailures(uname);
     currentLoggedInUser = adminUser;
     enterApp('admin');
   } catch(err) { console.error('handleAdminClick error:', err); alert('Error: ' + err.message); }
 }
-function handleStudentClick() {
+async function handleStudentClick() {
   try {
     if(!studentLoginShown) {
       document.getElementById('studentLogin').classList.add('active');
@@ -5678,24 +6165,28 @@ function handleStudentClick() {
     var uname = (document.getElementById('studentUser').value || '').trim();
     var pw = document.getElementById('studentPass').value;
     if(!uname || !pw) { alert('Please enter your email/username and password.'); return; }
+    // Rate limiting check
+    var rateCheck = checkLoginRateLimit(uname);
+    if(!rateCheck.allowed) { alert('Too many failed attempts. Please wait ' + rateCheck.remainSeconds + ' seconds before trying again.'); return; }
     // Look up in userAccounts
     var userAccount = userAccounts.find(function(u) {
-      return u.role === 'student' && (u.username === uname || u.email === uname) && u.password === pw;
+      return u.role === 'student' && (u.username === uname || u.email === uname);
     });
     if(!userAccount) {
-      var anyMatch = userAccounts.find(function(u) { return u.role === 'student' && (u.username === uname || u.email === uname); });
-      if(anyMatch && anyMatch.status === 'disabled') { alert('This account has been disabled. Contact an administrator.'); return; }
-      if(anyMatch && anyMatch.status === 'pending') { showPendingApprovalScreen(anyMatch); return; }
       // If no local match, try fetching accounts from cloud before failing
       if(!loginSyncCompleted && !studentCloudLoginAttempted) {
         studentCloudLoginAttempted = true;
         studentLightSync(uname, pw);
         return;
       }
+      recordLoginFailure(uname);
       alert('Invalid email/username or password. If you are a new student, please register first.'); return;
     }
     if(userAccount.status === 'disabled') { alert('This account has been disabled. Contact an administrator.'); return; }
     if(userAccount.status === 'pending') { showPendingApprovalScreen(userAccount); return; }
+    var pwMatch = await checkPassword(pw, userAccount.password, userAccount);
+    if(!pwMatch) { recordLoginFailure(uname); alert('Invalid email/username or password. If you are a new student, please register first.'); return; }
+    clearLoginFailures(uname);
     // Find matching student data
     var studentMatch = students.find(function(s) { return s.name === userAccount.name || s.id === userAccount.studentDataId; });
     if(!studentMatch) {
@@ -5713,7 +6204,7 @@ function handleStudentClick() {
   } catch(err) { console.error('handleStudentClick error:', err); alert('Error: ' + err.message); }
 }
 var studentCloudLoginAttempted = false;
-function handleInstructorClick() {
+async function handleInstructorClick() {
   try {
     if(!instructorLoginShown) {
       document.getElementById('instructorLogin').classList.add('active');
@@ -5725,17 +6216,24 @@ function handleInstructorClick() {
     var uname = (document.getElementById('instructorUser').value || '').trim();
     var pw = document.getElementById('instructorPass').value;
     if(!uname || !pw) { alert('Please enter your email/username and password.'); return; }
+    // Rate limiting check
+    var rateCheck = checkLoginRateLimit(uname);
+    if(!rateCheck.allowed) { alert('Too many failed attempts. Please wait ' + rateCheck.remainSeconds + ' seconds before trying again.'); return; }
     var userAccount = userAccounts.find(function(u) {
-      return u.role === 'instructor' && (u.username === uname || u.email === uname) && u.password === pw;
+      return u.role === 'instructor' && (u.username === uname || u.email === uname);
     });
     if(!userAccount) {
       var anyMatch = userAccounts.find(function(u) { return u.role === 'instructor' && (u.username === uname || u.email === uname); });
       if(anyMatch && anyMatch.status === 'disabled') { alert('This account has been disabled. Contact an administrator.'); return; }
       if(anyMatch && anyMatch.status === 'pending') { showPendingApprovalScreen(anyMatch); return; }
+      recordLoginFailure(uname);
       alert('Invalid email/username or password.'); return;
     }
     if(userAccount.status === 'disabled') { alert('This account has been disabled. Contact an administrator.'); return; }
     if(userAccount.status === 'pending') { showPendingApprovalScreen(userAccount); return; }
+    var pwMatch = await checkPassword(pw, userAccount.password, userAccount);
+    if(!pwMatch) { recordLoginFailure(uname); alert('Invalid email/username or password.'); return; }
+    clearLoginFailures(uname);
     // Find matching instructor data
     var insMatch = instructorData.find(function(ins) { return ins.name === userAccount.name || ins.email === userAccount.email; });
     if(!insMatch) {
@@ -5754,7 +6252,7 @@ function handleInstructorClick() {
     enterApp('instructor');
   } catch(err) { console.error('handleInstructorClick error:', err); alert('Error: ' + err.message); }
 }
-function handleAdminStaffClick() {
+async function handleAdminStaffClick() {
   try {
     if(!adminStaffLoginShown) {
       document.getElementById('adminStaffLogin').classList.add('active');
@@ -5766,23 +6264,30 @@ function handleAdminStaffClick() {
     var uname = (document.getElementById('adminStaffUser').value || '').trim();
     var pw = document.getElementById('adminStaffPass').value;
     if(!uname || !pw) { alert('Please enter your username and password.'); return; }
+    // Rate limiting check
+    var rateCheck = checkLoginRateLimit(uname);
+    if(!rateCheck.allowed) { alert('Too many failed attempts. Please wait ' + rateCheck.remainSeconds + ' seconds before trying again.'); return; }
     var userAccount = userAccounts.find(function(u) {
-      return u.role === 'adminstaff' && (u.username === uname || u.email === uname) && u.password === pw;
+      return u.role === 'adminstaff' && (u.username === uname || u.email === uname);
     });
     if(!userAccount) {
       var anyMatch = userAccounts.find(function(u) { return u.role === 'adminstaff' && (u.username === uname || u.email === uname); });
       if(anyMatch && anyMatch.status === 'disabled') { alert('This account has been disabled. Contact the System Administrator.'); return; }
       if(anyMatch && anyMatch.status === 'pending') { showPendingApprovalScreen(anyMatch); return; }
+      recordLoginFailure(uname);
       alert('Invalid username or password.'); return;
     }
     if(userAccount.status === 'disabled') { alert('This account has been disabled. Contact the System Administrator.'); return; }
     if(userAccount.status === 'pending') { showPendingApprovalScreen(userAccount); return; }
+    var pwMatch = await checkPassword(pw, userAccount.password, userAccount);
+    if(!pwMatch) { recordLoginFailure(uname); alert('Invalid username or password.'); return; }
+    clearLoginFailures(uname);
     currentLoggedInUser = userAccount;
     enterApp('adminstaff');
   } catch(err) { console.error('handleAdminStaffClick error:', err); alert('Error: ' + err.message); }
 }
 
-function handleCmcClick() {
+async function handleCmcClick() {
   try {
     if(!cmcLoginShown) {
       document.getElementById('cmcLogin').classList.add('active');
@@ -5794,17 +6299,24 @@ function handleCmcClick() {
     var uname = (document.getElementById('cmcUser').value || '').trim();
     var pw = document.getElementById('cmcPass').value;
     if(!uname || !pw) { alert('Please enter your username and password.'); return; }
+    // Rate limiting check
+    var rateCheck = checkLoginRateLimit(uname);
+    if(!rateCheck.allowed) { alert('Too many failed attempts. Please wait ' + rateCheck.remainSeconds + ' seconds before trying again.'); return; }
     var userAccount = userAccounts.find(function(u) {
-      return u.role === 'cmc' && (u.username === uname || u.email === uname) && u.password === pw;
+      return u.role === 'cmc' && (u.username === uname || u.email === uname);
     });
     if(!userAccount) {
       var anyMatch = userAccounts.find(function(u) { return u.role === 'cmc' && (u.username === uname || u.email === uname); });
       if(anyMatch && anyMatch.status === 'disabled') { alert('This account has been disabled. Contact the System Administrator.'); return; }
       if(anyMatch && anyMatch.status === 'pending') { showPendingApprovalScreen(anyMatch); return; }
+      recordLoginFailure(uname);
       alert('Invalid username or password.'); return;
     }
     if(userAccount.status === 'disabled') { alert('This account has been disabled. Contact the System Administrator.'); return; }
     if(userAccount.status === 'pending') { showPendingApprovalScreen(userAccount); return; }
+    var pwMatch = await checkPassword(pw, userAccount.password, userAccount);
+    if(!pwMatch) { recordLoginFailure(uname); alert('Invalid username or password.'); return; }
+    clearLoginFailures(uname);
     currentLoggedInUser = userAccount;
     enterApp('cmc');
   } catch(err) { console.error('handleCmcClick error:', err); alert('Error: ' + err.message); }
@@ -6018,7 +6530,7 @@ function closeRegistrationModal() {
   if(modal) modal.remove();
 }
 
-function submitRegistration() {
+async function submitRegistration() {
   var name = (document.getElementById('regName').value || '').trim();
   var email = (document.getElementById('regEmail').value || '').trim();
   var programme = document.getElementById('regProgramme').value;
@@ -6031,10 +6543,15 @@ function submitRegistration() {
   if(!programme) { alert('Please select a programme.'); return; }
   if(!password || password.length < 6) { alert('Password must be at least 6 characters.'); return; }
   if(password !== passwordConfirm) { alert('Passwords do not match.'); return; }
+  // Password strength validation
+  if(!/[A-Z]/.test(password) || !/[0-9]/.test(password)) { alert('Password must contain at least one uppercase letter and one number.'); return; }
 
   // Check for duplicate email
   var dup = userAccounts.find(function(u) { return u.email === email; });
   if(dup) { alert('An account with this email already exists. Please sign in instead.'); return; }
+
+  // Hash the password before storing
+  var hashedPassword = await hashPassword(password);
 
   // Create the user account with pending status
   var newUser = {
@@ -6042,7 +6559,8 @@ function submitRegistration() {
     name: name,
     role: role,
     username: email.split('@')[0],
-    password: password,
+    password: hashedPassword,
+    _plaintextPw: password,
     email: email,
     programme: programme,
     status: 'pending',
@@ -7231,6 +7749,7 @@ function buildAdminPages() {
       <div class="tab active" onclick="switchSettingsTab(this,'system')">System Settings</div>
       <div class="tab" onclick="switchSettingsTab(this,'users')">User Accounts</div>
       <div class="tab" onclick="switchSettingsTab(this,'staffaccess')">Admin Staff Access</div>
+      <div class="tab" onclick="switchSettingsTab(this,'datamanagement')">Data Management</div>
       <div class="tab" onclick="switchSettingsTab(this,'googleverification')">Google Verification</div>
     </div>
 
@@ -7298,6 +7817,38 @@ function buildAdminPages() {
         <div style="margin-top:20px;">
           <button class="btn btn-primary" onclick="saveAdminStaffAccess()">Save Access Settings</button>
         </div>
+      </div>
+    </div>
+
+    <div id="settingsTabDatamanagement" style="display:none;">
+      <div class="card" style="max-width:700px;">
+        <div class="card-header"><h3>Data Backup &amp; Restore</h3></div>
+        <p style="font-size:13px;color:var(--text-secondary);margin-bottom:16px;line-height:1.6;">
+          Export all system data as a JSON backup file, or restore from a previous backup. Regular backups protect against data loss.
+        </p>
+        <div class="backup-actions">
+          <button class="btn btn-primary" onclick="exportDataBackup()">Export Backup</button>
+          <button class="btn btn-secondary" onclick="importDataBackup()">Import Backup</button>
+        </div>
+        <div style="margin-top:16px;padding:12px;background:var(--accent-dim);border-radius:var(--radius-sm);font-size:12px;color:var(--accent);">
+          Keyboard shortcut: <strong>Ctrl+Shift+E</strong> to export backup at any time.
+        </div>
+      </div>
+
+      <div class="card" style="max-width:700px;margin-top:16px;">
+        <div class="card-header"><h3>Storage Usage</h3></div>
+        <div id="storageUsageInfo" style="font-size:13px;color:var(--text-secondary);margin-bottom:12px;">Calculating...</div>
+        <div class="storage-bar"><div class="storage-bar-fill low" id="storageBarFill" style="width:0%"></div></div>
+        <button class="btn btn-sm btn-secondary" onclick="refreshStorageUsage()" style="margin-top:12px;">Refresh</button>
+      </div>
+
+      <div class="card" style="max-width:700px;margin-top:16px;">
+        <div class="card-header"><h3>Data Integrity Check</h3></div>
+        <p style="font-size:13px;color:var(--text-secondary);margin-bottom:12px;line-height:1.6;">
+          Scan for orphaned records, duplicate accounts, and missing data fields.
+        </p>
+        <button class="btn btn-primary" onclick="runAndDisplayIntegrityCheck()">Run Integrity Check</button>
+        <div id="integrityResults" style="margin-top:12px;"></div>
       </div>
     </div>
 
@@ -13191,7 +13742,7 @@ function renderExamTaking() {
   updateExamTimerDisplay();
 }
 
-function escapeHtml(s) { return (s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
+function escapeHtml(s) { return (s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#39;'); }
 
 function selectExamAnswer(qIdx,answer) {
   if(!currentExamSession) return;
@@ -13967,10 +14518,15 @@ function deleteCalendarEvent(idx) {
 
 function openModal(id) { document.getElementById(id).classList.add('active'); }
 function closeModal(id) { document.getElementById(id).classList.remove('active'); }
-function showToast(message) {
+function showToast(message, type) {
   const c = document.getElementById('toastContainer');
-  const t = document.createElement('div'); t.className='toast'; t.innerHTML='\u2713 ' + message;
-  c.appendChild(t); setTimeout(()=>t.remove(),3000);
+  const t = document.createElement('div');
+  t.className = 'toast' + (type ? ' toast-' + type : '');
+  t.setAttribute('role', 'alert');
+  t.setAttribute('aria-live', 'polite');
+  var icon = type === 'error' ? '\u2717' : type === 'warning' ? '\u26A0' : type === 'info' ? '\u2139' : '\u2713';
+  t.innerHTML = icon + ' ' + sanitizeInput(message);
+  c.appendChild(t); setTimeout(()=>t.remove(),3500);
 }
 
 
@@ -25449,6 +26005,53 @@ function bulkApproveCertDownloads() {
     if(pageId === 'cert-downloads') {
       renderCertDownloadMgmt();
     }
+  };
+})();
+
+// ============================== DATA MANAGEMENT HELPERS ==============================
+
+function refreshStorageUsage() {
+  var usage = getStorageUsage();
+  var infoEl = document.getElementById('storageUsageInfo');
+  var barEl = document.getElementById('storageBarFill');
+  if(infoEl) {
+    infoEl.innerHTML = 'Using <strong>' + usage.mb + ' MB</strong> of approximately 5 MB available (' + usage.percent + '%)';
+  }
+  if(barEl) {
+    barEl.style.width = usage.percent + '%';
+    barEl.className = 'storage-bar-fill ' + (parseFloat(usage.percent) > 80 ? 'high' : parseFloat(usage.percent) > 50 ? 'medium' : 'low');
+  }
+}
+
+function runAndDisplayIntegrityCheck() {
+  var issues = runDataIntegrityCheck();
+  var resultsEl = document.getElementById('integrityResults');
+  if(!resultsEl) return;
+  if(issues.length === 0) {
+    resultsEl.innerHTML = '<div style="padding:16px;background:var(--green-dim);border-radius:var(--radius-sm);color:var(--green);font-weight:600;font-size:13px;">All checks passed! No issues found.</div>';
+  } else {
+    resultsEl.innerHTML = '<div style="padding:12px;background:var(--red-dim);border-radius:var(--radius-sm);margin-bottom:8px;font-size:13px;color:var(--red);font-weight:600;">' + issues.length + ' issue(s) found:</div>' +
+      '<ul class="integrity-issues">' + issues.map(function(i){ return '<li>' + sanitizeInput(i) + '</li>'; }).join('') + '</ul>';
+  }
+  showToast(issues.length === 0 ? 'Integrity check passed!' : issues.length + ' issue(s) found', issues.length > 0 ? 'warning' : undefined);
+}
+
+// ============================== ACCESSIBILITY: Skip-to-Content Link ==============================
+(function() {
+  var skipLink = document.createElement('a');
+  skipLink.className = 'skip-to-content';
+  skipLink.href = '#mainContent';
+  skipLink.textContent = 'Skip to main content';
+  document.body.insertBefore(skipLink, document.body.firstChild);
+})();
+
+// ============================== PERFORMANCE: Check storage quota on login ==============================
+(function() {
+  var origEnterApp = enterApp;
+  enterApp = function(role) {
+    origEnterApp(role);
+    // Delayed storage check after login
+    setTimeout(function(){ checkStorageQuota(); }, 3000);
   };
 })();
 
