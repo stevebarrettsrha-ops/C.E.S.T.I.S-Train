@@ -8601,7 +8601,7 @@ function buildInstructorPages() {
         ${lowAttStudents.length > 0 ? `<div class="alert-item alert-danger"><div class="alert-icon">⚠️</div><div class="alert-body"><div class="alert-msg">${lowAttStudents.length} student${lowAttStudents.length!==1?'s':''} below 70% attendance</div><div class="alert-time">Needs follow-up</div></div></div>` : ''}
         <div class="alert-item alert-info"><div class="alert-icon">📝</div><div class="alert-body"><div class="alert-msg">${upcomingExams.length} exam${upcomingExams.length!==1?'s':''} scheduled for ${ins.course}</div><div class="alert-time">Review schedule</div></div></div>
         <div class="alert-item alert-warning"><div class="alert-icon">📋</div><div class="alert-body"><div class="alert-msg">${myStudents.filter(s=>s.stage==='incomplete').length} student${myStudents.filter(s=>s.stage==='incomplete').length!==1?'s':''} marked incomplete</div><div class="alert-time">Review progress</div></div></div>
-        <div class="alert-item alert-info"><div class="alert-icon">🔔</div><div class="alert-body"><div class="alert-msg">Today's class: ${ins.course} Theory Session</div><div class="alert-time">9:00 AM</div></div></div>
+        <div class="alert-item alert-info" id="iDashNextClassAlert" style="display:none;"><div class="alert-icon">🔔</div><div class="alert-body"><div class="alert-msg" id="iDashNextClassMsg"></div><div class="alert-time" id="iDashNextClassTime"></div></div></div>
       </div>
       <div class="card"><div class="card-header"><h3>Top Students</h3></div>
         ${[...myStudents].sort((a,b)=>parseFloat(b.gpa)-parseFloat(a.gpa)).slice(0,5).map((s,i) => {
@@ -8618,11 +8618,8 @@ function buildInstructorPages() {
     </div>
 
     <div class="card"><div class="card-header"><h3>Recent Activity</h3></div>
-      <div style="display:flex;flex-direction:column;gap:12px;">
-        <div style="display:flex;align-items:center;gap:12px;padding:8px 0;border-bottom:1px solid var(--border);"><div style="width:8px;height:8px;border-radius:50%;background:var(--green);flex-shrink:0;"></div><div><div style="font-size:13px;">Attendance marked for <strong>${ins.course}</strong> Theory class</div><div style="font-size:11px;color:var(--text-muted);">Today &mdash; ${myStudents.length} students</div></div></div>
-        <div style="display:flex;align-items:center;gap:12px;padding:8px 0;border-bottom:1px solid var(--border);"><div style="width:8px;height:8px;border-radius:50%;background:var(--blue);flex-shrink:0;"></div><div><div style="font-size:13px;">Practical Report #2 graded for <strong>${myStudents.length > 0 ? myStudents[0].name : 'N/A'}</strong></div><div style="font-size:11px;color:var(--text-muted);">2 hours ago</div></div></div>
-        <div style="display:flex;align-items:center;gap:12px;padding:8px 0;border-bottom:1px solid var(--border);"><div style="width:8px;height:8px;border-radius:50%;background:var(--accent);flex-shrink:0;"></div><div><div style="font-size:13px;">New resource uploaded: <strong>${ins.course} Safety Guide</strong></div><div style="font-size:11px;color:var(--text-muted);">Yesterday</div></div></div>
-        <div style="display:flex;align-items:center;gap:12px;padding:8px 0;"><div style="width:8px;height:8px;border-radius:50%;background:var(--purple);flex-shrink:0;"></div><div><div style="font-size:13px;">Video class completed: <strong>${ins.course} Workshop Review</strong></div><div style="font-size:11px;color:var(--text-muted);">Yesterday &mdash; 1hr 15min</div></div></div>
+      <div id="iDashRecentActivity" style="display:flex;flex-direction:column;gap:12px;">
+        <p style="color:var(--text-muted);padding:16px;text-align:center;">No recent activity yet. Activity will appear here as you use the system.</p>
       </div>
     </div>
   </section>
@@ -8631,32 +8628,12 @@ function buildInstructorPages() {
   <section class="page" id="page-i-classes">
     <div style="display:flex;gap:12px;margin-bottom:18px;"><button class="btn btn-primary" onclick="openModal('createClassSessionModal')">+ New Class Session</button><button class="btn btn-secondary" onclick="openModal('createClassSessionModal')">Schedule Session</button></div>
     <div class="card" id="iVideoClassList"><div class="card-header"><h3>My Class Sessions</h3></div>
-      <div class="class-schedule-card" style="border-color:rgba(231,76,60,0.3);">
-        <div class="class-time-block" style="background:var(--red-dim);"><div class="time">9:00</div><div class="period">AM</div></div>
-        <div style="flex:1;"><div style="font-size:14px;font-weight:600;">${ins.course} &mdash; Theory Session</div><div style="font-size:12px;color:var(--text-muted);">${myStudents.length} students enrolled &bull; Virtual-01</div></div>
-        <span class="badge badge-red"><span class="live-dot"></span>&nbsp;Live Now</span>
-        <button class="btn btn-primary" onclick="enterVideoRoom('${ins.course} \u2014 Theory','instructor')">Join Class &rarr;</button>
-      </div>
-      <div class="class-schedule-card">
-        <div class="class-time-block"><div class="time">1:00</div><div class="period">PM</div></div>
-        <div style="flex:1;"><div style="font-size:14px;font-weight:600;">${ins.course} &mdash; Practical Lab</div><div style="font-size:12px;color:var(--text-muted);">${myStudents.length} students &bull; Workshop Bay 3</div></div>
-        <span class="badge badge-blue">Scheduled</span>
-        <button class="btn btn-secondary btn-sm" disabled>Not Started</button>
-      </div>
-      <div class="class-schedule-card">
-        <div class="class-time-block"><div class="time">3:30</div><div class="period">PM</div></div>
-        <div style="flex:1;"><div style="font-size:14px;font-weight:600;">${ins.course} &mdash; Workshop Review</div><div style="font-size:12px;color:var(--text-muted);">Group session &bull; Virtual-02</div></div>
-        <span class="badge badge-purple">Optional</span>
-        <button class="btn btn-secondary btn-sm" disabled>Not Started</button>
-      </div>
-    </div>
-    <div class="card" style="margin-top:18px;"><div class="card-header"><h3>My Scheduled Sessions</h3><span style="font-size:12px;color:var(--text-muted);">Created by you</span></div>
       <div id="iClassSessionsList"></div>
     </div>
     <div class="card" style="margin-top:18px;"><div class="card-header"><h3>Past Recordings</h3></div>
-      <div class="material-item"><div class="material-icon" style="background:var(--red-dim);color:var(--red);">\u25B6</div><div style="flex:1;"><div style="font-size:13px;">${ins.course} &mdash; Safety Fundamentals</div><div style="font-size:11px;color:var(--text-muted);">Feb 12 &bull; 1hr 20min &bull; ${myStudents.length} attended</div></div><button class="btn btn-sm btn-secondary">Watch</button></div>
-      <div class="material-item"><div class="material-icon" style="background:var(--red-dim);color:var(--red);">\u25B6</div><div style="flex:1;"><div style="font-size:13px;">${ins.course} &mdash; Core Techniques Review</div><div style="font-size:11px;color:var(--text-muted);">Feb 10 &bull; 55min &bull; ${myStudents.length - 2} attended</div></div><button class="btn btn-sm btn-secondary">Watch</button></div>
-      <div class="material-item"><div class="material-icon" style="background:var(--red-dim);color:var(--red);">\u25B6</div><div style="flex:1;"><div style="font-size:13px;">${ins.course} &mdash; Tool Identification</div><div style="font-size:11px;color:var(--text-muted);">Feb 7 &bull; 1hr 5min &bull; ${myStudents.length - 1} attended</div></div><button class="btn btn-sm btn-secondary">Watch</button></div>
+      <div id="iPastRecordingsList">
+        <p style="color:var(--text-muted);padding:16px;text-align:center;">No past recordings yet. Completed class sessions will appear here.</p>
+      </div>
     </div>
     <div id="iVideoRoom" style="display:none;"></div>
   </section>
@@ -8978,6 +8955,7 @@ function buildInstructorPages() {
   renderInstructorAnnouncements();
   renderInstructorCalendar();
   renderInstructorClassSessions();
+  renderInstructorDashboardDynamic();
   renderInstructorGradebook();
   renderInstructorCustomResources();
   } catch(err) {
@@ -11072,6 +11050,61 @@ function renderInstructorClassSessions() {
       '<button class="btn btn-sm btn-danger" onclick="deleteClassSession(\''+s.id+'\')">Delete</button>' +
     '</div>';
   }).join('');
+}
+
+function renderInstructorDashboardDynamic() {
+  var ins = currentInstructor;
+  if (!ins) return;
+
+  // Populate "next class" alert from classSessions
+  var alertEl = document.getElementById('iDashNextClassAlert');
+  var msgEl = document.getElementById('iDashNextClassMsg');
+  var timeEl = document.getElementById('iDashNextClassTime');
+  if (alertEl && msgEl && timeEl) {
+    var mySessions = classSessions.filter(function(s) {
+      return s.course === ins.course || s.createdBy === ins.name;
+    });
+    var today = new Date().toISOString().split('T')[0];
+    var todaySessions = mySessions.filter(function(s) { return s.date === today; });
+    if (todaySessions.length === 0) {
+      // Show next upcoming session
+      var futureSessions = mySessions.filter(function(s) { return s.date >= today; }).sort(function(a,b) { return (a.date+a.time).localeCompare(b.date+b.time); });
+      if (futureSessions.length > 0) {
+        var next = futureSessions[0];
+        var timeStr = next.time ? new Date('2000-01-01T'+next.time).toLocaleTimeString([],{hour:'numeric',minute:'2-digit'}) : next.time;
+        msgEl.textContent = 'Next class: ' + next.name;
+        timeEl.textContent = next.date + ' at ' + timeStr;
+        alertEl.style.display = '';
+      }
+    } else {
+      var nextToday = todaySessions.sort(function(a,b) { return a.time.localeCompare(b.time); })[0];
+      var timeStr = nextToday.time ? new Date('2000-01-01T'+nextToday.time).toLocaleTimeString([],{hour:'numeric',minute:'2-digit'}) : nextToday.time;
+      msgEl.textContent = "Today's class: " + nextToday.name;
+      timeEl.textContent = timeStr;
+      alertEl.style.display = '';
+    }
+  }
+
+  // Populate recent activity from notifications
+  var activityEl = document.getElementById('iDashRecentActivity');
+  if (activityEl) {
+    var myNotifs = notifications.filter(function(n) {
+      return n.role === 'instructor' || !n.role;
+    }).slice(0, 5);
+
+    if (myNotifs.length === 0) {
+      activityEl.innerHTML = '<p style="color:var(--text-muted);padding:16px;text-align:center;">No recent activity yet. Activity will appear here as you use the system.</p>';
+    } else {
+      var colors = ['var(--green)','var(--blue)','var(--accent)','var(--purple)','var(--red)'];
+      activityEl.innerHTML = myNotifs.map(function(n, i) {
+        var border = i < myNotifs.length - 1 ? 'border-bottom:1px solid var(--border);' : '';
+        return '<div style="display:flex;align-items:center;gap:12px;padding:8px 0;' + border + '">' +
+          '<div style="width:8px;height:8px;border-radius:50%;background:' + colors[i % colors.length] + ';flex-shrink:0;"></div>' +
+          '<div><div style="font-size:13px;">' + n.message + '</div>' +
+          '<div style="font-size:11px;color:var(--text-muted);">' + (n.time || 'Recently') + '</div></div></div>';
+      }).join('');
+    }
+  }
 }
 
 function renderAdminClassSessions() {
