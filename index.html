@@ -5563,11 +5563,12 @@ function loadState() {
 
 function updateSkillAreaCounts() {
   skillAreas.forEach(function(sk) {
+    var skNameLower = sk.name.toLowerCase().trim();
     sk.students = students.filter(function(s) {
-      return s.course && sk.name.toLowerCase().indexOf(s.course.toLowerCase().split(' ')[0]) !== -1;
+      return s.course && s.course.toLowerCase().trim() === skNameLower;
     }).length;
     sk.materials = driveResources.filter(function(r) {
-      return r.course && sk.name.toLowerCase().indexOf(r.course.toLowerCase().split(' ')[0]) !== -1;
+      return r.course && r.course.toLowerCase().trim() === skNameLower;
     }).length;
   });
 }
@@ -6659,11 +6660,13 @@ function closePendingScreen() {
 
 // ----- Create student/instructor data entries for approved accounts -----
 function createStudentDataForAccount(userAccount) {
+  var prog = userAccount.programme || 'Welding';
+  var matchedInstructor = instructorData.find(function(ins){ return ins.course && ins.course.toLowerCase().trim() === prog.toLowerCase().trim(); });
   var newStudent = {
     id: 'STU-' + Date.now(),
     name: userAccount.name,
     stage: 'training',
-    course: userAccount.programme || 'Welding',
+    course: prog,
     score: '0%',
     progress: 5,
     certNo: '',
@@ -6675,9 +6678,12 @@ function createStudentDataForAccount(userAccount) {
     gpa: '0.0',
     gender: '',
     createdAt: new Date().toISOString().split('T')[0],
-    instructor: instructorData.find(function(ins){ return ins.course === userAccount.programme; }) ? instructorData.find(function(ins){ return ins.course === userAccount.programme; }).name : instructorData[0].name
+    instructor: matchedInstructor ? matchedInstructor.name : (instructorData.length ? instructorData[0].name : '')
   };
   students.push(newStudent);
+  // Auto-create attendance record so the student appears in attendance pages
+  attendanceRecords.push({studentId:newStudent.id, studentName:newStudent.name, course:newStudent.course, date:new Date().toISOString().split('T')[0], days:{Mon:'absent',Tue:'absent',Wed:'absent',Thu:'absent',Fri:'absent'}});
+  updateSkillAreaCounts();
   userAccount.studentDataId = newStudent.id;
   saveState();
   return newStudent;
@@ -8661,15 +8667,15 @@ function buildInstructorPages() {
   try {
   resolveExamStatuses();
   const ins = currentInstructor;
-  const myStudents = students.filter(s => s.instructor === ins.name);
-  const myCourseStudents = students.filter(s => s.course === ins.course);
+  const myStudents = students.filter(s => s.instructor === ins.name || (s.course && ins.course && s.course.toLowerCase().trim() === ins.course.toLowerCase().trim()));
+  const myCourseStudents = students.filter(s => s.course && ins.course && s.course.toLowerCase().trim() === ins.course.toLowerCase().trim());
   const myExams = exams.filter(e => e.course === ins.course);
   const certifiedCount = myStudents.filter(s => s.stage === 'certified' || s.stage === 'collected').length;
   const avgAttendance = myStudents.length ? Math.round(myStudents.reduce((a,s) => a + s.attendance, 0) / myStudents.length) : 0;
   const avgGpa = myStudents.length ? (myStudents.reduce((a,s) => a + parseFloat(s.gpa), 0) / myStudents.length).toFixed(1) : '0.0';
   const lowAttStudents = myStudents.filter(s => s.attendance < 70);
   const upcomingExams = myExams.filter(e => e.status === 'upcoming');
-  const skill = skillAreas.find(sk => ins.course.toLowerCase().indexOf(sk.name.split(' ')[0].toLowerCase()) !== -1) || skillAreas[0];
+  const skill = skillAreas.find(sk => sk.name.toLowerCase().trim() === ins.course.toLowerCase().trim()) || skillAreas[0];
 
   const mc = document.getElementById('mainContent');
   mc.innerHTML = `
@@ -9119,7 +9125,8 @@ function renderInstructorStudents(data) {
 
 function filterInstructorStudents() {
   if(!currentInstructor) return;
-  let filtered = students.filter(s => s.instructor === currentInstructor.name);
+  var insCourse = (currentInstructor.course || '').toLowerCase().trim();
+  let filtered = students.filter(s => s.instructor === currentInstructor.name || (s.course && s.course.toLowerCase().trim() === insCourse));
   const stage = document.getElementById('iFilterStage')?.value;
   const search = document.getElementById('iStudentSearch')?.value?.toLowerCase();
   if(stage && stage !== 'all') filtered = filtered.filter(s => s.stage === stage);
@@ -9129,7 +9136,8 @@ function filterInstructorStudents() {
 
 function updateInstructorPipeline() {
   if(!currentInstructor) return;
-  const myStudents = students.filter(s => s.instructor === currentInstructor.name);
+  var insCourse = (currentInstructor.course || '').toLowerCase().trim();
+  const myStudents = students.filter(s => s.instructor === currentInstructor.name || (s.course && s.course.toLowerCase().trim() === insCourse));
   const stageIdMap = {testing:'ipTest',interview:'ipInterview',training:'ipTraining',certified:'ipCertified',collected:'ipCollected',incomplete:'ipIncomplete'};
   stages.forEach(s => {
     const count = myStudents.filter(st => st.stage === s).length;
@@ -9148,9 +9156,10 @@ function exportInstructorStudentsCSV() {
 
 function renderInstructorAttendance() {
   if(!currentInstructor) return;
+  var insCourse = (currentInstructor.course || '').toLowerCase().trim();
   const myRecords = attendanceRecords.filter(r => {
     const student = students.find(s => s.id === r.studentId);
-    return student && student.instructor === currentInstructor.name;
+    return student && (student.instructor === currentInstructor.name || (student.course && student.course.toLowerCase().trim() === insCourse));
   });
   const tbody = document.getElementById('iAttendanceTableBody');
   if(!tbody) return;
@@ -13080,6 +13089,7 @@ function saveEditStudent() {
   }
   s.name = name;
   s.gender = document.getElementById('editStudentGender').value || '';
+  var oldCourse = s.course;
   s.course = document.getElementById('editStudentCourse').value;
   s.instructor = document.getElementById('editStudentInstructor').value.trim();
   s.attendance = parseInt(document.getElementById('editStudentAttendance').value) || 0;
@@ -13090,6 +13100,15 @@ function saveEditStudent() {
     studentProfiles[s.id].email = email;
     studentProfiles[s.id].updatedAt = new Date().toISOString();
   }
+  // Update attendance record if course or name changed
+  var attRec = attendanceRecords.find(function(r){ return r.studentId === s.id; });
+  if(attRec) {
+    attRec.studentName = s.name;
+    attRec.course = s.course;
+  } else {
+    attendanceRecords.push({studentId:s.id, studentName:s.name, course:s.course, date:new Date().toISOString().split('T')[0], days:{Mon:'absent',Tue:'absent',Wed:'absent',Thu:'absent',Fri:'absent'}});
+  }
+  updateSkillAreaCounts();
   closeModal('editStudentModal');
   filterStudents();
   showToast(s.name + ' updated successfully');
@@ -13125,9 +13144,16 @@ function addStudent() {
   const name = document.getElementById('newStudentName').value.trim();
   if(!name){alert('Please enter a name');return;}
   var selectedCourse = document.getElementById('newStudentCourse').value;
-  var assignedInstructor = (instructorData.find(function(ins){return ins.course === selectedCourse;})||{}).name || '';
+  var assignedInstructor = (instructorData.find(function(ins){return ins.course && ins.course.toLowerCase().trim() === selectedCourse.toLowerCase().trim();})||{}).name || '';
   var gender = document.getElementById('newStudentGender').value || '';
-  students.unshift({id:generateStudentId(),name,stage:document.getElementById('newStudentStage').value,course:selectedCourse,score:'',progress:10,certNo:null,certDate:null,certCollected:false,attendance:0,assignments:0,assignmentsTotal:8,gpa:'0.0',instructor:assignedInstructor,gender:gender,createdAt:new Date().toISOString().split('T')[0]});
+  var newId = generateStudentId();
+  students.unshift({id:newId,name,stage:document.getElementById('newStudentStage').value,course:selectedCourse,score:'',progress:10,certNo:null,certDate:null,certCollected:false,attendance:0,assignments:0,assignmentsTotal:8,gpa:'0.0',instructor:assignedInstructor,gender:gender,createdAt:new Date().toISOString().split('T')[0]});
+  // Auto-create attendance record so the student appears in attendance pages
+  var existingAtt = attendanceRecords.find(function(r){ return r.studentId === newId; });
+  if(!existingAtt) {
+    attendanceRecords.push({studentId:newId, studentName:name, course:selectedCourse, date:new Date().toISOString().split('T')[0], days:{Mon:'absent',Tue:'absent',Wed:'absent',Thu:'absent',Fri:'absent'}});
+  }
+  updateSkillAreaCounts();
   closeModal('addStudentModal');filterStudents();updatePipelineCounts();showToast(`${name} added!`);document.getElementById('newStudentName').value='';document.getElementById('newStudentGender').value='';
   addNotification('New student enrolled: ' + name + ' — ' + document.getElementById('newStudentCourse').value, 'student', null, ['admin','instructor']);
   saveState();
