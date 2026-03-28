@@ -4946,6 +4946,7 @@ let instructorAssignments = [];
 let assignmentSubmissions = []; // Student submissions for assignments
 let instructorResources = [];
 let driveResources = []; // Admin-managed resources uploaded to Google Drive
+let documentHubFiles = []; // Document Hub files for staff download
 let studentProfiles = {};
 let instructorProfiles = {};
 let systemSettings = { institutionName: 'C.E.S.T.I.S LMS - Community Training Intervention', adminEmail: 'admin@heartlms.edu.jm', academicYear: '2025/2026', vcProvider: 'Built-in (WebRTC)' };
@@ -5471,6 +5472,7 @@ function saveState() {
     localStorage.setItem('voctrain_instructorData', JSON.stringify(instructorData));
     localStorage.setItem('voctrain_certDownloadApprovals', JSON.stringify(certDownloadApprovals));
     localStorage.setItem('voctrain_skillAreas', JSON.stringify(skillAreas));
+    localStorage.setItem('voctrain_documentHubFiles', JSON.stringify(documentHubFiles));
     // Strip large base64 images before saving to localStorage (images are in IndexedDB)
     var certTplsClean = {};
     Object.keys(certTemplates).forEach(function(k) {
@@ -5535,6 +5537,8 @@ function loadState() {
     if(ct) certTemplates = ct;
     var sa = safeJsonParse(localStorage.getItem('voctrain_skillAreas'), null);
     if(sa) skillAreas = sa;
+    var dhf = safeJsonParse(localStorage.getItem('voctrain_documentHubFiles'), null);
+    if(dhf) documentHubFiles = dhf;
   } catch(e) { console.warn('[loadState] Error loading data:', e.message); }
   // Migrate any cert template images from localStorage to IndexedDB, then load from IndexedDB
   var needsMigration = false;
@@ -6931,6 +6935,8 @@ function buildAdminSidebar() {
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 5H7a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V7a2 2 0 0 0-2-2h-2"/><rect x="9" y="3" width="6" height="4" rx="1"/><path d="M9 12l2 2 4-4"/></svg>Class Attendance</div>
     <div class="nav-item" data-page="cashbook" onclick="showPage('cashbook')">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="3" width="20" height="14" rx="2"/><line x1="8" y1="21" x2="16" y2="21"/><line x1="12" y1="17" x2="12" y2="21"/></svg>Cashbook Management</div>
+    <div class="nav-item" data-page="document-hub" onclick="showPage('document-hub')">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><path d="M12 18v-6"/><path d="M9 15l3 3 3-3"/></svg>Document Hub</div>
     <div class="nav-item" data-page="settings" onclick="showPage('settings')">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>Settings</div>
   `;
@@ -6990,6 +6996,9 @@ function buildInstructorSidebar() {
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 17H2a3 3 0 0 0 3-3V9a7 7 0 0 1 14 0v5a3 3 0 0 0 3 3zm-8.27 4a2 2 0 0 1-3.46 0"/></svg>Announcements</div>
     <div class="nav-item" data-page="i-calendar" onclick="showPage('i-calendar')">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>Calendar</div>
+    <div class="nav-section-label">Resources</div>
+    <div class="nav-item" data-page="i-document-hub" onclick="showPage('i-document-hub')">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><path d="M12 18v-6"/><path d="M9 15l3 3 3-3"/></svg>Document Hub</div>
     <div class="nav-section-label">Tools</div>
     <div class="nav-item" data-page="i-timetracking" onclick="showPage('i-timetracking')">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>Time Tracking</div>
@@ -7065,7 +7074,7 @@ function showPage(pageId) {
     'timetracking':'Staff Time Tracking','i-timetracking':'Staff Time Tracking','as-timetracking':'Staff Time Tracking',
     'fee-management':'School Fee Management','as-fee-management':'School Fee Management',
     'class-attendance':'Class Attendance','as-class-attendance':'Class Attendance',
-    'cashbook':'Cashbook Management',
+    'cashbook':'Cashbook Management','document-hub':'Document Hub','i-document-hub':'Document Hub','as-document-hub':'Document Hub',
     'cmc-dashboard':'CMC Analytics Dashboard','cmc-financial':'Financial Overview','cmc-staff':'Staff & HR','cmc-academic':'Academic Performance','cmc-sources':'Source Viewer','cmc-profile':'My Profile'
   };
   document.getElementById('topbarTitle').textContent = titles[pageId]||pageId;
@@ -7075,6 +7084,9 @@ function showPage(pageId) {
   if(pageId === 'i-duties') iOnDutiesPageShow();
   if(pageId === 'verify-users') renderVerifyUsersPage();
   if(pageId === 'a-resources') renderAdminResources();
+  if(pageId === 'document-hub') renderDocumentHubAdmin();
+  if(pageId === 'i-document-hub') renderDocumentHubInstructor();
+  if(pageId === 'as-document-hub') renderDocumentHubAdmin();
   if(pageId === 'a-assignments') renderAdminAssignments();
   if(pageId === 'exams' || pageId === 'i-exams') renderInstructorExams();
   if(pageId === 's-resources') renderStudentDriveResources();
@@ -8102,6 +8114,66 @@ function buildAdminPages() {
   <section class="page" id="page-cashbook">
     <iframe id="cashbookFrame" style="width:100%;height:calc(100vh - 80px);border:none;border-radius:12px;"></iframe>
   </section>
+
+  <!-- DOCUMENT HUB (Admin) -->
+  <section class="page" id="page-document-hub">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:20px;flex-wrap:wrap;gap:12px;">
+      <div>
+        <h3 style="font-family:'Playfair Display',serif;margin:0;">Document Hub</h3>
+        <p style="font-size:13px;color:var(--text-muted);margin:4px 0 0;">Upload and manage documents for staff to download</p>
+      </div>
+      <button class="btn btn-primary" onclick="toggleDocHubUploadForm()">+ Upload Document</button>
+    </div>
+    <div id="docHubUploadForm" style="display:none;">
+      <div class="card" style="padding:20px;margin-bottom:20px;">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px;">
+          <h4 style="margin:0;">Upload New Document</h4>
+          <button class="btn btn-sm btn-secondary" onclick="toggleDocHubUploadForm()">&#10005; Close</button>
+        </div>
+        <div class="form-group"><label>Document Title</label><input type="text" class="form-control" id="docHubTitle" placeholder="e.g. Staff Handbook 2026"></div>
+        <div style="display:flex;gap:12px;flex-wrap:wrap;">
+          <div class="form-group" style="flex:1;min-width:200px;"><label>Category</label>
+            <select class="form-control" id="docHubCategory">
+              <option value="General">General</option>
+              <option value="Policies">Policies</option>
+              <option value="Forms">Forms</option>
+              <option value="Templates">Templates</option>
+              <option value="Training Materials">Training Materials</option>
+              <option value="HR Documents">HR Documents</option>
+              <option value="Procedures">Procedures</option>
+              <option value="Other">Other</option>
+            </select>
+          </div>
+          <div class="form-group" style="flex:1;min-width:200px;"><label>Target Audience</label>
+            <select class="form-control" id="docHubAudience">
+              <option value="all">All Staff</option>
+              <option value="instructors">Instructors Only</option>
+              <option value="adminstaff">Admin Staff Only</option>
+            </select>
+          </div>
+        </div>
+        <div class="form-group"><label>Description (optional)</label><textarea class="form-control" id="docHubDesc" rows="2" placeholder="Brief description of this document..."></textarea></div>
+        <div class="form-group"><label>Select File</label><input type="file" class="form-control" id="docHubFile" accept=".pdf,.doc,.docx,.xls,.xlsx,.ppt,.pptx,.txt,.csv,.zip,.png,.jpg,.jpeg"></div>
+        <button class="btn btn-primary" onclick="docHubUploadFile()">Upload Document</button>
+      </div>
+    </div>
+    <div style="display:flex;gap:12px;margin-bottom:16px;flex-wrap:wrap;align-items:center;">
+      <input type="text" class="form-control" id="docHubSearch" placeholder="Search documents..." style="width:250px;" oninput="renderDocumentHubAdmin()">
+      <select class="form-control" id="docHubCategoryFilter" style="width:180px;" onchange="renderDocumentHubAdmin()">
+        <option value="all">All Categories</option>
+        <option value="General">General</option>
+        <option value="Policies">Policies</option>
+        <option value="Forms">Forms</option>
+        <option value="Templates">Templates</option>
+        <option value="Training Materials">Training Materials</option>
+        <option value="HR Documents">HR Documents</option>
+        <option value="Procedures">Procedures</option>
+        <option value="Other">Other</option>
+      </select>
+    </div>
+    <div class="stats-grid stats-grid-4" id="docHubStats"></div>
+    <div id="docHubAdminList"></div>
+  </section>
   `;
 
   populateCourseDropdowns();
@@ -8989,6 +9061,30 @@ function buildInstructorPages() {
     </div>
     <div id="iExamResultsView" style="display:none;"></div>
     <div id="iAdminExamPreviewView" style="display:none;"></div>
+  </section>
+
+  <!-- DOCUMENT HUB (Instructor - Download Only) -->
+  <section class="page" id="page-i-document-hub">
+    <div style="margin-bottom:20px;">
+      <h3 style="font-family:'Playfair Display',serif;margin:0;">Document Hub</h3>
+      <p style="font-size:13px;color:var(--text-muted);margin:4px 0 0;">Download documents shared by the Administrator</p>
+    </div>
+    <div style="display:flex;gap:12px;margin-bottom:16px;flex-wrap:wrap;align-items:center;">
+      <input type="text" class="form-control" id="iDocHubSearch" placeholder="Search documents..." style="width:250px;" oninput="renderDocumentHubInstructor()">
+      <select class="form-control" id="iDocHubCategoryFilter" style="width:180px;" onchange="renderDocumentHubInstructor()">
+        <option value="all">All Categories</option>
+        <option value="General">General</option>
+        <option value="Policies">Policies</option>
+        <option value="Forms">Forms</option>
+        <option value="Templates">Templates</option>
+        <option value="Training Materials">Training Materials</option>
+        <option value="HR Documents">HR Documents</option>
+        <option value="Procedures">Procedures</option>
+        <option value="Other">Other</option>
+      </select>
+    </div>
+    <div class="stats-grid stats-grid-4" id="iDocHubStats"></div>
+    <div id="iDocHubList"></div>
   </section>
   `;
 
@@ -22345,6 +22441,11 @@ function buildAdminStaffSidebar() {
     html += '<div class="nav-item" data-page="as-reports" onclick="showPage(\'as-reports\')"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/></svg>Reports</div>';
   }
 
+  // Document Hub always visible for admin staff
+  html += '<div class="nav-section-label">Resources</div>';
+  html += '<div class="nav-item" data-page="as-document-hub" onclick="showPage(\'as-document-hub\')">' +
+    '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><path d="M12 18v-6"/><path d="M9 15l3 3 3-3"/></svg>Document Hub</div>';
+
   // Time Tracking always visible for admin staff
   html += '<div class="nav-section-label">Tools</div>';
   html += '<div class="nav-item" data-page="as-timetracking" onclick="showPage(\'as-timetracking\')">' +
@@ -22679,6 +22780,45 @@ function buildAdminStaffPages() {
     '<iframe id="asClassAttendanceFrame" style="width:100%;height:calc(100vh - 80px);border:none;border-radius:12px;"></iframe>' +
   '</section>';
 
+  // ---- Document Hub Page (Admin Staff - same admin view) ----
+  html += '<section class="page" id="page-as-document-hub">' +
+    '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:20px;flex-wrap:wrap;gap:12px;">' +
+      '<div>' +
+        '<h3 style="font-family:Playfair Display,serif;margin:0;">Document Hub</h3>' +
+        '<p style="font-size:13px;color:var(--text-muted);margin:4px 0 0;">Upload and manage documents for staff to download</p>' +
+      '</div>' +
+      '<button class="btn btn-primary" onclick="toggleDocHubUploadForm(\'as\')">+ Upload Document</button>' +
+    '</div>' +
+    '<div id="asDocHubUploadForm" style="display:none;">' +
+      '<div class="card" style="padding:20px;margin-bottom:20px;">' +
+        '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px;">' +
+          '<h4 style="margin:0;">Upload New Document</h4>' +
+          '<button class="btn btn-sm btn-secondary" onclick="toggleDocHubUploadForm(\'as\')">&#10005; Close</button>' +
+        '</div>' +
+        '<div class="form-group"><label>Document Title</label><input type="text" class="form-control" id="asDocHubTitle" placeholder="e.g. Staff Handbook 2026"></div>' +
+        '<div style="display:flex;gap:12px;flex-wrap:wrap;">' +
+          '<div class="form-group" style="flex:1;min-width:200px;"><label>Category</label>' +
+            '<select class="form-control" id="asDocHubCategory"><option value="General">General</option><option value="Policies">Policies</option><option value="Forms">Forms</option><option value="Templates">Templates</option><option value="Training Materials">Training Materials</option><option value="HR Documents">HR Documents</option><option value="Procedures">Procedures</option><option value="Other">Other</option></select>' +
+          '</div>' +
+          '<div class="form-group" style="flex:1;min-width:200px;"><label>Target Audience</label>' +
+            '<select class="form-control" id="asDocHubAudience"><option value="all">All Staff</option><option value="instructors">Instructors Only</option><option value="adminstaff">Admin Staff Only</option></select>' +
+          '</div>' +
+        '</div>' +
+        '<div class="form-group"><label>Description (optional)</label><textarea class="form-control" id="asDocHubDesc" rows="2" placeholder="Brief description of this document..."></textarea></div>' +
+        '<div class="form-group"><label>Select File</label><input type="file" class="form-control" id="asDocHubFile" accept=".pdf,.doc,.docx,.xls,.xlsx,.ppt,.pptx,.txt,.csv,.zip,.png,.jpg,.jpeg"></div>' +
+        '<button class="btn btn-primary" onclick="docHubUploadFile(\'as\')">Upload Document</button>' +
+      '</div>' +
+    '</div>' +
+    '<div style="display:flex;gap:12px;margin-bottom:16px;flex-wrap:wrap;align-items:center;">' +
+      '<input type="text" class="form-control" id="asDocHubSearch" placeholder="Search documents..." style="width:250px;" oninput="renderDocumentHubAdmin(\'as\')">' +
+      '<select class="form-control" id="asDocHubCategoryFilter" style="width:180px;" onchange="renderDocumentHubAdmin(\'as\')">' +
+        '<option value="all">All Categories</option><option value="General">General</option><option value="Policies">Policies</option><option value="Forms">Forms</option><option value="Templates">Templates</option><option value="Training Materials">Training Materials</option><option value="HR Documents">HR Documents</option><option value="Procedures">Procedures</option><option value="Other">Other</option>' +
+      '</select>' +
+    '</div>' +
+    '<div class="stats-grid stats-grid-4" id="asDocHubStats"></div>' +
+    '<div id="asDocHubAdminList"></div>' +
+  '</section>';
+
   // ---- Task Detail Modal (needed for My Duties click-to-view) ----
   html += '<div class="modal-overlay" id="adrTaskDetailModal">' +
     '<div class="modal" style="max-width:700px;max-height:85vh;overflow-y:auto;">' +
@@ -22704,6 +22844,263 @@ function asFilterStudents() {
     var matchCourse = course === 'all' || c === course;
     row.style.display = (matchSearch && matchCourse) ? '' : 'none';
   });
+}
+
+// ============================== DOCUMENT HUB FUNCTIONS ==============================
+
+function toggleDocHubUploadForm(prefix) {
+  var formId = prefix === 'as' ? 'asDocHubUploadForm' : 'docHubUploadForm';
+  var form = document.getElementById(formId);
+  if(form) form.style.display = form.style.display === 'none' ? 'block' : 'none';
+}
+
+function docHubUploadFile(prefix) {
+  var p = prefix === 'as' ? 'as' : '';
+  var titleEl = document.getElementById((p ? p : '') + 'DocHubTitle') || document.getElementById('docHubTitle');
+  var catEl = document.getElementById((p ? p : '') + 'DocHubCategory') || document.getElementById('docHubCategory');
+  var audEl = document.getElementById((p ? p : '') + 'DocHubAudience') || document.getElementById('docHubAudience');
+  var descEl = document.getElementById((p ? p : '') + 'DocHubDesc') || document.getElementById('docHubDesc');
+  var fileEl = document.getElementById((p ? p : '') + 'DocHubFile') || document.getElementById('docHubFile');
+
+  var title = (titleEl ? titleEl.value : '').trim();
+  var category = catEl ? catEl.value : 'General';
+  var audience = audEl ? audEl.value : 'all';
+  var desc = descEl ? descEl.value.trim() : '';
+
+  if(!title) { showToast('Please enter a document title', 'warning'); return; }
+  if(!fileEl || !fileEl.files || !fileEl.files[0]) { showToast('Please select a file to upload', 'warning'); return; }
+
+  var file = fileEl.files[0];
+  if(file.size > 10 * 1024 * 1024) { showToast('File size must be under 10MB', 'warning'); return; }
+
+  var reader = new FileReader();
+  reader.onload = function(e) {
+    var uploaderName = 'Administrator';
+    if(currentLoggedInUser) uploaderName = currentLoggedInUser.name;
+
+    var doc = {
+      id: 'DOC-' + Date.now(),
+      title: title,
+      category: category,
+      audience: audience,
+      description: desc,
+      fileName: file.name,
+      fileType: file.type || 'application/octet-stream',
+      fileSize: file.size,
+      fileData: e.target.result,
+      uploadedBy: uploaderName,
+      uploadedDate: new Date().toISOString().split('T')[0],
+      downloads: 0
+    };
+
+    documentHubFiles.push(doc);
+    saveState();
+    showToast('Document "' + title + '" uploaded successfully!', 'success');
+
+    // Reset form
+    if(titleEl) titleEl.value = '';
+    if(descEl) descEl.value = '';
+    if(fileEl) fileEl.value = '';
+    if(catEl) catEl.value = 'General';
+    if(audEl) audEl.value = 'all';
+    toggleDocHubUploadForm(prefix);
+
+    if(prefix === 'as') renderDocumentHubAdmin('as');
+    else renderDocumentHubAdmin();
+  };
+  reader.readAsDataURL(file);
+}
+
+function docHubDeleteFile(docId) {
+  if(!confirm('Are you sure you want to delete this document?')) return;
+  documentHubFiles = documentHubFiles.filter(function(d) { return d.id !== docId; });
+  saveState();
+  showToast('Document deleted', 'success');
+  renderDocumentHubAdmin();
+  renderDocumentHubAdmin('as');
+}
+
+function docHubDownloadFile(docId) {
+  var doc = documentHubFiles.find(function(d) { return d.id === docId; });
+  if(!doc) { showToast('Document not found', 'warning'); return; }
+  doc.downloads = (doc.downloads || 0) + 1;
+  saveState();
+
+  var link = document.createElement('a');
+  link.href = doc.fileData;
+  link.download = doc.fileName;
+  document.body.appendChild(link);
+  link.click();
+  document.body.removeChild(link);
+  showToast('Downloading "' + doc.fileName + '"', 'success');
+}
+
+function docHubEditFile(docId) {
+  var doc = documentHubFiles.find(function(d) { return d.id === docId; });
+  if(!doc) return;
+  var newTitle = prompt('Edit document title:', doc.title);
+  if(newTitle === null) return;
+  newTitle = newTitle.trim();
+  if(!newTitle) { showToast('Title cannot be empty', 'warning'); return; }
+  doc.title = newTitle;
+  var newDesc = prompt('Edit description:', doc.description || '');
+  if(newDesc !== null) doc.description = newDesc.trim();
+  saveState();
+  showToast('Document updated', 'success');
+  renderDocumentHubAdmin();
+  renderDocumentHubAdmin('as');
+}
+
+function docHubFormatFileSize(bytes) {
+  if(bytes < 1024) return bytes + ' B';
+  if(bytes < 1048576) return (bytes / 1024).toFixed(1) + ' KB';
+  return (bytes / 1048576).toFixed(1) + ' MB';
+}
+
+function docHubGetFileIcon(fileName) {
+  var ext = (fileName || '').split('.').pop().toLowerCase();
+  var icons = {
+    pdf: '<svg viewBox="0 0 24 24" fill="none" stroke="#e74c3c" stroke-width="2" style="width:32px;height:32px;"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>',
+    doc: '<svg viewBox="0 0 24 24" fill="none" stroke="#2980b9" stroke-width="2" style="width:32px;height:32px;"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg>',
+    docx: '<svg viewBox="0 0 24 24" fill="none" stroke="#2980b9" stroke-width="2" style="width:32px;height:32px;"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg>',
+    xls: '<svg viewBox="0 0 24 24" fill="none" stroke="#27ae60" stroke-width="2" style="width:32px;height:32px;"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><rect x="8" y="12" width="8" height="6" rx="1"/></svg>',
+    xlsx: '<svg viewBox="0 0 24 24" fill="none" stroke="#27ae60" stroke-width="2" style="width:32px;height:32px;"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><rect x="8" y="12" width="8" height="6" rx="1"/></svg>',
+    ppt: '<svg viewBox="0 0 24 24" fill="none" stroke="#e67e22" stroke-width="2" style="width:32px;height:32px;"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>',
+    pptx: '<svg viewBox="0 0 24 24" fill="none" stroke="#e67e22" stroke-width="2" style="width:32px;height:32px;"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>',
+    zip: '<svg viewBox="0 0 24 24" fill="none" stroke="#8e44ad" stroke-width="2" style="width:32px;height:32px;"><path d="M21 8v13H3V3h12l6 5z"/><path d="M12 3v4h-2v2h2v2h-2v2h2"/></svg>',
+    png: '<svg viewBox="0 0 24 24" fill="none" stroke="#16a085" stroke-width="2" style="width:32px;height:32px;"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21 15 16 10 5 21"/></svg>',
+    jpg: '<svg viewBox="0 0 24 24" fill="none" stroke="#16a085" stroke-width="2" style="width:32px;height:32px;"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21 15 16 10 5 21"/></svg>',
+    jpeg: '<svg viewBox="0 0 24 24" fill="none" stroke="#16a085" stroke-width="2" style="width:32px;height:32px;"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21 15 16 10 5 21"/></svg>'
+  };
+  return icons[ext] || '<svg viewBox="0 0 24 24" fill="none" stroke="var(--text-muted)" stroke-width="2" style="width:32px;height:32px;"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>';
+}
+
+function renderDocumentHubAdmin(prefix) {
+  var p = prefix === 'as' ? 'as' : '';
+  var searchEl = document.getElementById((p ? p : '') + 'DocHubSearch') || document.getElementById('docHubSearch');
+  var catEl = document.getElementById((p ? p : '') + 'DocHubCategoryFilter') || document.getElementById('docHubCategoryFilter');
+  var statsEl = document.getElementById((p ? p + 'DocHubStats' : 'docHubStats'));
+  var listEl = document.getElementById((p ? p + 'DocHubAdminList' : 'docHubAdminList'));
+
+  if(!listEl) return;
+
+  var search = searchEl ? searchEl.value.toLowerCase().trim() : '';
+  var catFilter = catEl ? catEl.value : 'all';
+
+  var filtered = documentHubFiles.filter(function(d) {
+    var matchSearch = !search || d.title.toLowerCase().indexOf(search) !== -1 || (d.description || '').toLowerCase().indexOf(search) !== -1 || d.fileName.toLowerCase().indexOf(search) !== -1;
+    var matchCat = catFilter === 'all' || d.category === catFilter;
+    return matchSearch && matchCat;
+  });
+
+  // Stats
+  if(statsEl) {
+    var totalDocs = documentHubFiles.length;
+    var totalDownloads = documentHubFiles.reduce(function(a, d) { return a + (d.downloads || 0); }, 0);
+    var categories = {};
+    documentHubFiles.forEach(function(d) { categories[d.category] = true; });
+    var totalSize = documentHubFiles.reduce(function(a, d) { return a + (d.fileSize || 0); }, 0);
+    statsEl.innerHTML =
+      '<div class="stat-card"><div class="stat-icon" style="background:var(--accent-dim);color:var(--accent);">&#128196;</div><div class="stat-value" data-count="' + totalDocs + '">0</div><div class="stat-label">Total Documents</div></div>' +
+      '<div class="stat-card"><div class="stat-icon" style="background:var(--green-dim);color:var(--green);">&#11015;</div><div class="stat-value" data-count="' + totalDownloads + '">0</div><div class="stat-label">Total Downloads</div></div>' +
+      '<div class="stat-card"><div class="stat-icon" style="background:var(--blue-dim);color:var(--blue);">&#128193;</div><div class="stat-value" data-count="' + Object.keys(categories).length + '">0</div><div class="stat-label">Categories</div></div>' +
+      '<div class="stat-card"><div class="stat-icon" style="background:var(--purple-dim);color:var(--purple);">&#128190;</div><div class="stat-value">' + docHubFormatFileSize(totalSize) + '</div><div class="stat-label">Total Size</div></div>';
+    setTimeout(animateAllCounters, 50);
+  }
+
+  // List
+  if(filtered.length === 0) {
+    listEl.innerHTML = '<div class="card" style="padding:40px;text-align:center;"><div style="font-size:48px;margin-bottom:12px;">&#128194;</div><h4 style="color:var(--text-muted);margin-bottom:8px;">No Documents Found</h4><p style="color:var(--text-muted);font-size:13px;">' + (documentHubFiles.length === 0 ? 'Upload your first document using the button above.' : 'Try adjusting your search or filter.') + '</p></div>';
+    return;
+  }
+
+  var html = '<div class="card"><div class="table-wrapper"><table><thead><tr><th style="width:40px;"></th><th>Document</th><th>Category</th><th>Audience</th><th>Uploaded By</th><th>Date</th><th>Size</th><th>Downloads</th><th>Actions</th></tr></thead><tbody>';
+  filtered.sort(function(a, b) { return new Date(b.uploadedDate) - new Date(a.uploadedDate); }).forEach(function(doc) {
+    var audienceLabel = doc.audience === 'all' ? 'All Staff' : doc.audience === 'instructors' ? 'Instructors' : 'Admin Staff';
+    var audienceBadge = doc.audience === 'all' ? 'badge-blue' : doc.audience === 'instructors' ? 'badge-green' : 'badge-amber';
+    html += '<tr>' +
+      '<td style="text-align:center;">' + docHubGetFileIcon(doc.fileName) + '</td>' +
+      '<td><strong style="font-size:13px;">' + doc.title + '</strong>' + (doc.description ? '<div style="font-size:11px;color:var(--text-muted);margin-top:2px;">' + doc.description + '</div>' : '') + '<div style="font-size:11px;color:var(--text-muted);margin-top:2px;">' + doc.fileName + '</div></td>' +
+      '<td><span class="badge badge-blue" style="font-size:10px;">' + doc.category + '</span></td>' +
+      '<td><span class="badge ' + audienceBadge + '" style="font-size:10px;">' + audienceLabel + '</span></td>' +
+      '<td style="font-size:12px;">' + doc.uploadedBy + '</td>' +
+      '<td style="font-size:12px;">' + doc.uploadedDate + '</td>' +
+      '<td style="font-size:12px;">' + docHubFormatFileSize(doc.fileSize) + '</td>' +
+      '<td style="font-size:12px;font-weight:600;">' + (doc.downloads || 0) + '</td>' +
+      '<td><div style="display:flex;gap:6px;">' +
+        '<button class="btn btn-sm btn-primary" onclick="docHubDownloadFile(\'' + doc.id + '\')" title="Download" style="padding:4px 8px;">&#11015;</button>' +
+        '<button class="btn btn-sm btn-secondary" onclick="docHubEditFile(\'' + doc.id + '\')" title="Edit" style="padding:4px 8px;">&#9998;</button>' +
+        '<button class="btn btn-sm" onclick="docHubDeleteFile(\'' + doc.id + '\')" title="Delete" style="padding:4px 8px;background:var(--red-dim);color:var(--red);border:1px solid var(--red);">&#128465;</button>' +
+      '</div></td>' +
+    '</tr>';
+  });
+  html += '</tbody></table></div></div>';
+  listEl.innerHTML = html;
+}
+
+function renderDocumentHubInstructor() {
+  var searchEl = document.getElementById('iDocHubSearch');
+  var catEl = document.getElementById('iDocHubCategoryFilter');
+  var statsEl = document.getElementById('iDocHubStats');
+  var listEl = document.getElementById('iDocHubList');
+
+  if(!listEl) return;
+
+  var search = searchEl ? searchEl.value.toLowerCase().trim() : '';
+  var catFilter = catEl ? catEl.value : 'all';
+
+  // Filter: only show documents for 'all' or 'instructors' audience
+  var available = documentHubFiles.filter(function(d) {
+    return d.audience === 'all' || d.audience === 'instructors';
+  });
+
+  var filtered = available.filter(function(d) {
+    var matchSearch = !search || d.title.toLowerCase().indexOf(search) !== -1 || (d.description || '').toLowerCase().indexOf(search) !== -1 || d.fileName.toLowerCase().indexOf(search) !== -1;
+    var matchCat = catFilter === 'all' || d.category === catFilter;
+    return matchSearch && matchCat;
+  });
+
+  // Stats
+  if(statsEl) {
+    var categories = {};
+    available.forEach(function(d) { categories[d.category] = true; });
+    statsEl.innerHTML =
+      '<div class="stat-card"><div class="stat-icon" style="background:var(--accent-dim);color:var(--accent);">&#128196;</div><div class="stat-value" data-count="' + available.length + '">0</div><div class="stat-label">Available Documents</div></div>' +
+      '<div class="stat-card"><div class="stat-icon" style="background:var(--green-dim);color:var(--green);">&#128193;</div><div class="stat-value" data-count="' + Object.keys(categories).length + '">0</div><div class="stat-label">Categories</div></div>' +
+      '<div class="stat-card"><div class="stat-icon" style="background:var(--blue-dim);color:var(--blue);">&#128270;</div><div class="stat-value" data-count="' + filtered.length + '">0</div><div class="stat-label">Showing</div></div>' +
+      '<div class="stat-card"><div class="stat-icon" style="background:var(--purple-dim);color:var(--purple);">&#11015;</div><div class="stat-value">Ready</div><div class="stat-label">Download Status</div></div>';
+    setTimeout(animateAllCounters, 50);
+  }
+
+  // List
+  if(filtered.length === 0) {
+    listEl.innerHTML = '<div class="card" style="padding:40px;text-align:center;"><div style="font-size:48px;margin-bottom:12px;">&#128194;</div><h4 style="color:var(--text-muted);margin-bottom:8px;">No Documents Available</h4><p style="color:var(--text-muted);font-size:13px;">' + (available.length === 0 ? 'No documents have been shared yet. Check back later.' : 'Try adjusting your search or filter.') + '</p></div>';
+    return;
+  }
+
+  var html = '';
+  filtered.sort(function(a, b) { return new Date(b.uploadedDate) - new Date(a.uploadedDate); }).forEach(function(doc) {
+    html += '<div class="card" style="padding:16px;margin-bottom:12px;display:flex;align-items:center;gap:16px;">' +
+      '<div style="flex-shrink:0;">' + docHubGetFileIcon(doc.fileName) + '</div>' +
+      '<div style="flex:1;min-width:0;">' +
+        '<div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:4px;">' +
+          '<strong style="font-size:14px;">' + doc.title + '</strong>' +
+          '<span class="badge badge-blue" style="font-size:10px;">' + doc.category + '</span>' +
+        '</div>' +
+        (doc.description ? '<div style="font-size:12px;color:var(--text-secondary);margin-bottom:4px;">' + doc.description + '</div>' : '') +
+        '<div style="font-size:11px;color:var(--text-muted);display:flex;gap:12px;flex-wrap:wrap;">' +
+          '<span>' + doc.fileName + '</span>' +
+          '<span>' + docHubFormatFileSize(doc.fileSize) + '</span>' +
+          '<span>Uploaded: ' + doc.uploadedDate + '</span>' +
+          '<span>By: ' + doc.uploadedBy + '</span>' +
+        '</div>' +
+      '</div>' +
+      '<div style="flex-shrink:0;">' +
+        '<button class="btn btn-primary" onclick="docHubDownloadFile(\'' + doc.id + '\')" style="display:flex;align-items:center;gap:6px;"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:16px;height:16px;"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg> Download</button>' +
+      '</div>' +
+    '</div>';
+  });
+  listEl.innerHTML = html;
 }
 
 // ---- Admin Staff Video Meeting Functions ----
