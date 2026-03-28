@@ -6433,6 +6433,18 @@ function enterApp(role) {
     updateNotificationDot();
     setTimeout(animateAllCounters, 100);
 
+    // Notify admin of pending/disabled accounts needing review
+    if (role === 'admin') {
+      var pendingCount = userAccounts.filter(function(u) { return u.status === 'pending'; }).length;
+      var disabledCount = userAccounts.filter(function(u) { return u.status === 'disabled' && u.role !== 'admin'; }).length;
+      if (pendingCount > 0 || disabledCount > 0) {
+        var msg = '';
+        if (pendingCount > 0) msg += pendingCount + ' account(s) awaiting approval';
+        if (disabledCount > 0) msg += (msg ? ', ' : '') + disabledCount + ' disabled account(s) to review';
+        addNotification(msg + ' — go to Verify Users', 'warning', null, ['admin']);
+      }
+    }
+
     // Show profile picture in sidebar if user has one in LMS Chat
     if(currentLoggedInUser && typeof lmsChatProfiles !== 'undefined') {
       var cp = lmsChatProfiles[currentLoggedInUser.id];
@@ -6701,16 +6713,18 @@ function createInstructorDataForAccount(userAccount) {
 // ----- Verify Users Page (Admin) -----
 function renderVerifyUsersPage() {
   var pending = userAccounts.filter(function(u) { return u.status === 'pending'; });
+  var disabled = userAccounts.filter(function(u) { return u.status === 'disabled' && u.role !== 'admin'; });
+  var needsReview = pending.concat(disabled);
   var recentlyProcessed = userAccounts.filter(function(u) {
     return (u.status === 'active' || u.status === 'rejected') && u.approvedAt;
   }).sort(function(a, b) { return (b.approvedAt || '').localeCompare(a.approvedAt || ''); }).slice(0, 10);
 
-  // Update badge
+  // Update badge — show count of both pending and disabled accounts needing review
   var badge = document.getElementById('pendingUsersBadge');
   if(badge) {
-    if(pending.length > 0) {
+    if(needsReview.length > 0) {
       badge.style.display = 'inline';
-      badge.textContent = pending.length;
+      badge.textContent = needsReview.length;
     } else {
       badge.style.display = 'none';
     }
@@ -6720,32 +6734,35 @@ function renderVerifyUsersPage() {
   var statsEl = document.getElementById('verifyUsersStats');
   if(statsEl) {
     var totalPending = pending.length;
-    var pendingStudents = pending.filter(function(u){ return u.role === 'student'; }).length;
-    var pendingInstructors = pending.filter(function(u){ return u.role === 'instructor'; }).length;
+    var totalDisabled = disabled.length;
+    var pendingStudents = needsReview.filter(function(u){ return u.role === 'student'; }).length;
+    var pendingInstructors = needsReview.filter(function(u){ return u.role === 'instructor'; }).length;
     var totalApproved = userAccounts.filter(function(u){ return u.approvedAt && u.status === 'active'; }).length;
     statsEl.innerHTML =
       '<div class="stat-card"><div class="stat-icon" style="background:var(--accent-dim);color:var(--accent);">⏳</div><div class="stat-value">'+totalPending+'</div><div class="stat-label">Pending Approval</div></div>' +
-      '<div class="stat-card"><div class="stat-icon" style="background:var(--blue-dim);color:var(--blue);">🎓</div><div class="stat-value">'+pendingStudents+'</div><div class="stat-label">Pending Students</div></div>' +
-      '<div class="stat-card"><div class="stat-icon" style="background:var(--green-dim);color:var(--green);">📚</div><div class="stat-value">'+pendingInstructors+'</div><div class="stat-label">Pending Instructors</div></div>' +
+      '<div class="stat-card"><div class="stat-icon" style="background:var(--red-dim);color:var(--red);">🔒</div><div class="stat-value">'+totalDisabled+'</div><div class="stat-label">Disabled (Awaiting Sync)</div></div>' +
+      '<div class="stat-card"><div class="stat-icon" style="background:var(--blue-dim);color:var(--blue);">🎓</div><div class="stat-value">'+pendingStudents+'</div><div class="stat-label">Students to Review</div></div>' +
       '<div class="stat-card"><div class="stat-icon" style="background:var(--green-dim);color:var(--green);">✅</div><div class="stat-value">'+totalApproved+'</div><div class="stat-label">Total Approved</div></div>';
   }
 
-  // Table
+  // Table — show both pending and disabled accounts
   var tbody = document.getElementById('verifyUsersTableBody');
   if(tbody) {
-    if(pending.length === 0) {
+    if(needsReview.length === 0) {
       tbody.innerHTML = '<tr><td colspan="6" style="text-align:center;color:var(--text-muted);padding:24px;">No pending accounts to review.</td></tr>';
     } else {
-      tbody.innerHTML = pending.map(function(u) {
+      tbody.innerHTML = needsReview.map(function(u) {
         var roleBadge = u.role === 'student' ? 'badge-blue' : 'badge-green';
+        var statusLabel = u.status === 'pending' ? '<span style="color:var(--accent);font-size:11px;font-weight:600;">Pending</span>' : '<span style="color:var(--red);font-size:11px;font-weight:600;">Disabled</span>';
+        var sourceLabel = u.registeredVia === 'admin-created' ? ' <span style="font-size:10px;color:var(--text-muted);">(Admin Created)</span>' : u.registeredVia === 'fee-system' ? ' <span style="font-size:10px;color:var(--text-muted);">(Fee System)</span>' : u.registeredVia === 'registration' ? ' <span style="font-size:10px;color:var(--text-muted);">(Self-Registered)</span>' : '';
         return '<tr>' +
-          '<td><strong>' + escapeHtml(u.name) + '</strong></td>' +
-          '<td style="font-size:12px;">' + escapeHtml(u.email) + '</td>' +
-          '<td><span class="badge ' + roleBadge + '"><span class="badge-dot"></span>' + u.role.charAt(0).toUpperCase() + u.role.slice(1) + '</span></td>' +
+          '<td><strong>' + escapeHtml(u.name) + '</strong>' + sourceLabel + '</td>' +
+          '<td style="font-size:12px;">' + escapeHtml(u.email || '—') + '</td>' +
+          '<td><span class="badge ' + roleBadge + '"><span class="badge-dot"></span>' + u.role.charAt(0).toUpperCase() + u.role.slice(1) + '</span> ' + statusLabel + '</td>' +
           '<td>' + escapeHtml(u.programme || '—') + '</td>' +
           '<td style="font-size:12px;color:var(--text-muted);">' + u.createdAt + '</td>' +
           '<td><div class="verify-action-btns">' +
-          '<button class="btn btn-sm btn-primary" onclick="approveUser(\'' + escapeAttr(u.id) + '\')">Approve</button>' +
+          '<button class="btn btn-sm btn-primary" onclick="approveUser(\'' + escapeAttr(u.id) + '\')">Activate</button>' +
           '<button class="btn btn-sm btn-secondary" style="background:var(--red-dim);color:var(--red);border-color:var(--red);" onclick="rejectUser(\'' + escapeAttr(u.id) + '\')">Reject</button>' +
           '</div></td></tr>';
       }).join('');
@@ -6777,6 +6794,22 @@ function approveUser(userId) {
   user.status = 'active';
   user.approvedAt = new Date().toISOString().split('T')[0];
   user.approvedBy = 'admin';
+  // Ensure student data is created and linked when approving a student account
+  if (user.role === 'student' && !user.studentDataId) {
+    var existingStudent = students.find(function(s) { return s.name === user.name; });
+    if (existingStudent) {
+      user.studentDataId = existingStudent.id;
+    } else {
+      createStudentDataForAccount(user);
+    }
+  }
+  // Ensure instructor data is created and linked when approving an instructor account
+  if (user.role === 'instructor') {
+    var existingInstructor = instructorData.find(function(ins) { return ins.name === user.name || ins.email === user.email; });
+    if (!existingInstructor) {
+      createInstructorDataForAccount(user);
+    }
+  }
   saveState();
   renderVerifyUsersPage();
   showToast('Account approved: ' + user.name + ' (' + user.role + ')');
@@ -6797,14 +6830,29 @@ function rejectUser(userId) {
 }
 
 function approveAllPending() {
-  var pending = userAccounts.filter(function(u) { return u.status === 'pending'; });
+  var pending = userAccounts.filter(function(u) { return u.status === 'pending' || (u.status === 'disabled' && u.role !== 'admin'); });
   if(pending.length === 0) { alert('No pending accounts to approve.'); return; }
-  if(!confirm('Approve all ' + pending.length + ' pending account(s)?')) return;
+  if(!confirm('Activate all ' + pending.length + ' pending/disabled account(s)?')) return;
   var dateStr = new Date().toISOString().split('T')[0];
   pending.forEach(function(u) {
     u.status = 'active';
     u.approvedAt = dateStr;
     u.approvedBy = 'admin';
+    // Create linked student/instructor data on approval
+    if (u.role === 'student' && !u.studentDataId) {
+      var existingStudent = students.find(function(s) { return s.name === u.name; });
+      if (existingStudent) {
+        u.studentDataId = existingStudent.id;
+      } else {
+        createStudentDataForAccount(u);
+      }
+    }
+    if (u.role === 'instructor') {
+      var existingInstructor = instructorData.find(function(ins) { return ins.name === u.name || ins.email === u.email; });
+      if (!existingInstructor) {
+        createInstructorDataForAccount(u);
+      }
+    }
   });
   saveState();
   renderVerifyUsersPage();
@@ -6813,7 +6861,7 @@ function approveAllPending() {
 }
 
 function rejectAllPending() {
-  var pending = userAccounts.filter(function(u) { return u.status === 'pending'; });
+  var pending = userAccounts.filter(function(u) { return u.status === 'pending' || (u.status === 'disabled' && u.role !== 'admin'); });
   if(pending.length === 0) { alert('No pending accounts to reject.'); return; }
   if(!confirm('Reject all ' + pending.length + ' pending account(s)?')) return;
   var dateStr = new Date().toISOString().split('T')[0];
@@ -13121,15 +13169,48 @@ function updatePipelineCounts() {
     ['','2'].forEach(sfx => { const el=document.getElementById('p'+s.charAt(0).toUpperCase()+s.slice(1)+sfx); if(el) el.textContent=count; });
   });
 }
-function addStudent() {
+async function addStudent() {
   const name = document.getElementById('newStudentName').value.trim();
   if(!name){alert('Please enter a name');return;}
+  var email = (document.getElementById('newStudentEmail').value || '').trim();
   var selectedCourse = document.getElementById('newStudentCourse').value;
   var assignedInstructor = (instructorData.find(function(ins){return ins.course === selectedCourse;})||{}).name || '';
   var gender = document.getElementById('newStudentGender').value || '';
-  students.unshift({id:generateStudentId(),name,stage:document.getElementById('newStudentStage').value,course:selectedCourse,score:'',progress:10,certNo:null,certDate:null,certCollected:false,attendance:0,assignments:0,assignmentsTotal:8,gpa:'0.0',instructor:assignedInstructor,gender:gender,createdAt:new Date().toISOString().split('T')[0]});
-  closeModal('addStudentModal');filterStudents();updatePipelineCounts();showToast(`${name} added!`);document.getElementById('newStudentName').value='';document.getElementById('newStudentGender').value='';
-  addNotification('New student enrolled: ' + name + ' — ' + document.getElementById('newStudentCourse').value, 'student', null, ['admin','instructor']);
+  var studentId = generateStudentId();
+  students.unshift({id:studentId,name,stage:document.getElementById('newStudentStage').value,course:selectedCourse,score:'',progress:10,certNo:null,certDate:null,certCollected:false,attendance:0,assignments:0,assignmentsTotal:8,gpa:'0.0',instructor:assignedInstructor,gender:gender,createdAt:new Date().toISOString().split('T')[0]});
+
+  // Create a linked disabled user account so the student syncs across the dashboard
+  var username = email ? email.split('@')[0] : name.toLowerCase().replace(/\s+/g, '.');
+  // Check for duplicate email/username before creating account
+  var dupAccount = userAccounts.find(function(u) {
+    if (email && u.email === email) return true;
+    if (u.username === username && u.role === 'student') return true;
+    return false;
+  });
+  if (!dupAccount) {
+    var defaultPw = await hashPassword(name.split(' ')[0].toLowerCase() + '123');
+    var newAccount = {
+      id: 'USR-' + Date.now(),
+      name: name,
+      role: 'student',
+      username: username,
+      password: defaultPw,
+      email: email || '',
+      programme: selectedCourse,
+      status: 'disabled',
+      createdAt: new Date().toISOString().split('T')[0],
+      registeredVia: 'admin-created',
+      studentDataId: studentId,
+      approvedBy: 'admin'
+    };
+    userAccounts.push(newAccount);
+  } else {
+    // Link existing account to this student data
+    dupAccount.studentDataId = studentId;
+  }
+
+  closeModal('addStudentModal');filterStudents();updatePipelineCounts();showToast(`${name} added (account disabled until activated)!`);document.getElementById('newStudentName').value='';document.getElementById('newStudentGender').value='';document.getElementById('newStudentEmail').value='';
+  addNotification('New student enrolled: ' + name + ' — ' + selectedCourse + ' (account disabled — activate in Verify Users)', 'student', null, ['admin','instructor']);
   saveState();
 
   // Auto-merge from cloud to pick up students added on other devices
@@ -16228,6 +16309,29 @@ async function syncStudentsFromFeeSystem() {
         instructor: assignedInstructor
       });
 
+      // Create a disabled user account for this fee-synced student
+      var feeUsername = name.toLowerCase().replace(/\s+/g, '.');
+      var feeDupAccount = userAccounts.find(function(u) {
+        return (u.username === feeUsername && u.role === 'student') ||
+               (u.studentDataId === studentId);
+      });
+      if (!feeDupAccount) {
+        userAccounts.push({
+          id: 'USR-FEE-' + Date.now() + '-' + Math.floor(Math.random() * 1000),
+          name: name.trim(),
+          role: 'student',
+          username: feeUsername,
+          password: '',
+          email: '',
+          programme: course.trim(),
+          status: 'disabled',
+          createdAt: new Date().toISOString().split('T')[0],
+          registeredVia: 'fee-system',
+          studentDataId: studentId,
+          approvedBy: 'system'
+        });
+      }
+
       existingIds[studentId] = true;
       existingKeys[dupKey] = true;
       changed = true;
@@ -17477,6 +17581,8 @@ async function silentMergeFromBackup(fileId) {
           if (cloudUser.email && cloudUser.email !== localMatch.email) { localMatch.email = cloudUser.email; userAccountsChanged = true; }
           if (cloudUser.programme !== undefined && cloudUser.programme !== localMatch.programme) { localMatch.programme = cloudUser.programme; userAccountsChanged = true; }
           if (cloudUser.role && cloudUser.role !== localMatch.role) { localMatch.role = cloudUser.role; userAccountsChanged = true; }
+          if (cloudUser.studentDataId && !localMatch.studentDataId) { localMatch.studentDataId = cloudUser.studentDataId; userAccountsChanged = true; }
+          if (cloudUser.registeredVia && !localMatch.registeredVia) { localMatch.registeredVia = cloudUser.registeredVia; userAccountsChanged = true; }
         } else {
           // New account — add it
           userAccounts.push(cloudUser);
@@ -17493,6 +17599,31 @@ async function silentMergeFromBackup(fileId) {
         if (_ds[cloudStudent.id]) return;
         if (!localStudentIds.includes(cloudStudent.id)) {
           students.push(cloudStudent);
+          changed = true;
+        }
+      });
+
+      // Create disabled user accounts for any orphaned students (no linked user account)
+      students.forEach(function(s) {
+        if (_ds[s.id]) return;
+        var hasAccount = userAccounts.find(function(u) {
+          return u.studentDataId === s.id || (u.role === 'student' && u.name === s.name);
+        });
+        if (!hasAccount) {
+          userAccounts.push({
+            id: 'USR-SYNC-' + Date.now() + '-' + Math.floor(Math.random() * 1000),
+            name: s.name,
+            role: 'student',
+            username: s.name.toLowerCase().replace(/\s+/g, '.'),
+            password: '',
+            email: '',
+            programme: s.course || '',
+            status: 'disabled',
+            createdAt: s.createdAt || new Date().toISOString().split('T')[0],
+            registeredVia: 'cloud-sync',
+            studentDataId: s.id,
+            approvedBy: 'system'
+          });
           changed = true;
         }
       });
