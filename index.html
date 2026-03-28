@@ -5734,8 +5734,24 @@ async function createUserAccount() {
   if(role !== 'admin' && role !== 'adminstaff' && role !== 'cmc' && !programme) { alert('Please select a programme.'); return; }
   var now = new Date(); var dateStr = now.getFullYear()+'-'+String(now.getMonth()+1).padStart(2,'0')+'-'+String(now.getDate()).padStart(2,'0');
   var hashedPw = await hashPassword(password);
-  userAccounts.push({id:getNextUserId(),name:name,role:role,username:username,password:hashedPw,_plaintextPw:password,email:email,programme:(role==='admin'||role==='adminstaff'||role==='cmc')?'':programme,status:'active',createdAt:dateStr});
+  var newAccount = {id:getNextUserId(),name:name,role:role,username:username,password:hashedPw,_plaintextPw:password,email:email,programme:(role==='admin'||role==='adminstaff'||role==='cmc')?'':programme,status:'active',createdAt:dateStr,registeredVia:'admin-created'};
+  userAccounts.push(newAccount);
+  // Create linked student/instructor data so the account is immediately usable
+  if (role === 'student') {
+    var existingStudent = students.find(function(s) { return s.name === name; });
+    if (existingStudent) {
+      newAccount.studentDataId = existingStudent.id;
+    } else {
+      createStudentDataForAccount(newAccount);
+    }
+  } else if (role === 'instructor') {
+    var existingInstructor = instructorData.find(function(ins) { return ins.name === name || ins.email === email; });
+    if (!existingInstructor) {
+      createInstructorDataForAccount(newAccount);
+    }
+  }
   saveUserAccounts();
+  saveState();
   closeModal('createUserModal');
   document.getElementById('newUserName').value='';
   document.getElementById('newUserUsername').value='';
@@ -6232,8 +6248,18 @@ async function handleStudentClick() {
     var pwMatch = await checkPassword(pw, userAccount.password, userAccount);
     if(!pwMatch) { recordLoginFailure(uname); alert('Invalid email/username or password. If you are a new student, please register first.'); return; }
     clearLoginFailures(uname);
-    // Find matching student data
-    var studentMatch = students.find(function(s) { return s.name === userAccount.name || s.id === userAccount.studentDataId; });
+    // Find matching student data — try studentDataId first, then name match
+    var studentMatch = null;
+    if (userAccount.studentDataId) {
+      studentMatch = students.find(function(s) { return s.id === userAccount.studentDataId; });
+    }
+    if (!studentMatch) {
+      studentMatch = students.find(function(s) { return s.name === userAccount.name; });
+      if (studentMatch && !userAccount.studentDataId) {
+        userAccount.studentDataId = studentMatch.id;
+        saveState();
+      }
+    }
     if(!studentMatch) {
       // Create a student data entry for this account
       studentMatch = createStudentDataForAccount(userAccount);
@@ -6671,6 +6697,8 @@ function closePendingScreen() {
 
 // ----- Create student/instructor data entries for approved accounts -----
 function createStudentDataForAccount(userAccount) {
+  var matchedInstructor = instructorData.find(function(ins){ return ins.course === userAccount.programme; });
+  var assignedInstructor = matchedInstructor ? matchedInstructor.name : (instructorData.length > 0 ? instructorData[0].name : '');
   var newStudent = {
     id: 'STU-' + Date.now(),
     name: userAccount.name,
@@ -6687,7 +6715,7 @@ function createStudentDataForAccount(userAccount) {
     gpa: '0.0',
     gender: '',
     createdAt: new Date().toISOString().split('T')[0],
-    instructor: instructorData.find(function(ins){ return ins.course === userAccount.programme; }) ? instructorData.find(function(ins){ return ins.course === userAccount.programme; }).name : instructorData[0].name
+    instructor: assignedInstructor
   };
   students.push(newStudent);
   userAccount.studentDataId = newStudent.id;
