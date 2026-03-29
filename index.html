@@ -5735,8 +5735,24 @@ async function createUserAccount() {
   if(role !== 'admin' && role !== 'adminstaff' && role !== 'cmc' && !programme) { alert('Please select a programme.'); return; }
   var now = new Date(); var dateStr = now.getFullYear()+'-'+String(now.getMonth()+1).padStart(2,'0')+'-'+String(now.getDate()).padStart(2,'0');
   var hashedPw = await hashPassword(password);
-  userAccounts.push({id:getNextUserId(),name:name,role:role,username:username,password:hashedPw,_plaintextPw:password,email:email,programme:(role==='admin'||role==='adminstaff'||role==='cmc')?'':programme,status:'active',createdAt:dateStr});
+  var newAccount = {id:getNextUserId(),name:name,role:role,username:username,password:hashedPw,_plaintextPw:password,email:email,programme:(role==='admin'||role==='adminstaff'||role==='cmc')?'':programme,status:'active',createdAt:dateStr,registeredVia:'admin-created'};
+  userAccounts.push(newAccount);
+  // Create linked student/instructor data so the account is immediately usable
+  if (role === 'student') {
+    var existingStudent = students.find(function(s) { return s.name === name; });
+    if (existingStudent) {
+      newAccount.studentDataId = existingStudent.id;
+    } else {
+      createStudentDataForAccount(newAccount);
+    }
+  } else if (role === 'instructor') {
+    var existingInstructor = instructorData.find(function(ins) { return ins.name === name || ins.email === email; });
+    if (!existingInstructor) {
+      createInstructorDataForAccount(newAccount);
+    }
+  }
   saveUserAccounts();
+  saveState();
   closeModal('createUserModal');
   document.getElementById('newUserName').value='';
   document.getElementById('newUserUsername').value='';
@@ -6233,8 +6249,18 @@ async function handleStudentClick() {
     var pwMatch = await checkPassword(pw, userAccount.password, userAccount);
     if(!pwMatch) { recordLoginFailure(uname); alert('Invalid email/username or password. If you are a new student, please register first.'); return; }
     clearLoginFailures(uname);
-    // Find matching student data
-    var studentMatch = students.find(function(s) { return s.name === userAccount.name || s.id === userAccount.studentDataId; });
+    // Find matching student data — try studentDataId first, then name match
+    var studentMatch = null;
+    if (userAccount.studentDataId) {
+      studentMatch = students.find(function(s) { return s.id === userAccount.studentDataId; });
+    }
+    if (!studentMatch) {
+      studentMatch = students.find(function(s) { return s.name === userAccount.name; });
+      if (studentMatch && !userAccount.studentDataId) {
+        userAccount.studentDataId = studentMatch.id;
+        saveState();
+      }
+    }
     if(!studentMatch) {
       // Create a student data entry for this account
       studentMatch = createStudentDataForAccount(userAccount);
@@ -6433,6 +6459,18 @@ function enterApp(role) {
     if(bellBtn) bellBtn.onclick = function(e) { e.stopPropagation(); toggleNotifications(); };
     updateNotificationDot();
     setTimeout(animateAllCounters, 100);
+
+    // Notify admin of pending/disabled accounts needing review
+    if (role === 'admin') {
+      var pendingCount = userAccounts.filter(function(u) { return u.status === 'pending'; }).length;
+      var disabledCount = userAccounts.filter(function(u) { return u.status === 'disabled' && u.role !== 'admin'; }).length;
+      if (pendingCount > 0 || disabledCount > 0) {
+        var msg = '';
+        if (pendingCount > 0) msg += pendingCount + ' account(s) awaiting approval';
+        if (disabledCount > 0) msg += (msg ? ', ' : '') + disabledCount + ' disabled account(s) to review';
+        addNotification(msg + ' — go to Verify Users', 'warning', null, ['admin']);
+      }
+    }
 
     // Show profile picture in sidebar if user has one in LMS Chat
     if(currentLoggedInUser && typeof lmsChatProfiles !== 'undefined') {
@@ -6662,6 +6700,7 @@ function closePendingScreen() {
 function createStudentDataForAccount(userAccount) {
   var prog = userAccount.programme || 'Welding';
   var matchedInstructor = instructorData.find(function(ins){ return ins.course && ins.course.toLowerCase().trim() === prog.toLowerCase().trim(); });
+  var assignedInstructor = matchedInstructor ? matchedInstructor.name : (instructorData.length > 0 ? instructorData[0].name : '');
   var newStudent = {
     id: 'STU-' + Date.now(),
     name: userAccount.name,
@@ -6678,7 +6717,7 @@ function createStudentDataForAccount(userAccount) {
     gpa: '0.0',
     gender: '',
     createdAt: new Date().toISOString().split('T')[0],
-    instructor: matchedInstructor ? matchedInstructor.name : (instructorData.length ? instructorData[0].name : '')
+    instructor: assignedInstructor
   };
   students.push(newStudent);
   // Auto-create attendance record so the student appears in attendance pages
@@ -6707,16 +6746,18 @@ function createInstructorDataForAccount(userAccount) {
 // ----- Verify Users Page (Admin) -----
 function renderVerifyUsersPage() {
   var pending = userAccounts.filter(function(u) { return u.status === 'pending'; });
+  var disabled = userAccounts.filter(function(u) { return u.status === 'disabled' && u.role !== 'admin'; });
+  var needsReview = pending.concat(disabled);
   var recentlyProcessed = userAccounts.filter(function(u) {
     return (u.status === 'active' || u.status === 'rejected') && u.approvedAt;
   }).sort(function(a, b) { return (b.approvedAt || '').localeCompare(a.approvedAt || ''); }).slice(0, 10);
 
-  // Update badge
+  // Update badge — show count of both pending and disabled accounts needing review
   var badge = document.getElementById('pendingUsersBadge');
   if(badge) {
-    if(pending.length > 0) {
+    if(needsReview.length > 0) {
       badge.style.display = 'inline';
-      badge.textContent = pending.length;
+      badge.textContent = needsReview.length;
     } else {
       badge.style.display = 'none';
     }
@@ -6726,32 +6767,35 @@ function renderVerifyUsersPage() {
   var statsEl = document.getElementById('verifyUsersStats');
   if(statsEl) {
     var totalPending = pending.length;
-    var pendingStudents = pending.filter(function(u){ return u.role === 'student'; }).length;
-    var pendingInstructors = pending.filter(function(u){ return u.role === 'instructor'; }).length;
+    var totalDisabled = disabled.length;
+    var pendingStudents = needsReview.filter(function(u){ return u.role === 'student'; }).length;
+    var pendingInstructors = needsReview.filter(function(u){ return u.role === 'instructor'; }).length;
     var totalApproved = userAccounts.filter(function(u){ return u.approvedAt && u.status === 'active'; }).length;
     statsEl.innerHTML =
       '<div class="stat-card"><div class="stat-icon" style="background:var(--accent-dim);color:var(--accent);">⏳</div><div class="stat-value">'+totalPending+'</div><div class="stat-label">Pending Approval</div></div>' +
-      '<div class="stat-card"><div class="stat-icon" style="background:var(--blue-dim);color:var(--blue);">🎓</div><div class="stat-value">'+pendingStudents+'</div><div class="stat-label">Pending Students</div></div>' +
-      '<div class="stat-card"><div class="stat-icon" style="background:var(--green-dim);color:var(--green);">📚</div><div class="stat-value">'+pendingInstructors+'</div><div class="stat-label">Pending Instructors</div></div>' +
+      '<div class="stat-card"><div class="stat-icon" style="background:var(--red-dim);color:var(--red);">🔒</div><div class="stat-value">'+totalDisabled+'</div><div class="stat-label">Disabled (Awaiting Sync)</div></div>' +
+      '<div class="stat-card"><div class="stat-icon" style="background:var(--blue-dim);color:var(--blue);">🎓</div><div class="stat-value">'+pendingStudents+'</div><div class="stat-label">Students to Review</div></div>' +
       '<div class="stat-card"><div class="stat-icon" style="background:var(--green-dim);color:var(--green);">✅</div><div class="stat-value">'+totalApproved+'</div><div class="stat-label">Total Approved</div></div>';
   }
 
-  // Table
+  // Table — show both pending and disabled accounts
   var tbody = document.getElementById('verifyUsersTableBody');
   if(tbody) {
-    if(pending.length === 0) {
+    if(needsReview.length === 0) {
       tbody.innerHTML = '<tr><td colspan="6" style="text-align:center;color:var(--text-muted);padding:24px;">No pending accounts to review.</td></tr>';
     } else {
-      tbody.innerHTML = pending.map(function(u) {
+      tbody.innerHTML = needsReview.map(function(u) {
         var roleBadge = u.role === 'student' ? 'badge-blue' : 'badge-green';
+        var statusLabel = u.status === 'pending' ? '<span style="color:var(--accent);font-size:11px;font-weight:600;">Pending</span>' : '<span style="color:var(--red);font-size:11px;font-weight:600;">Disabled</span>';
+        var sourceLabel = u.registeredVia === 'admin-created' ? ' <span style="font-size:10px;color:var(--text-muted);">(Admin Created)</span>' : u.registeredVia === 'fee-system' ? ' <span style="font-size:10px;color:var(--text-muted);">(Fee System)</span>' : u.registeredVia === 'registration' ? ' <span style="font-size:10px;color:var(--text-muted);">(Self-Registered)</span>' : '';
         return '<tr>' +
-          '<td><strong>' + escapeHtml(u.name) + '</strong></td>' +
-          '<td style="font-size:12px;">' + escapeHtml(u.email) + '</td>' +
-          '<td><span class="badge ' + roleBadge + '"><span class="badge-dot"></span>' + u.role.charAt(0).toUpperCase() + u.role.slice(1) + '</span></td>' +
+          '<td><strong>' + escapeHtml(u.name) + '</strong>' + sourceLabel + '</td>' +
+          '<td style="font-size:12px;">' + escapeHtml(u.email || '—') + '</td>' +
+          '<td><span class="badge ' + roleBadge + '"><span class="badge-dot"></span>' + u.role.charAt(0).toUpperCase() + u.role.slice(1) + '</span> ' + statusLabel + '</td>' +
           '<td>' + escapeHtml(u.programme || '—') + '</td>' +
           '<td style="font-size:12px;color:var(--text-muted);">' + u.createdAt + '</td>' +
           '<td><div class="verify-action-btns">' +
-          '<button class="btn btn-sm btn-primary" onclick="approveUser(\'' + escapeAttr(u.id) + '\')">Approve</button>' +
+          '<button class="btn btn-sm btn-primary" onclick="approveUser(\'' + escapeAttr(u.id) + '\')">Activate</button>' +
           '<button class="btn btn-sm btn-secondary" style="background:var(--red-dim);color:var(--red);border-color:var(--red);" onclick="rejectUser(\'' + escapeAttr(u.id) + '\')">Reject</button>' +
           '</div></td></tr>';
       }).join('');
@@ -6783,6 +6827,22 @@ function approveUser(userId) {
   user.status = 'active';
   user.approvedAt = new Date().toISOString().split('T')[0];
   user.approvedBy = 'admin';
+  // Ensure student data is created and linked when approving a student account
+  if (user.role === 'student' && !user.studentDataId) {
+    var existingStudent = students.find(function(s) { return s.name === user.name; });
+    if (existingStudent) {
+      user.studentDataId = existingStudent.id;
+    } else {
+      createStudentDataForAccount(user);
+    }
+  }
+  // Ensure instructor data is created and linked when approving an instructor account
+  if (user.role === 'instructor') {
+    var existingInstructor = instructorData.find(function(ins) { return ins.name === user.name || ins.email === user.email; });
+    if (!existingInstructor) {
+      createInstructorDataForAccount(user);
+    }
+  }
   saveState();
   renderVerifyUsersPage();
   showToast('Account approved: ' + user.name + ' (' + user.role + ')');
@@ -6803,14 +6863,29 @@ function rejectUser(userId) {
 }
 
 function approveAllPending() {
-  var pending = userAccounts.filter(function(u) { return u.status === 'pending'; });
+  var pending = userAccounts.filter(function(u) { return u.status === 'pending' || (u.status === 'disabled' && u.role !== 'admin'); });
   if(pending.length === 0) { alert('No pending accounts to approve.'); return; }
-  if(!confirm('Approve all ' + pending.length + ' pending account(s)?')) return;
+  if(!confirm('Activate all ' + pending.length + ' pending/disabled account(s)?')) return;
   var dateStr = new Date().toISOString().split('T')[0];
   pending.forEach(function(u) {
     u.status = 'active';
     u.approvedAt = dateStr;
     u.approvedBy = 'admin';
+    // Create linked student/instructor data on approval
+    if (u.role === 'student' && !u.studentDataId) {
+      var existingStudent = students.find(function(s) { return s.name === u.name; });
+      if (existingStudent) {
+        u.studentDataId = existingStudent.id;
+      } else {
+        createStudentDataForAccount(u);
+      }
+    }
+    if (u.role === 'instructor') {
+      var existingInstructor = instructorData.find(function(ins) { return ins.name === u.name || ins.email === u.email; });
+      if (!existingInstructor) {
+        createInstructorDataForAccount(u);
+      }
+    }
   });
   saveState();
   renderVerifyUsersPage();
@@ -6819,7 +6894,7 @@ function approveAllPending() {
 }
 
 function rejectAllPending() {
-  var pending = userAccounts.filter(function(u) { return u.status === 'pending'; });
+  var pending = userAccounts.filter(function(u) { return u.status === 'pending' || (u.status === 'disabled' && u.role !== 'admin'); });
   if(pending.length === 0) { alert('No pending accounts to reject.'); return; }
   if(!confirm('Reject all ' + pending.length + ' pending account(s)?')) return;
   var dateStr = new Date().toISOString().split('T')[0];
@@ -13140,22 +13215,54 @@ function updatePipelineCounts() {
     ['','2'].forEach(sfx => { const el=document.getElementById('p'+s.charAt(0).toUpperCase()+s.slice(1)+sfx); if(el) el.textContent=count; });
   });
 }
-function addStudent() {
+async function addStudent() {
   const name = document.getElementById('newStudentName').value.trim();
   if(!name){alert('Please enter a name');return;}
+  var email = (document.getElementById('newStudentEmail').value || '').trim();
   var selectedCourse = document.getElementById('newStudentCourse').value;
   var assignedInstructor = (instructorData.find(function(ins){return ins.course && ins.course.toLowerCase().trim() === selectedCourse.toLowerCase().trim();})||{}).name || '';
   var gender = document.getElementById('newStudentGender').value || '';
-  var newId = generateStudentId();
-  students.unshift({id:newId,name,stage:document.getElementById('newStudentStage').value,course:selectedCourse,score:'',progress:10,certNo:null,certDate:null,certCollected:false,attendance:0,assignments:0,assignmentsTotal:8,gpa:'0.0',instructor:assignedInstructor,gender:gender,createdAt:new Date().toISOString().split('T')[0]});
+  var studentId = generateStudentId();
+  students.unshift({id:studentId,name,stage:document.getElementById('newStudentStage').value,course:selectedCourse,score:'',progress:10,certNo:null,certDate:null,certCollected:false,attendance:0,assignments:0,assignmentsTotal:8,gpa:'0.0',instructor:assignedInstructor,gender:gender,createdAt:new Date().toISOString().split('T')[0]});
   // Auto-create attendance record so the student appears in attendance pages
-  var existingAtt = attendanceRecords.find(function(r){ return r.studentId === newId; });
+  var existingAtt = attendanceRecords.find(function(r){ return r.studentId === studentId; });
   if(!existingAtt) {
-    attendanceRecords.push({studentId:newId, studentName:name, course:selectedCourse, date:new Date().toISOString().split('T')[0], days:{Mon:'absent',Tue:'absent',Wed:'absent',Thu:'absent',Fri:'absent'}});
+    attendanceRecords.push({studentId:studentId, studentName:name, course:selectedCourse, date:new Date().toISOString().split('T')[0], days:{Mon:'absent',Tue:'absent',Wed:'absent',Thu:'absent',Fri:'absent'}});
   }
   updateSkillAreaCounts();
-  closeModal('addStudentModal');filterStudents();updatePipelineCounts();showToast(`${name} added!`);document.getElementById('newStudentName').value='';document.getElementById('newStudentGender').value='';
-  addNotification('New student enrolled: ' + name + ' — ' + document.getElementById('newStudentCourse').value, 'student', null, ['admin','instructor']);
+
+  // Create a linked disabled user account so the student syncs across the dashboard
+  var username = email ? email.split('@')[0] : name.toLowerCase().replace(/\s+/g, '.');
+  // Check for duplicate email/username before creating account
+  var dupAccount = userAccounts.find(function(u) {
+    if (email && u.email === email) return true;
+    if (u.username === username && u.role === 'student') return true;
+    return false;
+  });
+  if (!dupAccount) {
+    var defaultPw = await hashPassword(name.split(' ')[0].toLowerCase() + '123');
+    var newAccount = {
+      id: 'USR-' + Date.now(),
+      name: name,
+      role: 'student',
+      username: username,
+      password: defaultPw,
+      email: email || '',
+      programme: selectedCourse,
+      status: 'disabled',
+      createdAt: new Date().toISOString().split('T')[0],
+      registeredVia: 'admin-created',
+      studentDataId: studentId,
+      approvedBy: 'admin'
+    };
+    userAccounts.push(newAccount);
+  } else {
+    // Link existing account to this student data
+    dupAccount.studentDataId = studentId;
+  }
+
+  closeModal('addStudentModal');filterStudents();updatePipelineCounts();showToast(`${name} added (account disabled until activated)!`);document.getElementById('newStudentName').value='';document.getElementById('newStudentGender').value='';document.getElementById('newStudentEmail').value='';
+  addNotification('New student enrolled: ' + name + ' — ' + selectedCourse + ' (account disabled — activate in Verify Users)', 'student', null, ['admin','instructor']);
   saveState();
 
   // Auto-merge from cloud to pick up students added on other devices
@@ -16254,6 +16361,29 @@ async function syncStudentsFromFeeSystem() {
         instructor: assignedInstructor
       });
 
+      // Create a disabled user account for this fee-synced student
+      var feeUsername = name.toLowerCase().replace(/\s+/g, '.');
+      var feeDupAccount = userAccounts.find(function(u) {
+        return (u.username === feeUsername && u.role === 'student') ||
+               (u.studentDataId === studentId);
+      });
+      if (!feeDupAccount) {
+        userAccounts.push({
+          id: 'USR-FEE-' + Date.now() + '-' + Math.floor(Math.random() * 1000),
+          name: name.trim(),
+          role: 'student',
+          username: feeUsername,
+          password: '',
+          email: '',
+          programme: course.trim(),
+          status: 'disabled',
+          createdAt: new Date().toISOString().split('T')[0],
+          registeredVia: 'fee-system',
+          studentDataId: studentId,
+          approvedBy: 'system'
+        });
+      }
+
       existingIds[studentId] = true;
       existingKeys[dupKey] = true;
       changed = true;
@@ -17503,6 +17633,8 @@ async function silentMergeFromBackup(fileId) {
           if (cloudUser.email && cloudUser.email !== localMatch.email) { localMatch.email = cloudUser.email; userAccountsChanged = true; }
           if (cloudUser.programme !== undefined && cloudUser.programme !== localMatch.programme) { localMatch.programme = cloudUser.programme; userAccountsChanged = true; }
           if (cloudUser.role && cloudUser.role !== localMatch.role) { localMatch.role = cloudUser.role; userAccountsChanged = true; }
+          if (cloudUser.studentDataId && !localMatch.studentDataId) { localMatch.studentDataId = cloudUser.studentDataId; userAccountsChanged = true; }
+          if (cloudUser.registeredVia && !localMatch.registeredVia) { localMatch.registeredVia = cloudUser.registeredVia; userAccountsChanged = true; }
         } else {
           // New account — add it
           userAccounts.push(cloudUser);
@@ -17519,6 +17651,31 @@ async function silentMergeFromBackup(fileId) {
         if (_ds[cloudStudent.id]) return;
         if (!localStudentIds.includes(cloudStudent.id)) {
           students.push(cloudStudent);
+          changed = true;
+        }
+      });
+
+      // Create disabled user accounts for any orphaned students (no linked user account)
+      students.forEach(function(s) {
+        if (_ds[s.id]) return;
+        var hasAccount = userAccounts.find(function(u) {
+          return u.studentDataId === s.id || (u.role === 'student' && u.name === s.name);
+        });
+        if (!hasAccount) {
+          userAccounts.push({
+            id: 'USR-SYNC-' + Date.now() + '-' + Math.floor(Math.random() * 1000),
+            name: s.name,
+            role: 'student',
+            username: s.name.toLowerCase().replace(/\s+/g, '.'),
+            password: '',
+            email: '',
+            programme: s.course || '',
+            status: 'disabled',
+            createdAt: s.createdAt || new Date().toISOString().split('T')[0],
+            registeredVia: 'cloud-sync',
+            studentDataId: s.id,
+            approvedBy: 'system'
+          });
           changed = true;
         }
       });
@@ -22961,6 +23118,97 @@ function docHubDownloadFile(docId) {
   showToast('Downloading "' + doc.fileName + '"', 'success');
 }
 
+function docHubPreviewFile(docId) {
+  var doc = documentHubFiles.find(function(d) { return d.id === docId; });
+  if(!doc) { showToast('Document not found', 'warning'); return; }
+
+  var ext = (doc.fileName || '').split('.').pop().toLowerCase();
+  var previewContent = '';
+
+  if(ext === 'pdf') {
+    previewContent = '<iframe src="' + doc.fileData + '#toolbar=0" style="width:100%;height:calc(80vh - 120px);border:none;border-radius:8px;background:#fff;"></iframe>';
+  } else if(['png','jpg','jpeg','gif','bmp','webp','svg'].indexOf(ext) !== -1) {
+    previewContent = '<div style="display:flex;align-items:center;justify-content:center;height:calc(80vh - 120px);overflow:auto;background:var(--bg-tertiary);border-radius:8px;">' +
+      '<img src="' + doc.fileData + '" style="max-width:100%;max-height:100%;object-fit:contain;border-radius:4px;" alt="' + escapeHtml(doc.title) + '">' +
+    '</div>';
+  } else if(['txt','csv'].indexOf(ext) !== -1) {
+    previewContent = '<div id="docHubTextPreview" style="height:calc(80vh - 120px);overflow:auto;background:var(--bg-tertiary);border-radius:8px;padding:20px;font-family:monospace;font-size:13px;white-space:pre-wrap;color:var(--text-primary);"></div>';
+  } else {
+    previewContent = '<div style="display:flex;flex-direction:column;align-items:center;justify-content:center;height:calc(80vh - 200px);gap:16px;">' +
+      '<div style="font-size:64px;">' + docHubGetFileIcon(doc.fileName).replace(/32px/g, '64px') + '</div>' +
+      '<h3 style="color:var(--text-primary);margin:0;">' + escapeHtml(doc.title) + '</h3>' +
+      '<p style="color:var(--text-muted);font-size:13px;margin:0;">Preview is not available for .' + ext.toUpperCase() + ' files</p>' +
+      '<p style="color:var(--text-muted);font-size:12px;margin:0;">' + doc.fileName + ' &bull; ' + docHubFormatFileSize(doc.fileSize) + '</p>' +
+    '</div>';
+  }
+
+  var overlay = document.createElement('div');
+  overlay.id = 'docHubPreviewOverlay';
+  overlay.className = 'modal-overlay';
+  overlay.style.cssText = 'display:flex;align-items:center;justify-content:center;z-index:10000;';
+  overlay.onclick = function(e) { if(e.target === overlay) overlay.remove(); };
+
+  overlay.innerHTML =
+    '<div style="background:var(--bg-secondary);border-radius:12px;width:90vw;max-width:900px;max-height:90vh;display:flex;flex-direction:column;box-shadow:0 20px 60px rgba(0,0,0,0.5);border:1px solid var(--border-light);" onclick="event.stopPropagation()">' +
+      '<div style="display:flex;align-items:center;justify-content:space-between;padding:16px 20px;border-bottom:1px solid var(--border-light);">' +
+        '<div style="display:flex;align-items:center;gap:12px;min-width:0;flex:1;">' +
+          '<div style="flex-shrink:0;">' + docHubGetFileIcon(doc.fileName) + '</div>' +
+          '<div style="min-width:0;">' +
+            '<h3 style="margin:0;font-size:16px;font-family:\'Playfair Display\',serif;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">' + escapeHtml(doc.title) + '</h3>' +
+            '<div style="font-size:11px;color:var(--text-muted);display:flex;gap:8px;flex-wrap:wrap;margin-top:2px;">' +
+              '<span>' + doc.fileName + '</span><span>' + docHubFormatFileSize(doc.fileSize) + '</span>' +
+              '<span class="badge badge-blue" style="font-size:9px;">' + doc.category + '</span>' +
+            '</div>' +
+          '</div>' +
+        '</div>' +
+        '<div style="display:flex;align-items:center;gap:8px;flex-shrink:0;">' +
+          '<button class="btn btn-secondary btn-sm" onclick="docHubPrintFile(\'' + doc.id + '\')" style="display:flex;align-items:center;gap:4px;font-size:12px;" title="Print">' +
+            '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:14px;height:14px;"><polyline points="6 9 6 2 18 2 18 9"/><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"/><rect x="6" y="14" width="12" height="8"/></svg> Print</button>' +
+          '<button class="btn btn-primary btn-sm" onclick="docHubDownloadFile(\'' + doc.id + '\')" style="display:flex;align-items:center;gap:4px;font-size:12px;" title="Download">' +
+            '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:14px;height:14px;"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg> Download</button>' +
+          '<button onclick="this.closest(\'#docHubPreviewOverlay\').remove()" style="background:none;border:none;color:var(--text-muted);cursor:pointer;font-size:20px;padding:4px 8px;line-height:1;" title="Close">&times;</button>' +
+        '</div>' +
+      '</div>' +
+      '<div style="padding:16px 20px;flex:1;overflow:hidden;">' +
+        previewContent +
+      '</div>' +
+    '</div>';
+
+  document.body.appendChild(overlay);
+
+  // Decode base64 text content for txt/csv files
+  if(['txt','csv'].indexOf(ext) !== -1 && doc.fileData) {
+    try {
+      var textEl = document.getElementById('docHubTextPreview');
+      if(textEl) {
+        var base64 = doc.fileData.split(',')[1];
+        textEl.textContent = atob(base64);
+      }
+    } catch(e) { console.warn('Text preview decode error:', e); }
+  }
+}
+
+function docHubPrintFile(docId) {
+  var doc = documentHubFiles.find(function(d) { return d.id === docId; });
+  if(!doc) { showToast('Document not found', 'warning'); return; }
+
+  var ext = (doc.fileName || '').split('.').pop().toLowerCase();
+  var printWin = window.open('', '_blank');
+  if(!printWin) { showToast('Pop-up blocked. Please allow pop-ups to print.', 'warning'); return; }
+
+  if(ext === 'pdf') {
+    printWin.document.write('<html><head><title>Print — ' + escapeHtml(doc.title) + '</title></head><body style="margin:0;"><embed src="' + doc.fileData + '" type="application/pdf" width="100%" height="100%" style="position:fixed;inset:0;"></body></html>');
+    printWin.document.close();
+    printWin.onload = function() { setTimeout(function(){ printWin.print(); }, 500); };
+  } else if(['png','jpg','jpeg','gif','bmp','webp','svg'].indexOf(ext) !== -1) {
+    printWin.document.write('<html><head><title>Print — ' + escapeHtml(doc.title) + '</title><style>@media print{body{margin:0;} img{max-width:100%;height:auto;}}</style></head><body style="margin:20px;text-align:center;"><img src="' + doc.fileData + '" onload="setTimeout(function(){window.print();},300)"></body></html>');
+    printWin.document.close();
+  } else {
+    printWin.close();
+    showToast('Print is only available for PDF and image files. Please download the file instead.', 'warning');
+  }
+}
+
 function docHubEditFile(docId) {
   var doc = documentHubFiles.find(function(d) { return d.id === docId; });
   if(!doc) return;
@@ -23106,23 +23354,24 @@ function renderDocumentHubInstructor() {
 
   var html = '';
   filtered.sort(function(a, b) { return new Date(b.uploadedDate) - new Date(a.uploadedDate); }).forEach(function(doc) {
-    html += '<div class="card" style="padding:16px;margin-bottom:12px;display:flex;align-items:center;gap:16px;">' +
+    html += '<div class="card" style="padding:16px;margin-bottom:12px;display:flex;align-items:center;gap:16px;cursor:pointer;transition:border-color 0.2s,box-shadow 0.2s;" onclick="docHubPreviewFile(\'' + doc.id + '\')" onmouseenter="this.style.borderColor=\'var(--accent)\';this.style.boxShadow=\'0 0 0 1px var(--accent)\'" onmouseleave="this.style.borderColor=\'\';this.style.boxShadow=\'\'">' +
       '<div style="flex-shrink:0;">' + docHubGetFileIcon(doc.fileName) + '</div>' +
       '<div style="flex:1;min-width:0;">' +
         '<div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:4px;">' +
-          '<strong style="font-size:14px;">' + doc.title + '</strong>' +
+          '<strong style="font-size:14px;">' + escapeHtml(doc.title) + '</strong>' +
           '<span class="badge badge-blue" style="font-size:10px;">' + doc.category + '</span>' +
         '</div>' +
-        (doc.description ? '<div style="font-size:12px;color:var(--text-secondary);margin-bottom:4px;">' + doc.description + '</div>' : '') +
+        (doc.description ? '<div style="font-size:12px;color:var(--text-secondary);margin-bottom:4px;">' + escapeHtml(doc.description) + '</div>' : '') +
         '<div style="font-size:11px;color:var(--text-muted);display:flex;gap:12px;flex-wrap:wrap;">' +
-          '<span>' + doc.fileName + '</span>' +
+          '<span>' + escapeHtml(doc.fileName) + '</span>' +
           '<span>' + docHubFormatFileSize(doc.fileSize) + '</span>' +
           '<span>Uploaded: ' + doc.uploadedDate + '</span>' +
-          '<span>By: ' + doc.uploadedBy + '</span>' +
+          '<span>By: ' + escapeHtml(doc.uploadedBy) + '</span>' +
         '</div>' +
       '</div>' +
-      '<div style="flex-shrink:0;">' +
-        '<button class="btn btn-primary" onclick="docHubDownloadFile(\'' + doc.id + '\')" style="display:flex;align-items:center;gap:6px;"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:16px;height:16px;"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg> Download</button>' +
+      '<div style="flex-shrink:0;display:flex;gap:8px;" onclick="event.stopPropagation()">' +
+        '<button class="btn btn-secondary" onclick="docHubPreviewFile(\'' + doc.id + '\')" style="display:flex;align-items:center;gap:6px;" title="Preview"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:16px;height:16px;"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg> Preview</button>' +
+        '<button class="btn btn-primary" onclick="docHubDownloadFile(\'' + doc.id + '\')" style="display:flex;align-items:center;gap:6px;" title="Download"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:16px;height:16px;"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg> Download</button>' +
       '</div>' +
     '</div>';
   });
