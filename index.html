@@ -6988,6 +6988,8 @@ function buildAdminSidebar() {
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg>Online Exams</div>
     <div class="nav-item" data-page="import-exam" onclick="showPage('import-exam')">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>Import Exam</div>
+    <div class="nav-item" data-page="pdf-workshop" onclick="showPage('pdf-workshop')">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><path d="M12 18v-6"/><path d="M9 15l3-3 3 3"/></svg>PDF Workshop</div>
     <div class="nav-section-label">Management</div>
     <div class="nav-item" data-page="attendance" onclick="showPage('attendance')">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M16 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="8.5" cy="7" r="4"/><polyline points="17 11 19 13 23 9"/></svg>Attendance</div>
@@ -8406,6 +8408,20 @@ function buildStudentPages() {
             '<span style="font-size:13px;font-weight:600;">Avg: '+avg+'%</span>';
         })()}
       </div>
+    </div>
+  </section>
+
+  <!-- PDF WORKSHOP -->
+  <section class="page" id="page-pdf-workshop">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:20px;flex-wrap:wrap;gap:12px;">
+      <div>
+        <h3 style="font-family:'Playfair Display',serif;margin:0;">PDF Workshop</h3>
+        <p style="font-size:13px;color:var(--text-muted);margin:4px 0 0;">Interactive PDF tools and resources</p>
+      </div>
+      <a href="https://stevebarrettsrha-ops.github.io/PDF-Workshop/" target="_blank" rel="noopener noreferrer" class="btn btn-primary" style="text-decoration:none;">Open in New Tab ↗</a>
+    </div>
+    <div class="card" style="padding:0;overflow:hidden;">
+      <iframe src="https://stevebarrettsrha-ops.github.io/PDF-Workshop/" style="width:100%;height:calc(100vh - 200px);border:none;border-radius:var(--radius);" loading="lazy" allow="fullscreen"></iframe>
     </div>
   </section>
 
