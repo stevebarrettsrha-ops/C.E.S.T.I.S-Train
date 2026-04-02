@@ -7157,7 +7157,7 @@ function showPage(pageId) {
     'timetracking':'Staff Time Tracking','i-timetracking':'Staff Time Tracking','as-timetracking':'Staff Time Tracking',
     'fee-management':'School Fee Management','as-fee-management':'School Fee Management',
     'class-attendance':'Class Attendance','as-class-attendance':'Class Attendance',
-    'cashbook':'Cashbook Management','document-hub':'Document Hub','i-document-hub':'Document Hub','as-document-hub':'Document Hub',
+    'cashbook':'Cashbook Management','document-hub':'Document Hub','i-document-hub':'Document Hub','as-document-hub':'Document Hub','pdf-workshop':'PDF Workshop',
     'cmc-dashboard':'CMC Analytics Dashboard','cmc-financial':'Financial Overview','cmc-staff':'Staff & HR','cmc-academic':'Academic Performance','cmc-sources':'Source Viewer','cmc-profile':'My Profile'
   };
   document.getElementById('topbarTitle').textContent = titles[pageId]||pageId;
@@ -8258,6 +8258,15 @@ function buildAdminPages() {
     <div class="stats-grid stats-grid-4" id="docHubStats"></div>
     <div id="docHubAdminList"></div>
   </section>
+
+  <!-- PDF WORKSHOP -->
+  <section class="page" id="page-pdf-workshop">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;flex-wrap:wrap;gap:12px;">
+      <h3 style="font-family:'Playfair Display',serif;margin:0;">PDF Workshop</h3>
+      <a href="https://stevebarrettsrha-ops.github.io/PDF-Workshop/" target="_blank" rel="noopener noreferrer" class="btn btn-primary" style="text-decoration:none;">Open in New Tab ↗</a>
+    </div>
+    <iframe id="pdfWorkshopFrame" style="width:100%;height:calc(100vh - 80px);border:none;border-radius:12px;"></iframe>
+  </section>
   `;
 
   populateCourseDropdowns();
@@ -8410,15 +8419,6 @@ function buildStudentPages() {
         })()}
       </div>
     </div>
-  </section>
-
-  <!-- PDF WORKSHOP -->
-  <section class="page" id="page-pdf-workshop">
-    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;flex-wrap:wrap;gap:12px;">
-      <h3 style="font-family:'Playfair Display',serif;margin:0;">PDF Workshop</h3>
-      <a href="https://stevebarrettsrha-ops.github.io/PDF-Workshop/" target="_blank" rel="noopener noreferrer" class="btn btn-primary" style="text-decoration:none;">Open in New Tab ↗</a>
-    </div>
-    <iframe id="pdfWorkshopFrame" style="width:100%;height:calc(100vh - 80px);border:none;border-radius:12px;"></iframe>
   </section>
 
   <!-- STUDENT VIDEO -->
