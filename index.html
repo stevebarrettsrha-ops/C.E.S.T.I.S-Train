@@ -7190,7 +7190,8 @@ function showPage(pageId) {
     'i-timetracking':    {id:'iTimetrackingFrame',   src:'https://stevebarrettsrha-ops.github.io/Staff-Clock-in-System/'},
     'as-timetracking':   {id:'asTimetrackingFrame',  src:'https://stevebarrettsrha-ops.github.io/Staff-Clock-in-System/'},
     'as-fee-management': {id:'asFeeManagementFrame', src:'https://stevebarrettsrha-ops.github.io/School-Fee-Management-System/'},
-    'as-class-attendance':{id:'asClassAttendanceFrame',src:'https://stevebarrettsrha-ops.github.io/Class-Attendance-System/'}
+    'as-class-attendance':{id:'asClassAttendanceFrame',src:'https://stevebarrettsrha-ops.github.io/Class-Attendance-System/'},
+    'pdf-workshop':      {id:'pdfWorkshopFrame',     src:'https://stevebarrettsrha-ops.github.io/PDF-Workshop/'}
   };
   if(iframePageMap[pageId]) {
     var iframeInfo = iframePageMap[pageId];
@@ -8413,16 +8414,11 @@ function buildStudentPages() {
 
   <!-- PDF WORKSHOP -->
   <section class="page" id="page-pdf-workshop">
-    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:20px;flex-wrap:wrap;gap:12px;">
-      <div>
-        <h3 style="font-family:'Playfair Display',serif;margin:0;">PDF Workshop</h3>
-        <p style="font-size:13px;color:var(--text-muted);margin:4px 0 0;">Interactive PDF tools and resources</p>
-      </div>
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;flex-wrap:wrap;gap:12px;">
+      <h3 style="font-family:'Playfair Display',serif;margin:0;">PDF Workshop</h3>
       <a href="https://stevebarrettsrha-ops.github.io/PDF-Workshop/" target="_blank" rel="noopener noreferrer" class="btn btn-primary" style="text-decoration:none;">Open in New Tab ↗</a>
     </div>
-    <div class="card" style="padding:0;overflow:hidden;">
-      <iframe src="https://stevebarrettsrha-ops.github.io/PDF-Workshop/" style="width:100%;height:calc(100vh - 200px);border:none;border-radius:var(--radius);" loading="lazy" allow="fullscreen"></iframe>
-    </div>
+    <iframe id="pdfWorkshopFrame" style="width:100%;height:calc(100vh - 80px);border:none;border-radius:12px;"></iframe>
   </section>
 
   <!-- STUDENT VIDEO -->
