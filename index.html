@@ -7977,6 +7977,7 @@ function buildAdminPages() {
   <section class="page" id="page-a-resources">
     <div style="display:flex;gap:12px;margin-bottom:18px;flex-wrap:wrap;align-items:center;">
       <button class="btn btn-primary" onclick="openModal('driveUploadModal')">+ Upload Resource to Drive</button>
+      <button class="btn btn-secondary" onclick="scanAllDriveFolders()" title="Scan Google Drive folders and recover any resources not currently tracked">🔄 Rescan Drive</button>
       <select class="form-control" id="arFilterCourse" style="width:220px;" onchange="renderAdminResources()">
         <option value="all">All Programmes</option>
       </select>
@@ -12483,6 +12484,126 @@ async function uploadFileToDriveFolder(file, folderId, resourceId) {
   return result;
 }
 
+// Scan a Google Drive folder for existing files and re-import them as driveResources
+// This recovers resources when a skill area is deleted and recreated
+async function scanDriveFolderForResources(courseName) {
+  if (!googleAccessToken) return { found: 0, imported: 0 };
+  try {
+    // Search for existing folder with this course name
+    var query = encodeURIComponent("name='" + courseName.replace(/'/g, "\\'") + "' and '" + DRIVE_RESOURCES_FOLDER_ID + "' in parents and mimeType='application/vnd.google-apps.folder' and trashed=false");
+    var searchResp = await fetch('https://www.googleapis.com/drive/v3/files?q=' + query + '&fields=files(id,name)', {
+      headers: { 'Authorization': 'Bearer ' + googleAccessToken }
+    });
+    var searchData = await searchResp.json();
+    if (!searchData.files || searchData.files.length === 0) return { found: 0, imported: 0 };
+
+    var folderId = searchData.files[0].id;
+
+    // List all files in the folder
+    var listQuery = encodeURIComponent("'" + folderId + "' in parents and trashed=false and mimeType!='application/vnd.google-apps.folder'");
+    var listResp = await fetch('https://www.googleapis.com/drive/v3/files?q=' + listQuery + '&fields=files(id,name,mimeType,webViewLink,size,createdTime)&pageSize=100', {
+      headers: { 'Authorization': 'Bearer ' + googleAccessToken }
+    });
+    var listData = await listResp.json();
+    if (!listData.files || listData.files.length === 0) return { found: 0, imported: 0 };
+
+    var found = listData.files.length;
+    var imported = 0;
+
+    listData.files.forEach(function(file) {
+      // Skip if this Drive file is already tracked
+      var alreadyTracked = driveResources.some(function(r) {
+        return r.driveFileId === file.id;
+      });
+      if (alreadyTracked) return;
+
+      // Infer category from MIME type / file extension
+      var category = 'document';
+      var format = 'PDF';
+      var mime = (file.mimeType || '').toLowerCase();
+      var fname = (file.name || '').toLowerCase();
+      if (mime.indexOf('video') !== -1 || fname.match(/\.(mp4|avi|mov|mkv|webm)$/)) {
+        category = 'video'; format = 'Video';
+      } else if (mime.indexOf('pdf') !== -1 || fname.match(/\.pdf$/)) {
+        category = 'document'; format = 'PDF';
+      } else if (mime.indexOf('spreadsheet') !== -1 || mime.indexOf('excel') !== -1 || fname.match(/\.(xlsx?|csv)$/)) {
+        category = 'worksheet'; format = 'Spreadsheet';
+      } else if (mime.indexOf('presentation') !== -1 || mime.indexOf('powerpoint') !== -1 || fname.match(/\.(pptx?|pps)$/)) {
+        category = 'document'; format = 'Presentation';
+      } else if (mime.indexOf('document') !== -1 || mime.indexOf('word') !== -1 || fname.match(/\.(docx?|rtf|txt)$/)) {
+        category = 'document'; format = 'Document';
+      } else if (mime.indexOf('image') !== -1 || fname.match(/\.(jpg|jpeg|png|gif|bmp|svg|webp)$/)) {
+        category = 'document'; format = 'Image';
+      }
+
+      // Extract resource ID from filename if present (pattern: VT-XXXX-YYYY_filename)
+      var resourceId = 'RECOVERED';
+      var nameMatch = file.name.match(/^(VT-[A-Z0-9]+-[A-Z0-9]+)/);
+      if (nameMatch) resourceId = nameMatch[1];
+
+      // Clean display name: remove resource ID prefix if present
+      var displayName = file.name;
+      if (nameMatch) {
+        displayName = file.name.substring(nameMatch[0].length).replace(/^_/, '').replace(/\.[^.]+$/, '') || file.name;
+      } else {
+        displayName = file.name.replace(/\.[^.]+$/, '');
+      }
+
+      var viewLink = file.webViewLink || ('https://drive.google.com/file/d/' + file.id + '/view');
+
+      driveResources.push({
+        id: 'DRES-' + Date.now() + '-' + imported,
+        resourceId: resourceId,
+        name: displayName,
+        course: courseName,
+        category: category,
+        format: format,
+        url: viewLink,
+        driveFileId: file.id,
+        driveFileName: file.name,
+        classFolderId: folderId,
+        description: 'Recovered from Drive',
+        uploadedBy: 'Admin',
+        uploadedAt: file.createdTime || new Date().toISOString()
+      });
+      imported++;
+    });
+
+    if (imported > 0) {
+      saveState();
+    }
+    return { found: found, imported: imported, folderId: folderId };
+  } catch(err) {
+    console.error('Scan Drive folder error:', err);
+    return { found: 0, imported: 0, error: err.message };
+  }
+}
+
+// Scan all skill area Drive folders and recover any untracked resources
+async function scanAllDriveFolders() {
+  if (!googleAccessToken) {
+    showToast('Please connect to Google Drive first');
+    return;
+  }
+  showToast('Scanning Drive folders for resources...');
+  var totalImported = 0;
+  var scannedCourses = [];
+  for (var i = 0; i < skillAreas.length; i++) {
+    var result = await scanDriveFolderForResources(skillAreas[i].name);
+    if (result.imported > 0) {
+      scannedCourses.push(skillAreas[i].name + ' (' + result.imported + ')');
+      totalImported += result.imported;
+    }
+  }
+  if (totalImported > 0) {
+    showToast(totalImported + ' resource(s) recovered from Drive: ' + scannedCourses.join(', '));
+    renderAdminResources();
+  } else {
+    showToast('All Drive resources are already synced. No new resources found.');
+  }
+  return totalImported;
+}
+
 async function uploadResourceToDrive() {
   const name = document.getElementById('driveResName')?.value?.trim();
   const course = document.getElementById('driveResCourse')?.value;
@@ -13791,6 +13912,19 @@ function addTrainingCentre() {
   addNotification('New training centre created: ' + name, 'system', null, ['admin']);
   populateCourseDropdowns();
   saveState();
+  // Auto-scan Drive for existing resources if this skill area had a folder before
+  if (googleAccessToken) {
+    scanDriveFolderForResources(name).then(function(result) {
+      if (result.imported > 0) {
+        showToast(result.imported + ' existing resource(s) recovered from Drive for ' + name + '!');
+        // Update skill area materials count
+        var sk = skillAreas.find(function(s){ return s.name === name; });
+        if (sk) { sk.materials = (sk.materials || 0) + result.imported; }
+        renderAdminResources();
+        saveState();
+      }
+    });
+  }
 }
 
 function openEditCentre(id) {
@@ -18187,10 +18321,13 @@ async function silentMergeFromBackup(fileId) {
       });
     }
 
-    // Merge drive resources
+    // Merge drive resources (match by id or driveFileId to avoid duplicates from recovery)
     if (backupData.data.driveResources) {
       backupData.data.driveResources.forEach(function(cr) {
-        if (!driveResources.some(function(lr) { return lr.id === cr.id; })) {
+        var isDuplicate = driveResources.some(function(lr) {
+          return lr.id === cr.id || (cr.driveFileId && lr.driveFileId === cr.driveFileId);
+        });
+        if (!isDuplicate) {
           driveResources.push(cr);
           changed = true;
         }
