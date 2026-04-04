@@ -5522,7 +5522,7 @@ function loadState() {
     if(ip) instructorProfiles = ip;
     if(ss) systemSettings = ss;
     if(er) examResults = er;
-    if(ce) calendarEvents = ce;
+    if(ce) { var _cc={class:'var(--blue)',exam:'var(--red)',deadline:'var(--accent)',meeting:'var(--purple)'}; calendarEvents = ce.map(function(e){if(!e.color){e.color=_cc[e.type]||'var(--blue)';}return e;}); }
     var adrT = safeJsonParse(localStorage.getItem('voctrain_adrTasks'), null);
     var adrM = safeJsonParse(localStorage.getItem('voctrain_adrStaffMeta'), null);
     if(adrT) adrTasks = adrT;
@@ -9373,7 +9373,7 @@ function renderInstructorCalendar() {
   if(eventListEl) {
     eventListEl.innerHTML = instructorEvents.sort((a,b)=>a.date.localeCompare(b.date)).slice(0,8).map(e =>
       '<div style="display:flex;align-items:center;gap:10px;padding:8px 0;border-bottom:1px solid var(--border);">' +
-        '<div style="width:8px;height:8px;border-radius:50%;background:' + e.color + ';flex-shrink:0;"></div>' +
+        '<div style="width:8px;height:8px;border-radius:50%;background:' + (e.color||'var(--blue)') + ';flex-shrink:0;"></div>' +
         '<div><div style="font-size:13px;">' + e.title + '</div><div style="font-size:11px;color:var(--text-muted);">' + e.date + ' @ ' + e.time + '</div></div></div>'
     ).join('');
   }
@@ -15246,7 +15246,7 @@ function renderStudentCalendar() {
   if(eventListEl) {
     eventListEl.innerHTML = studentEvents.slice(0,6).map(e =>
       `<div style="display:flex;align-items:center;gap:10px;padding:8px 0;border-bottom:1px solid var(--border);">
-        <div style="width:8px;height:8px;border-radius:50%;background:${e.color};flex-shrink:0;"></div>
+        <div style="width:8px;height:8px;border-radius:50%;background:${e.color||'var(--blue)'};flex-shrink:0;"></div>
         <div><div style="font-size:13px;">${e.title}</div><div style="font-size:11px;color:var(--text-muted);">${e.date} @ ${e.time}</div></div>
       </div>`
     ).join('');
@@ -15315,7 +15315,7 @@ function selectCalDay(dateStr, titleId, eventsId, isStudent) {
         var evtIdx = calendarEvents.indexOf(e);
         var adminBtns = isAdminView ? '<div style="display:flex;gap:4px;margin-left:auto;flex-shrink:0;"><button class="btn btn-sm btn-secondary" onclick="editCalendarEvent('+evtIdx+')" title="Edit" style="padding:3px 6px;font-size:11px;">&#9998;</button><button class="btn btn-sm btn-secondary" onclick="deleteCalendarEvent('+evtIdx+')" title="Delete" style="padding:3px 6px;font-size:11px;color:var(--red);">&#10005;</button></div>' : '';
         return '<div style="display:flex;align-items:center;gap:10px;padding:10px 0;border-bottom:1px solid var(--border);">' +
-          '<div style="width:4px;height:32px;border-radius:2px;background:'+e.color+';flex-shrink:0;"></div>' +
+          '<div style="width:4px;height:32px;border-radius:2px;background:'+(e.color||'var(--blue)')+';flex-shrink:0;"></div>' +
           '<div style="flex:1;"><div style="font-size:13px;font-weight:600;">'+e.title+'</div><div style="font-size:11px;color:var(--text-muted);">'+e.time+' \u2022 '+e.type+'</div></div>' +
           adminBtns +
         '</div>';
@@ -15346,7 +15346,7 @@ function renderCalendarEventList() {
     var audienceIcons = roles.map(function(r){var c={admin:'var(--accent)',adminstaff:'var(--accent)',instructor:'var(--green)',student:'var(--blue)'};return '<span style="width:6px;height:6px;border-radius:50%;background:'+(c[r]||'var(--text-muted)')+';display:inline-block;" title="'+r+'"></span>';}).join('');
     var evtIdx = calendarEvents.indexOf(e);
     return `<div style="display:flex;align-items:center;gap:10px;padding:8px 0;border-bottom:1px solid var(--border);">
-      <div style="width:8px;height:8px;border-radius:50%;background:${e.color};flex-shrink:0;"></div>
+      <div style="width:8px;height:8px;border-radius:50%;background:${e.color||'var(--blue)'};flex-shrink:0;"></div>
       <div style="flex:1;"><div style="font-size:13px;">${e.title}</div><div style="display:flex;align-items:center;gap:6px;"><span style="font-size:11px;color:var(--text-muted);">${e.date} @ ${e.time}</span><span style="display:flex;gap:3px;">${audienceIcons}</span></div></div>
       <span class="badge ${e.type==='exam'?'badge-red':e.type==='class'?'badge-blue':e.type==='deadline'?'badge-amber':'badge-purple'}" style="font-size:10px;">${e.type}</span>
       <button class="btn btn-sm btn-secondary" onclick="editCalendarEvent(${evtIdx})" title="Edit" style="padding:4px 8px;">&#9998;</button>
