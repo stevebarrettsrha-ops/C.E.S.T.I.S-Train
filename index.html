@@ -5686,6 +5686,99 @@ function updateSkillAreaCounts() {
     }).length;
   });
 }
+
+// Reconcile student user accounts with the students array.
+// Creates student records for any user accounts with role=student that
+// don't have a corresponding entry in the students[] array, and also
+// creates attendance records for students missing them.
+function reconcileStudentsFromAccounts() {
+  var changed = false;
+  // Build lookup sets for fast matching
+  var studentIds = {};
+  var studentNameCourse = {};
+  students.forEach(function(s) {
+    studentIds[s.id] = true;
+    if (s.name && s.course) {
+      studentNameCourse[(s.name + '|' + s.course).toLowerCase()] = true;
+    }
+  });
+
+  userAccounts.forEach(function(u) {
+    if (u.role !== 'student') return;
+    if (u.status === 'pending') return; // Don't create records for unapproved accounts
+
+    // Check if a student record already exists
+    if (u.studentDataId && studentIds[u.studentDataId]) return;
+    var nameKey = u.name && u.programme ? (u.name + '|' + u.programme).toLowerCase() : null;
+    if (nameKey && studentNameCourse[nameKey]) return;
+
+    // No matching student record — create one
+    var studentId = u.studentDataId || ('STU-' + Date.now().toString(36).toUpperCase() + Math.random().toString(36).substring(2,6).toUpperCase());
+    var course = u.programme || '';
+
+    // Find an instructor for this course
+    var assignedInstructor = '';
+    if (course) {
+      var matchedInstructor = instructorData.find(function(ins) {
+        if (!ins.course) return false;
+        if (ins.course.toLowerCase().trim() === course.toLowerCase().trim()) return true;
+        var insSk = findSkillAreaForCourse(ins.course);
+        var stuSk = findSkillAreaForCourse(course);
+        return insSk && stuSk && insSk.id && stuSk.id && insSk.id === stuSk.id;
+      });
+      if (matchedInstructor) assignedInstructor = matchedInstructor.name;
+    }
+
+    students.push({
+      id: studentId,
+      name: (u.name || '').trim(),
+      stage: 'training',
+      course: course.trim(),
+      score: '',
+      progress: 5,
+      certNo: null,
+      certDate: null,
+      certCollected: false,
+      attendance: 0,
+      assignments: 0,
+      assignmentsTotal: 10,
+      gpa: '0.0',
+      gender: '',
+      createdAt: u.createdAt || new Date().toISOString().split('T')[0],
+      instructor: assignedInstructor
+    });
+
+    // Link the user account to this student record
+    if (!u.studentDataId) u.studentDataId = studentId;
+
+    // Track for dedup
+    studentIds[studentId] = true;
+    if (nameKey) studentNameCourse[nameKey] = true;
+    changed = true;
+  });
+
+  // Also ensure every student has an attendance record
+  var attStudentIds = {};
+  attendanceRecords.forEach(function(r) { attStudentIds[r.studentId] = true; });
+  students.forEach(function(s) {
+    if (!attStudentIds[s.id]) {
+      attendanceRecords.push({
+        studentId: s.id,
+        studentName: s.name,
+        course: s.course,
+        date: new Date().toISOString().split('T')[0],
+        days: {Mon:'absent', Tue:'absent', Wed:'absent', Thu:'absent', Fri:'absent'}
+      });
+      changed = true;
+    }
+  });
+
+  if (changed) {
+    updateSkillAreaCounts();
+  }
+  return changed;
+}
+
 loadState();
 applyGoogleVerificationMeta();
 
@@ -6524,6 +6617,8 @@ async function handleCmcClick() {
 function enterApp(role) {
   try {
     currentRole = role;
+    // Ensure all student user accounts have corresponding student records
+    if (reconcileStudentsFromAccounts()) saveState();
     document.getElementById('landingPage').style.display = 'none';
     document.getElementById('appShell').classList.add('active');
     document.body.style.overflow = 'hidden';
@@ -12771,6 +12866,8 @@ async function recoverAllCourseData() {
     totalInstructors += result.instructors;
     totalAccounts += result.accounts;
   }
+  // Reconcile: create student records for any recovered user accounts missing them
+  if (reconcileStudentsFromAccounts()) saveState();
   var parts = [];
   if (totalStudents > 0) parts.push(totalStudents + ' student(s)');
   if (totalInstructors > 0) parts.push(totalInstructors + ' instructor(s)');
@@ -17725,6 +17822,9 @@ async function syncFromCloud() {
       if (Array.isArray(backupData.data.certDownloadApprovals)) certDownloadApprovals = backupData.data.certDownloadApprovals;
     } catch(e) { console.warn('[SyncFromCloud] Error restoring additional data:', e); }
 
+    // Reconcile: create student records for any user accounts missing them
+    reconcileStudentsFromAccounts();
+
     // Persist all restored data to localStorage
     saveState();
 
@@ -18772,6 +18872,10 @@ async function silentMergeFromBackup(fileId) {
       } catch(e) { console.warn('[Merge] skillAreas error:', e); }
     }
 
+    // Reconcile: create student records for any user accounts missing them
+    var reconciled = reconcileStudentsFromAccounts();
+    if (reconciled) changed = true;
+
     if (changed) {
       saveState();
     }
@@ -18953,19 +19057,23 @@ async function autoSyncOnLogin() {
       console.warn('[AutoSync] Course data recovery error:', e);
     }
 
-    // 3. Update sync timestamp
+    // 3. Reconcile: create student records for any user accounts missing them
+    var reconciled = reconcileStudentsFromAccounts();
+    if (reconciled) { anyChanged = true; saveState(); }
+
+    // 4. Update sync timestamp
     lastSyncTime = new Date();
     localStorage.setItem('schoolDashboardLastSyncTime', lastSyncTime.toISOString());
     updateLastSyncDisplay();
 
-    // 4. Keep the main cloudFileId in sync
+    // 5. Keep the main cloudFileId in sync
     if (!cloudFileId) {
       await findExistingBackupFile();
     }
 
     console.log('[AutoSync] Auto-sync complete. Data changed: ' + anyChanged);
 
-    // 5. Refresh dashboard display if data changed
+    // 6. Refresh dashboard display if data changed
     if (anyChanged) {
       if (currentRole === 'admin') {
         try { showPage('dashboard'); } catch (e) {}
@@ -19351,6 +19459,9 @@ async function loginPageSync() {
     } catch (e) {
       console.warn('[LoginSync] Fee system student sync error:', e);
     }
+
+    // Step 3c: Reconcile student user accounts with student records
+    if (reconcileStudentsFromAccounts()) { totalMerged++; saveState(); }
 
     // Step 4: Ensure main cloudFileId is set
     if (!cloudFileId) {
