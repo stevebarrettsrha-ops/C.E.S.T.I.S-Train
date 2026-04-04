@@ -5513,6 +5513,7 @@ function clearAllSessionData() {
 
 function saveState() {
   try {
+    var isAdmin = currentRole === 'admin' || currentRole === 'adminstaff';
     localStorage.setItem('voctrain_students', JSON.stringify(students));
     localStorage.setItem('voctrain_exams', JSON.stringify(exams));
     localStorage.setItem('voctrain_announcements', JSON.stringify(announcements));
@@ -5523,19 +5524,20 @@ function saveState() {
     localStorage.setItem('voctrain_assignments', JSON.stringify(instructorAssignments));
     localStorage.setItem('voctrain_submissions', JSON.stringify(assignmentSubmissions));
     localStorage.setItem('voctrain_resources', JSON.stringify(instructorResources));
-    localStorage.setItem('voctrain_driveResources', JSON.stringify(driveResources));
     localStorage.setItem('voctrain_studentProfiles', JSON.stringify(studentProfiles));
     localStorage.setItem('voctrain_instructorProfiles', JSON.stringify(instructorProfiles));
     localStorage.setItem('voctrain_systemSettings', JSON.stringify(systemSettings));
     localStorage.setItem('voctrain_examResults', JSON.stringify(examResults));
     localStorage.setItem('voctrain_calendarEvents', JSON.stringify(calendarEvents));
-    localStorage.setItem('voctrain_adrTasks', JSON.stringify(adrTasks));
-    localStorage.setItem('voctrain_adrStaffMeta', JSON.stringify(adrStaffMeta));
-    localStorage.setItem('voctrain_adminStaffAccess', JSON.stringify(adminStaffAccessSettings));
     localStorage.setItem('voctrain_instructorData', JSON.stringify(instructorData));
     localStorage.setItem('voctrain_certDownloadApprovals', JSON.stringify(certDownloadApprovals));
-    localStorage.setItem('voctrain_skillAreas', JSON.stringify(skillAreas));
-    localStorage.setItem('voctrain_documentHubFiles', JSON.stringify(documentHubFiles));
+    // Admin-managed data: only save if admin OR if data is non-empty (prevents wiping admin data)
+    if (isAdmin || driveResources.length > 0) localStorage.setItem('voctrain_driveResources', JSON.stringify(driveResources));
+    if (isAdmin || skillAreas.length > 0) localStorage.setItem('voctrain_skillAreas', JSON.stringify(skillAreas));
+    if (isAdmin || documentHubFiles.length > 0) localStorage.setItem('voctrain_documentHubFiles', JSON.stringify(documentHubFiles));
+    if (isAdmin) localStorage.setItem('voctrain_adminStaffAccess', JSON.stringify(adminStaffAccessSettings));
+    if (isAdmin || adrTasks.length > 0) localStorage.setItem('voctrain_adrTasks', JSON.stringify(adrTasks));
+    if (isAdmin || Object.keys(adrStaffMeta).length > 0) localStorage.setItem('voctrain_adrStaffMeta', JSON.stringify(adrStaffMeta));
     // Strip large base64 images before saving to localStorage (images are in IndexedDB)
     var certTplsClean = {};
     Object.keys(certTemplates).forEach(function(k) {
@@ -5543,7 +5545,7 @@ function saveState() {
       delete certTplsClean[k].bgPage1;
       delete certTplsClean[k].bgPage2;
     });
-    localStorage.setItem('voctrain_certTemplates', JSON.stringify(certTplsClean));
+    if (isAdmin || Object.keys(certTplsClean).length > 0) localStorage.setItem('voctrain_certTemplates', JSON.stringify(certTplsClean));
     saveLmsChatData();
   } catch(e) {
     console.warn('saveState: storage quota exceeded or unavailable');
@@ -17234,8 +17236,13 @@ async function syncFromCloud() {
       examResults = backupData.data.examResults;
     }
 
-    if (backupData.data.driveResources) {
-      driveResources = backupData.data.driveResources;
+    if (backupData.data.driveResources && backupData.data.driveResources.length > 0) {
+      // Merge: add cloud resources that don't exist locally, never replace with empty
+      backupData.data.driveResources.forEach(function(cr) {
+        if (!driveResources.some(function(lr) { return lr.id === cr.id; })) {
+          driveResources.push(cr);
+        }
+      });
     }
 
     // Restore additional data arrays from cloud backup
@@ -17263,8 +17270,18 @@ async function syncFromCloud() {
       if (Array.isArray(backupData.data.chatRooms)) lmsChatRooms = backupData.data.chatRooms;
       if (Array.isArray(backupData.data.chatMessages)) lmsChatMessages = backupData.data.chatMessages;
       if (backupData.data.chatProfiles && typeof backupData.data.chatProfiles === 'object') lmsChatProfiles = backupData.data.chatProfiles;
-      if (Array.isArray(backupData.data.skillAreas) && backupData.data.skillAreas.length > 0) skillAreas = backupData.data.skillAreas;
-      if (backupData.data.certTemplates && typeof backupData.data.certTemplates === 'object') certTemplates = backupData.data.certTemplates;
+      if (Array.isArray(backupData.data.skillAreas) && backupData.data.skillAreas.length > 0) {
+        // Merge: add cloud skill areas that don't exist locally, update existing ones
+        backupData.data.skillAreas.forEach(function(sa) {
+          if (!sa || !sa.id) return;
+          var existing = skillAreas.find(function(l) { return l.id === sa.id; });
+          if (!existing) { skillAreas.push(sa); }
+          else { if(sa.name) existing.name = sa.name; if(sa.desc) existing.desc = sa.desc; if(sa.icon) existing.icon = sa.icon; if(sa.color) existing.color = sa.color; }
+        });
+      }
+      if (backupData.data.certTemplates && typeof backupData.data.certTemplates === 'object' && Object.keys(backupData.data.certTemplates).length > 0) {
+        Object.keys(backupData.data.certTemplates).forEach(function(k) { certTemplates[k] = backupData.data.certTemplates[k]; });
+      }
       if (Array.isArray(backupData.data.certDownloadApprovals)) certDownloadApprovals = backupData.data.certDownloadApprovals;
     } catch(e) { console.warn('[SyncFromCloud] Error restoring additional data:', e); }
 
@@ -18370,10 +18387,14 @@ async function autoSaveToAllFolders() {
     const cloudUser = getCurrentCloudUser();
 
     // Prepare the full backup data
+    // Only include admin-managed data if user is admin/adminstaff OR data is non-empty
+    // This prevents non-admin users from uploading empty arrays that would overwrite admin data
+    var _isAdminSave = currentRole === 'admin' || currentRole === 'adminstaff';
     const backupData = {
       version: '1.0',
       timestamp: new Date().toISOString(),
       savedBy: cloudUser.username,
+      savedByRole: currentRole || 'unknown',
       data: {
         userAccounts: userAccounts,
         students: students,
@@ -18386,7 +18407,6 @@ async function autoSaveToAllFolders() {
         chatMessages: lmsChatMessages,
         chatProfiles: lmsChatProfiles,
         chatFollows: lmsChatFollows,
-        driveResources: driveResources,
         classSessions: classSessions,
         adminMeetings: adminMeetings,
         instructorAssignments: instructorAssignments,
@@ -18395,23 +18415,27 @@ async function autoSaveToAllFolders() {
         instructorProfiles: instructorProfiles,
         instructorData: instructorData,
         systemSettings: systemSettings,
-        adrTasks: adrTasks,
-        adrStaffMeta: adrStaffMeta,
-        adminStaffAccessSettings: adminStaffAccessSettings,
         supportMessages: supportMessages,
         notifications: notifications,
-        certTemplates: (function() {
-          var clean = {};
-          Object.keys(certTemplates).forEach(function(k) {
-            clean[k] = Object.assign({}, certTemplates[k]);
-            delete clean[k].bgPage1; delete clean[k].bgPage2;
-          });
-          return clean;
-        })(),
-        certDownloadApprovals: certDownloadApprovals,
-        skillAreas: skillAreas
+        certDownloadApprovals: certDownloadApprovals
       }
     };
+    // Admin-managed data: only include if admin OR if non-empty (never upload empty to overwrite real data)
+    if (_isAdminSave || driveResources.length > 0) backupData.data.driveResources = driveResources;
+    if (_isAdminSave || skillAreas.length > 0) backupData.data.skillAreas = skillAreas;
+    if (_isAdminSave) backupData.data.adminStaffAccessSettings = adminStaffAccessSettings;
+    if (_isAdminSave || adrTasks.length > 0) backupData.data.adrTasks = adrTasks;
+    if (_isAdminSave || Object.keys(adrStaffMeta).length > 0) backupData.data.adrStaffMeta = adrStaffMeta;
+    if (_isAdminSave || documentHubFiles.length > 0) backupData.data.documentHubFiles = documentHubFiles;
+    var _cleanCertTpls = (function() {
+      var clean = {};
+      Object.keys(certTemplates).forEach(function(k) {
+        clean[k] = Object.assign({}, certTemplates[k]);
+        delete clean[k].bgPage1; delete clean[k].bgPage2;
+      });
+      return clean;
+    })();
+    if (_isAdminSave || Object.keys(_cleanCertTpls).length > 0) backupData.data.certTemplates = _cleanCertTpls;
 
     const jsonContent = JSON.stringify(backupData);
     const blob = new Blob([jsonContent], { type: 'application/json' });
