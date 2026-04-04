@@ -5881,6 +5881,8 @@ async function createUserAccount() {
 function openEditUser(userId) {
   var user = userAccounts.find(function(u){ return u.id === userId; });
   if(!user) return;
+  // Ensure programme dropdown is populated with current skill areas
+  populateCourseDropdowns();
   document.getElementById('editUserId').value = userId;
   document.getElementById('editUserName').value = user.name;
   document.getElementById('editUserRole').value = user.role;
@@ -5905,9 +5907,20 @@ function saveUserEdit() {
   var dup = userAccounts.find(function(u){ return u.username === username && u.id !== userId; });
   if(dup) { alert('Username already in use by another account.'); return; }
   if(role !== 'admin' && role !== 'adminstaff' && role !== 'cmc' && !programme) { alert('Please select a programme.'); return; }
+  var oldRole = user.role;
   user.name = name; user.role = role; user.username = username; user.email = email;
   user.programme = (role === 'admin' || role === 'adminstaff' || role === 'cmc') ? '' : programme;
+  // Create linked instructor/student data when role changes
+  if(role === 'instructor' && oldRole !== 'instructor') {
+    var existingIns = instructorData.find(function(ins){ return ins.name === user.name || ins.email === user.email; });
+    if(!existingIns) { createInstructorDataForAccount(user); }
+  }
+  if(role === 'student' && oldRole !== 'student') {
+    var existingStu = students.find(function(s){ return s.name === user.name || user.studentDataId === s.id; });
+    if(!existingStu) { createStudentDataForAccount(user); }
+  }
   saveUserAccounts();
+  saveState();
   closeModal('editUserModal');
   renderUserAccountsTable();
   showToast('User updated successfully!');
