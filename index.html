@@ -7445,6 +7445,7 @@ function buildAdminPages() {
   <section class="page" id="page-students">
     <div style="display:flex;gap:12px;margin-bottom:20px;flex-wrap:wrap;">
       <button class="btn btn-primary" onclick="openModal('addStudentModal')">+ Add Student</button>
+      <button class="btn btn-secondary" onclick="recoverAllCourseData()" title="Recover students and instructors from cloud backups">🔄 Recover from Cloud</button>
       <select class="form-control" style="width:200px;" id="filterStage" onchange="filterStudents()"><option value="all">All Stages</option><option value="testing">Testing</option><option value="interview">Interview</option><option value="training">In Training</option><option value="certified">Certified</option><option value="collected">Cert. Collected</option><option value="incomplete">Incomplete</option></select>
       <select class="form-control" style="width:200px;" id="filterCourse" onchange="filterStudents()"><option value="all">All Courses</option>${courses.map(c=>'<option>'+c+'</option>').join('')}</select>
       <input type="text" class="form-control" style="width:220px;" placeholder="Search student name..." id="studentSearch" onkeyup="filterStudents()">
@@ -7460,6 +7461,7 @@ function buildAdminPages() {
       <div id="trainingAdminControls" style="display:none;margin-bottom:20px;">
         <div style="display:flex;gap:12px;align-items:center;flex-wrap:wrap;">
           <button class="btn btn-primary" onclick="openModal('addCentreModal')">+ Add Training Centre</button>
+          <button class="btn btn-secondary" onclick="recoverAllCourseData()" title="Scan cloud backups to recover students and instructors for all skill areas">🔄 Recover from Cloud</button>
           <div style="flex:1;"></div>
           <div style="display:flex;gap:8px;">
             <button class="btn btn-secondary" onclick="toggleCentreView('grid')" id="centreViewGrid" title="Grid View" style="padding:8px 12px;">▦</button>
@@ -12604,6 +12606,128 @@ async function scanAllDriveFolders() {
   return totalImported;
 }
 
+// Recover students, instructors, user accounts, and attendance from cloud backup
+// for a specific course that was deleted and recreated
+async function recoverCourseDataFromCloud(courseName) {
+  if (!googleAccessToken) return { students: 0, instructors: 0, accounts: 0, attendance: 0 };
+  var result = { students: 0, instructors: 0, accounts: 0, attendance: 0 };
+  var courseNameLower = courseName.toLowerCase().trim();
+
+  try {
+    // Search all backup folders for backup files
+    var backupData = null;
+    for (var i = 0; i < ALL_DRIVE_FOLDERS.length; i++) {
+      var fileId = await findBackupFileInFolder(ALL_DRIVE_FOLDERS[i].id);
+      if (!fileId) continue;
+      var resp = await fetch('https://www.googleapis.com/drive/v3/files/' + fileId + '?alt=media', {
+        headers: { 'Authorization': 'Bearer ' + googleAccessToken }
+      });
+      if (resp.ok) {
+        backupData = await resp.json();
+        if (backupData && backupData.data) break; // Use first valid backup found
+      }
+    }
+    if (!backupData || !backupData.data) return result;
+
+    // Recover students from cloud that match this course
+    if (Array.isArray(backupData.data.students)) {
+      backupData.data.students.forEach(function(cloudStudent) {
+        if (!cloudStudent.course || cloudStudent.course.toLowerCase().trim() !== courseNameLower) return;
+        // Skip if already exists locally (by ID or by name+course)
+        var exists = students.some(function(s) {
+          return s.id === cloudStudent.id ||
+            (s.name === cloudStudent.name && s.course && s.course.toLowerCase().trim() === courseNameLower);
+        });
+        if (!exists) {
+          students.push(cloudStudent);
+          result.students++;
+        }
+      });
+    }
+
+    // Recover instructors from cloud that match this course
+    if (Array.isArray(backupData.data.instructorData)) {
+      backupData.data.instructorData.forEach(function(cloudInstructor) {
+        if (!cloudInstructor.course || cloudInstructor.course.toLowerCase().trim() !== courseNameLower) return;
+        var exists = instructorData.some(function(ins) {
+          return ins.id === cloudInstructor.id ||
+            (ins.name === cloudInstructor.name && ins.course && ins.course.toLowerCase().trim() === courseNameLower);
+        });
+        if (!exists) {
+          instructorData.push(cloudInstructor);
+          result.instructors++;
+        }
+      });
+    }
+
+    // Recover user accounts linked to this course
+    if (Array.isArray(backupData.data.userAccounts)) {
+      backupData.data.userAccounts.forEach(function(cloudUser) {
+        if (!cloudUser.programme || cloudUser.programme.toLowerCase().trim() !== courseNameLower) return;
+        var exists = userAccounts.some(function(u) {
+          return u.id === cloudUser.id ||
+            (u.username && cloudUser.username && u.username.toLowerCase() === cloudUser.username.toLowerCase());
+        });
+        if (!exists) {
+          userAccounts.push(cloudUser);
+          result.accounts++;
+        }
+      });
+    }
+
+    // Recover attendance records for recovered students
+    if (Array.isArray(backupData.data.attendanceRecords)) {
+      var localAttKeys = {};
+      attendanceRecords.forEach(function(a) { localAttKeys[a.studentId + '|' + a.date] = true; });
+      backupData.data.attendanceRecords.forEach(function(cloudRec) {
+        if (!cloudRec.course || cloudRec.course.toLowerCase().trim() !== courseNameLower) return;
+        var key = cloudRec.studentId + '|' + cloudRec.date;
+        if (!localAttKeys[key]) {
+          attendanceRecords.push(cloudRec);
+          result.attendance++;
+        }
+      });
+    }
+
+    if (result.students > 0 || result.instructors > 0 || result.accounts > 0) {
+      if (result.accounts > 0) saveUserAccounts();
+      updateSkillAreaCounts();
+      saveState();
+    }
+    return result;
+  } catch(err) {
+    console.error('Recover course data error:', err);
+    return result;
+  }
+}
+
+// Scan all skill areas and recover any students/instructors from cloud
+async function recoverAllCourseData() {
+  if (!googleAccessToken) {
+    showToast('Please connect to Google Drive first');
+    return;
+  }
+  showToast('Scanning cloud backups for students and instructors...');
+  var totalStudents = 0, totalInstructors = 0, totalAccounts = 0;
+  for (var i = 0; i < skillAreas.length; i++) {
+    var result = await recoverCourseDataFromCloud(skillAreas[i].name);
+    totalStudents += result.students;
+    totalInstructors += result.instructors;
+    totalAccounts += result.accounts;
+  }
+  var parts = [];
+  if (totalStudents > 0) parts.push(totalStudents + ' student(s)');
+  if (totalInstructors > 0) parts.push(totalInstructors + ' instructor(s)');
+  if (totalAccounts > 0) parts.push(totalAccounts + ' user account(s)');
+  if (parts.length > 0) {
+    showToast('Recovered from cloud: ' + parts.join(', '));
+    updateSkillAreaCounts();
+    renderSkills();
+  } else {
+    showToast('All student and instructor data is already synced. No new records found.');
+  }
+}
+
 async function uploadResourceToDrive() {
   const name = document.getElementById('driveResName')?.value?.trim();
   const course = document.getElementById('driveResCourse')?.value;
@@ -13912,16 +14036,30 @@ function addTrainingCentre() {
   addNotification('New training centre created: ' + name, 'system', null, ['admin']);
   populateCourseDropdowns();
   saveState();
-  // Auto-scan Drive for existing resources if this skill area had a folder before
+  // Auto-recover data from Drive/cloud if this skill area existed before
   if (googleAccessToken) {
+    // Recover resources from Drive folder
     scanDriveFolderForResources(name).then(function(result) {
       if (result.imported > 0) {
         showToast(result.imported + ' existing resource(s) recovered from Drive for ' + name + '!');
-        // Update skill area materials count
         var sk = skillAreas.find(function(s){ return s.name === name; });
         if (sk) { sk.materials = (sk.materials || 0) + result.imported; }
         renderAdminResources();
         saveState();
+      }
+    });
+    // Recover students, instructors, and user accounts from cloud backup
+    recoverCourseDataFromCloud(name).then(function(result) {
+      var parts = [];
+      if (result.students > 0) parts.push(result.students + ' student(s)');
+      if (result.instructors > 0) parts.push(result.instructors + ' instructor(s)');
+      if (result.accounts > 0) parts.push(result.accounts + ' user account(s)');
+      if (result.attendance > 0) parts.push(result.attendance + ' attendance record(s)');
+      if (parts.length > 0) {
+        showToast('Recovered from cloud for ' + name + ': ' + parts.join(', '));
+        updateSkillAreaCounts();
+        renderSkills();
+        if(centreViewMode === 'table') renderCentreTable();
       }
     });
   }
