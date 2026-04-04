@@ -5240,19 +5240,98 @@ function initLmsChatData() {
         members:[], color:sk.color, createdBy:'admin', skillAreaId:sk.id
       });
     });
-    // Auto-populate members based on student/instructor programmes
-    lmsChatRooms.forEach(function(room) {
-      if(room.type === 'admin') {
-        // Admin room has all admins and admin staff
-        room.members = userAccounts.filter(function(u){ return u.role==='admin' || u.role==='adminstaff'; }).map(function(u){ return u.id; });
-      } else if(room.type === 'class') {
-        // Class rooms have admin + admin staff + instructor for that programme + students in that programme
-        var admins = userAccounts.filter(function(u){ return u.role==='admin' || u.role==='adminstaff'; }).map(function(u){ return u.id; });
-        var instructors = userAccounts.filter(function(u){ return u.role==='instructor' && room.name.toLowerCase().indexOf(u.programme.toLowerCase().split(' ')[0]) !== -1; }).map(function(u){ return u.id; });
-        var studs = userAccounts.filter(function(u){ return u.role==='student' && room.name.toLowerCase().indexOf(u.programme.toLowerCase().split(' ')[0]) !== -1; }).map(function(u){ return u.id; });
-        room.members = admins.concat(instructors).concat(studs);
-      }
+    // Auto-populate members — lmsChatEnsureMembership handles this properly
+    lmsChatEnsureMembership();
+    saveLmsChatData();
+  }
+}
+
+// Ensure all users are members of their appropriate chat rooms.
+// Called on chat page show and after cloud sync to keep membership current.
+function lmsChatEnsureMembership() {
+  if (!lmsChatRooms.length) return;
+  var changed = false;
+
+  // 1. Ensure default skill area rooms exist (in case cloud data is missing some)
+  skillAreas.forEach(function(sk) {
+    var roomId = 'chat-class-' + sk.id;
+    if (!lmsChatRooms.some(function(r) { return r.id === roomId; })) {
+      lmsChatRooms.push({
+        id: roomId, name: sk.name, icon: sk.icon, type: 'class',
+        members: [], color: sk.color, createdBy: 'admin', skillAreaId: sk.id
+      });
+      changed = true;
+    }
+  });
+
+  // 2. Ensure Admin General room exists
+  if (!lmsChatRooms.some(function(r) { return r.id === 'chat-admin'; })) {
+    lmsChatRooms.unshift({
+      id: 'chat-admin', name: 'Admin General', icon: '\uD83D\uDCBC', type: 'admin',
+      members: [], color: '#f0a500', createdBy: 'admin'
     });
+    changed = true;
+  }
+
+  // 3. Refresh membership for all group/class rooms
+  lmsChatRooms.forEach(function(room) {
+    if (room.type === 'dm') return; // DMs are managed separately
+
+    var currentMembers = room.members || [];
+    var memberSet = {};
+    currentMembers.forEach(function(id) { memberSet[id] = true; });
+    var beforeCount = Object.keys(memberSet).length;
+
+    if (room.type === 'admin' || room.id === 'chat-admin') {
+      // Admin room: all admins and admin staff
+      userAccounts.forEach(function(u) {
+        if ((u.role === 'admin' || u.role === 'adminstaff') && !memberSet[u.id]) {
+          memberSet[u.id] = true;
+        }
+      });
+    } else if (room.type === 'class') {
+      // Class rooms: admin + admin staff + matching instructors + matching students
+      // Always add admins and admin staff
+      userAccounts.forEach(function(u) {
+        if ((u.role === 'admin' || u.role === 'adminstaff') && !memberSet[u.id]) {
+          memberSet[u.id] = true;
+        }
+      });
+
+      // Match by skill area: find the skill area for this room, then match users by programme
+      var roomSkill = room.skillAreaId ? skillAreas.find(function(sk) { return sk.id === room.skillAreaId; }) : null;
+      var roomNameLower = room.name.toLowerCase().trim();
+
+      userAccounts.forEach(function(u) {
+        if (u.role !== 'instructor' && u.role !== 'student') return;
+        if (memberSet[u.id]) return;
+        if (!u.programme) return;
+
+        var progLower = u.programme.toLowerCase().trim();
+        // Direct name match
+        if (progLower === roomNameLower) { memberSet[u.id] = true; return; }
+        // Skill area match via findSkillAreaForCourse
+        if (typeof findSkillAreaForCourse === 'function') {
+          var userSkill = findSkillAreaForCourse(u.programme);
+          if (roomSkill && userSkill && userSkill.id && roomSkill.id && userSkill.id === roomSkill.id) {
+            memberSet[u.id] = true; return;
+          }
+          // Also match if the user's skill area name matches the room name
+          if (userSkill && userSkill.name && userSkill.name.toLowerCase().trim() === roomNameLower) {
+            memberSet[u.id] = true; return;
+          }
+        }
+      });
+    }
+
+    var newMembers = Object.keys(memberSet);
+    if (newMembers.length !== beforeCount) {
+      room.members = newMembers;
+      changed = true;
+    }
+  });
+
+  if (changed) {
     saveLmsChatData();
   }
 }
@@ -5910,6 +5989,7 @@ loadUserAccounts();
 loadNotifications();
 updateNotificationDot();
 initLmsChatData();
+lmsChatEnsureMembership();
 
 function getNextUserId() {
   var maxNum = 0;
@@ -20126,7 +20206,22 @@ function lmsChatGetUserRooms() {
   return lmsChatRooms.filter(function(room) {
     if(room.type === 'dm') return room.members.indexOf(user.id) !== -1; // DM rooms: only participants
     if(currentRole === 'admin' || currentRole === 'adminstaff') return true; // Admin and admin staff see all group rooms
-    return room.members.indexOf(user.id) !== -1;
+    // Check direct membership
+    if(room.members && room.members.indexOf(user.id) !== -1) return true;
+    // Fallback: match class rooms by programme/course for students and instructors
+    if(room.type === 'class' && user.programme) {
+      var userProg = user.programme.toLowerCase().trim();
+      var roomName = room.name.toLowerCase().trim();
+      if(userProg === roomName) return true;
+      // Match via skill area
+      if(typeof findSkillAreaForCourse === 'function') {
+        var userSkill = findSkillAreaForCourse(user.programme);
+        var roomSkill = room.skillAreaId ? skillAreas.find(function(sk){ return sk.id === room.skillAreaId; }) : null;
+        if(userSkill && roomSkill && userSkill.id && roomSkill.id && userSkill.id === roomSkill.id) return true;
+        if(userSkill && userSkill.name && userSkill.name.toLowerCase().trim() === roomName) return true;
+      }
+    }
+    return false;
   });
 }
 
@@ -22263,6 +22358,7 @@ var lmsChatCallPollInterval = null;
 
 function lmsChatOnPageShow(prefix) {
   initLmsChatData();
+  lmsChatEnsureMembership();
   lmsChatActiveRoom = null;
   lmsChatRenderRoomList(prefix);
 
@@ -22274,6 +22370,7 @@ function lmsChatOnPageShow(prefix) {
   // Auto-fetch latest chat data from Google Drive
   if(isCloudConnected && googleAccessToken) {
     lmsChatSyncFromDrive().then(function() {
+      lmsChatEnsureMembership();
       lmsChatRenderRoomList(prefix);
       // Check for any active calls in rooms the user is a member of
       lmsChatCheckForActiveCalls();
