@@ -18797,6 +18797,101 @@ async function autoSyncOnLogin() {
       console.warn('[AutoSync] Cert template image sync error:', e);
     }
 
+    // 2d. Auto-scan Drive folders for untracked resources (recovers resources for recreated skill areas)
+    try {
+      for (var _ski = 0; _ski < skillAreas.length; _ski++) {
+        var _scanRes = await scanDriveFolderForResources(skillAreas[_ski].name);
+        if (_scanRes.imported > 0) {
+          console.log('[AutoSync] Recovered ' + _scanRes.imported + ' resource(s) for ' + skillAreas[_ski].name);
+          var _sk = skillAreas[_ski];
+          _sk.materials = (_sk.materials || 0) + _scanRes.imported;
+          anyChanged = true;
+        }
+      }
+    } catch (e) {
+      console.warn('[AutoSync] Drive resource scan error:', e);
+    }
+
+    // 2e. Auto-recover students/instructors/accounts from cloud for all skill areas
+    try {
+      // Read backup once and recover for each skill area
+      var _backupData = null;
+      for (var _bi = 0; _bi < ALL_DRIVE_FOLDERS.length; _bi++) {
+        var _bfId = await findBackupFileInFolder(ALL_DRIVE_FOLDERS[_bi].id);
+        if (!_bfId) continue;
+        var _bResp = await fetch('https://www.googleapis.com/drive/v3/files/' + _bfId + '?alt=media', {
+          headers: { 'Authorization': 'Bearer ' + googleAccessToken }
+        });
+        if (_bResp.ok) {
+          _backupData = await _bResp.json();
+          if (_backupData && _backupData.data) break;
+        }
+      }
+      if (_backupData && _backupData.data) {
+        var _totalRecovered = { students: 0, instructors: 0, accounts: 0, attendance: 0 };
+        for (var _si = 0; _si < skillAreas.length; _si++) {
+          var _courseName = skillAreas[_si].name;
+          var _courseNameLower = _courseName.toLowerCase().trim();
+
+          // Recover students
+          if (Array.isArray(_backupData.data.students)) {
+            _backupData.data.students.forEach(function(cs) {
+              if (!cs.course || cs.course.toLowerCase().trim() !== _courseNameLower) return;
+              var exists = students.some(function(s) {
+                return s.id === cs.id || (s.name === cs.name && s.course && s.course.toLowerCase().trim() === _courseNameLower);
+              });
+              if (!exists) { students.push(cs); _totalRecovered.students++; }
+            });
+          }
+
+          // Recover instructors
+          if (Array.isArray(_backupData.data.instructorData)) {
+            _backupData.data.instructorData.forEach(function(ci) {
+              if (!ci.course || ci.course.toLowerCase().trim() !== _courseNameLower) return;
+              var exists = instructorData.some(function(ins) {
+                return ins.id === ci.id || (ins.name === ci.name && ins.course && ins.course.toLowerCase().trim() === _courseNameLower);
+              });
+              if (!exists) { instructorData.push(ci); _totalRecovered.instructors++; }
+            });
+          }
+
+          // Recover user accounts
+          if (Array.isArray(_backupData.data.userAccounts)) {
+            _backupData.data.userAccounts.forEach(function(cu) {
+              if (!cu.programme || cu.programme.toLowerCase().trim() !== _courseNameLower) return;
+              var exists = userAccounts.some(function(u) {
+                return u.id === cu.id || (u.username && cu.username && u.username.toLowerCase() === cu.username.toLowerCase());
+              });
+              if (!exists) { userAccounts.push(cu); _totalRecovered.accounts++; }
+            });
+          }
+
+          // Recover attendance
+          if (Array.isArray(_backupData.data.attendanceRecords)) {
+            var _localAttKeys = {};
+            attendanceRecords.forEach(function(a) { _localAttKeys[a.studentId + '|' + a.date] = true; });
+            _backupData.data.attendanceRecords.forEach(function(cr) {
+              if (!cr.course || cr.course.toLowerCase().trim() !== _courseNameLower) return;
+              if (!_localAttKeys[cr.studentId + '|' + cr.date]) {
+                attendanceRecords.push(cr);
+                _totalRecovered.attendance++;
+              }
+            });
+          }
+        }
+
+        if (_totalRecovered.students > 0 || _totalRecovered.instructors > 0 || _totalRecovered.accounts > 0) {
+          console.log('[AutoSync] Recovered: ' + _totalRecovered.students + ' students, ' + _totalRecovered.instructors + ' instructors, ' + _totalRecovered.accounts + ' accounts, ' + _totalRecovered.attendance + ' attendance records');
+          if (_totalRecovered.accounts > 0) saveUserAccounts();
+          updateSkillAreaCounts();
+          saveState();
+          anyChanged = true;
+        }
+      }
+    } catch (e) {
+      console.warn('[AutoSync] Course data recovery error:', e);
+    }
+
     // 3. Update sync timestamp
     lastSyncTime = new Date();
     localStorage.setItem('schoolDashboardLastSyncTime', lastSyncTime.toISOString());
