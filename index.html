@@ -12519,19 +12519,34 @@ async function scanDriveFolderForResources(courseName) {
       });
       if (alreadyTracked) return;
 
-      // Infer category from MIME type / file extension
+      // Infer category from filename patterns, MIME type, and file extension
       var category = 'document';
       var format = 'PDF';
       var mime = (file.mimeType || '').toLowerCase();
       var fname = (file.name || '').toLowerCase();
-      if (mime.indexOf('video') !== -1 || fname.match(/\.(mp4|avi|mov|mkv|webm)$/)) {
+
+      // First: check filename content after resource ID prefix for type hints
+      // Strip the VT-XXXX-YYYY_ prefix to get the meaningful part of the name
+      var contentName = file.name;
+      var _prefixMatch = file.name.match(/^VT-[A-Z0-9]+-[A-Z0-9]+[_]/);
+      if (_prefixMatch) contentName = file.name.substring(_prefixMatch[0].length);
+      var contentNameLower = contentName.toLowerCase();
+
+      // Worksheet detection: filenames starting with WS followed by a number (WS1_, WS2_, etc.)
+      // or containing "worksheet" in the name
+      var isWorksheet = /^ws\d/i.test(contentName) || contentNameLower.indexOf('worksheet') !== -1;
+
+      if (mime.indexOf('video') !== -1 || fname.match(/\.(mp4|avi|mov|mkv|webm|m4v)$/) || mime.indexOf('google-apps.video') !== -1) {
         category = 'video'; format = 'Video';
-      } else if (mime.indexOf('pdf') !== -1 || fname.match(/\.pdf$/)) {
-        category = 'document'; format = 'PDF';
+      } else if (isWorksheet) {
+        category = 'worksheet';
+        format = fname.match(/\.pdf$/) ? 'PDF' : fname.match(/\.(xlsx?|csv)$/) ? 'Spreadsheet' : fname.match(/\.(docx?)$/) ? 'DOC' : 'PDF';
       } else if (mime.indexOf('spreadsheet') !== -1 || mime.indexOf('excel') !== -1 || fname.match(/\.(xlsx?|csv)$/)) {
         category = 'worksheet'; format = 'Spreadsheet';
       } else if (mime.indexOf('presentation') !== -1 || mime.indexOf('powerpoint') !== -1 || fname.match(/\.(pptx?|pps)$/)) {
         category = 'document'; format = 'Presentation';
+      } else if (mime.indexOf('pdf') !== -1 || fname.match(/\.pdf$/)) {
+        category = 'document'; format = 'PDF';
       } else if (mime.indexOf('document') !== -1 || mime.indexOf('word') !== -1 || fname.match(/\.(docx?|rtf|txt)$/)) {
         category = 'document'; format = 'Document';
       } else if (mime.indexOf('image') !== -1 || fname.match(/\.(jpg|jpeg|png|gif|bmp|svg|webp)$/)) {
@@ -12581,6 +12596,42 @@ async function scanDriveFolderForResources(courseName) {
   }
 }
 
+// Re-categorize existing driveResources based on filename patterns
+// Fixes resources that were recovered before smart categorization was added
+function recategorizeDriveResources() {
+  var fixed = 0;
+  driveResources.forEach(function(r) {
+    if (!r.driveFileName && !r.name) return;
+    var fname = (r.driveFileName || r.name || '').toLowerCase();
+
+    // Strip VT prefix to get content name
+    var contentName = r.driveFileName || r.name || '';
+    var _pm = contentName.match(/^VT-[A-Z0-9]+-[A-Z0-9]+[_]/);
+    if (_pm) contentName = contentName.substring(_pm[0].length);
+
+    // Check if this is a worksheet by filename pattern (WS1_, WS2_, etc.)
+    var isWorksheet = /^ws\d/i.test(contentName) || contentName.toLowerCase().indexOf('worksheet') !== -1;
+
+    // Check if this is a video by extension
+    var isVideo = !!fname.match(/\.(mp4|avi|mov|mkv|webm|m4v)$/);
+
+    if (isVideo && r.category !== 'video') {
+      r.category = 'video';
+      r.format = 'Video';
+      fixed++;
+    } else if (isWorksheet && r.category !== 'worksheet') {
+      r.category = 'worksheet';
+      r.format = fname.match(/\.pdf$/) ? 'PDF' : fname.match(/\.(xlsx?|csv)$/) ? 'Spreadsheet' : 'PDF';
+      fixed++;
+    }
+  });
+  if (fixed > 0) {
+    saveState();
+    console.log('[Resources] Re-categorized ' + fixed + ' resource(s)');
+  }
+  return fixed;
+}
+
 // Scan all skill area Drive folders and recover any untracked resources
 async function scanAllDriveFolders() {
   if (!googleAccessToken) {
@@ -12597,11 +12648,16 @@ async function scanAllDriveFolders() {
       totalImported += result.imported;
     }
   }
-  if (totalImported > 0) {
-    showToast(totalImported + ' resource(s) recovered from Drive: ' + scannedCourses.join(', '));
+  // Also re-categorize any miscategorized existing resources
+  var reCatCount = recategorizeDriveResources();
+  if (totalImported > 0 || reCatCount > 0) {
+    var msg = '';
+    if (totalImported > 0) msg += totalImported + ' resource(s) recovered from Drive: ' + scannedCourses.join(', ');
+    if (reCatCount > 0) msg += (msg ? '. ' : '') + reCatCount + ' resource(s) re-categorized.';
+    showToast(msg);
     renderAdminResources();
   } else {
-    showToast('All Drive resources are already synced. No new resources found.');
+    showToast('All Drive resources are already synced and correctly categorized.');
   }
   return totalImported;
 }
@@ -12833,6 +12889,9 @@ async function uploadResourceToDrive() {
 function renderAdminResources() {
   const container = document.getElementById('adminResourcesList');
   if (!container) return;
+
+  // Auto-fix any miscategorized resources on render
+  recategorizeDriveResources();
 
   // Dynamically populate course filter from current skillAreas
   var courseSel = document.getElementById('arFilterCourse');
@@ -18808,6 +18867,8 @@ async function autoSyncOnLogin() {
           anyChanged = true;
         }
       }
+      // Re-categorize any resources with incorrect categories
+      recategorizeDriveResources();
     } catch (e) {
       console.warn('[AutoSync] Drive resource scan error:', e);
     }
