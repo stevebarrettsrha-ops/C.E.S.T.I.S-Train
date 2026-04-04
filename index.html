@@ -3774,6 +3774,26 @@ body.vc-fullscreen-mode.vc-host-only-mode .video-grid .video-tile:not(.vc-hoston
   </div>
 </div>
 
+<!-- Recording Player Modal -->
+<div class="modal-overlay" id="recordingPlayerModal" style="z-index:1100;">
+  <div class="modal" style="max-width:720px;width:95%;">
+    <div class="modal-header"><h3 id="recPlayerTitle">Recording</h3><button class="modal-close" onclick="closeModal('recordingPlayerModal')">&#10005;</button></div>
+    <div style="padding:24px;">
+      <div style="background:#000;border-radius:var(--radius);aspect-ratio:16/9;display:flex;align-items:center;justify-content:center;position:relative;overflow:hidden;">
+        <div style="text-align:center;color:#888;">
+          <div style="font-size:56px;margin-bottom:12px;">&#9654;&#65039;</div>
+          <div style="font-size:15px;font-weight:600;color:#ccc;">Class Recording</div>
+          <div style="font-size:12px;margin-top:6px;">This recording will be available once your instructor uploads it.</div>
+        </div>
+      </div>
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-top:14px;">
+        <div id="recPlayerMeta" style="font-size:12px;color:var(--text-muted);"></div>
+        <div style="font-size:11px;color:var(--text-muted);">Recording pending upload</div>
+      </div>
+    </div>
+  </div>
+</div>
+
 <!-- ============================== APP SHELL ============================== -->
 <div id="appShell" role="application" aria-label="VocTrain LMS Application">
   <aside class="sidebar" id="sidebar" role="navigation" aria-label="Main Navigation">
@@ -4373,6 +4393,49 @@ const stageLabels = {testing:'Testing',interview:'Interview',training:'In Traini
 const stageBadge = {testing:'badge-blue',interview:'badge-purple',training:'badge-amber',certified:'badge-green',collected:'badge-green',incomplete:'badge-red'};
 const stageIcons = {testing:'\uD83D\uDCDD',interview:'\uD83D\uDDE3\uFE0F',training:'\uD83D\uDCDA',certified:'\uD83C\uDF93',collected:'\u2705',incomplete:'\u26A0\uFE0F'};
 function getCourseList() { return skillAreas.map(function(s) { return s.name; }); }
+function findSkillAreaForCourse(courseName) {
+  if (!courseName) return skillAreas[0];
+  var cn = courseName.toLowerCase().trim();
+  // 1. Exact match
+  var exact = skillAreas.find(function(sk) { return sk.name.toLowerCase().trim() === cn; });
+  if (exact) return exact;
+  // 2. One contains the other
+  var contains = skillAreas.find(function(sk) {
+    var sn = sk.name.toLowerCase().trim();
+    return cn.indexOf(sn) !== -1 || sn.indexOf(cn) !== -1;
+  });
+  if (contains) return contains;
+  // 3. First-word match (original logic)
+  var firstWord = skillAreas.find(function(sk) {
+    var fw = sk.name.split(' ')[0].toLowerCase();
+    return fw.length > 2 && cn.indexOf(fw) !== -1;
+  });
+  if (firstWord) return firstWord;
+  // 4. Any significant word overlap (words > 3 chars)
+  var cnWords = cn.split(/[\s&,\-]+/).filter(function(w) { return w.length > 3; });
+  var wordMatch = skillAreas.find(function(sk) {
+    var snWords = sk.name.toLowerCase().split(/[\s&,\-]+/).filter(function(w) { return w.length > 3; });
+    return cnWords.some(function(cw) { return snWords.some(function(sw) { return cw.indexOf(sw) !== -1 || sw.indexOf(cw) !== -1; }); });
+  });
+  if (wordMatch) return wordMatch;
+  // 5. Check certTemplate courseFullName mapping
+  var tplMatch = null;
+  Object.keys(certTemplates).forEach(function(key) {
+    if (tplMatch) return;
+    var tpl = certTemplates[key];
+    if (tpl.courseFullName) {
+      var fn = tpl.courseFullName.toLowerCase();
+      if (fn.indexOf(cn) !== -1 || cn.indexOf(fn) !== -1 ||
+          cnWords.some(function(w) { return fn.indexOf(w) !== -1; })) {
+        var sk = skillAreas.find(function(s) { return s.name.toLowerCase().trim() === key.toLowerCase().trim(); });
+        if (sk) tplMatch = sk;
+      }
+    }
+  });
+  if (tplMatch) return tplMatch;
+  // 6. Build a fallback skill area from the course name itself
+  return { id: 0, name: courseName, icon: '\uD83D\uDCDA', color: '#3498db', students: 0, materials: 0, desc: courseName };
+}
 var courses = getCourseList();
 
 let students = [];
@@ -8301,7 +8364,7 @@ function buildStudentPages() {
   try {
   resolveExamStatuses();
   const s = currentStudent;
-  const skill = skillAreas.find(function(sk) { return s.course.toLowerCase().indexOf(sk.name.split(' ')[0].toLowerCase()) !== -1; }) || skillAreas[0];
+  const skill = findSkillAreaForCourse(s.course);
   const stageOrder = ['testing','interview','training','certified','collected'];
   const currentStageIdx = stageOrder.indexOf(s.stage === 'incomplete' ? 'training' : s.stage);
   const circumference = 2 * Math.PI * 52;
@@ -8438,9 +8501,11 @@ function buildStudentPages() {
         <button class="btn btn-secondary btn-sm" disabled>Not Started</button>
       </div>
       <div class="card" style="margin-top:18px;"><div class="card-header"><h3>Past Recordings</h3></div>
-        <div class="material-item"><div class="material-icon" style="background:var(--red-dim);color:var(--red);">▶</div><div style="flex:1;"><div style="font-size:13px;">${s.course} — Safety Fundamentals</div><div style="font-size:11px;color:var(--text-muted);">Feb 12 • 1hr 20min</div></div><button class="btn btn-sm btn-secondary">Watch</button></div>
-        <div class="material-item"><div class="material-icon" style="background:var(--red-dim);color:var(--red);">▶</div><div style="flex:1;"><div style="font-size:13px;">${s.course} — Core Techniques Review</div><div style="font-size:11px;color:var(--text-muted);">Feb 10 • 55min</div></div><button class="btn btn-sm btn-secondary">Watch</button></div>
-        <div class="material-item"><div class="material-icon" style="background:var(--red-dim);color:var(--red);">▶</div><div style="flex:1;"><div style="font-size:13px;">${s.course} — Tool Identification</div><div style="font-size:11px;color:var(--text-muted);">Feb 7 • 1hr 5min</div></div><button class="btn btn-sm btn-secondary">Watch</button></div>
+        <div id="sPastRecordingsList">
+        <div class="material-item"><div class="material-icon" style="background:var(--red-dim);color:var(--red);">▶</div><div style="flex:1;"><div style="font-size:13px;">${s.course} — Safety Fundamentals</div><div style="font-size:11px;color:var(--text-muted);">Feb 12 • 1hr 20min</div></div><button class="btn btn-sm btn-secondary" onclick="watchRecording('${s.course.replace(/'/g,"\\'")} — Safety Fundamentals','Feb 12','1hr 20min')">Watch</button></div>
+        <div class="material-item"><div class="material-icon" style="background:var(--red-dim);color:var(--red);">▶</div><div style="flex:1;"><div style="font-size:13px;">${s.course} — Core Techniques Review</div><div style="font-size:11px;color:var(--text-muted);">Feb 10 • 55min</div></div><button class="btn btn-sm btn-secondary" onclick="watchRecording('${s.course.replace(/'/g,"\\'")} — Core Techniques Review','Feb 10','55min')">Watch</button></div>
+        <div class="material-item"><div class="material-icon" style="background:var(--red-dim);color:var(--red);">▶</div><div style="flex:1;"><div style="font-size:13px;">${s.course} — Tool Identification</div><div style="font-size:11px;color:var(--text-muted);">Feb 7 • 1hr 5min</div></div><button class="btn btn-sm btn-secondary" onclick="watchRecording('${s.course.replace(/'/g,"\\'")} — Tool Identification','Feb 7','1hr 5min')">Watch</button></div>
+        </div>
       </div>
     </div>
     <div id="sVideoRoom" style="display:none;"></div>
@@ -8762,7 +8827,7 @@ function buildInstructorPages() {
   const avgGpa = myStudents.length ? (myStudents.reduce((a,s) => a + parseFloat(s.gpa), 0) / myStudents.length).toFixed(1) : '0.0';
   const lowAttStudents = myStudents.filter(s => s.attendance < 70);
   const upcomingExams = myExams.filter(e => e.status === 'upcoming');
-  const skill = skillAreas.find(sk => sk.name.toLowerCase().trim() === ins.course.toLowerCase().trim()) || skillAreas[0];
+  const skill = findSkillAreaForCourse(ins.course);
 
   const mc = document.getElementById('mainContent');
   mc.innerHTML = `
@@ -11233,6 +11298,14 @@ function exitVideoRoom(role) {
   if(container) container.style.display = 'none';
 }
 
+function watchRecording(title, date, duration) {
+  openModal('recordingPlayerModal');
+  var titleEl = document.getElementById('recPlayerTitle');
+  var metaEl = document.getElementById('recPlayerMeta');
+  if(titleEl) titleEl.textContent = title;
+  if(metaEl) metaEl.textContent = (date || '') + (duration ? ' • ' + duration : '');
+}
+
 // ============================== CLASS SESSION FUNCTIONS ==============================
 function createClassSession() {
   const name = document.getElementById('csSessionName')?.value?.trim();
@@ -12410,8 +12483,7 @@ function renderAdminResources() {
   const catIcons = { video:'📹', document:'📄', worksheet:'📝' };
   const catLabels = { video:'Video', document:'Document', worksheet:'Worksheet' };
   const courseSkill = function(courseName) {
-    var sk = skillAreas.find(function(s) { return courseName.toLowerCase().indexOf(s.name.split(' ')[0].toLowerCase()) !== -1; });
-    return sk || { icon:'📚', color:'var(--accent)' };
+    return findSkillAreaForCourse(courseName);
   };
 
   var html = '';
@@ -12534,12 +12606,28 @@ function renderStudentDriveResources() {
 
   var searchTerm = (document.getElementById('sResSearch')?.value || '').toLowerCase().trim();
 
-  // Helper to match course names
+  // Helper to match course names — uses findSkillAreaForCourse to resolve both to skill area
   function courseMatches(resCourse, studentCourse) {
     if (!resCourse || !studentCourse) return false;
-    return studentCourse.toLowerCase().indexOf(resCourse.toLowerCase().split(' ')[0]) !== -1 ||
-      resCourse.toLowerCase().indexOf(studentCourse.toLowerCase().split(' ')[0]) !== -1 ||
-      resCourse === studentCourse;
+    var rc = resCourse.toLowerCase().trim();
+    var sc = studentCourse.toLowerCase().trim();
+    // Direct match
+    if (rc === sc) return true;
+    // One contains the other
+    if (rc.indexOf(sc) !== -1 || sc.indexOf(rc) !== -1) return true;
+    // First-word cross-match
+    var rcFirst = rc.split(' ')[0], scFirst = sc.split(' ')[0];
+    if (rcFirst.length > 2 && sc.indexOf(rcFirst) !== -1) return true;
+    if (scFirst.length > 2 && rc.indexOf(scFirst) !== -1) return true;
+    // Word overlap (words > 3 chars)
+    var rcWords = rc.split(/[\s&,\-]+/).filter(function(w){return w.length>3;});
+    var scWords = sc.split(/[\s&,\-]+/).filter(function(w){return w.length>3;});
+    if (rcWords.some(function(rw){return scWords.some(function(sw){return rw.indexOf(sw)!==-1||sw.indexOf(rw)!==-1;});})) return true;
+    // Both resolve to same skill area
+    var resSk = findSkillAreaForCourse(resCourse);
+    var stuSk = findSkillAreaForCourse(studentCourse);
+    if (resSk && stuSk && resSk.id && stuSk.id && resSk.id === stuSk.id) return true;
+    return false;
   }
 
   // Get admin drive resources for this student's course
@@ -12566,7 +12654,7 @@ function renderStudentDriveResources() {
   }
   if (noResMsg) noResMsg.style.display = 'none';
 
-  var sk = skillAreas.find(function(sk) { return s.course.toLowerCase().indexOf(sk.name.split(' ')[0].toLowerCase()) !== -1; }) || skillAreas[0];
+  var sk = findSkillAreaForCourse(s.course);
   var catIcons = { video:'📹', document:'📄', worksheet:'📝', guide:'📄', rubric:'📊' };
   var catLabels = { video:'Video Lectures', document:'Documents', worksheet:'Worksheets', guide:'Study Guides', rubric:'Assessments' };
 
