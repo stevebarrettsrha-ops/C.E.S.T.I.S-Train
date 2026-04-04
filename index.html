@@ -5547,6 +5547,8 @@ function saveState() {
     });
     if (isAdmin || Object.keys(certTplsClean).length > 0) localStorage.setItem('voctrain_certTemplates', JSON.stringify(certTplsClean));
     saveLmsChatData();
+    // Save per-user data keyed by user ID
+    savePerUserLocalData();
   } catch(e) {
     console.warn('saveState: storage quota exceeded or unavailable');
     showToast('Warning: Storage quota may be full. Export a backup to free space.', 'warning');
@@ -5555,6 +5557,53 @@ function saveState() {
   scheduleDebouncedCloudSave();
 }
 var debouncedSaveState = debounce(saveState, 500);
+
+// Save per-user data to localStorage so chat, profiles persist on this device
+function savePerUserLocalData() {
+  var userId = currentLoggedInUser ? currentLoggedInUser.id : null;
+  if (!userId) return;
+  try {
+    var prefix = 'voctrain_user_' + userId + '_';
+    localStorage.setItem(prefix + 'chatMessages', JSON.stringify(lmsChatMessages));
+    localStorage.setItem(prefix + 'chatProfiles', JSON.stringify(lmsChatProfiles));
+    localStorage.setItem(prefix + 'chatFollows', JSON.stringify(lmsChatFollows));
+    localStorage.setItem(prefix + 'chatRooms', JSON.stringify(lmsChatRooms));
+    if (currentRole === 'student') {
+      localStorage.setItem(prefix + 'studentProfiles', JSON.stringify(studentProfiles));
+    } else if (currentRole === 'instructor') {
+      localStorage.setItem(prefix + 'instructorProfiles', JSON.stringify(instructorProfiles));
+    }
+    localStorage.setItem(prefix + 'notifications', JSON.stringify(notifications || []));
+  } catch(e) { console.warn('[PerUser] localStorage save error:', e); }
+}
+
+// Load per-user data from localStorage for this specific user
+function loadPerUserLocalData() {
+  var userId = currentLoggedInUser ? currentLoggedInUser.id : null;
+  if (!userId) return;
+  try {
+    var prefix = 'voctrain_user_' + userId + '_';
+    var cm = safeJsonParse(localStorage.getItem(prefix + 'chatMessages'), null);
+    var cp = safeJsonParse(localStorage.getItem(prefix + 'chatProfiles'), null);
+    var cf = safeJsonParse(localStorage.getItem(prefix + 'chatFollows'), null);
+    var cr = safeJsonParse(localStorage.getItem(prefix + 'chatRooms'), null);
+    var nt = safeJsonParse(localStorage.getItem(prefix + 'notifications'), null);
+    // Merge per-user data (don't overwrite if already loaded from cloud)
+    if (cm) { Object.keys(cm).forEach(function(k) { if (!lmsChatMessages[k] || lmsChatMessages[k].length === 0) lmsChatMessages[k] = cm[k]; }); }
+    if (cp) { Object.keys(cp).forEach(function(k) { if (!lmsChatProfiles[k]) lmsChatProfiles[k] = cp[k]; }); }
+    if (cf) { Object.keys(cf).forEach(function(k) { if (!lmsChatFollows[k]) lmsChatFollows[k] = cf[k]; }); }
+    if (cr) { cr.forEach(function(room) { if (!lmsChatRooms.some(function(r) { return r.id === room.id; })) lmsChatRooms.push(room); }); }
+    if (currentRole === 'student') {
+      var sp = safeJsonParse(localStorage.getItem(prefix + 'studentProfiles'), null);
+      if (sp) { Object.keys(sp).forEach(function(k) { if (!studentProfiles[k]) studentProfiles[k] = sp[k]; }); }
+    } else if (currentRole === 'instructor') {
+      var ip = safeJsonParse(localStorage.getItem(prefix + 'instructorProfiles'), null);
+      if (ip) { Object.keys(ip).forEach(function(k) { if (!instructorProfiles[k]) instructorProfiles[k] = ip[k]; }); }
+    }
+    if (nt && Array.isArray(nt)) { nt.forEach(function(n) { if (!notifications.some(function(l) { return l.id === n.id; })) notifications.push(n); }); }
+    console.log('[PerUser] Loaded per-user local data for ' + userId);
+  } catch(e) { console.warn('[PerUser] localStorage load error:', e); }
+}
 
 function loadState() {
   try {
@@ -5832,6 +5881,8 @@ async function createUserAccount() {
 function openEditUser(userId) {
   var user = userAccounts.find(function(u){ return u.id === userId; });
   if(!user) return;
+  // Ensure programme dropdown is populated with current skill areas
+  populateCourseDropdowns();
   document.getElementById('editUserId').value = userId;
   document.getElementById('editUserName').value = user.name;
   document.getElementById('editUserRole').value = user.role;
@@ -5856,9 +5907,20 @@ function saveUserEdit() {
   var dup = userAccounts.find(function(u){ return u.username === username && u.id !== userId; });
   if(dup) { alert('Username already in use by another account.'); return; }
   if(role !== 'admin' && role !== 'adminstaff' && role !== 'cmc' && !programme) { alert('Please select a programme.'); return; }
+  var oldRole = user.role;
   user.name = name; user.role = role; user.username = username; user.email = email;
   user.programme = (role === 'admin' || role === 'adminstaff' || role === 'cmc') ? '' : programme;
+  // Create linked instructor/student data when role changes
+  if(role === 'instructor' && oldRole !== 'instructor') {
+    var existingIns = instructorData.find(function(ins){ return ins.name === user.name || ins.email === user.email; });
+    if(!existingIns) { createInstructorDataForAccount(user); }
+  }
+  if(role === 'student' && oldRole !== 'student') {
+    var existingStu = students.find(function(s){ return s.name === user.name || user.studentDataId === s.id; });
+    if(!existingStu) { createStudentDataForAccount(user); }
+  }
   saveUserAccounts();
+  saveState();
   closeModal('editUserModal');
   renderUserAccountsTable();
   showToast('User updated successfully!');
@@ -6549,6 +6611,9 @@ function enterApp(role) {
     // Set session expiry and start periodic check
     setSessionExpiry();
     startSessionExpiryCheck();
+
+    // Load per-user local data (chat, profiles) for this specific user
+    loadPerUserLocalData();
 
     // Auto-sync from all Google Drive folders on login, then start 5s auto-save
     setTimeout(function() {
@@ -7385,13 +7450,13 @@ function buildAdminPages() {
       <input type="text" class="form-control" style="width:220px;" placeholder="Search student name..." id="studentSearch" onkeyup="filterStudents()">
     </div>
     <div class="pipeline" style="margin-bottom:20px;"><div class="pipeline-stage s-test"><span class="count" id="pTest2">0</span>Testing</div><div class="pipeline-stage s-interview"><span class="count" id="pInterview2">0</span>Interview</div><div class="pipeline-stage s-training"><span class="count" id="pTraining2">0</span>In Training</div><div class="pipeline-stage s-certified"><span class="count" id="pCertified2">0</span>Certified</div><div class="pipeline-stage s-collected"><span class="count" id="pCollected2">0</span>Collected</div><div class="pipeline-stage s-incomplete"><span class="count" id="pIncomplete2">0</span>Incomplete</div></div>
-    <div class="card"><div class="card-header"><h3>Student Records</h3><span style="font-size:13px;color:var(--text-muted);" id="studentCount">Showing 80 students</span></div><div class="table-wrapper"><table><thead><tr><th>Student</th><th>ID</th><th>Course</th><th>Stage</th><th>Test Score</th><th>Progress</th><th>Actions</th></tr></thead><tbody id="studentTableBody"></tbody></table></div></div>
+    <div class="card"><div class="card-header"><h3>Student Records</h3><span style="font-size:13px;color:var(--text-muted);" id="studentCount">Showing ${students.length} students</span></div><div class="table-wrapper"><table><thead><tr><th>Student</th><th>ID</th><th>Course</th><th>Stage</th><th>Test Score</th><th>Progress</th><th>Actions</th></tr></thead><tbody id="studentTableBody"></tbody></table></div></div>
   </section>
 
   <!-- TRAINING -->
   <section class="page" id="page-training">
     <div id="trainingOverview">
-      <p style="color:var(--text-secondary);margin-bottom:20px;font-size:14px;" id="trainingCentreCount">20 dedicated skill centres — select a programme to view materials, curriculum, and resources.</p>
+      <p style="color:var(--text-secondary);margin-bottom:20px;font-size:14px;" id="trainingCentreCount">${skillAreas.length} dedicated skill centres — select a programme to view materials, curriculum, and resources.</p>
       <div id="trainingAdminControls" style="display:none;margin-bottom:20px;">
         <div style="display:flex;gap:12px;align-items:center;flex-wrap:wrap;">
           <button class="btn btn-primary" onclick="openModal('addCentreModal')">+ Add Training Centre</button>
@@ -8563,7 +8628,7 @@ function buildStudentPages() {
     <!-- Detailed progress -->
     <div class="card">
       <div class="card-header"><h3>Course Modules Progress</h3></div>
-      ${['Safety & PPE','Core Theory','Tool Identification','Practical Skills 1','Practical Skills 2','Workshop Practice','Assessment Preparation','Final Examination'].map((mod,i) => {
+      ${(function(){ var tpl = certTemplates[s.course] || certTemplates[Object.keys(certTemplates).find(function(k){return instructorCourseMatch(k,s.course);})||''] || {}; return (tpl.modules && tpl.modules.length > 0 ? tpl.modules.map(function(m){return typeof m === 'string' ? m : m.name || m.title || 'Module';}) : ['Module 1','Module 2','Module 3','Module 4','Module 5','Module 6','Module 7','Module 8']); })().map((mod,i) => {
         const pct = i < Math.floor(s.progress/12.5) ? 100 : (i === Math.floor(s.progress/12.5) ? (s.progress % 12.5)/12.5*100 : 0);
         return `<div style="display:flex;align-items:center;gap:14px;padding:10px 0;${i<7?'border-bottom:1px solid var(--border);':''}">
           <div style="width:200px;font-size:13px;">${mod}</div>
@@ -9004,46 +9069,86 @@ function buildInstructorPages() {
     <div class="card" style="margin-bottom:18px;"><div class="card-header"><h3>My Assignments</h3><span style="font-size:12px;color:var(--text-muted);">Created by you</span></div>
       <div id="iCustomAssignmentsList"></div>
     </div>
-    <div class="card"><div class="card-header"><h3>Gradebook &mdash; ${ins.course}</h3></div>
-      <div class="table-wrapper"><table><thead><tr><th>Student</th><th>Safety Quiz</th><th>Tool ID Test</th><th>Theory #1</th><th>Practical #1</th><th>Mid-Term</th><th>Report #2</th><th>Portfolio</th><th>Avg</th></tr></thead><tbody id="iGradebookBody">
-        ${myStudents.map(s => {
-          const grades = [
-            Math.floor(Math.random()*25)+75,
-            Math.floor(Math.random()*25)+70,
-            Math.floor(Math.random()*30)+65,
-            Math.floor(Math.random()*20)+75,
-            parseInt(s.score)||Math.floor(Math.random()*25)+70,
-            s.stage==='training'||s.stage==='certified'||s.stage==='collected'?Math.floor(Math.random()*20)+75:null,
-            null
-          ];
-          const validGrades = grades.filter(g => g !== null);
-          const avg = validGrades.length > 0 ? Math.round(validGrades.reduce((a,b)=>a+b,0)/validGrades.length) : 0;
-          return `<tr><td><strong>${s.name}</strong></td>${grades.map(g => `<td style="text-align:center;${g!==null?(g>=80?'color:var(--green);':g>=60?'color:var(--accent);':''):'color:var(--text-muted);'}">${g !== null ? g + '%' : '\u2014'}</td>`).join('')}<td style="text-align:center;font-weight:700;color:${avg>=80?'var(--green)':avg>=60?'var(--accent)':'var(--red)'};">${avg}%</td></tr>`;
-        }).join('')}
-      </tbody></table></div>
-    </div>
-    <div class="grid-2col">
-      <div class="card"><div class="card-header"><h3>Grade Distribution</h3></div>
-        <div style="display:flex;gap:16px;justify-content:center;padding:16px 0;">
-          ${[{label:'A (80-100%)',color:'var(--green)',pct:35},{label:'B (70-79%)',color:'var(--blue)',pct:30},{label:'C (60-69%)',color:'var(--accent)',pct:20},{label:'D (50-59%)',color:'var(--orange)',pct:10},{label:'F (<50%)',color:'var(--red)',pct:5}].map(g => `
-            <div style="text-align:center;">
-              <div style="width:48px;height:${g.pct*2}px;background:${g.color};border-radius:4px 4px 0 0;margin:${(100-g.pct*2)}px auto 0;min-height:10px;"></div>
-              <div style="font-size:11px;font-weight:600;color:${g.color};">${g.pct}%</div>
-              <div style="font-size:10px;color:var(--text-muted);margin-top:2px;">${g.label}</div>
-            </div>
-          `).join('')}
-        </div>
-      </div>
-      <div class="card"><div class="card-header"><h3>Class Statistics</h3></div>
-        <div style="padding:16px 0;">
-          <div style="display:flex;justify-content:space-between;padding:10px 0;border-bottom:1px solid var(--border);"><span style="font-size:13px;color:var(--text-secondary);">Highest Score</span><span style="font-size:13px;font-weight:600;color:var(--green);">${myStudents.length > 0 ? Math.max(...myStudents.map(s=>parseInt(s.score)||0)) : 0}%</span></div>
-          <div style="display:flex;justify-content:space-between;padding:10px 0;border-bottom:1px solid var(--border);"><span style="font-size:13px;color:var(--text-secondary);">Lowest Score</span><span style="font-size:13px;font-weight:600;color:var(--red);">${myStudents.length > 0 ? Math.min(...myStudents.filter(s=>s.score).map(s=>parseInt(s.score))) || 'N/A' : 'N/A'}%</span></div>
-          <div style="display:flex;justify-content:space-between;padding:10px 0;border-bottom:1px solid var(--border);"><span style="font-size:13px;color:var(--text-secondary);">Class Average GPA</span><span style="font-size:13px;font-weight:600;">${avgGpa}</span></div>
-          <div style="display:flex;justify-content:space-between;padding:10px 0;border-bottom:1px solid var(--border);"><span style="font-size:13px;color:var(--text-secondary);">Assignments Graded</span><span style="font-size:13px;font-weight:600;">${myStudents.length * 5}</span></div>
-          <div style="display:flex;justify-content:space-between;padding:10px 0;"><span style="font-size:13px;color:var(--text-secondary);">Pending Submissions</span><span style="font-size:13px;font-weight:600;color:var(--accent);">${myStudents.length * 2}</span></div>
-        </div>
-      </div>
-    </div>
+    ${(function(){
+      // Build gradebook dynamically from actual exams and exam results
+      var courseExams = myExams.slice(0, 7);
+      var myAssignments = (instructorAssignments||[]).filter(function(a){ return instructorCourseMatch(a.course, ins.course); });
+      var gradeCols = courseExams.map(function(ex){ return ex.title || 'Exam'; });
+      if (gradeCols.length === 0 && myAssignments.length > 0) gradeCols = myAssignments.slice(0,7).map(function(a){ return a.title || 'Assignment'; });
+      if (gradeCols.length === 0) gradeCols = ['Test Score'];
+
+      var html = '<div class="card"><div class="card-header"><h3>Gradebook &mdash; '+ins.course+'</h3></div>';
+      html += '<div class="table-wrapper"><table><thead><tr><th>Student</th>';
+      gradeCols.forEach(function(c){ html += '<th>'+c+'</th>'; });
+      html += '<th>Avg</th></tr></thead><tbody id="iGradebookBody">';
+
+      var allScores = [];
+      myStudents.forEach(function(st) {
+        var stuResults = (examResults||[]).filter(function(r){ return r.studentId === st.id; });
+        var grades = [];
+        if (courseExams.length > 0) {
+          grades = courseExams.map(function(ex) {
+            var r = stuResults.find(function(res){ return res.examId === ex.id || res.examTitle === ex.title; });
+            return r ? (typeof r.score === 'number' ? r.score : parseInt(r.score)||null) : null;
+          });
+        } else if (myAssignments.length > 0) {
+          grades = myAssignments.slice(0,7).map(function(a) {
+            var sub = (assignmentSubmissions||[]).find(function(s){ return s.assignmentId === a.id && s.studentId === st.id && s.grade != null; });
+            return sub ? parseInt(sub.grade)||null : null;
+          });
+        } else {
+          grades = [parseInt(st.score)||null];
+        }
+        var validGrades = grades.filter(function(g){ return g !== null; });
+        var avg = validGrades.length > 0 ? Math.round(validGrades.reduce(function(a,b){return a+b;},0)/validGrades.length) : 0;
+        if (avg > 0) allScores.push(avg);
+        html += '<tr><td><strong>'+st.name+'</strong></td>';
+        grades.forEach(function(g){
+          var clr = g !== null ? (g >= 80 ? 'color:var(--green);' : g >= 60 ? 'color:var(--accent);' : '') : 'color:var(--text-muted);';
+          html += '<td style="text-align:center;'+clr+'">'+(g !== null ? g+'%' : '\u2014')+'</td>';
+        });
+        html += '<td style="text-align:center;font-weight:700;color:'+(avg>=80?'var(--green)':avg>=60?'var(--accent)':'var(--red)')+';">'+avg+'%</td></tr>';
+      });
+      html += '</tbody></table></div></div>';
+
+      // Grade distribution from actual scores
+      var distA = allScores.filter(function(s){return s>=80;}).length;
+      var distB = allScores.filter(function(s){return s>=70&&s<80;}).length;
+      var distC = allScores.filter(function(s){return s>=60&&s<70;}).length;
+      var distD = allScores.filter(function(s){return s>=50&&s<60;}).length;
+      var distF = allScores.filter(function(s){return s<50;}).length;
+      var distTotal = allScores.length || 1;
+      var distData = [
+        {label:'A (80-100%)',color:'var(--green)',pct:Math.round(distA/distTotal*100)},
+        {label:'B (70-79%)',color:'var(--blue)',pct:Math.round(distB/distTotal*100)},
+        {label:'C (60-69%)',color:'var(--accent)',pct:Math.round(distC/distTotal*100)},
+        {label:'D (50-59%)',color:'var(--orange)',pct:Math.round(distD/distTotal*100)},
+        {label:'F (<50%)',color:'var(--red)',pct:Math.round(distF/distTotal*100)}
+      ];
+
+      // Real assignment counts
+      var totalGraded = (assignmentSubmissions||[]).filter(function(s){ return s.grade != null && myStudents.some(function(st){return st.id===s.studentId;}); }).length + (examResults||[]).filter(function(r){ return myStudents.some(function(st){return st.id===r.studentId;}); }).length;
+      var totalPending = (assignmentSubmissions||[]).filter(function(s){ return s.grade == null && s.submitted && myStudents.some(function(st){return st.id===s.studentId;}); }).length;
+      var highScore = allScores.length > 0 ? Math.max.apply(null, allScores) : 0;
+      var lowScore = allScores.length > 0 ? Math.min.apply(null, allScores) : 0;
+
+      html += '<div class="grid-2col"><div class="card"><div class="card-header"><h3>Grade Distribution</h3></div>';
+      html += '<div style="display:flex;gap:16px;justify-content:center;padding:16px 0;">';
+      distData.forEach(function(g){
+        var h = Math.max(g.pct * 2, 10);
+        html += '<div style="text-align:center;"><div style="width:48px;height:'+h+'px;background:'+g.color+';border-radius:4px 4px 0 0;margin:'+(100-h)+'px auto 0;min-height:10px;"></div><div style="font-size:11px;font-weight:600;color:'+g.color+';">'+g.pct+'%</div><div style="font-size:10px;color:var(--text-muted);margin-top:2px;">'+g.label+'</div></div>';
+      });
+      html += '</div></div>';
+
+      html += '<div class="card"><div class="card-header"><h3>Class Statistics</h3></div><div style="padding:16px 0;">';
+      html += '<div style="display:flex;justify-content:space-between;padding:10px 0;border-bottom:1px solid var(--border);"><span style="font-size:13px;color:var(--text-secondary);">Highest Score</span><span style="font-size:13px;font-weight:600;color:var(--green);">'+highScore+'%</span></div>';
+      html += '<div style="display:flex;justify-content:space-between;padding:10px 0;border-bottom:1px solid var(--border);"><span style="font-size:13px;color:var(--text-secondary);">Lowest Score</span><span style="font-size:13px;font-weight:600;color:var(--red);">'+(allScores.length>0?lowScore+'%':'N/A')+'</span></div>';
+      html += '<div style="display:flex;justify-content:space-between;padding:10px 0;border-bottom:1px solid var(--border);"><span style="font-size:13px;color:var(--text-secondary);">Class Average GPA</span><span style="font-size:13px;font-weight:600;">'+avgGpa+'</span></div>';
+      html += '<div style="display:flex;justify-content:space-between;padding:10px 0;border-bottom:1px solid var(--border);"><span style="font-size:13px;color:var(--text-secondary);">Assignments Graded</span><span style="font-size:13px;font-weight:600;">'+totalGraded+'</span></div>';
+      html += '<div style="display:flex;justify-content:space-between;padding:10px 0;"><span style="font-size:13px;color:var(--text-secondary);">Pending Submissions</span><span style="font-size:13px;font-weight:600;color:var(--accent);">'+totalPending+'</span></div>';
+      html += '</div></div></div>';
+      return html;
+    })()}
   </section>
 
   <!-- INSTRUCTOR RESOURCES -->
@@ -15048,7 +15153,7 @@ function renderCerts(filter,search) {
   if(search) certs=certs.filter(c=>c.name.toLowerCase().includes(search)||(c.certNo||'').toLowerCase().includes(search));
   const tbody = document.getElementById('certTableBody');
   if(!tbody) return;
-  tbody.innerHTML = certs.map(s=>`<tr><td><strong>${s.name}</strong></td><td style="font-family:monospace;font-size:12px;">${s.certNo}</td><td>${s.course}</td><td>Level ${Math.floor(Math.random()*3)+1}</td><td>${s.certDate}</td><td>${s.certCollected?'<span class="badge badge-green"><span class="badge-dot"></span>Collected</span>':'<span class="badge badge-amber"><span class="badge-dot"></span>Pending</span>'}</td><td>${!s.certCollected?`<button class="btn btn-sm btn-success" onclick="markCollected(${students.indexOf(s)})">Mark Collected</button>`:'<span style="font-size:12px;color:var(--text-muted);">✓ Done</span>'}</td></tr>`).join('');
+  tbody.innerHTML = certs.map(s=>`<tr><td><strong>${s.name}</strong></td><td style="font-family:monospace;font-size:12px;">${s.certNo}</td><td>${s.course}</td><td>${(certTemplates[s.course]||{}).programmeCode||s.course}</td><td>${s.certDate}</td><td>${s.certCollected?'<span class="badge badge-green"><span class="badge-dot"></span>Collected</span>':'<span class="badge badge-amber"><span class="badge-dot"></span>Pending</span>'}</td><td>${!s.certCollected?`<button class="btn btn-sm btn-success" onclick="markCollected(${students.indexOf(s)})">Mark Collected</button>`:'<span style="font-size:12px;color:var(--text-muted);">✓ Done</span>'}</td></tr>`).join('');
 }
 function filterCerts() { renderCerts(document.getElementById('certFilter')?.value,document.getElementById('certSearch')?.value?.toLowerCase()); }
 function markCollected(idx) { students[idx].certCollected=true;students[idx].stage='collected';students[idx].progress=100;filterCerts();updatePipelineCounts();renderCertStats();showToast(`Certificate collected: ${students[idx].name}`);addNotification('Certificate collected: ' + students[idx].name + ' — ' + students[idx].course, 'cert', null, ['admin']);saveState(); }
@@ -16402,6 +16507,10 @@ const ALL_DRIVE_FOLDERS = [
   { id: VC_RECORDINGS_FOLDER_ID, label: 'Class Recording' }
 ];
 
+// Per-user backup folder — each user saves their own data here
+const PER_USER_DRIVE_FOLDER_ID = '1w23WEyGuRduVM9irEkgOjXaIStBy5i0J';
+let _perUserFileId = null; // cached file ID for current user's backup
+
 // School Fee Management System — Google Drive folder containing fee system backup
 const FEE_SYSTEM_DRIVE_CONFIG = {
   FOLDER_ID: '11vWe_Nc40TtJ1Hi7PoE7EZ3JrpR-K0Vj',
@@ -17754,6 +17863,136 @@ async function findBackupFileInFolder(folderId) {
   return null;
 }
 
+// ---- Per-User Backup Helpers ----
+function getPerUserBackupFileName() {
+  var userId = currentLoggedInUser ? currentLoggedInUser.id : null;
+  var role = currentRole || 'unknown';
+  if (!userId) return null;
+  return 'CESTIS_USER_' + role + '_' + userId + '.json';
+}
+
+async function findPerUserBackupFile() {
+  if (_perUserFileId) return _perUserFileId;
+  var fileName = getPerUserBackupFileName();
+  if (!fileName) return null;
+  try {
+    var query = "name='" + fileName + "' and '" + PER_USER_DRIVE_FOLDER_ID + "' in parents and trashed=false";
+    var response = await fetch(
+      'https://www.googleapis.com/drive/v3/files?q=' + encodeURIComponent(query) + '&fields=files(id,name)',
+      { headers: { 'Authorization': 'Bearer ' + googleAccessToken } }
+    );
+    if (response.ok) {
+      var data = await response.json();
+      if (data.files && data.files.length > 0) {
+        _perUserFileId = data.files[0].id;
+        return _perUserFileId;
+      }
+    }
+  } catch (e) {
+    console.warn('[PerUser] Error finding per-user backup:', e);
+  }
+  return null;
+}
+
+async function savePerUserBackup() {
+  if (!isCloudConnected || !googleAccessToken || !currentLoggedInUser) return;
+  var fileName = getPerUserBackupFileName();
+  if (!fileName) return;
+  try {
+    var userData = {
+      version: '1.0',
+      timestamp: new Date().toISOString(),
+      userId: currentLoggedInUser.id,
+      userName: currentLoggedInUser.name,
+      userRole: currentRole,
+      data: {
+        // User-specific data
+        studentProfiles: studentProfiles,
+        instructorProfiles: instructorProfiles,
+        chatMessages: lmsChatMessages,
+        chatProfiles: lmsChatProfiles,
+        chatFollows: lmsChatFollows,
+        chatRooms: lmsChatRooms,
+        supportMessages: typeof supportMessages !== 'undefined' ? supportMessages : [],
+        notifications: typeof notifications !== 'undefined' ? notifications : [],
+        // Shared data this user has (so their dashboard is complete)
+        students: students,
+        exams: exams,
+        examResults: examResults,
+        announcements: announcements,
+        attendanceRecords: attendanceRecords,
+        calendarEvents: calendarEvents,
+        classSessions: classSessions,
+        instructorAssignments: instructorAssignments,
+        assignmentSubmissions: assignmentSubmissions,
+        instructorResources: instructorResources,
+        instructorData: instructorData,
+        certDownloadApprovals: certDownloadApprovals,
+        systemSettings: systemSettings,
+        userAccounts: userAccounts
+      }
+    };
+    // Admin-managed data: include if admin or if non-empty
+    var isAdmin = currentRole === 'admin' || currentRole === 'adminstaff';
+    if (isAdmin || driveResources.length > 0) userData.data.driveResources = driveResources;
+    if (isAdmin || skillAreas.length > 0) userData.data.skillAreas = skillAreas;
+    if (isAdmin) userData.data.adminStaffAccessSettings = adminStaffAccessSettings;
+    if (isAdmin || adrTasks.length > 0) userData.data.adrTasks = adrTasks;
+    if (isAdmin || Object.keys(adrStaffMeta).length > 0) userData.data.adrStaffMeta = adrStaffMeta;
+    var cleanCertTpls = {};
+    Object.keys(certTemplates).forEach(function(k) {
+      cleanCertTpls[k] = Object.assign({}, certTemplates[k]);
+      delete cleanCertTpls[k].bgPage1; delete cleanCertTpls[k].bgPage2;
+    });
+    if (isAdmin || Object.keys(cleanCertTpls).length > 0) userData.data.certTemplates = cleanCertTpls;
+    if (isAdmin || documentHubFiles.length > 0) userData.data.documentHubFiles = documentHubFiles;
+
+    var blob = new Blob([JSON.stringify(userData)], { type: 'application/json' });
+
+    var fileId = await findPerUserBackupFile();
+    if (fileId) {
+      await fetch('https://www.googleapis.com/upload/drive/v3/files/' + fileId + '?uploadType=media', {
+        method: 'PATCH',
+        headers: { 'Authorization': 'Bearer ' + googleAccessToken, 'Content-Type': 'application/json' },
+        body: blob
+      });
+    } else {
+      var metadata = { name: fileName, parents: [PER_USER_DRIVE_FOLDER_ID], mimeType: 'application/json' };
+      var form = new FormData();
+      form.append('metadata', new Blob([JSON.stringify(metadata)], { type: 'application/json' }));
+      form.append('file', blob);
+      var resp = await fetch('https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart&fields=id', {
+        method: 'POST',
+        headers: { 'Authorization': 'Bearer ' + googleAccessToken },
+        body: form
+      });
+      if (resp.ok) {
+        var result = await resp.json();
+        _perUserFileId = result.id;
+      }
+    }
+    console.log('[PerUser] Saved per-user backup: ' + fileName);
+  } catch (e) {
+    console.warn('[PerUser] Error saving per-user backup:', e);
+  }
+}
+
+async function loadPerUserBackup() {
+  if (!isCloudConnected || !googleAccessToken) return false;
+  try {
+    var fileId = await findPerUserBackupFile();
+    if (!fileId) {
+      console.log('[PerUser] No per-user backup found — first login on this device');
+      return false;
+    }
+    console.log('[PerUser] Loading per-user backup...');
+    return await silentMergeFromBackup(fileId);
+  } catch (e) {
+    console.warn('[PerUser] Error loading per-user backup:', e);
+    return false;
+  }
+}
+
 // Silent merge from a backup file (no confirmations, no alerts, no page reload)
 async function silentMergeFromBackup(fileId) {
   try {
@@ -18248,6 +18487,15 @@ async function autoSyncOnLogin() {
       }
     }
 
+    // 1b. Load per-user backup (user-specific data like chat, profiles)
+    try {
+      _perUserFileId = null; // reset cache for new login
+      var userChanged = await loadPerUserBackup();
+      if (userChanged) anyChanged = true;
+    } catch (e) {
+      console.warn('[AutoSync] Per-user backup sync error:', e);
+    }
+
     // 2. Also sync chat-specific data from the chat Drive folder
     try {
       await lmsChatSyncFromDrive();
@@ -18453,6 +18701,13 @@ async function autoSaveToAllFolders() {
       await lmsChatSyncToDrive();
     } catch (e) {
       console.warn('[AutoSave] Chat Drive sync error:', e);
+    }
+
+    // Save per-user backup to individual user folder
+    try {
+      await savePerUserBackup();
+    } catch (e) {
+      console.warn('[AutoSave] Per-user backup error:', e);
     }
 
     const successCount = results.filter(r => r.status === 'fulfilled' && r.value === true).length;
