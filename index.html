@@ -5465,6 +5465,7 @@ function clearAllSessionData() {
     var key = localStorage.key(i);
     if(key === 'voctrain_users') continue; // preserve user accounts for login
     if(key === 'schoolDashboardGoogleAccessToken' || key === 'schoolDashboardGoogleTokenExpiry') continue; // preserve auth tokens for cloud sync
+    if(key && key.startsWith('voctrain_user_')) continue; // preserve per-user chat data so messages survive logout/login
     if(key && (key.startsWith('voctrain_') || key.startsWith('schoolDashboard') || key === 'cmcDashboardData' || key === 'cmcHtmlContent')) {
       keysToRemove.push(key);
     }
@@ -17805,7 +17806,7 @@ async function syncFromCloud() {
       if (Array.isArray(backupData.data.notifications)) { notifications = backupData.data.notifications; saveNotifications(); }
       if (backupData.data.chatFollows && typeof backupData.data.chatFollows === 'object') lmsChatFollows = backupData.data.chatFollows;
       if (Array.isArray(backupData.data.chatRooms)) lmsChatRooms = backupData.data.chatRooms;
-      if (Array.isArray(backupData.data.chatMessages)) lmsChatMessages = backupData.data.chatMessages;
+      if (backupData.data.chatMessages && typeof backupData.data.chatMessages === 'object') lmsChatMessages = backupData.data.chatMessages;
       if (backupData.data.chatProfiles && typeof backupData.data.chatProfiles === 'object') lmsChatProfiles = backupData.data.chatProfiles;
       if (Array.isArray(backupData.data.skillAreas) && backupData.data.skillAreas.length > 0) {
         // Merge: add cloud skill areas that don't exist locally, update existing ones
