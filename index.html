@@ -6762,7 +6762,7 @@ function closePendingScreen() {
 // ----- Create student/instructor data entries for approved accounts -----
 function createStudentDataForAccount(userAccount) {
   var prog = userAccount.programme || 'Welding';
-  var matchedInstructor = instructorData.find(function(ins){ return ins.course && ins.course.toLowerCase().trim() === prog.toLowerCase().trim(); });
+  var matchedInstructor = instructorData.find(function(ins){ return ins.course && instructorCourseMatch(prog, ins.course); });
   var assignedInstructor = matchedInstructor ? matchedInstructor.name : (instructorData.length > 0 ? instructorData[0].name : '');
   var newStudent = {
     id: 'STU-' + Date.now(),
@@ -8488,23 +8488,61 @@ function buildStudentPages() {
   <section class="page" id="page-s-video">
     <div class="card" id="sVideoClassList">
       <div class="card-header"><h3>My Class Sessions</h3></div>
-      <div class="class-schedule-card" style="border-color:rgba(231,76,60,0.3);">
-        <div class="class-time-block" style="background:var(--red-dim);"><div class="time">9:00</div><div class="period">AM</div></div>
-        <div style="flex:1;"><div style="font-size:14px;font-weight:600;">${s.course} — Theory Session</div><div style="font-size:12px;color:var(--text-muted);">${s.instructor} &nbsp;•&nbsp; 24 students online</div></div>
-        <span class="badge badge-red"><span class="live-dot"></span>&nbsp;Live Now</span>
-        <button class="btn btn-blue" onclick="enterVideoRoom('${s.course} — Theory','student')">Join Class →</button>
+      <div id="sClassSessionsList">
+      ${(function(){
+        var today = new Date().toISOString().split('T')[0];
+        var mySessions = classSessions.filter(function(cs) {
+          return instructorCourseMatch(cs.course, s.course) && cs.date >= today;
+        }).sort(function(a,b){ return (a.date+a.time).localeCompare(b.date+b.time); });
+        if(mySessions.length === 0) return '<p style="color:var(--text-muted);padding:16px;text-align:center;">No upcoming class sessions scheduled. Your instructor will create sessions when ready.</p>';
+        return mySessions.map(function(cs) {
+          var isToday = cs.date === today;
+          var hr = parseInt((cs.time||'0').split(':')[0]);
+          var period = hr >= 12 ? 'PM' : 'AM';
+          var displayHr = hr > 12 ? hr-12 : (hr === 0 ? 12 : hr);
+          var min = (cs.time||'00:00').split(':')[1] || '00';
+          var escapedName = (cs.name||cs.course).replace(/'/g,"&#39;");
+          var roomCodeParam = cs.roomCode ? ',\'' + cs.roomCode.replace(/'/g,"&#39;") + '\'' : '';
+          return '<div class="class-schedule-card"' + (isToday && cs.status==='live' ? ' style="border-color:rgba(231,76,60,0.3);"' : '') + '>' +
+            '<div class="class-time-block"' + (isToday && cs.status==='live' ? ' style="background:var(--red-dim);"' : '') + '><div class="time">' + displayHr + ':' + min + '</div><div class="period">' + period + '</div></div>' +
+            '<div style="flex:1;"><div style="font-size:14px;font-weight:600;">' + (cs.name || cs.course) + '</div><div style="font-size:12px;color:var(--text-muted);">' + (cs.createdBy || s.instructor) + ' &bull; ' + (cs.location||'Virtual') + (isToday ? '' : ' &bull; ' + cs.date) + '</div></div>' +
+            (isToday && cs.status==='live' ? '<span class="badge badge-red"><span class="live-dot"></span>&nbsp;Live Now</span><button class="btn btn-blue" onclick="enterVideoRoom(\'' + escapedName + '\',\'student\'' + roomCodeParam + ')">Join Class &rarr;</button>' :
+             '<span class="badge badge-blue">' + (cs.status==='completed'?'Completed':'Scheduled') + '</span>' +
+             (isToday ? '<button class="btn btn-blue btn-sm" onclick="enterVideoRoom(\'' + escapedName + '\',\'student\'' + roomCodeParam + ')">Join</button>' : '<button class="btn btn-secondary btn-sm" disabled>Not Started</button>')) +
+          '</div>';
+        }).join('');
+      })()}
       </div>
-      <div class="class-schedule-card">
-        <div class="class-time-block"><div class="time">2:00</div><div class="period">PM</div></div>
-        <div style="flex:1;"><div style="font-size:14px;font-weight:600;">${s.course} — Workshop Review</div><div style="font-size:12px;color:var(--text-muted);">${s.instructor} &nbsp;•&nbsp; Starts in 5 hours</div></div>
-        <span class="badge badge-blue">Scheduled</span>
-        <button class="btn btn-secondary btn-sm" disabled>Not Started</button>
-      </div>
-      <div class="card" style="margin-top:18px;"><div class="card-header"><h3>Past Recordings</h3></div>
+      <div class="card" style="margin-top:18px;"><div class="card-header"><h3>Past Recordings & Video Resources</h3></div>
         <div id="sPastRecordingsList">
-        <div class="material-item"><div class="material-icon" style="background:var(--red-dim);color:var(--red);">▶</div><div style="flex:1;"><div style="font-size:13px;">${s.course} — Safety Fundamentals</div><div style="font-size:11px;color:var(--text-muted);">Feb 12 • 1hr 20min</div></div><button class="btn btn-sm btn-secondary" onclick="watchRecording('${s.course.replace(/'/g,"\\'")} — Safety Fundamentals','Feb 12','1hr 20min')">Watch</button></div>
-        <div class="material-item"><div class="material-icon" style="background:var(--red-dim);color:var(--red);">▶</div><div style="flex:1;"><div style="font-size:13px;">${s.course} — Core Techniques Review</div><div style="font-size:11px;color:var(--text-muted);">Feb 10 • 55min</div></div><button class="btn btn-sm btn-secondary" onclick="watchRecording('${s.course.replace(/'/g,"\\'")} — Core Techniques Review','Feb 10','55min')">Watch</button></div>
-        <div class="material-item"><div class="material-icon" style="background:var(--red-dim);color:var(--red);">▶</div><div style="flex:1;"><div style="font-size:13px;">${s.course} — Tool Identification</div><div style="font-size:11px;color:var(--text-muted);">Feb 7 • 1hr 5min</div></div><button class="btn btn-sm btn-secondary" onclick="watchRecording('${s.course.replace(/'/g,"\\'")} — Tool Identification','Feb 7','1hr 5min')">Watch</button></div>
+        ${(function(){
+          var videoResources = [];
+          instructorResources.forEach(function(r) {
+            if ((r.type === 'Video' || r.category === 'video') && instructorCourseMatch(r.course, s.course)) {
+              videoResources.push({name: r.name, date: r.createdAt ? r.createdAt.split('T')[0] : '', url: r.url || '', source: 'Instructor'});
+            }
+          });
+          driveResources.forEach(function(r) {
+            if (r.category === 'video' && instructorCourseMatch(r.course, s.course)) {
+              videoResources.push({name: r.name, date: r.uploadedAt ? r.uploadedAt.split('T')[0] : '', url: r.url || '', source: 'Drive'});
+            }
+          });
+          var pastSessions = classSessions.filter(function(cs) {
+            return instructorCourseMatch(cs.course, s.course) && cs.status === 'completed' && cs.recordingUrl;
+          });
+          pastSessions.forEach(function(cs) {
+            videoResources.push({name: cs.name, date: cs.date || '', url: cs.recordingUrl || '', source: 'Recording'});
+          });
+          if(videoResources.length === 0) return '<p style="color:var(--text-muted);padding:16px;text-align:center;">No video resources available yet. Your instructor will upload learning videos here.</p>';
+          return videoResources.map(function(v) {
+            var escapedName = v.name.replace(/'/g,"&#39;");
+            var escapedUrl = v.url.replace(/'/g,"&#39;");
+            var btn = v.url ?
+              '<button class="btn btn-sm btn-secondary" onclick="window.open(\'' + escapedUrl + '\',\'_blank\')">&#9654; Watch</button>' :
+              '<button class="btn btn-sm btn-secondary" onclick="watchRecording(\'' + escapedName + '\',\'' + v.date + '\',\'\')">Watch</button>';
+            return '<div class="material-item"><div class="material-icon" style="background:var(--red-dim);color:var(--red);">&#9654;</div><div style="flex:1;"><div style="font-size:13px;">' + v.name + '</div><div style="font-size:11px;color:var(--text-muted);">' + v.date + (v.source !== 'Recording' ? ' &bull; ' + v.source : '') + '</div></div>' + btn + '</div>';
+          }).join('');
+        })()}
         </div>
       </div>
     </div>
@@ -8819,9 +8857,9 @@ function buildInstructorPages() {
   try {
   resolveExamStatuses();
   const ins = currentInstructor;
-  const myStudents = students.filter(s => s.instructor === ins.name || (s.course && ins.course && s.course.toLowerCase().trim() === ins.course.toLowerCase().trim()));
-  const myCourseStudents = students.filter(s => s.course && ins.course && s.course.toLowerCase().trim() === ins.course.toLowerCase().trim());
-  const myExams = exams.filter(e => e.course === ins.course);
+  const myStudents = students.filter(s => s.instructor === ins.name || instructorCourseMatch(s.course, ins.course));
+  const myCourseStudents = students.filter(s => instructorCourseMatch(s.course, ins.course));
+  const myExams = exams.filter(e => instructorCourseMatch(e.course, ins.course));
   const certifiedCount = myStudents.filter(s => s.stage === 'certified' || s.stage === 'collected').length;
   const avgAttendance = myStudents.length ? Math.round(myStudents.reduce((a,s) => a + s.attendance, 0) / myStudents.length) : 0;
   const avgGpa = myStudents.length ? (myStudents.reduce((a,s) => a + parseFloat(s.gpa), 0) / myStudents.length).toFixed(1) : '0.0';
@@ -9275,10 +9313,16 @@ function renderInstructorStudents(data) {
   if(sc) sc.textContent = 'Showing ' + data.length + ' students';
 }
 
+function instructorCourseMatch(studentCourse, instructorCourse) {
+  if (!studentCourse || !instructorCourse) return false;
+  if (studentCourse.toLowerCase().trim() === instructorCourse.toLowerCase().trim()) return true;
+  var stuSk = findSkillAreaForCourse(studentCourse);
+  var insSk = findSkillAreaForCourse(instructorCourse);
+  return stuSk && insSk && stuSk.id && insSk.id && stuSk.id === insSk.id;
+}
 function filterInstructorStudents() {
   if(!currentInstructor) return;
-  var insCourse = (currentInstructor.course || '').toLowerCase().trim();
-  let filtered = students.filter(s => s.instructor === currentInstructor.name || (s.course && s.course.toLowerCase().trim() === insCourse));
+  let filtered = students.filter(s => s.instructor === currentInstructor.name || instructorCourseMatch(s.course, currentInstructor.course));
   const stage = document.getElementById('iFilterStage')?.value;
   const search = document.getElementById('iStudentSearch')?.value?.toLowerCase();
   if(stage && stage !== 'all') filtered = filtered.filter(s => s.stage === stage);
@@ -9288,8 +9332,7 @@ function filterInstructorStudents() {
 
 function updateInstructorPipeline() {
   if(!currentInstructor) return;
-  var insCourse = (currentInstructor.course || '').toLowerCase().trim();
-  const myStudents = students.filter(s => s.instructor === currentInstructor.name || (s.course && s.course.toLowerCase().trim() === insCourse));
+  const myStudents = students.filter(s => s.instructor === currentInstructor.name || instructorCourseMatch(s.course, currentInstructor.course));
   const stageIdMap = {testing:'ipTest',interview:'ipInterview',training:'ipTraining',certified:'ipCertified',collected:'ipCollected',incomplete:'ipIncomplete'};
   stages.forEach(s => {
     const count = myStudents.filter(st => st.stage === s).length;
@@ -9300,7 +9343,7 @@ function updateInstructorPipeline() {
 
 function exportInstructorStudentsCSV() {
   if(!currentInstructor) return;
-  const myStudents = students.filter(s => s.instructor === currentInstructor.name);
+  const myStudents = students.filter(s => s.instructor === currentInstructor.name || instructorCourseMatch(s.course, currentInstructor.course));
   const headers = ['name','id','course','stage','score','progress','attendance','gpa'];
   exportCSV(myStudents, headers, 'my_students_export.csv');
   showToast('Students CSV exported!');
@@ -9308,10 +9351,9 @@ function exportInstructorStudentsCSV() {
 
 function renderInstructorAttendance() {
   if(!currentInstructor) return;
-  var insCourse = (currentInstructor.course || '').toLowerCase().trim();
   const myRecords = attendanceRecords.filter(r => {
     const student = students.find(s => s.id === r.studentId);
-    return student && (student.instructor === currentInstructor.name || (student.course && student.course.toLowerCase().trim() === insCourse));
+    return student && (student.instructor === currentInstructor.name || instructorCourseMatch(student.course, currentInstructor.course));
   });
   const tbody = document.getElementById('iAttendanceTableBody');
   if(!tbody) return;
@@ -13320,7 +13362,13 @@ async function addStudent() {
   if(!name){alert('Please enter a name');return;}
   var email = (document.getElementById('newStudentEmail').value || '').trim();
   var selectedCourse = document.getElementById('newStudentCourse').value;
-  var assignedInstructor = (instructorData.find(function(ins){return ins.course && ins.course.toLowerCase().trim() === selectedCourse.toLowerCase().trim();})||{}).name || '';
+  var assignedInstructor = (instructorData.find(function(ins){
+    if (!ins.course) return false;
+    if (ins.course.toLowerCase().trim() === selectedCourse.toLowerCase().trim()) return true;
+    var insSk = findSkillAreaForCourse(ins.course);
+    var stuSk = findSkillAreaForCourse(selectedCourse);
+    return insSk && stuSk && insSk.id && stuSk.id && insSk.id === stuSk.id;
+  })||{}).name || '';
   var gender = document.getElementById('newStudentGender').value || '';
   var studentId = generateStudentId();
   students.unshift({id:studentId,name,stage:document.getElementById('newStudentStage').value,course:selectedCourse,score:'',progress:10,certNo:null,certDate:null,certCollected:false,attendance:0,assignments:0,assignmentsTotal:8,gpa:'0.0',instructor:assignedInstructor,gender:gender,createdAt:new Date().toISOString().split('T')[0]});
