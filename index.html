@@ -6487,6 +6487,11 @@ async function handleStudentClick() {
       studentMatch = createStudentDataForAccount(userAccount);
     }
     currentStudent = studentMatch;
+    // Resolve instructor name if missing
+    if (!studentMatch.instructor && studentMatch.course) {
+      var matchedIns = instructorData.find(function(ins) { return ins.course && instructorCourseMatch(studentMatch.course, ins.course); });
+      if (matchedIns) { studentMatch.instructor = matchedIns.name; saveState(); }
+    }
     // Apply any saved profile edits back to the student data object
     var savedStuProfile = studentProfiles[studentMatch.id];
     if(savedStuProfile) {
@@ -6777,6 +6782,11 @@ function handleGmailProfile(profile, role) {
       var studentMatch = students.find(function(s) { return s.name === existing.name || s.id === existing.studentDataId; });
       if(!studentMatch) studentMatch = createStudentDataForAccount(existing);
       currentStudent = studentMatch;
+      // Resolve instructor name if missing
+      if (!studentMatch.instructor && studentMatch.course) {
+        var matchedIns = instructorData.find(function(ins) { return ins.course && instructorCourseMatch(studentMatch.course, ins.course); });
+        if (matchedIns) { studentMatch.instructor = matchedIns.name; saveState(); }
+      }
       var savedSP = studentProfiles[studentMatch.id];
       if(savedSP && savedSP.name) { studentMatch.name = savedSP.name; existing.name = savedSP.name; }
       currentLoggedInUser = existing;
@@ -8530,6 +8540,11 @@ function buildStudentPages() {
   try {
   resolveExamStatuses();
   const s = currentStudent;
+  // Resolve instructor name if missing — look up by course match in instructorData
+  if (!s.instructor && s.course) {
+    var matchedIns = instructorData.find(function(ins) { return ins.course && instructorCourseMatch(s.course, ins.course); });
+    if (matchedIns) { s.instructor = matchedIns.name; saveState(); }
+  }
   const skill = findSkillAreaForCourse(s.course);
   const stageOrder = ['testing','interview','training','certified','collected'];
   const currentStageIdx = stageOrder.indexOf(s.stage === 'incomplete' ? 'training' : s.stage);
@@ -19782,6 +19797,11 @@ async function studentLightSync(uname, pw) {
       studentMatch = createStudentDataForAccount(userAccount);
     }
     currentStudent = studentMatch;
+    // Resolve instructor name if missing
+    if (!studentMatch.instructor && studentMatch.course) {
+      var matchedIns = instructorData.find(function(ins) { return ins.course && instructorCourseMatch(studentMatch.course, ins.course); });
+      if (matchedIns) { studentMatch.instructor = matchedIns.name; saveState(); }
+    }
     var savedSP2 = studentProfiles[studentMatch.id];
     if(savedSP2 && savedSP2.name) { studentMatch.name = savedSP2.name; userAccount.name = savedSP2.name; }
     currentLoggedInUser = userAccount;
@@ -20008,6 +20028,11 @@ async function studentRefreshCertData() {
       if (localIdx !== -1) {
         students[localIdx] = cloudStudent;
         currentStudent = cloudStudent;
+        // Resolve instructor name if missing from cloud data
+        if (!cloudStudent.instructor && cloudStudent.course) {
+          var matchedIns = instructorData.find(function(ins) { return ins.course && instructorCourseMatch(cloudStudent.course, ins.course); });
+          if (matchedIns) cloudStudent.instructor = matchedIns.name;
+        }
         updated = true;
       }
     }
