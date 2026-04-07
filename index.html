@@ -4366,10 +4366,10 @@ var skillAreas = [
   {id:20,name:"Customer Service",icon:"\uD83C\uDFAF",color:"#7e57c2",students:0,materials:0,desc:"Communication skills, conflict resolution, CRM systems"}
 ];
 
-const stages = ['testing','interview','training','certified','collected','incomplete'];
-const stageLabels = {testing:'Testing',interview:'Interview',training:'In Training',certified:'Certified',collected:'Collected',incomplete:'Incomplete'};
-const stageBadge = {testing:'badge-blue',interview:'badge-purple',training:'badge-amber',certified:'badge-green',collected:'badge-green',incomplete:'badge-red'};
-const stageIcons = {testing:'\uD83D\uDCDD',interview:'\uD83D\uDDE3\uFE0F',training:'\uD83D\uDCDA',certified:'\uD83C\uDF93',collected:'\u2705',incomplete:'\u26A0\uFE0F'};
+var stages = ['testing','interview','training','certified','collected','incomplete'];
+var stageLabels = {testing:'Testing',interview:'Interview',training:'In Training',certified:'Certified',collected:'Collected',incomplete:'Incomplete'};
+var stageBadge = {testing:'badge-blue',interview:'badge-purple',training:'badge-amber',certified:'badge-green',collected:'badge-green',incomplete:'badge-red'};
+var stageIcons = {testing:'\uD83D\uDCDD',interview:'\uD83D\uDDE3\uFE0F',training:'\uD83D\uDCDA',certified:'\uD83C\uDF93',collected:'\u2705',incomplete:'\u26A0\uFE0F'};
 function getCourseList() {
   var courseSet = {};
   // Include all skill area names
@@ -4954,8 +4954,8 @@ function batchDOMUpdate(callback) {
 setTimeout(function() { migratePasswordsToHash(); }, 100);
 
 // ============================== SESSION EXPIRY CONFIG ==============================
-const SESSION_EXPIRY_MS = 8 * 60 * 60 * 1000; // 8 hours default session duration
-const SESSION_CHECK_INTERVAL_MS = 60 * 1000;   // Check every 60 seconds
+var SESSION_EXPIRY_MS = 8 * 60 * 60 * 1000; // 8 hours default session duration
+var SESSION_CHECK_INTERVAL_MS = 60 * 1000;   // Check every 60 seconds
 var _sessionCheckIntervalId = null;
 var videoTimerInterval = null;
 var videoSeconds = 0;
@@ -5015,7 +5015,7 @@ var lmsChatLocalStream = null;
 var lmsChatPeer = null;
 
 // Google Drive folder for chat file uploads
-const LMS_CHAT_DRIVE_FOLDER = '1ashmmL0ZS7mW6XrwoxMuamf7yjtVWHyO';
+var LMS_CHAT_DRIVE_FOLDER = '1ashmmL0ZS7mW6XrwoxMuamf7yjtVWHyO';
 
 // ---- IndexedDB for chat image storage (persists base64 across reloads) ----
 var _lmsChatImageDB = null;
@@ -11055,8 +11055,8 @@ function vcCopyCode() {
 }
 
 // ── Video Recording ──
-const VC_RECORDINGS_FOLDER_ID = '1Yp9aLXGGjhojF1J04QxoNG-9yEgaiS-A';
-const ASSIGNMENTS_DRIVE_FOLDER_ID = '1SEjU_-8XOPM-C2q-Vo-EZUgBz3PMg5Ma';
+var VC_RECORDINGS_FOLDER_ID = '1Yp9aLXGGjhojF1J04QxoNG-9yEgaiS-A';
+var ASSIGNMENTS_DRIVE_FOLDER_ID = '1SEjU_-8XOPM-C2q-Vo-EZUgBz3PMg5Ma';
 var vcRecTimerInterval = null;
 
 function vcGetSupportedMimeType() {
@@ -12682,7 +12682,7 @@ function renderStudentAssignmentsPage() {
 }
 
 // ============================== ASSIGNMENT DRIVE SYNC ==============================
-const ASSIGNMENTS_BACKUP_FILE_NAME = 'CESTIS_ASSIGNMENTS.json';
+var ASSIGNMENTS_BACKUP_FILE_NAME = 'CESTIS_ASSIGNMENTS.json';
 var _assignmentsDriveFileId = null;
 
 // Save all assignments + submissions to the dedicated Assignments Drive folder
@@ -13154,7 +13154,7 @@ function deleteResource(id) {
 }
 
 // ============================== ADMIN RESOURCE MANAGER (GOOGLE DRIVE) ==============================
-const DRIVE_RESOURCES_FOLDER_ID = '122aVdNWxJG9ShRWf9Xso0MdXGdQeDuyt';
+var DRIVE_RESOURCES_FOLDER_ID = '122aVdNWxJG9ShRWf9Xso0MdXGdQeDuyt';
 var _driveSelectedFile = null;
 
 function generateResourceId() {
@@ -17799,7 +17799,7 @@ function finalizeImportExam() {
 // ============================================
 
 // Google Drive Configuration
-const GOOGLE_DRIVE_CONFIG = {
+var GOOGLE_DRIVE_CONFIG = {
   CLIENT_ID: '302497466088-0b619cqa9qno2c606k4rqp742lebc5o8.apps.googleusercontent.com',
   FOLDER_ID: '1lNpI00Et1BN5c4eaV5WfQwuQVhCMBtv8',
   BACKUP_FILE_NAME: 'CESTIS_LMS_BACKUP.json',
@@ -17820,7 +17820,7 @@ var loginSyncCompleted = false;
 var _autoSaveIntervalId = null;
 var _isAutoSaving = false;
 var _autoSaveFileIds = {}; // { folderId: fileId } for tracking backup files per folder
-const AUTO_SAVE_INTERVAL_MS = 5000; // 5 seconds
+var AUTO_SAVE_INTERVAL_MS = 5000; // 5 seconds
 var _debouncedCloudSaveTimer = null;
 
 // Debounced immediate cloud push — called by saveState() and saveUserAccounts()
@@ -17835,7 +17835,7 @@ function scheduleDebouncedCloudSave() {
     autoSaveToAllFolders();
   }, 2000);
 }
-const ALL_DRIVE_FOLDERS = [
+var ALL_DRIVE_FOLDERS = [
   { id: GOOGLE_DRIVE_CONFIG.FOLDER_ID, label: 'Main Backup' },
   { id: '18ACBw0kRi0BssLEoZLWoeXNa1EiANeBu', label: 'Online Exams' },
   { id: LMS_CHAT_DRIVE_FOLDER, label: 'LMS Chat' },
@@ -17844,11 +17844,11 @@ const ALL_DRIVE_FOLDERS = [
 ];
 
 // Per-user backup folder — each user saves their own data here
-const PER_USER_DRIVE_FOLDER_ID = '1w23WEyGuRduVM9irEkgOjXaIStBy5i0J';
+var PER_USER_DRIVE_FOLDER_ID = '1w23WEyGuRduVM9irEkgOjXaIStBy5i0J';
 var _perUserFileId = null; // cached file ID for current user's backup
 
 // School Fee Management System — Google Drive folder containing fee system backup
-const FEE_SYSTEM_DRIVE_CONFIG = {
+var FEE_SYSTEM_DRIVE_CONFIG = {
   FOLDER_ID: '11vWe_Nc40TtJ1Hi7PoE7EZ3JrpR-K0Vj',
   FILE_NAME: 'school_fee_management_system.json'
 };
@@ -20802,53 +20802,32 @@ async function loginPageSync() {
 // Google OAuth for the login page (returns access token or null)
 function loginPageGoogleAuth() {
   return new Promise(function(resolve, reject) {
-    var resolved = false;
-    function safeResolve(val) { if (!resolved) { resolved = true; resolve(val); } }
-    function safeReject(err) { if (!resolved) { resolved = true; reject(err); } }
-
-    // Timeout: if nothing happens within 60 seconds, fail gracefully
-    var authTimeout = setTimeout(function() {
-      console.warn('[LoginAuth] Auth timed out after 60s');
-      safeResolve(null);
-    }, 60000);
-
-    function resolveWithCleanup(val) { clearTimeout(authTimeout); safeResolve(val); }
-    function rejectWithCleanup(err) { clearTimeout(authTimeout); safeReject(err); }
-
     // Try Google Identity Services first
     if (typeof google !== 'undefined' && google.accounts && google.accounts.oauth2) {
-      try {
-        var client = google.accounts.oauth2.initTokenClient({
-          client_id: GOOGLE_DRIVE_CONFIG.CLIENT_ID,
-          scope: GOOGLE_DRIVE_CONFIG.SCOPES,
-          callback: function(tokenResponse) {
-            if (tokenResponse.error) {
-              resolveWithCleanup(null);
-              return;
-            }
-            // Save token
-            var expiry = new Date();
-            expiry.setSeconds(expiry.getSeconds() + (tokenResponse.expires_in || 3600));
-            localStorage.setItem('schoolDashboardGoogleAccessToken', tokenResponse.access_token);
-            localStorage.setItem('schoolDashboardGoogleTokenExpiry', expiry.toISOString());
-            resolveWithCleanup(tokenResponse.access_token);
-          },
-          error_callback: function(err) {
-            if (err.type === 'popup_closed') {
-              resolveWithCleanup(null);
-            } else {
-              rejectWithCleanup(new Error(err.message || 'Google auth failed'));
-            }
+      var client = google.accounts.oauth2.initTokenClient({
+        client_id: GOOGLE_DRIVE_CONFIG.CLIENT_ID,
+        scope: GOOGLE_DRIVE_CONFIG.SCOPES,
+        callback: function(tokenResponse) {
+          if (tokenResponse.error) {
+            resolve(null);
+            return;
           }
-        });
-        client.requestAccessToken();
-      } catch(e) {
-        console.warn('[LoginAuth] GIS initTokenClient error:', e);
-        // Fall back to manual auth modal
-        clearTimeout(authTimeout);
-        window._loginPageAuthResolve = safeResolve;
-        showGoogleAuthModal();
-      }
+          // Save token
+          var expiry = new Date();
+          expiry.setSeconds(expiry.getSeconds() + (tokenResponse.expires_in || 3600));
+          localStorage.setItem('schoolDashboardGoogleAccessToken', tokenResponse.access_token);
+          localStorage.setItem('schoolDashboardGoogleTokenExpiry', expiry.toISOString());
+          resolve(tokenResponse.access_token);
+        },
+        error_callback: function(err) {
+          if (err.type === 'popup_closed') {
+            resolve(null);
+          } else {
+            reject(new Error(err.message || 'Google auth failed'));
+          }
+        }
+      });
+      client.requestAccessToken();
     } else {
       // Google Identity Services not loaded yet (async defer) — wait for it
       var waitAttempts = 0;
@@ -20857,41 +20836,33 @@ function loginPageGoogleAuth() {
         waitAttempts++;
         if (typeof google !== 'undefined' && google.accounts && google.accounts.oauth2) {
           clearInterval(waitInterval);
-          // GIS loaded — proceed with OAuth popup
-          try {
-            var client = google.accounts.oauth2.initTokenClient({
-              client_id: GOOGLE_DRIVE_CONFIG.CLIENT_ID,
-              scope: GOOGLE_DRIVE_CONFIG.SCOPES,
-              callback: function(tokenResponse) {
-                if (tokenResponse.error) {
-                  resolveWithCleanup(null);
-                  return;
-                }
-                var expiry = new Date();
-                expiry.setSeconds(expiry.getSeconds() + (tokenResponse.expires_in || 3600));
-                localStorage.setItem('schoolDashboardGoogleAccessToken', tokenResponse.access_token);
-                localStorage.setItem('schoolDashboardGoogleTokenExpiry', expiry.toISOString());
-                resolveWithCleanup(tokenResponse.access_token);
-              },
-              error_callback: function(err) {
-                if (err.type === 'popup_closed') {
-                  resolveWithCleanup(null);
-                } else {
-                  rejectWithCleanup(new Error(err.message || 'Google auth failed'));
-                }
+          var client = google.accounts.oauth2.initTokenClient({
+            client_id: GOOGLE_DRIVE_CONFIG.CLIENT_ID,
+            scope: GOOGLE_DRIVE_CONFIG.SCOPES,
+            callback: function(tokenResponse) {
+              if (tokenResponse.error) {
+                resolve(null);
+                return;
               }
-            });
-            client.requestAccessToken();
-          } catch(e) {
-            console.warn('[LoginAuth] GIS initTokenClient error (delayed):', e);
-            clearTimeout(authTimeout);
-            window._loginPageAuthResolve = safeResolve;
-            showGoogleAuthModal();
-          }
+              var expiry = new Date();
+              expiry.setSeconds(expiry.getSeconds() + (tokenResponse.expires_in || 3600));
+              localStorage.setItem('schoolDashboardGoogleAccessToken', tokenResponse.access_token);
+              localStorage.setItem('schoolDashboardGoogleTokenExpiry', expiry.toISOString());
+              resolve(tokenResponse.access_token);
+            },
+            error_callback: function(err) {
+              if (err.type === 'popup_closed') {
+                resolve(null);
+              } else {
+                reject(new Error(err.message || 'Google auth failed'));
+              }
+            }
+          });
+          client.requestAccessToken();
         } else if (waitAttempts >= maxWaitAttempts) {
           clearInterval(waitInterval);
-          // GIS failed to load — show manual auth modal and wait for completion
-          window._loginPageAuthResolve = safeResolve;
+          // GIS failed to load — show manual auth modal
+          window._loginPageAuthResolve = resolve;
           showGoogleAuthModal();
         }
       }, 250);
@@ -25954,7 +25925,7 @@ function iRenderDuties() {
 
 // ============================== CMC DASHBOARD ==============================
 // Google Drive folder IDs for data sources
-const CMC_DRIVE_CONFIG = {
+var CMC_DRIVE_CONFIG = {
   STORAGE_FOLDER: '1f2QGRwqkQxFiCQ8yixtoXFAbciB2ygMz',
   SOURCES: [
     { id: '1JY8N-AXxxM_eQJ3Gfr0OKBoK4rKchdeV', label: 'Staff Payslip Dashboard', key: 'payslip' },
