@@ -7466,7 +7466,7 @@ function showPage(pageId) {
     'timetracking':'Staff Time Tracking','i-timetracking':'Staff Time Tracking','as-timetracking':'Staff Time Tracking',
     'fee-management':'School Fee Management','as-fee-management':'School Fee Management',
     'class-attendance':'Class Attendance','as-class-attendance':'Class Attendance',
-    'cashbook':'Cashbook Management','document-hub':'Document Hub','i-document-hub':'Document Hub','as-document-hub':'Document Hub','pdf-workshop':'PDF Workshop',
+    'cashbook':'Cashbook Management','document-hub':'Document Hub','i-document-hub':'Document Hub','as-document-hub':'Document Hub','pdf-workshop':'PDF Workshop','as-pdf-workshop':'PDF Workshop',
     'cmc-dashboard':'CMC Analytics Dashboard','cmc-financial':'Financial Overview','cmc-staff':'Staff & HR','cmc-academic':'Academic Performance','cmc-sources':'Source Viewer','cmc-profile':'My Profile'
   };
   document.getElementById('topbarTitle').textContent = titles[pageId]||pageId;
@@ -7500,7 +7500,8 @@ function showPage(pageId) {
     'as-timetracking':   {id:'asTimetrackingFrame',  src:'https://stevebarrettsrha-ops.github.io/Staff-Clock-in-System/'},
     'as-fee-management': {id:'asFeeManagementFrame', src:'https://stevebarrettsrha-ops.github.io/School-Fee-Management-System/'},
     'as-class-attendance':{id:'asClassAttendanceFrame',src:'https://stevebarrettsrha-ops.github.io/Class-Attendance-System/'},
-    'pdf-workshop':      {id:'pdfWorkshopFrame',     src:'https://stevebarrettsrha-ops.github.io/PDF-Workshop/'}
+    'pdf-workshop':      {id:'pdfWorkshopFrame',     src:'https://stevebarrettsrha-ops.github.io/PDF-Workshop/'},
+    'as-pdf-workshop':   {id:'asPdfWorkshopFrame',   src:'https://stevebarrettsrha-ops.github.io/PDF-Workshop/'}
   };
   if(iframePageMap[pageId]) {
     var iframeInfo = iframePageMap[pageId];
@@ -23604,7 +23605,13 @@ var asAccessPages = [
   { key:'training', label:'Training Centres', desc:'View training centre information' },
   { key:'exams', label:'Online Exams', desc:'View and manage exams' },
   { key:'video', label:'Video Conference', desc:'Join and manage video sessions' },
-  { key:'resources', label:'Resource Manager', desc:'Access shared resources' }
+  { key:'resources', label:'Resource Manager', desc:'Access shared resources' },
+  { key:'pdfworkshop', label:'PDF Workshop', desc:'Edit, merge, and convert PDF documents' },
+  { key:'documenthub', label:'Document Hub', desc:'Upload and manage shared documents' },
+  { key:'timetracking', label:'Time Tracking', desc:'Clock in/out and track work hours' },
+  { key:'feemanagement', label:'School Fee Management', desc:'View and manage school fees' },
+  { key:'classattendance', label:'Class Attendance', desc:'Mark and view class attendance' },
+  { key:'supportmessages', label:'Support Messages', desc:'Send and receive support messages' }
 ];
 
 function loadAdminStaffAccess() {
@@ -23709,24 +23716,43 @@ function buildAdminStaffSidebar() {
     html += '<div class="nav-item" data-page="as-reports" onclick="showPage(\'as-reports\')"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/></svg>Reports</div>';
   }
 
-  // Document Hub always visible for admin staff
-  html += '<div class="nav-section-label">Resources</div>';
-  html += '<div class="nav-item" data-page="as-document-hub" onclick="showPage(\'as-document-hub\')">' +
-    '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><path d="M12 18v-6"/><path d="M9 15l3 3 3-3"/></svg>Document Hub</div>';
+  // Resources section — conditionally visible based on access settings
+  var hasResources = false;
+  if(adminStaffAccessSettings.documenthub) {
+    if(!hasResources) { html += '<div class="nav-section-label">Resources</div>'; hasResources = true; }
+    html += '<div class="nav-item" data-page="as-document-hub" onclick="showPage(\'as-document-hub\')">' +
+      '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><path d="M12 18v-6"/><path d="M9 15l3 3 3-3"/></svg>Document Hub</div>';
+  }
+  if(adminStaffAccessSettings.pdfworkshop) {
+    if(!hasResources) { html += '<div class="nav-section-label">Resources</div>'; hasResources = true; }
+    html += '<div class="nav-item" data-page="as-pdf-workshop" onclick="showPage(\'as-pdf-workshop\')">' +
+      '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><path d="M12 18v-6"/><path d="M9 15l3-3 3 3"/></svg>PDF Workshop</div>';
+  }
 
-  // Time Tracking always visible for admin staff
-  html += '<div class="nav-section-label">Tools</div>';
-  html += '<div class="nav-item" data-page="as-timetracking" onclick="showPage(\'as-timetracking\')">' +
-    '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>Time Tracking</div>';
-  html += '<div class="nav-item" data-page="as-fee-management" onclick="showPage(\'as-fee-management\')">' +
-    '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="12" y1="1" x2="12" y2="23"/><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg>School Fee Management</div>';
-  html += '<div class="nav-item" data-page="as-class-attendance" onclick="showPage(\'as-class-attendance\')">' +
-    '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 5H7a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V7a2 2 0 0 0-2-2h-2"/><rect x="9" y="3" width="6" height="4" rx="1"/><path d="M9 12l2 2 4-4"/></svg>Class Attendance</div>';
+  // Tools section — conditionally visible based on access settings
+  var hasTools = false;
+  if(adminStaffAccessSettings.timetracking) {
+    if(!hasTools) { html += '<div class="nav-section-label">Tools</div>'; hasTools = true; }
+    html += '<div class="nav-item" data-page="as-timetracking" onclick="showPage(\'as-timetracking\')">' +
+      '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>Time Tracking</div>';
+  }
+  if(adminStaffAccessSettings.feemanagement) {
+    if(!hasTools) { html += '<div class="nav-section-label">Tools</div>'; hasTools = true; }
+    html += '<div class="nav-item" data-page="as-fee-management" onclick="showPage(\'as-fee-management\')">' +
+      '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="12" y1="1" x2="12" y2="23"/><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg>School Fee Management</div>';
+  }
+  if(adminStaffAccessSettings.classattendance) {
+    if(!hasTools) { html += '<div class="nav-section-label">Tools</div>'; hasTools = true; }
+    html += '<div class="nav-item" data-page="as-class-attendance" onclick="showPage(\'as-class-attendance\')">' +
+      '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 5H7a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V7a2 2 0 0 0-2-2h-2"/><rect x="9" y="3" width="6" height="4" rx="1"/><path d="M9 12l2 2 4-4"/></svg>Class Attendance</div>';
+  }
 
-  // Support Messages always visible for admin staff
-  html += '<div class="nav-section-label">Support</div>';
-  html += '<div class="nav-item" data-page="as-support-messages" onclick="showPage(\'as-support-messages\')">' +
-    '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"/><polyline points="22,6 12,13 2,6"/></svg>Support Messages<span class="nav-badge" id="supportMsgBadge" style="display:none;background:var(--red);">0</span></div>';
+  // Support section — conditionally visible based on access settings
+  if(adminStaffAccessSettings.supportmessages) {
+    html += '<div class="nav-section-label">Support</div>';
+    html += '<div class="nav-item" data-page="as-support-messages" onclick="showPage(\'as-support-messages\')">' +
+      '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"/><polyline points="22,6 12,13 2,6"/></svg>Support Messages<span class="nav-badge" id="supportMsgBadge" style="display:none;background:var(--red);">0</span></div>';
+  }
 
   // Profile always visible
   html += '<div class="nav-section-label">Account</div>';
@@ -24013,6 +24039,15 @@ function buildAdminStaffPages() {
         '<div><div style="font-size:28px;font-weight:700;color:var(--blue);">'+exams.filter(function(e){ return e.status==='upcoming'; }).length+'</div><div style="font-size:12px;color:var(--text-muted);">Upcoming Exams</div></div>' +
       '</div>' +
     '</div>' +
+  '</section>';
+
+  // ---- PDF Workshop Page (Admin Staff) ----
+  html += '<section class="page" id="page-as-pdf-workshop">' +
+    '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;flex-wrap:wrap;gap:12px;">' +
+      '<h3 style="font-family:\'Playfair Display\',serif;margin:0;">PDF Workshop</h3>' +
+      '<a href="https://stevebarrettsrha-ops.github.io/PDF-Workshop/" target="_blank" rel="noopener noreferrer" class="btn btn-primary" style="text-decoration:none;">Open in New Tab ↗</a>' +
+    '</div>' +
+    '<iframe id="asPdfWorkshopFrame" style="width:100%;height:calc(100vh - 80px);border:none;border-radius:12px;"></iframe>' +
   '</section>';
 
   // ---- Profile Page ----
