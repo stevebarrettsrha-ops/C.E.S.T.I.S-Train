@@ -19273,6 +19273,54 @@ async function mergeFromCloud() {
       }
     } catch(e) { console.warn('[Merge] certTemplateCourseMap error:', e); }
 
+    // Merge skillAreas (training centres) — add new AND update existing
+    try {
+      if (Array.isArray(backupData.data.skillAreas)) {
+        backupData.data.skillAreas.forEach(function(sa) {
+          if (!sa || !sa.id) return;
+          var existing = skillAreas.find(function(l) { return l.id === sa.id; });
+          if (!existing) {
+            skillAreas.push(sa);
+          } else {
+            if (sa.name && sa.name !== existing.name) existing.name = sa.name;
+            if (sa.desc && sa.desc !== existing.desc) existing.desc = sa.desc;
+            if (sa.icon && sa.icon !== existing.icon) existing.icon = sa.icon;
+            if (sa.color && sa.color !== existing.color) existing.color = sa.color;
+          }
+        });
+      }
+    } catch(e) { console.warn('[Merge] skillAreas error:', e); }
+
+    // Merge certTemplates (metadata only, no background images)
+    try {
+      if (backupData.data.certTemplates && typeof backupData.data.certTemplates === 'object') {
+        Object.keys(backupData.data.certTemplates).forEach(function(course) {
+          if (!certTemplates[course]) {
+            certTemplates[course] = backupData.data.certTemplates[course];
+          } else {
+            var local = certTemplates[course];
+            var cloud = backupData.data.certTemplates[course];
+            Object.keys(cloud).forEach(function(key) {
+              if (key !== 'bgPage1' && key !== 'bgPage2' && !local[key] && cloud[key]) {
+                local[key] = cloud[key];
+              }
+            });
+          }
+        });
+      }
+    } catch(e) { console.warn('[Merge] certTemplates error:', e); }
+
+    // Merge certDownloadApprovals
+    try {
+      if (Array.isArray(backupData.data.certDownloadApprovals)) {
+        backupData.data.certDownloadApprovals.forEach(function(ca) {
+          if (ca && ca.studentId && !certDownloadApprovals.some(function(l) { return l.studentId === ca.studentId; })) {
+            certDownloadApprovals.push(ca);
+          }
+        });
+      }
+    } catch(e) { console.warn('[Merge] certDownloadApprovals error:', e); }
+
     // Merge support messages
     try {
       if (Array.isArray(backupData.data.supportMessages)) {
@@ -19450,6 +19498,7 @@ async function savePerUserBackup() {
         attendanceRecords: attendanceRecords,
         calendarEvents: calendarEvents,
         classSessions: classSessions,
+        adminMeetings: adminMeetings,
         instructorAssignments: instructorAssignments,
         assignmentSubmissions: assignmentSubmissions,
         instructorResources: instructorResources,
