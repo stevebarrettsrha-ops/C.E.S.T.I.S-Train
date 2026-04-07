@@ -5639,6 +5639,8 @@ function saveState() {
       delete certTplsClean[k].bgPage2;
     });
     if (isAdmin || Object.keys(certTplsClean).length > 0) localStorage.setItem('voctrain_certTemplates', JSON.stringify(certTplsClean));
+    // Persist certTemplateCourseMap (modified by course renames)
+    try { localStorage.setItem('voctrain_certTemplateCourseMap', JSON.stringify(certTemplateCourseMap)); } catch(e) {}
     saveLmsChatData();
     // Save per-user data keyed by user ID
     savePerUserLocalData();
@@ -5746,6 +5748,9 @@ function loadState() {
     if(sa) skillAreas = sa;
     var dhf = safeJsonParse(localStorage.getItem('voctrain_documentHubFiles'), null);
     if(dhf) documentHubFiles = dhf;
+    // Load certTemplateCourseMap (modified by course renames)
+    var ctcm = safeJsonParse(localStorage.getItem('voctrain_certTemplateCourseMap'), null);
+    if(ctcm && typeof ctcm === 'object') certTemplateCourseMap = ctcm;
   } catch(e) { console.warn('[loadState] Error loading data:', e.message); }
   // Migrate any cert template images from localStorage to IndexedDB, then load from IndexedDB
   var needsMigration = false;
@@ -14499,6 +14504,7 @@ function updateStudentStage(idx) {
   if(newStage==='certified'){students[idx].progress=90;students[idx].certNo=students[idx].course.substring(0,2).toUpperCase()+'-'+new Date().getFullYear()+'-'+String(Math.floor(Math.random()*9000)+1000);students[idx].certDate=new Date().toLocaleDateString('en-US',{year:'numeric',month:'long',day:'2-digit'});}
   if(newStage==='collected'){students[idx].progress=100;students[idx].certCollected=true;}
   if(newStage==='incomplete')students[idx].progress=Math.min(students[idx].progress,40);
+  students[idx].lastModified = new Date().toISOString();
   closeModal('updateStageModal');filterStudents();updatePipelineCounts();
   showToast(`${students[idx].name} moved to ${stageLabels[newStage]}`);
   if(newStage==='certified') addNotification('Certificate issued: ' + students[idx].name + ' — ' + students[idx].course, 'cert', null, ['admin','student']);
@@ -14568,6 +14574,7 @@ function saveEditStudent() {
   } else {
     attendanceRecords.push({studentId:s.id, studentName:s.name, course:s.course, date:new Date().toISOString().split('T')[0], days:{Mon:'absent',Tue:'absent',Wed:'absent',Thu:'absent',Fri:'absent'}});
   }
+  s.lastModified = new Date().toISOString();
   updateSkillAreaCounts();
   closeModal('editStudentModal');
   filterStudents();
@@ -14614,7 +14621,7 @@ async function addStudent() {
   })||{}).name || '';
   var gender = document.getElementById('newStudentGender').value || '';
   var studentId = generateStudentId();
-  students.unshift({id:studentId,name,stage:document.getElementById('newStudentStage').value,course:selectedCourse,score:'',progress:10,certNo:null,certDate:null,certCollected:false,attendance:0,assignments:0,assignmentsTotal:8,gpa:'0.0',instructor:assignedInstructor,gender:gender,createdAt:new Date().toISOString().split('T')[0]});
+  students.unshift({id:studentId,name,stage:document.getElementById('newStudentStage').value,course:selectedCourse,score:'',progress:10,certNo:null,certDate:null,certCollected:false,attendance:0,assignments:0,assignmentsTotal:8,gpa:'0.0',instructor:assignedInstructor,gender:gender,createdAt:new Date().toISOString().split('T')[0],lastModified:new Date().toISOString()});
   // Auto-create attendance record so the student appears in attendance pages
   var existingAtt = attendanceRecords.find(function(r){ return r.studentId === studentId; });
   if(!existingAtt) {
@@ -18537,7 +18544,8 @@ async function saveToCloud() {
           });
           return clean;
         })(),
-        certDownloadApprovals: certDownloadApprovals
+        certDownloadApprovals: certDownloadApprovals,
+        certTemplateCourseMap: certTemplateCourseMap
       }
     };
 
@@ -18643,6 +18651,20 @@ async function syncFromCloud() {
     return;
   }
 
+  // Wait for any pending debounced cloud save to complete before syncing
+  if (_debouncedCloudSaveTimer) {
+    clearTimeout(_debouncedCloudSaveTimer);
+    _debouncedCloudSaveTimer = null;
+  }
+  if (_isAutoSaving) {
+    showToast('Waiting for auto-save to complete...', 'info');
+    var _syncWaitCount = 0;
+    while (_isAutoSaving && _syncWaitCount < 30) {
+      await new Promise(function(r) { setTimeout(r, 500); });
+      _syncWaitCount++;
+    }
+  }
+
   setCloudSyncing(true);
 
   try {
@@ -18742,6 +18764,10 @@ async function syncFromCloud() {
         Object.keys(backupData.data.certTemplates).forEach(function(k) { certTemplates[k] = backupData.data.certTemplates[k]; });
       }
       if (Array.isArray(backupData.data.certDownloadApprovals)) certDownloadApprovals = backupData.data.certDownloadApprovals;
+      // Restore certTemplateCourseMap (course rename mappings)
+      if (backupData.data.certTemplateCourseMap && typeof backupData.data.certTemplateCourseMap === 'object') {
+        Object.assign(certTemplateCourseMap, backupData.data.certTemplateCourseMap);
+      }
     } catch(e) { console.warn('[SyncFromCloud] Error restoring additional data:', e); }
 
     // Reconcile: create student records for any user accounts missing them
@@ -18814,6 +18840,21 @@ async function mergeFromCloud() {
     return;
   }
 
+  // Wait for any pending debounced cloud save to complete before merging
+  if (_debouncedCloudSaveTimer) {
+    clearTimeout(_debouncedCloudSaveTimer);
+    _debouncedCloudSaveTimer = null;
+  }
+  // Wait for any active auto-save to finish
+  if (_isAutoSaving) {
+    showToast('Waiting for auto-save to complete...', 'info');
+    var _mergeWaitCount = 0;
+    while (_isAutoSaving && _mergeWaitCount < 30) {
+      await new Promise(function(r) { setTimeout(r, 500); });
+      _mergeWaitCount++;
+    }
+  }
+
   setCloudSyncing(true);
 
   try {
@@ -18832,7 +18873,7 @@ async function mergeFromCloud() {
       throw new Error('Invalid backup file format');
     }
 
-    let mergeStats = { usersAdded: 0, studentsAdded: 0, examsAdded: 0, announcementsAdded: 0, eventsAdded: 0 };
+    let mergeStats = { usersAdded: 0, studentsAdded: 0, studentsUpdated: 0, examsAdded: 0, announcementsAdded: 0, eventsAdded: 0, assignmentsUpdated: 0, submissionsUpdated: 0 };
 
     // Legacy demo data IDs to exclude from merges (purged in data version 4)
     var _demoStudentIds = {};
@@ -18861,24 +18902,34 @@ async function mergeFromCloud() {
     }
 
     // Merge students — update existing records AND add new ones (match by id)
+    // Uses lastModified timestamp when available for conflict resolution
     if (backupData.data.students) {
       backupData.data.students.forEach(cloudStudent => {
         if (_demoStudentIds[cloudStudent.id]) return; // Skip legacy demo data
         var localMatch = students.find(function(s) { return s.id === cloudStudent.id; });
         if (localMatch) {
-          // Update existing student with cloud data (stage, progress, certifications, etc.)
-          if (cloudStudent.stage && cloudStudent.stage !== localMatch.stage) { localMatch.stage = cloudStudent.stage; }
-          if (cloudStudent.progress !== undefined && cloudStudent.progress !== localMatch.progress) { localMatch.progress = cloudStudent.progress; }
-          if (cloudStudent.name && cloudStudent.name !== localMatch.name) { localMatch.name = cloudStudent.name; }
-          if (cloudStudent.course && cloudStudent.course !== localMatch.course) { localMatch.course = cloudStudent.course; }
-          if (cloudStudent.instructor && cloudStudent.instructor !== localMatch.instructor) { localMatch.instructor = cloudStudent.instructor; }
-          if (cloudStudent.certCollected !== undefined && cloudStudent.certCollected !== localMatch.certCollected) { localMatch.certCollected = cloudStudent.certCollected; }
-          if (cloudStudent.certNumber && cloudStudent.certNumber !== localMatch.certNumber) { localMatch.certNumber = cloudStudent.certNumber; }
-          if (cloudStudent.certDate && cloudStudent.certDate !== localMatch.certDate) { localMatch.certDate = cloudStudent.certDate; }
-          if (cloudStudent.email && cloudStudent.email !== localMatch.email) { localMatch.email = cloudStudent.email; }
-          if (cloudStudent.phone && cloudStudent.phone !== localMatch.phone) { localMatch.phone = cloudStudent.phone; }
-          if (cloudStudent.status && cloudStudent.status !== localMatch.status) { localMatch.status = cloudStudent.status; }
-          mergeStats.studentsAdded++; // count as merged
+          // Timestamp-based merge: cloud wins if it has a newer lastModified, or if local has none
+          var cloudMod = cloudStudent.lastModified ? new Date(cloudStudent.lastModified).getTime() : 0;
+          var localMod = localMatch.lastModified ? new Date(localMatch.lastModified).getTime() : 0;
+          var cloudIsNewer = cloudMod > localMod;
+          // Update fields: cloud wins if newer OR if local field is empty/undefined
+          var fieldsToMerge = ['stage','progress','name','course','instructor','certCollected','certNumber','certDate','email','phone','status','address','dob','enrollDate','completionDate','nqfLevel','notes'];
+          fieldsToMerge.forEach(function(field) {
+            if (cloudStudent[field] !== undefined && cloudStudent[field] !== null && cloudStudent[field] !== '') {
+              if (cloudIsNewer || !localMatch[field] || localMatch[field] === '') {
+                if (localMatch[field] !== cloudStudent[field]) {
+                  localMatch[field] = cloudStudent[field];
+                }
+              }
+            }
+          });
+          // Always merge arrays additively (skills, certifications)
+          if (Array.isArray(cloudStudent.skills)) {
+            if (!Array.isArray(localMatch.skills)) localMatch.skills = [];
+            cloudStudent.skills.forEach(function(sk) { if (localMatch.skills.indexOf(sk) === -1) localMatch.skills.push(sk); });
+          }
+          if (cloudIsNewer && cloudStudent.lastModified) localMatch.lastModified = cloudStudent.lastModified;
+          mergeStats.studentsUpdated++;
         } else {
           students.push(cloudStudent);
           mergeStats.studentsAdded++;
@@ -18925,27 +18976,48 @@ async function mergeFromCloud() {
       });
     }
 
-    // Merge attendance records — add any new date entries
+    // Merge attendance records — add new AND update status if cloud has changes
     if (backupData.data.attendanceRecords) {
-      const localAttKeys = attendanceRecords.map(a => a.studentId + '|' + a.date);
       backupData.data.attendanceRecords.forEach(cloudRec => {
         if (_demoStudentIds[cloudRec.studentId]) return; // Skip legacy demo data
-        const key = cloudRec.studentId + '|' + cloudRec.date;
-        if (!localAttKeys.includes(key)) {
+        var existing = attendanceRecords.find(function(a) { return a.studentId === cloudRec.studentId && a.date === cloudRec.date; });
+        if (!existing) {
           attendanceRecords.push(cloudRec);
+        } else {
+          // Update status if cloud has a different value and a more recent timestamp
+          if (cloudRec.status && cloudRec.status !== existing.status) {
+            var cloudTime = cloudRec.markedAt ? new Date(cloudRec.markedAt).getTime() : 0;
+            var localTime = existing.markedAt ? new Date(existing.markedAt).getTime() : 0;
+            if (cloudTime > localTime) {
+              existing.status = cloudRec.status;
+              if (cloudRec.markedAt) existing.markedAt = cloudRec.markedAt;
+              if (cloudRec.markedBy) existing.markedBy = cloudRec.markedBy;
+            }
+          }
         }
       });
     }
 
-    // Merge exam results — add cloud results that don't exist locally
+    // Merge exam results — add new AND update scores if cloud has newer data
     if (backupData.data.examResults) {
       const localResultKeys = examResults.map(r => r.examId + '|' + r.studentId);
       backupData.data.examResults.forEach(cloudResult => {
         if (_demoExamIds[cloudResult.examId] || _demoStudentIds[cloudResult.studentId]) return; // Skip legacy demo data
         const key = cloudResult.examId + '|' + cloudResult.studentId;
-        if (!localResultKeys.includes(key)) {
+        var keyIdx = localResultKeys.indexOf(key);
+        if (keyIdx === -1) {
           examResults.push(cloudResult);
           mergeStats.examResultsAdded = (mergeStats.examResultsAdded||0) + 1;
+        } else {
+          // Update if cloud result has a newer timestamp or if local has no score
+          var localResult = examResults[keyIdx];
+          if (localResult && cloudResult.submittedAt && localResult.submittedAt) {
+            if (new Date(cloudResult.submittedAt) > new Date(localResult.submittedAt)) {
+              examResults[keyIdx] = cloudResult;
+            }
+          } else if (localResult && cloudResult.score !== undefined && localResult.score === undefined) {
+            examResults[keyIdx] = cloudResult;
+          }
         }
       });
     }
@@ -19001,13 +19073,30 @@ async function mergeFromCloud() {
       }
     } catch(e) { console.warn('[Merge] chatFollows error:', e); }
 
-    // Merge class sessions
+    // Merge class sessions — add new AND update recording URLs from cloud
     try {
       if (Array.isArray(backupData.data.classSessions)) {
         backupData.data.classSessions.forEach(function(cs) {
-          if (cs && cs.id && !classSessions.some(function(ls) { return ls.id === cs.id; })) {
+          if (!cs || !cs.id) return;
+          var existing = classSessions.find(function(ls) { return ls.id === cs.id; });
+          if (!existing) {
             classSessions.push(cs);
             mergeStats.sessionsAdded = (mergeStats.sessionsAdded||0) + 1;
+          } else {
+            // Update recording URL if cloud has one and local doesn't
+            if (cs.recordingUrl && !existing.recordingUrl) existing.recordingUrl = cs.recordingUrl;
+            if (cs.recordingDriveId && !existing.recordingDriveId) existing.recordingDriveId = cs.recordingDriveId;
+            if (cs.endTime && !existing.endTime) existing.endTime = cs.endTime;
+            if (cs.duration && !existing.duration) existing.duration = cs.duration;
+            // Merge attendees additively
+            if (Array.isArray(cs.attendees) && cs.attendees.length > 0) {
+              if (!Array.isArray(existing.attendees)) existing.attendees = [];
+              cs.attendees.forEach(function(att) {
+                if (!existing.attendees.some(function(ea) { return (ea.id || ea.name) === (att.id || att.name); })) {
+                  existing.attendees.push(att);
+                }
+              });
+            }
           }
         });
       }
@@ -19024,23 +19113,59 @@ async function mergeFromCloud() {
       }
     } catch(e) { console.warn('[Merge] adminMeetings error:', e); }
 
-    // Merge instructor assignments
+    // Merge instructor assignments — add new AND merge grades from cloud
     try {
       if (Array.isArray(backupData.data.instructorAssignments)) {
         backupData.data.instructorAssignments.forEach(function(ca) {
-          if (ca && ca.id && !instructorAssignments.some(function(la) { return la.id === ca.id; })) {
+          if (!ca || !ca.id) return;
+          var existing = instructorAssignments.find(function(la) { return la.id === ca.id; });
+          if (!existing) {
             instructorAssignments.push(ca);
+            mergeStats.assignmentsUpdated++;
+          } else {
+            // Merge grades from cloud (additive — never remove a grade)
+            if (ca.grades && typeof ca.grades === 'object') {
+              if (!existing.grades) existing.grades = {};
+              Object.keys(ca.grades).forEach(function(sid) {
+                if (existing.grades[sid] === undefined) {
+                  existing.grades[sid] = ca.grades[sid];
+                  mergeStats.assignmentsUpdated++;
+                }
+              });
+            }
+            // Merge driveFiles from cloud if local doesn't have them
+            if (ca.driveFiles && Array.isArray(ca.driveFiles) && (!existing.driveFiles || existing.driveFiles.length === 0)) {
+              existing.driveFiles = ca.driveFiles;
+            }
+            // Update instructions/attachments if local is empty
+            if (ca.instructions && !existing.instructions) existing.instructions = ca.instructions;
+            if (ca.attachments && Array.isArray(ca.attachments) && (!existing.attachments || existing.attachments.length === 0)) {
+              existing.attachments = ca.attachments;
+            }
           }
         });
       }
     } catch(e) { console.warn('[Merge] instructorAssignments error:', e); }
 
-    // Merge assignment submissions
+    // Merge assignment submissions — add new AND update Drive links
     try {
       if (Array.isArray(backupData.data.assignmentSubmissions)) {
         backupData.data.assignmentSubmissions.forEach(function(cs) {
-          if (cs && cs.id && !assignmentSubmissions.some(function(ls) { return ls.id === cs.id; })) {
+          if (!cs || !cs.id) return;
+          var existing = assignmentSubmissions.find(function(ls) { return ls.id === cs.id; });
+          if (!existing) {
             assignmentSubmissions.push(cs);
+            mergeStats.submissionsUpdated++;
+          } else {
+            // Merge driveFiles from cloud if local doesn't have them
+            if (cs.driveFiles && Array.isArray(cs.driveFiles) && (!existing.driveFiles || existing.driveFiles.length === 0)) {
+              existing.driveFiles = cs.driveFiles;
+              mergeStats.submissionsUpdated++;
+            }
+            // Update files from cloud if local has none (cross-device sync)
+            if (cs.files && Array.isArray(cs.files) && cs.files.length > 0 && (!existing.files || existing.files.length === 0)) {
+              existing.files = cs.files;
+            }
           }
         });
       }
@@ -19137,6 +19262,65 @@ async function mergeFromCloud() {
       }
     } catch(e) { console.warn('[Merge] documentHubFiles error:', e); }
 
+    // Merge certTemplateCourseMap — add new mappings from cloud
+    try {
+      if (backupData.data.certTemplateCourseMap && typeof backupData.data.certTemplateCourseMap === 'object') {
+        Object.keys(backupData.data.certTemplateCourseMap).forEach(function(k) {
+          if (!certTemplateCourseMap[k]) {
+            certTemplateCourseMap[k] = backupData.data.certTemplateCourseMap[k];
+          }
+        });
+      }
+    } catch(e) { console.warn('[Merge] certTemplateCourseMap error:', e); }
+
+    // Merge skillAreas (training centres) — add new AND update existing
+    try {
+      if (Array.isArray(backupData.data.skillAreas)) {
+        backupData.data.skillAreas.forEach(function(sa) {
+          if (!sa || !sa.id) return;
+          var existing = skillAreas.find(function(l) { return l.id === sa.id; });
+          if (!existing) {
+            skillAreas.push(sa);
+          } else {
+            if (sa.name && sa.name !== existing.name) existing.name = sa.name;
+            if (sa.desc && sa.desc !== existing.desc) existing.desc = sa.desc;
+            if (sa.icon && sa.icon !== existing.icon) existing.icon = sa.icon;
+            if (sa.color && sa.color !== existing.color) existing.color = sa.color;
+          }
+        });
+      }
+    } catch(e) { console.warn('[Merge] skillAreas error:', e); }
+
+    // Merge certTemplates (metadata only, no background images)
+    try {
+      if (backupData.data.certTemplates && typeof backupData.data.certTemplates === 'object') {
+        Object.keys(backupData.data.certTemplates).forEach(function(course) {
+          if (!certTemplates[course]) {
+            certTemplates[course] = backupData.data.certTemplates[course];
+          } else {
+            var local = certTemplates[course];
+            var cloud = backupData.data.certTemplates[course];
+            Object.keys(cloud).forEach(function(key) {
+              if (key !== 'bgPage1' && key !== 'bgPage2' && !local[key] && cloud[key]) {
+                local[key] = cloud[key];
+              }
+            });
+          }
+        });
+      }
+    } catch(e) { console.warn('[Merge] certTemplates error:', e); }
+
+    // Merge certDownloadApprovals
+    try {
+      if (Array.isArray(backupData.data.certDownloadApprovals)) {
+        backupData.data.certDownloadApprovals.forEach(function(ca) {
+          if (ca && ca.studentId && !certDownloadApprovals.some(function(l) { return l.studentId === ca.studentId; })) {
+            certDownloadApprovals.push(ca);
+          }
+        });
+      }
+    } catch(e) { console.warn('[Merge] certDownloadApprovals error:', e); }
+
     // Merge support messages
     try {
       if (Array.isArray(backupData.data.supportMessages)) {
@@ -19183,14 +19367,16 @@ async function mergeFromCloud() {
     let summary = '✅ Merge from cloud completed!\n\n';
     summary += '📊 Merge Summary:\n';
     summary += `• Users added: ${mergeStats.usersAdded}\n`;
-    summary += `• Students added: ${mergeStats.studentsAdded}\n`;
+    summary += `• Students added/updated: ${mergeStats.studentsAdded + mergeStats.studentsUpdated}\n`;
     summary += `• Exams added: ${mergeStats.examsAdded}\n`;
     summary += `• Announcements added: ${mergeStats.announcementsAdded}\n`;
     summary += `• Calendar events added: ${mergeStats.eventsAdded}\n`;
     summary += `• Exam results added: ${mergeStats.examResultsAdded||0}\n`;
     summary += `• Class sessions added: ${mergeStats.sessionsAdded||0}\n`;
+    summary += `• Assignments updated: ${mergeStats.assignmentsUpdated||0}\n`;
+    summary += `• Submissions updated: ${mergeStats.submissionsUpdated||0}\n`;
 
-    const totalAdded = mergeStats.usersAdded + mergeStats.studentsAdded + mergeStats.examsAdded + mergeStats.announcementsAdded + mergeStats.eventsAdded + (mergeStats.examResultsAdded||0) + (mergeStats.sessionsAdded||0);
+    const totalAdded = mergeStats.usersAdded + mergeStats.studentsAdded + mergeStats.studentsUpdated + mergeStats.examsAdded + mergeStats.announcementsAdded + mergeStats.eventsAdded + (mergeStats.examResultsAdded||0) + (mergeStats.sessionsAdded||0) + (mergeStats.assignmentsUpdated||0) + (mergeStats.submissionsUpdated||0);
     if (totalAdded === 0) {
       summary += '\n💡 No new data found — your local data already contains everything from the cloud.';
     } else {
@@ -19312,6 +19498,7 @@ async function savePerUserBackup() {
         attendanceRecords: attendanceRecords,
         calendarEvents: calendarEvents,
         classSessions: classSessions,
+        adminMeetings: adminMeetings,
         instructorAssignments: instructorAssignments,
         assignmentSubmissions: assignmentSubmissions,
         instructorResources: instructorResources,
@@ -19335,6 +19522,7 @@ async function savePerUserBackup() {
     });
     if (isAdmin || Object.keys(cleanCertTpls).length > 0) userData.data.certTemplates = cleanCertTpls;
     if (isAdmin || documentHubFiles.length > 0) userData.data.documentHubFiles = documentHubFiles;
+    userData.data.certTemplateCourseMap = certTemplateCourseMap;
 
     var blob = new Blob([JSON.stringify(userData)], { type: 'application/json' });
 
@@ -19437,24 +19625,32 @@ async function silentMergeFromBackup(fileId) {
       if (userAccountsChanged) { changed = true; saveUserAccounts(); }
     }
 
-    // Merge students — update existing records AND add new ones
+    // Merge students — timestamp-based update for existing, add new ones
     if (backupData.data.students) {
       backupData.data.students.forEach(cloudStudent => {
         if (_ds[cloudStudent.id]) return;
         var localMatch = students.find(function(s) { return s.id === cloudStudent.id; });
         if (localMatch) {
-          // Update existing student with cloud data (stage, progress, certifications, etc.)
-          if (cloudStudent.stage && cloudStudent.stage !== localMatch.stage) { localMatch.stage = cloudStudent.stage; changed = true; }
-          if (cloudStudent.progress !== undefined && cloudStudent.progress !== localMatch.progress) { localMatch.progress = cloudStudent.progress; changed = true; }
-          if (cloudStudent.name && cloudStudent.name !== localMatch.name) { localMatch.name = cloudStudent.name; changed = true; }
-          if (cloudStudent.course && cloudStudent.course !== localMatch.course) { localMatch.course = cloudStudent.course; changed = true; }
-          if (cloudStudent.instructor && cloudStudent.instructor !== localMatch.instructor) { localMatch.instructor = cloudStudent.instructor; changed = true; }
-          if (cloudStudent.certCollected !== undefined && cloudStudent.certCollected !== localMatch.certCollected) { localMatch.certCollected = cloudStudent.certCollected; changed = true; }
-          if (cloudStudent.certNumber && cloudStudent.certNumber !== localMatch.certNumber) { localMatch.certNumber = cloudStudent.certNumber; changed = true; }
-          if (cloudStudent.certDate && cloudStudent.certDate !== localMatch.certDate) { localMatch.certDate = cloudStudent.certDate; changed = true; }
-          if (cloudStudent.email && cloudStudent.email !== localMatch.email) { localMatch.email = cloudStudent.email; changed = true; }
-          if (cloudStudent.phone && cloudStudent.phone !== localMatch.phone) { localMatch.phone = cloudStudent.phone; changed = true; }
-          if (cloudStudent.status && cloudStudent.status !== localMatch.status) { localMatch.status = cloudStudent.status; changed = true; }
+          // Timestamp-based merge: cloud wins if it has a newer lastModified, or if local has none
+          var cloudMod = cloudStudent.lastModified ? new Date(cloudStudent.lastModified).getTime() : 0;
+          var localMod = localMatch.lastModified ? new Date(localMatch.lastModified).getTime() : 0;
+          var cloudIsNewer = cloudMod > localMod;
+          var fieldsToMerge = ['stage','progress','name','course','instructor','certCollected','certNumber','certDate','email','phone','status','address','dob','enrollDate','completionDate','nqfLevel','notes'];
+          fieldsToMerge.forEach(function(field) {
+            if (cloudStudent[field] !== undefined && cloudStudent[field] !== null && cloudStudent[field] !== '') {
+              if (cloudIsNewer || !localMatch[field] || localMatch[field] === '') {
+                if (localMatch[field] !== cloudStudent[field]) {
+                  localMatch[field] = cloudStudent[field];
+                  changed = true;
+                }
+              }
+            }
+          });
+          if (Array.isArray(cloudStudent.skills)) {
+            if (!Array.isArray(localMatch.skills)) localMatch.skills = [];
+            cloudStudent.skills.forEach(function(sk) { if (localMatch.skills.indexOf(sk) === -1) { localMatch.skills.push(sk); changed = true; } });
+          }
+          if (cloudIsNewer && cloudStudent.lastModified) localMatch.lastModified = cloudStudent.lastModified;
         } else {
           students.push(cloudStudent);
           changed = true;
@@ -19526,28 +19722,48 @@ async function silentMergeFromBackup(fileId) {
       });
     }
 
-    // Merge attendance records
+    // Merge attendance records — add new AND update status with timestamp check
     if (backupData.data.attendanceRecords) {
-      const localAttKeys = attendanceRecords.map(a => a.studentId + '|' + a.date);
       backupData.data.attendanceRecords.forEach(cloudRec => {
         if (_ds[cloudRec.studentId]) return;
-        const key = cloudRec.studentId + '|' + cloudRec.date;
-        if (!localAttKeys.includes(key)) {
+        var existing = attendanceRecords.find(function(a) { return a.studentId === cloudRec.studentId && a.date === cloudRec.date; });
+        if (!existing) {
           attendanceRecords.push(cloudRec);
           changed = true;
+        } else if (cloudRec.status && cloudRec.status !== existing.status) {
+          var cloudTime = cloudRec.markedAt ? new Date(cloudRec.markedAt).getTime() : 0;
+          var localTime = existing.markedAt ? new Date(existing.markedAt).getTime() : 0;
+          if (cloudTime > localTime) {
+            existing.status = cloudRec.status;
+            if (cloudRec.markedAt) existing.markedAt = cloudRec.markedAt;
+            if (cloudRec.markedBy) existing.markedBy = cloudRec.markedBy;
+            changed = true;
+          }
         }
       });
     }
 
-    // Merge exam results
+    // Merge exam results — add new AND update scores if cloud has newer data
     if (backupData.data.examResults) {
-      const localResultKeys = examResults.map(r => r.examId + '|' + r.studentId);
+      var localResultKeys = examResults.map(function(r) { return r.examId + '|' + r.studentId; });
       backupData.data.examResults.forEach(cloudResult => {
         if (_de[cloudResult.examId] || _ds[cloudResult.studentId]) return;
-        const key = cloudResult.examId + '|' + cloudResult.studentId;
-        if (!localResultKeys.includes(key)) {
+        var key = cloudResult.examId + '|' + cloudResult.studentId;
+        var keyIdx = localResultKeys.indexOf(key);
+        if (keyIdx === -1) {
           examResults.push(cloudResult);
           changed = true;
+        } else {
+          var localResult = examResults[keyIdx];
+          if (localResult && cloudResult.submittedAt && localResult.submittedAt) {
+            if (new Date(cloudResult.submittedAt) > new Date(localResult.submittedAt)) {
+              examResults[keyIdx] = cloudResult;
+              changed = true;
+            }
+          } else if (localResult && cloudResult.score !== undefined && localResult.score === undefined) {
+            examResults[keyIdx] = cloudResult;
+            changed = true;
+          }
         }
       });
     }
@@ -19619,13 +19835,29 @@ async function silentMergeFromBackup(fileId) {
       } catch(e) { console.warn('[Merge] chatFollows error:', e); }
     }
 
-    // Merge class sessions
+    // Merge class sessions — add new AND update recording URLs/attendees
     if (Array.isArray(backupData.data.classSessions)) {
       try {
         backupData.data.classSessions.forEach(function(cs) {
-          if (cs && cs.id && !classSessions.some(function(ls) { return ls.id === cs.id; })) {
+          if (!cs || !cs.id) return;
+          var existing = classSessions.find(function(ls) { return ls.id === cs.id; });
+          if (!existing) {
             classSessions.push(cs);
             changed = true;
+          } else {
+            if (cs.recordingUrl && !existing.recordingUrl) { existing.recordingUrl = cs.recordingUrl; changed = true; }
+            if (cs.recordingDriveId && !existing.recordingDriveId) { existing.recordingDriveId = cs.recordingDriveId; changed = true; }
+            if (cs.endTime && !existing.endTime) { existing.endTime = cs.endTime; changed = true; }
+            if (cs.duration && !existing.duration) { existing.duration = cs.duration; changed = true; }
+            if (Array.isArray(cs.attendees) && cs.attendees.length > 0) {
+              if (!Array.isArray(existing.attendees)) existing.attendees = [];
+              cs.attendees.forEach(function(att) {
+                if (!existing.attendees.some(function(ea) { return (ea.id || ea.name) === (att.id || att.name); })) {
+                  existing.attendees.push(att);
+                  changed = true;
+                }
+              });
+            }
           }
         });
       } catch(e) { console.warn('[Merge] classSessions error:', e); }
@@ -19643,16 +19875,61 @@ async function silentMergeFromBackup(fileId) {
       } catch(e) { console.warn('[Merge] adminMeetings error:', e); }
     }
 
-    // Merge instructor assignments
+    // Merge instructor assignments — add new AND merge grades/Drive links
     if (Array.isArray(backupData.data.instructorAssignments)) {
       try {
         backupData.data.instructorAssignments.forEach(function(ca) {
-          if (ca && ca.id && !instructorAssignments.some(function(la) { return la.id === ca.id; })) {
+          if (!ca || !ca.id) return;
+          var existing = instructorAssignments.find(function(la) { return la.id === ca.id; });
+          if (!existing) {
             instructorAssignments.push(ca);
             changed = true;
+          } else {
+            // Merge grades from cloud additively
+            if (ca.grades && typeof ca.grades === 'object') {
+              if (!existing.grades) existing.grades = {};
+              Object.keys(ca.grades).forEach(function(sid) {
+                if (existing.grades[sid] === undefined) {
+                  existing.grades[sid] = ca.grades[sid];
+                  changed = true;
+                }
+              });
+            }
+            if (ca.driveFiles && Array.isArray(ca.driveFiles) && (!existing.driveFiles || existing.driveFiles.length === 0)) {
+              existing.driveFiles = ca.driveFiles;
+              changed = true;
+            }
+            if (ca.instructions && !existing.instructions) { existing.instructions = ca.instructions; changed = true; }
+            if (ca.attachments && Array.isArray(ca.attachments) && (!existing.attachments || existing.attachments.length === 0)) {
+              existing.attachments = ca.attachments;
+              changed = true;
+            }
           }
         });
       } catch(e) { console.warn('[Merge] instructorAssignments error:', e); }
+    }
+
+    // Merge assignment submissions — add new AND merge Drive links
+    if (Array.isArray(backupData.data.assignmentSubmissions)) {
+      try {
+        backupData.data.assignmentSubmissions.forEach(function(cs) {
+          if (!cs || !cs.id) return;
+          var existing = assignmentSubmissions.find(function(ls) { return ls.id === cs.id; });
+          if (!existing) {
+            assignmentSubmissions.push(cs);
+            changed = true;
+          } else {
+            if (cs.driveFiles && Array.isArray(cs.driveFiles) && (!existing.driveFiles || existing.driveFiles.length === 0)) {
+              existing.driveFiles = cs.driveFiles;
+              changed = true;
+            }
+            if (cs.files && Array.isArray(cs.files) && cs.files.length > 0 && (!existing.files || existing.files.length === 0)) {
+              existing.files = cs.files;
+              changed = true;
+            }
+          }
+        });
+      } catch(e) { console.warn('[Merge] assignmentSubmissions error:', e); }
     }
 
     // Merge instructor resources
@@ -19820,6 +20097,18 @@ async function silentMergeFromBackup(fileId) {
       } catch(e) { console.warn('[Merge] certDownloadApprovals error:', e); }
     }
 
+    // Merge certTemplateCourseMap
+    if (backupData.data.certTemplateCourseMap && typeof backupData.data.certTemplateCourseMap === 'object') {
+      try {
+        Object.keys(backupData.data.certTemplateCourseMap).forEach(function(k) {
+          if (!certTemplateCourseMap[k]) {
+            certTemplateCourseMap[k] = backupData.data.certTemplateCourseMap[k];
+            changed = true;
+          }
+        });
+      } catch(e) { console.warn('[Merge] certTemplateCourseMap error:', e); }
+    }
+
     // Merge skillAreas (training centres)
     if (Array.isArray(backupData.data.skillAreas)) {
       try {
@@ -19841,6 +20130,18 @@ async function silentMergeFromBackup(fileId) {
           }
         });
       } catch(e) { console.warn('[Merge] skillAreas error:', e); }
+    }
+
+    // Merge documentHubFiles
+    if (Array.isArray(backupData.data.documentHubFiles)) {
+      try {
+        backupData.data.documentHubFiles.forEach(function(cf) {
+          if (cf && cf.id && !documentHubFiles.some(function(lf) { return lf.id === cf.id; })) {
+            documentHubFiles.push(cf);
+            changed = true;
+          }
+        });
+      } catch(e) { console.warn('[Merge] documentHubFiles error:', e); }
     }
 
     // Reconcile: create student records for any user accounts missing them
@@ -19910,6 +20211,14 @@ async function autoSyncOnLogin() {
       await lmsChatSyncFromDrive();
     } catch (e) {
       console.warn('[AutoSync] Chat sync error:', e);
+    }
+
+    // 2a. Sync assignments from dedicated Assignments Drive folder
+    try {
+      var assignChanged = await syncAssignmentsFromDrive();
+      if (assignChanged) anyChanged = true;
+    } catch (e) {
+      console.warn('[AutoSync] Assignments Drive sync error:', e);
     }
 
     // 2b. Sync students from School Fee Management System
@@ -20176,7 +20485,8 @@ async function autoSaveToAllFolders() {
         systemSettings: systemSettings,
         supportMessages: supportMessages,
         notifications: notifications,
-        certDownloadApprovals: certDownloadApprovals
+        certDownloadApprovals: certDownloadApprovals,
+        certTemplateCourseMap: certTemplateCourseMap
       }
     };
     // Admin-managed data: only include if admin OR if non-empty (never upload empty to overwrite real data)
