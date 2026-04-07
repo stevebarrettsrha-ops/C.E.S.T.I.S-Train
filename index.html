@@ -4343,6 +4343,33 @@ body.vc-fullscreen-mode.vc-host-only-mode .video-grid .video-tile:not(.vc-hoston
 </div>
 
 <script>
+// ============================================
+// Configuration constants — declared first to avoid undefined errors
+// ============================================
+var GOOGLE_DRIVE_CONFIG = {
+  CLIENT_ID: '302497466088-0b619cqa9qno2c606k4rqp742lebc5o8.apps.googleusercontent.com',
+  FOLDER_ID: '1lNpI00Et1BN5c4eaV5WfQwuQVhCMBtv8',
+  BACKUP_FILE_NAME: 'CESTIS_LMS_BACKUP.json',
+  SCOPES: 'https://www.googleapis.com/auth/drive'
+};
+var LMS_CHAT_DRIVE_FOLDER = '1ashmmL0ZS7mW6XrwoxMuamf7yjtVWHyO';
+var VC_RECORDINGS_FOLDER_ID = '1Yp9aLXGGjhojF1J04QxoNG-9yEgaiS-A';
+var ASSIGNMENTS_DRIVE_FOLDER_ID = '1SEjU_-8XOPM-C2q-Vo-EZUgBz3PMg5Ma';
+var ASSIGNMENTS_BACKUP_FILE_NAME = 'CESTIS_ASSIGNMENTS.json';
+var DRIVE_RESOURCES_FOLDER_ID = '122aVdNWxJG9ShRWf9Xso0MdXGdQeDuyt';
+var PER_USER_DRIVE_FOLDER_ID = '1w23WEyGuRduVM9irEkgOjXaIStBy5i0J';
+var FEE_SYSTEM_DRIVE_CONFIG = {
+  FOLDER_ID: '11vWe_Nc40TtJ1Hi7PoE7EZ3JrpR-K0Vj',
+  FILE_NAME: 'school_fee_management_system.json'
+};
+var ALL_DRIVE_FOLDERS = [
+  { id: GOOGLE_DRIVE_CONFIG.FOLDER_ID, label: 'Main Backup' },
+  { id: '18ACBw0kRi0BssLEoZLWoeXNa1EiANeBu', label: 'Online Exams' },
+  { id: LMS_CHAT_DRIVE_FOLDER, label: 'LMS Chat' },
+  { id: VC_RECORDINGS_FOLDER_ID, label: 'Class Recording' },
+  { id: ASSIGNMENTS_DRIVE_FOLDER_ID, label: 'Assignments' }
+];
+
 var skillAreas = [
   {id:1,name:"Welding & Fabrication",icon:"\uD83D\uDD25",color:"#e74c3c",students:0,materials:0,desc:"SMAW, MIG, TIG welding processes and metal fabrication"},
   {id:2,name:"Electrical Installation",icon:"\u26A1",color:"#f1c40f",students:0,materials:0,desc:"Residential and commercial wiring, conduit bending, circuits"},
@@ -4373,11 +4400,11 @@ var stageIcons = {testing:'\uD83D\uDCDD',interview:'\uD83D\uDDE3\uFE0F',training
 function getCourseList() {
   var courseSet = {};
   // Include all skill area names
-  skillAreas.forEach(function(s) { courseSet[s.name] = true; });
+  if (skillAreas) skillAreas.forEach(function(s) { courseSet[s.name] = true; });
   // Also include any course names students actually have (handles legacy/renamed courses)
-  students.forEach(function(s) { if(s.course && !courseSet[s.course]) courseSet[s.course] = true; });
+  if (students) students.forEach(function(s) { if(s.course && !courseSet[s.course]) courseSet[s.course] = true; });
   // Also include any courses from user accounts
-  userAccounts.forEach(function(u) { if(u.programme && !courseSet[u.programme]) courseSet[u.programme] = true; });
+  if (userAccounts) userAccounts.forEach(function(u) { if(u.programme && !courseSet[u.programme]) courseSet[u.programme] = true; });
   return Object.keys(courseSet).sort();
 }
 function findSkillAreaForCourse(courseName) {
@@ -5013,9 +5040,6 @@ var lmsChatCallTimer = null;
 var lmsChatCallSeconds = 0;
 var lmsChatLocalStream = null;
 var lmsChatPeer = null;
-
-// Google Drive folder for chat file uploads
-var LMS_CHAT_DRIVE_FOLDER = '1ashmmL0ZS7mW6XrwoxMuamf7yjtVWHyO';
 
 // ---- IndexedDB for chat image storage (persists base64 across reloads) ----
 var _lmsChatImageDB = null;
@@ -11055,8 +11079,6 @@ function vcCopyCode() {
 }
 
 // ── Video Recording ──
-var VC_RECORDINGS_FOLDER_ID = '1Yp9aLXGGjhojF1J04QxoNG-9yEgaiS-A';
-var ASSIGNMENTS_DRIVE_FOLDER_ID = '1SEjU_-8XOPM-C2q-Vo-EZUgBz3PMg5Ma';
 var vcRecTimerInterval = null;
 
 function vcGetSupportedMimeType() {
@@ -12682,7 +12704,6 @@ function renderStudentAssignmentsPage() {
 }
 
 // ============================== ASSIGNMENT DRIVE SYNC ==============================
-var ASSIGNMENTS_BACKUP_FILE_NAME = 'CESTIS_ASSIGNMENTS.json';
 var _assignmentsDriveFileId = null;
 
 // Save all assignments + submissions to the dedicated Assignments Drive folder
@@ -13154,7 +13175,6 @@ function deleteResource(id) {
 }
 
 // ============================== ADMIN RESOURCE MANAGER (GOOGLE DRIVE) ==============================
-var DRIVE_RESOURCES_FOLDER_ID = '122aVdNWxJG9ShRWf9Xso0MdXGdQeDuyt';
 var _driveSelectedFile = null;
 
 function generateResourceId() {
@@ -17798,15 +17818,7 @@ function finalizeImportExam() {
 // Google Drive Cloud Sync Integration
 // ============================================
 
-// Google Drive Configuration
-var GOOGLE_DRIVE_CONFIG = {
-  CLIENT_ID: '302497466088-0b619cqa9qno2c606k4rqp742lebc5o8.apps.googleusercontent.com',
-  FOLDER_ID: '1lNpI00Et1BN5c4eaV5WfQwuQVhCMBtv8',
-  BACKUP_FILE_NAME: 'CESTIS_LMS_BACKUP.json',
-  SCOPES: 'https://www.googleapis.com/auth/drive'
-};
-
-// Cloud sync state — use var to avoid TDZ errors when hoisted functions access these
+// Cloud sync state
 var googleAccessToken = null;
 var isCloudConnected = false;
 var lastSyncTime = null;
@@ -17835,23 +17847,7 @@ function scheduleDebouncedCloudSave() {
     autoSaveToAllFolders();
   }, 2000);
 }
-var ALL_DRIVE_FOLDERS = [
-  { id: GOOGLE_DRIVE_CONFIG.FOLDER_ID, label: 'Main Backup' },
-  { id: '18ACBw0kRi0BssLEoZLWoeXNa1EiANeBu', label: 'Online Exams' },
-  { id: LMS_CHAT_DRIVE_FOLDER, label: 'LMS Chat' },
-  { id: VC_RECORDINGS_FOLDER_ID, label: 'Class Recording' },
-  { id: ASSIGNMENTS_DRIVE_FOLDER_ID, label: 'Assignments' }
-];
-
-// Per-user backup folder — each user saves their own data here
-var PER_USER_DRIVE_FOLDER_ID = '1w23WEyGuRduVM9irEkgOjXaIStBy5i0J';
 var _perUserFileId = null; // cached file ID for current user's backup
-
-// School Fee Management System — Google Drive folder containing fee system backup
-var FEE_SYSTEM_DRIVE_CONFIG = {
-  FOLDER_ID: '11vWe_Nc40TtJ1Hi7PoE7EZ3JrpR-K0Vj',
-  FILE_NAME: 'school_fee_management_system.json'
-};
 
 // Sync students from the School Fee Management System backup on Google Drive.
 // Reads the fee system JSON, extracts student records (Name, Student ID, Course),
