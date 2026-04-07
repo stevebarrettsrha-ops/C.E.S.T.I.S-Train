@@ -3502,6 +3502,87 @@ body.vc-fullscreen-mode.vc-host-only-mode .video-grid .video-tile:not(.vc-hoston
   .cestis-alert-msg { font-size:13px; }
   .backup-actions { flex-direction:column; }
 }
+
+/* ============================== MAINTENANCE MODE OVERLAY ============================== */
+.maintenance-overlay {
+  position:fixed; top:0; left:0; width:100%; height:100%; z-index:999999;
+  background:linear-gradient(135deg,#0f0c29,#302b63,#24243e);
+  display:flex; align-items:center; justify-content:center; flex-direction:column;
+  color:#fff; font-family:'Inter','Segoe UI',sans-serif; text-align:center;
+  animation:maintFadeIn 0.6s ease;
+}
+@keyframes maintFadeIn { from{opacity:0;} to{opacity:1;} }
+@keyframes maintPulse { 0%,100%{transform:scale(1);opacity:0.8;} 50%{transform:scale(1.05);opacity:1;} }
+@keyframes maintSpin { 0%{transform:rotate(0deg);} 100%{transform:rotate(360deg);} }
+.maintenance-icon {
+  width:100px; height:100px; margin-bottom:30px; position:relative;
+}
+.maintenance-icon svg { width:100%; height:100%; }
+.maintenance-gear { animation:maintSpin 4s linear infinite; transform-origin:center; }
+.maintenance-card {
+  background:rgba(255,255,255,0.08); backdrop-filter:blur(20px);
+  border:1px solid rgba(255,255,255,0.15); border-radius:20px;
+  padding:50px 40px; max-width:560px; width:90%;
+}
+.maintenance-title {
+  font-family:'Playfair Display',serif; font-size:32px; font-weight:700;
+  margin-bottom:12px; background:linear-gradient(135deg,#f093fb,#f5576c,#fda085);
+  -webkit-background-clip:text; -webkit-text-fill-color:transparent;
+  background-clip:text;
+}
+.maintenance-subtitle {
+  font-size:18px; color:rgba(255,255,255,0.7); margin-bottom:24px; line-height:1.6;
+}
+.maintenance-msg {
+  font-size:14px; color:rgba(255,255,255,0.5); line-height:1.7;
+  padding:16px; background:rgba(255,255,255,0.05); border-radius:12px;
+  border:1px solid rgba(255,255,255,0.08);
+}
+.maintenance-msg strong { color:rgba(255,255,255,0.8); }
+.maintenance-admin-bypass {
+  margin-top:28px; padding-top:20px; border-top:1px solid rgba(255,255,255,0.1);
+}
+.maintenance-admin-bypass a {
+  color:rgba(255,255,255,0.4); font-size:12px; text-decoration:none; cursor:pointer;
+  transition:color 0.2s;
+}
+.maintenance-admin-bypass a:hover { color:rgba(255,255,255,0.7); }
+/* Maintenance mode toggle in settings */
+.maint-toggle-container {
+  display:flex; align-items:center; gap:16px; padding:20px;
+  background:var(--bg-input); border-radius:12px; border:1px solid var(--border);
+}
+.maint-toggle-label { font-size:15px; font-weight:600; color:var(--text-primary); flex:1; }
+.maint-toggle-label small { display:block; font-weight:400; font-size:12px; color:var(--text-muted); margin-top:4px; }
+.maint-toggle {
+  position:relative; width:56px; height:28px; cursor:pointer;
+}
+.maint-toggle input { display:none; }
+.maint-toggle-slider {
+  position:absolute; top:0; left:0; right:0; bottom:0;
+  background:var(--border); border-radius:28px; transition:0.3s;
+}
+.maint-toggle-slider::before {
+  content:''; position:absolute; width:22px; height:22px; left:3px; bottom:3px;
+  background:#fff; border-radius:50%; transition:0.3s;
+}
+.maint-toggle input:checked + .maint-toggle-slider { background:var(--red); }
+.maint-toggle input:checked + .maint-toggle-slider::before { transform:translateX(28px); }
+.maint-status-badge {
+  display:inline-flex; align-items:center; gap:6px; padding:4px 12px;
+  border-radius:20px; font-size:12px; font-weight:600;
+}
+.maint-status-badge.active { background:rgba(231,76,60,0.15); color:var(--red); }
+.maint-status-badge.inactive { background:rgba(46,204,113,0.15); color:var(--green); }
+.maint-status-dot { width:8px; height:8px; border-radius:50%; }
+.maint-status-badge.active .maint-status-dot { background:var(--red); animation:maintPulse 2s ease infinite; }
+.maint-status-badge.inactive .maint-status-dot { background:var(--green); }
+.maint-preview-box {
+  margin-top:16px; padding:16px; border-radius:12px;
+  background:linear-gradient(135deg,#0f0c29,#302b63); color:#fff;
+  font-size:13px; text-align:center; line-height:1.6;
+}
+.maint-preview-box .maint-preview-title { font-family:'Playfair Display',serif; font-size:18px; margin-bottom:6px; }
 </style>
 <script src="https://unpkg.com/peerjs@1.5.4/dist/peerjs.min.js"></script>
 <!-- Google Identity Services for OAuth -->
@@ -3510,6 +3591,29 @@ body.vc-fullscreen-mode.vc-host-only-mode .video-grid .video-tile:not(.vc-hoston
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
 </head>
 <body>
+
+<!-- ============================== MAINTENANCE MODE OVERLAY ============================== -->
+<div id="maintenanceOverlay" class="maintenance-overlay" style="display:none;">
+  <div class="maintenance-card">
+    <div class="maintenance-icon">
+      <svg viewBox="0 0 100 100" fill="none" xmlns="http://www.w3.org/2000/svg">
+        <g class="maintenance-gear">
+          <path d="M50 30a20 20 0 1 0 0 40 20 20 0 0 0 0-40zm0 30a10 10 0 1 1 0-20 10 10 0 0 1 0 20z" fill="rgba(255,255,255,0.8)"/>
+          <path d="M50 18l3 8h-6l3-8zm0 64l-3-8h6l-3 8zM18 50l8-3v6l-8-3zm64 0l-8 3v-6l8 3zM27.3 27.3l7.1 4.1-3 5.2-4.1-7.1v-2.2zm45.4 45.4l-7.1-4.1 3-5.2 4.1 7.1v2.2zM27.3 72.7l4.1-7.1 5.2 3-7.1 4.1h-2.2zm45.4-45.4l-4.1 7.1-5.2-3 7.1-4.1h2.2z" fill="rgba(255,255,255,0.5)"/>
+        </g>
+      </svg>
+    </div>
+    <div class="maintenance-title">Under Maintenance</div>
+    <div class="maintenance-subtitle">We're making improvements to serve you better.</div>
+    <div class="maintenance-msg">
+      <strong>C.E.S.T.I.S LMS</strong> is currently undergoing scheduled maintenance.<br>
+      The site will be back online shortly. Thank you for your patience.
+    </div>
+    <div class="maintenance-admin-bypass">
+      <a onclick="maintenanceShowAdminLogin()">Administrator Access</a>
+    </div>
+  </div>
+</div>
 
 <!-- ============================== LANDING PAGE ============================== -->
 <div id="landingPage" role="main" aria-label="VocTrain LMS Login">
@@ -5629,6 +5733,7 @@ function saveState() {
     if (isAdmin || skillAreas.length > 0) localStorage.setItem('voctrain_skillAreas', JSON.stringify(skillAreas));
     if (isAdmin || documentHubFiles.length > 0) localStorage.setItem('voctrain_documentHubFiles', JSON.stringify(documentHubFiles));
     if (isAdmin) localStorage.setItem('voctrain_adminStaffAccess', JSON.stringify(adminStaffAccessSettings));
+    if (isAdmin) localStorage.setItem('voctrain_maintenanceMode', JSON.stringify({ active: systemSettings.maintenanceMode === true, message: systemSettings.maintenanceMessage || '', updatedAt: new Date().toISOString() }));
     if (isAdmin || adrTasks.length > 0) localStorage.setItem('voctrain_adrTasks', JSON.stringify(adrTasks));
     if (isAdmin || Object.keys(adrStaffMeta).length > 0) localStorage.setItem('voctrain_adrStaffMeta', JSON.stringify(adrStaffMeta));
     // Strip large base64 images before saving to localStorage (images are in IndexedDB)
@@ -5885,6 +5990,8 @@ function reconcileStudentsFromAccounts() {
 
 loadState();
 applyGoogleVerificationMeta();
+// Check and apply maintenance mode on page load
+checkMaintenanceOnLoad();
 
 // Check for expired session on page load (e.g. user returns to stale tab)
 (function() {
@@ -6474,10 +6581,12 @@ function switchSettingsTab(tab, which) {
   document.getElementById('settingsTabStaffAccess').style.display = which==='staffaccess' ? '' : 'none';
   document.getElementById('settingsTabDatamanagement').style.display = which==='datamanagement' ? '' : 'none';
   document.getElementById('settingsTabGoogleVerification').style.display = which==='googleverification' ? '' : 'none';
+  document.getElementById('settingsTabMaintenance').style.display = which==='maintenance' ? '' : 'none';
   if(which === 'users') renderUserAccountsTable();
   if(which === 'staffaccess') renderAdminStaffAccessGrid();
   if(which === 'datamanagement') refreshStorageUsage();
   if(which === 'googleverification') loadGoogleVerificationUI();
+  if(which === 'maintenance') loadMaintenanceModeUI();
 }
 
 let adminLoginShown = false, studentLoginShown = false, instructorLoginShown = false, adminStaffLoginShown = false, cmcLoginShown = false;
@@ -6723,6 +6832,11 @@ async function handleCmcClick() {
 
 function enterApp(role) {
   try {
+    // Maintenance mode check — block all non-admin users
+    if(systemSettings.maintenanceMode === true && role !== 'admin') {
+      alert('The site is currently under maintenance. Only administrators can access the system at this time. Please try again later.');
+      return;
+    }
     currentRole = role;
     // Ensure all student user accounts have corresponding student records
     if (reconcileStudentsFromAccounts()) saveState();
@@ -8261,6 +8375,7 @@ function buildAdminPages() {
       <div class="tab" onclick="switchSettingsTab(this,'staffaccess')">Admin Staff Access</div>
       <div class="tab" onclick="switchSettingsTab(this,'datamanagement')">Data Management</div>
       <div class="tab" onclick="switchSettingsTab(this,'googleverification')">Google Verification</div>
+      <div class="tab" onclick="switchSettingsTab(this,'maintenance')">Maintenance Mode</div>
     </div>
 
     <div id="settingsTabSystem">
@@ -8380,6 +8495,44 @@ function buildAdminPages() {
         <div style="display:flex;gap:10px;">
           <button class="btn btn-primary" onclick="saveGoogleVerification()">Save & Apply</button>
           <button class="btn btn-secondary" onclick="clearGoogleVerification()">Remove Tag</button>
+        </div>
+      </div>
+    </div>
+
+    <div id="settingsTabMaintenance" style="display:none;">
+      <div class="card" style="max-width:700px;">
+        <div class="card-header">
+          <h3>Maintenance Mode</h3>
+          <span class="maint-status-badge inactive" id="maintStatusBadge"><span class="maint-status-dot"></span> Inactive</span>
+        </div>
+        <p style="font-size:13px;color:var(--text-secondary);margin-bottom:20px;line-height:1.6;">
+          When maintenance mode is activated, <strong>all users except the Administrator</strong> will be unable to access the site. They will see a maintenance page informing them the site is temporarily unavailable. Only users with the <strong>admin</strong> role can bypass the maintenance screen.
+        </p>
+
+        <div class="maint-toggle-container">
+          <div class="maint-toggle-label">
+            Enable Maintenance Mode
+            <small>Blocks all non-admin users from accessing the site/dashboard</small>
+          </div>
+          <label class="maint-toggle">
+            <input type="checkbox" id="maintModeToggle" onchange="toggleMaintenanceMode(this.checked)">
+            <span class="maint-toggle-slider"></span>
+          </label>
+        </div>
+
+        <div class="form-group" style="margin-top:20px;">
+          <label>Custom Message (optional)</label>
+          <textarea class="form-control" id="maintCustomMsg" rows="3" placeholder="Enter a custom message to display to users during maintenance..." style="resize:vertical;"></textarea>
+          <small style="color:var(--text-muted);font-size:11px;">Leave blank to use the default maintenance message.</small>
+        </div>
+
+        <div style="margin-top:16px;">
+          <button class="btn btn-primary" onclick="saveMaintenanceSettings()">Save Maintenance Settings</button>
+        </div>
+
+        <div class="maint-preview-box" id="maintPreviewBox" style="margin-top:20px;">
+          <div class="maint-preview-title">Preview</div>
+          <div id="maintPreviewMsg">C.E.S.T.I.S LMS is currently undergoing scheduled maintenance. The site will be back online shortly.</div>
         </div>
       </div>
     </div>
@@ -14337,6 +14490,129 @@ function saveSystemSettings() {
   showToast('Settings saved successfully');
 }
 
+// ============================== MAINTENANCE MODE ==============================
+function loadMaintenanceModeUI() {
+  var toggle = document.getElementById('maintModeToggle');
+  var badge = document.getElementById('maintStatusBadge');
+  var msgBox = document.getElementById('maintCustomMsg');
+  var previewMsg = document.getElementById('maintPreviewMsg');
+  var isActive = systemSettings.maintenanceMode === true;
+  if(toggle) toggle.checked = isActive;
+  if(badge) {
+    badge.className = 'maint-status-badge ' + (isActive ? 'active' : 'inactive');
+    badge.innerHTML = '<span class="maint-status-dot"></span> ' + (isActive ? 'Active' : 'Inactive');
+  }
+  if(msgBox) msgBox.value = systemSettings.maintenanceMessage || '';
+  if(previewMsg) {
+    var msg = systemSettings.maintenanceMessage || 'C.E.S.T.I.S LMS is currently undergoing scheduled maintenance. The site will be back online shortly.';
+    previewMsg.textContent = msg;
+  }
+}
+
+function toggleMaintenanceMode(enabled) {
+  var badge = document.getElementById('maintStatusBadge');
+  if(badge) {
+    badge.className = 'maint-status-badge ' + (enabled ? 'active' : 'inactive');
+    badge.innerHTML = '<span class="maint-status-dot"></span> ' + (enabled ? 'Active' : 'Inactive');
+  }
+}
+
+function saveMaintenanceSettings() {
+  var toggle = document.getElementById('maintModeToggle');
+  var msgBox = document.getElementById('maintCustomMsg');
+  var wasActive = systemSettings.maintenanceMode === true;
+  var isNowActive = toggle ? toggle.checked : false;
+  systemSettings.maintenanceMode = isNowActive;
+  systemSettings.maintenanceMessage = msgBox ? msgBox.value.trim() : '';
+  // Persist to localStorage immediately so all browser tabs pick it up
+  localStorage.setItem('voctrain_maintenanceMode', JSON.stringify({ active: isNowActive, message: systemSettings.maintenanceMessage, updatedAt: new Date().toISOString() }));
+  saveState();
+  // Update the overlay state
+  applyMaintenanceOverlay();
+  // Update preview
+  var previewMsg = document.getElementById('maintPreviewMsg');
+  if(previewMsg) {
+    previewMsg.textContent = systemSettings.maintenanceMessage || 'C.E.S.T.I.S LMS is currently undergoing scheduled maintenance. The site will be back online shortly.';
+  }
+  if(isNowActive && !wasActive) {
+    showToast('Maintenance mode ACTIVATED — all non-admin users will be blocked.', 'warning');
+  } else if(!isNowActive && wasActive) {
+    showToast('Maintenance mode DEACTIVATED — site is now accessible to all users.', 'success');
+  } else {
+    showToast('Maintenance settings saved.', 'success');
+  }
+}
+
+function applyMaintenanceOverlay() {
+  var overlay = document.getElementById('maintenanceOverlay');
+  if(!overlay) return;
+  var isActive = systemSettings.maintenanceMode === true;
+  var isAdmin = currentRole === 'admin';
+  if(isActive && !isAdmin) {
+    // Update overlay message if custom message exists
+    var msgEl = overlay.querySelector('.maintenance-msg');
+    if(msgEl) {
+      var customMsg = systemSettings.maintenanceMessage || '';
+      if(customMsg) {
+        msgEl.innerHTML = '<strong>C.E.S.T.I.S LMS</strong> is currently under maintenance.<br>' + customMsg.replace(/\n/g, '<br>');
+      } else {
+        msgEl.innerHTML = '<strong>C.E.S.T.I.S LMS</strong> is currently undergoing scheduled maintenance.<br>The site will be back online shortly. Thank you for your patience.';
+      }
+    }
+    overlay.style.display = 'flex';
+  } else {
+    overlay.style.display = 'none';
+  }
+}
+
+// Called from the maintenance overlay — allows admin to bypass and login
+function maintenanceShowAdminLogin() {
+  var overlay = document.getElementById('maintenanceOverlay');
+  if(overlay) overlay.style.display = 'none';
+  // Show landing page and trigger admin login
+  document.getElementById('landingPage').style.display = '';
+  document.getElementById('appShell').classList.remove('active');
+  // Auto-open admin login
+  setTimeout(function() {
+    if(!adminLoginShown) {
+      var adminCard = document.getElementById('adminLogin');
+      if(adminCard) { adminCard.classList.add('active'); adminLoginShown = true; }
+      var adminUser = document.getElementById('adminUser');
+      if(adminUser) adminUser.focus();
+    }
+  }, 300);
+}
+
+// Check maintenance mode on page load and on storage events (cross-tab sync)
+function checkMaintenanceOnLoad() {
+  // Check from localStorage first for cross-tab awareness
+  var stored = safeJsonParse(localStorage.getItem('voctrain_maintenanceMode'), null);
+  if(stored && stored.active === true) {
+    systemSettings.maintenanceMode = true;
+    if(stored.message) systemSettings.maintenanceMessage = stored.message;
+  } else if(stored && stored.active === false) {
+    systemSettings.maintenanceMode = false;
+  }
+  applyMaintenanceOverlay();
+}
+
+// Listen for storage changes from other tabs to sync maintenance mode
+window.addEventListener('storage', function(e) {
+  if(e.key === 'voctrain_maintenanceMode') {
+    var val = safeJsonParse(e.newValue, null);
+    if(val) {
+      systemSettings.maintenanceMode = val.active === true;
+      systemSettings.maintenanceMessage = val.message || '';
+      applyMaintenanceOverlay();
+      // If maintenance just activated and current user is not admin, force them out
+      if(val.active === true && currentRole && currentRole !== 'admin') {
+        showToast('Site has been placed in maintenance mode. You will be logged out.', 'warning');
+        setTimeout(function() { logout(); applyMaintenanceOverlay(); }, 2000);
+      }
+    }
+  }
+});
+
 // ============================== GOOGLE SITE VERIFICATION ==============================
 function loadGoogleVerificationUI() {
   var textarea = document.getElementById('settGoogleVerificationHtml');
@@ -18747,7 +19023,7 @@ async function syncFromCloud() {
           }
         });
       }
-      if (backupData.data.systemSettings && typeof backupData.data.systemSettings === 'object') systemSettings = backupData.data.systemSettings;
+      if (backupData.data.systemSettings && typeof backupData.data.systemSettings === 'object') { systemSettings = backupData.data.systemSettings; applyMaintenanceOverlay(); }
       if (Array.isArray(backupData.data.adrTasks)) adrTasks = backupData.data.adrTasks;
       if (backupData.data.adrStaffMeta && typeof backupData.data.adrStaffMeta === 'object') adrStaffMeta = backupData.data.adrStaffMeta;
       if (backupData.data.adminStaffAccessSettings && typeof backupData.data.adminStaffAccessSettings === 'object') adminStaffAccessSettings = backupData.data.adminStaffAccessSettings;
@@ -19226,6 +19502,7 @@ async function mergeFromCloud() {
     try {
       if (backupData.data.systemSettings && typeof backupData.data.systemSettings === 'object') {
         Object.assign(systemSettings, backupData.data.systemSettings);
+        applyMaintenanceOverlay();
       }
     } catch(e) { console.warn('[Merge] systemSettings error:', e); }
 
@@ -19997,7 +20274,7 @@ async function silentMergeFromBackup(fileId) {
             settingsChanged = true;
           }
         });
-        if (settingsChanged) changed = true;
+        if (settingsChanged) { changed = true; applyMaintenanceOverlay(); }
       } catch(e) { console.warn('[Merge] systemSettings error:', e); }
     }
 
@@ -20783,6 +21060,9 @@ async function loginPageSync() {
     // Unlock login — sync completed successfully
     loginSyncCompleted = true;
     enableLoginButtons();
+
+    // Apply maintenance mode overlay after cloud data is merged
+    applyMaintenanceOverlay();
 
     console.log('[LoginSync] Pre-login sync complete. Folders synced: ' + foldersSynced + ', Data changed in: ' + totalMerged);
   } catch (err) {
