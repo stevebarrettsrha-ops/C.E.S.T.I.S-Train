@@ -434,13 +434,7 @@ body::-webkit-scrollbar { width:0; display:none; }
   pointer-events:none;
   transform:scale(0.97);
 }
-/* Student card stays active even before cloud sync — students can login/register without admin sync */
-.role-cards.sync-pending .role-card.student-card {
-  opacity:1;
-  filter:none;
-  pointer-events:auto;
-  transform:scale(1);
-}
+/* All cards (including student) are disabled until sync completes */
 .role-cards.sync-complete .role-card {
   opacity:1;
   filter:none;
@@ -3549,13 +3543,13 @@ body.vc-fullscreen-mode.vc-host-only-mode .video-grid .video-tile:not(.vc-hoston
       <span class="sync-icon">☁️</span>
       <div class="sync-text">
         <strong>Sync from Cloud before logging in</strong>
-        Pull the latest data from Google Drive. <em>Students can login or register directly without syncing.</em>
+        Pull the latest data from Google Drive. <em>All users must sync before logging in.</em>
         <div class="login-sync-status" id="loginSyncStatus"></div>
       </div>
       <button class="login-sync-btn" id="loginSyncBtn" onclick="loginPageSync()">Sync Now</button>
     </div>
 
-    <div class="role-cards">
+    <div class="role-cards sync-pending">
       <!-- ADMIN CARD -->
       <div class="role-card admin-card" id="adminCard">
         <div class="role-icon">🛡️</div>
@@ -6477,15 +6471,11 @@ function enableLoginButtons() {
   if(rc) { rc.classList.remove('sync-pending'); rc.classList.add('sync-complete'); }
 }
 function disableLoginButtons() {
-  // Disable all login buttons EXCEPT student card — students can login/register without cloud sync
+  // Disable ALL login buttons until cloud sync completes — prevents data loss and login issues
   document.querySelectorAll('.role-enter-btn').forEach(function(btn){
-    var card = btn.closest('.role-card');
-    if(card && card.id === 'studentCard') return; // Keep student button enabled
     btn.disabled = true;
   });
   document.querySelectorAll('.role-card .gmail-btn').forEach(function(btn){
-    var card = btn.closest('.role-card');
-    if(card && card.id === 'studentCard') return; // Keep student Gmail enabled
     btn.disabled = true;
   });
   var rc = document.querySelector('.role-cards');
@@ -6524,7 +6514,8 @@ async function handleStudentClick() {
       document.getElementById('studentUser').focus();
       return;
     }
-    // Students can login without full cloud sync — their data will be fetched on-demand after login
+    // Students must also sync before login to prevent data loss
+    if(requireLoginSync()) return;
     var uname = (document.getElementById('studentUser').value || '').trim();
     var pw = document.getElementById('studentPass').value;
     if(!uname || !pw) { alert('Please enter your email/username and password.'); return; }
@@ -6817,8 +6808,8 @@ var currentLoggedInUser = null;
 
 // ----- Gmail Sign-In via Google Identity Services -----
 function gmailSignIn(role) {
-  // Students and new registrations can sign in without full cloud sync
-  if(role !== 'student' && requireLoginSync()) return;
+  // All roles must sync before login to prevent data loss
+  if(requireLoginSync()) return;
   if(typeof google === 'undefined' || !google.accounts || !google.accounts.oauth2) {
     alert('Google Sign-In is not available. Please check your internet connection and reload the page.');
     return;
@@ -6902,6 +6893,8 @@ function handleGmailProfile(profile, role) {
 
 // ----- Registration Modal -----
 function openRegistrationModal(role, prefillName, prefillEmail) {
+  // All roles must sync before registration to prevent data loss
+  if(requireLoginSync()) return;
   // Remove any existing modal
   closeRegistrationModal();
   var roleLabel = role === 'student' ? 'Student' : 'Instructor';
