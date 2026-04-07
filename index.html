@@ -4118,6 +4118,7 @@ body.vc-fullscreen-mode.vc-host-only-mode .video-grid .video-tile:not(.vc-hoston
   <div class="modal">
     <div class="modal-header"><h3>Create New Assignment</h3><button class="modal-close" onclick="closeModal('createAssignmentModal')">✕</button></div>
     <div class="form-group"><label>Assignment Title</label><input type="text" class="form-control" id="assignTitle" placeholder="e.g. Practical Report #3"></div>
+    <div class="form-group"><label>Programme / Course</label><select class="form-control" id="assignCourse"></select></div>
     <div class="grid-2col" style="gap:12px;">
       <div class="form-group"><label>Type</label><select class="form-control" id="assignType"><option value="quiz">Quiz</option><option value="test">Test</option><option value="report">Report</option><option value="portfolio">Portfolio</option><option value="worksheet">Worksheet</option><option value="exam">Exam</option><option value="project">Project</option></select></div>
       <div class="form-group"><label>Due Date</label><input type="date" class="form-control" id="assignDueDate"></div>
@@ -4386,7 +4387,16 @@ const stages = ['testing','interview','training','certified','collected','incomp
 const stageLabels = {testing:'Testing',interview:'Interview',training:'In Training',certified:'Certified',collected:'Collected',incomplete:'Incomplete'};
 const stageBadge = {testing:'badge-blue',interview:'badge-purple',training:'badge-amber',certified:'badge-green',collected:'badge-green',incomplete:'badge-red'};
 const stageIcons = {testing:'\uD83D\uDCDD',interview:'\uD83D\uDDE3\uFE0F',training:'\uD83D\uDCDA',certified:'\uD83C\uDF93',collected:'\u2705',incomplete:'\u26A0\uFE0F'};
-function getCourseList() { return skillAreas.map(function(s) { return s.name; }); }
+function getCourseList() {
+  var courseSet = {};
+  // Include all skill area names
+  skillAreas.forEach(function(s) { courseSet[s.name] = true; });
+  // Also include any course names students actually have (handles legacy/renamed courses)
+  students.forEach(function(s) { if(s.course && !courseSet[s.course]) courseSet[s.course] = true; });
+  // Also include any courses from user accounts
+  userAccounts.forEach(function(u) { if(u.programme && !courseSet[u.programme]) courseSet[u.programme] = true; });
+  return Object.keys(courseSet).sort();
+}
 function findSkillAreaForCourse(courseName) {
   if (!courseName) return skillAreas[0];
   var cn = courseName.toLowerCase().trim();
@@ -5246,15 +5256,24 @@ function lmsChatEnsureMembership() {
   if (!lmsChatRooms.length) return;
   var changed = false;
 
-  // 1. Ensure default skill area rooms exist (in case cloud data is missing some)
+  // 1. Ensure default skill area rooms exist and sync names/icons with current skill areas
   skillAreas.forEach(function(sk) {
     var roomId = 'chat-class-' + sk.id;
-    if (!lmsChatRooms.some(function(r) { return r.id === roomId; })) {
+    var existing = lmsChatRooms.find(function(r) { return r.id === roomId; });
+    if (!existing) {
       lmsChatRooms.push({
         id: roomId, name: sk.name, icon: sk.icon, type: 'class',
         members: [], color: sk.color, createdBy: 'admin', skillAreaId: sk.id
       });
       changed = true;
+    } else {
+      // Sync room metadata with current skill area data
+      if(existing.name !== sk.name || existing.icon !== sk.icon || existing.color !== sk.color) {
+        existing.name = sk.name;
+        existing.icon = sk.icon;
+        existing.color = sk.color;
+        changed = true;
+      }
     }
   });
 
@@ -5753,10 +5772,16 @@ function updateSkillAreaCounts() {
   skillAreas.forEach(function(sk) {
     var skNameLower = sk.name.toLowerCase().trim();
     sk.students = students.filter(function(s) {
-      return s.course && s.course.toLowerCase().trim() === skNameLower;
+      if(!s.course) return false;
+      if(s.course.toLowerCase().trim() === skNameLower) return true;
+      var stuSk = findSkillAreaForCourse(s.course);
+      return stuSk && stuSk.id && stuSk.id === sk.id;
     }).length;
     sk.materials = driveResources.filter(function(r) {
-      return r.course && r.course.toLowerCase().trim() === skNameLower;
+      if(!r.course) return false;
+      if(r.course.toLowerCase().trim() === skNameLower) return true;
+      var resSk = findSkillAreaForCourse(r.course);
+      return resSk && resSk.id && resSk.id === sk.id;
     }).length;
   });
 }
@@ -7632,7 +7657,7 @@ function buildAdminPages() {
       <button class="btn btn-secondary" onclick="recoverAllCourseData()" title="Recover students and instructors from cloud backups">🔄 Recover from Cloud</button>
       <select class="form-control" style="width:200px;" id="filterStage" onchange="filterStudents()"><option value="all">All Stages</option><option value="testing">Testing</option><option value="interview">Interview</option><option value="training">In Training</option><option value="certified">Certified</option><option value="collected">Cert. Collected</option><option value="incomplete">Incomplete</option></select>
       <select class="form-control" style="width:200px;" id="filterCourse" onchange="filterStudents()"><option value="all">All Courses</option>${courses.map(c=>'<option>'+c+'</option>').join('')}</select>
-      <input type="text" class="form-control" style="width:220px;" placeholder="Search student name..." id="studentSearch" onkeyup="filterStudents()">
+      <input type="text" class="form-control" style="width:220px;" placeholder="Search by name, ID, or course..." id="studentSearch" onkeyup="filterStudents()">
     </div>
     <div class="pipeline" style="margin-bottom:20px;"><div class="pipeline-stage s-test"><span class="count" id="pTest2">0</span>Testing</div><div class="pipeline-stage s-interview"><span class="count" id="pInterview2">0</span>Interview</div><div class="pipeline-stage s-training"><span class="count" id="pTraining2">0</span>In Training</div><div class="pipeline-stage s-certified"><span class="count" id="pCertified2">0</span>Certified</div><div class="pipeline-stage s-collected"><span class="count" id="pCollected2">0</span>Collected</div><div class="pipeline-stage s-incomplete"><span class="count" id="pIncomplete2">0</span>Incomplete</div></div>
     <div class="card"><div class="card-header"><h3>Student Records</h3><span style="font-size:13px;color:var(--text-muted);" id="studentCount">Showing ${students.length} students</span></div><div class="table-wrapper"><table><thead><tr><th>Student</th><th>ID</th><th>Course</th><th>Stage</th><th>Test Score</th><th>Progress</th><th>Actions</th></tr></thead><tbody id="studentTableBody"></tbody></table></div></div>
@@ -8187,6 +8212,7 @@ function buildAdminPages() {
   <!-- ADMIN ASSIGNMENTS ACTIVITY PAGE -->
   <section class="page" id="page-a-assignments">
     <div style="display:flex;gap:12px;margin-bottom:18px;flex-wrap:wrap;align-items:center;">
+      <button class="btn btn-primary" onclick="openAdminCreateAssignment()">+ Create Assignment</button>
       <select class="form-control" id="aAssignFilterCourse" style="width:220px;" onchange="renderAdminAssignments()">
         <option value="all">All Programmes</option>
       </select>
@@ -8682,7 +8708,7 @@ function buildStudentPages() {
       <div class="card-header"><h3>Today's Schedule</h3><span style="font-size:12px;color:var(--text-muted);">${new Date().toLocaleDateString('en-US',{weekday:'long',month:'short',day:'numeric',year:'numeric'})}</span></div>
       ${(function(){
         const today = new Date().toISOString().split('T')[0];
-        const todaySessions = classSessions.filter(cs => cs.course === s.course && cs.date === today);
+        const todaySessions = classSessions.filter(cs => (cs.course === s.course || instructorCourseMatch(cs.course, s.course)) && cs.date === today);
         const todayEvents = calendarEvents.filter(ce => ce.date === today && (ce.forRoles||[]).indexOf('student') !== -1);
         if(todaySessions.length === 0 && todayEvents.length === 0) {
           return '<p style="color:var(--text-muted);padding:16px;text-align:center;">No classes scheduled for today. Check the calendar for upcoming sessions.</p>';
@@ -8787,7 +8813,7 @@ function buildStudentPages() {
             }
           });
           var pastSessions = classSessions.filter(function(cs) {
-            return instructorCourseMatch(cs.course, s.course) && cs.status === 'completed' && cs.recordingUrl;
+            return (cs.course === s.course || instructorCourseMatch(cs.course, s.course)) && cs.status === 'completed' && cs.recordingUrl;
           });
           pastSessions.forEach(function(cs) {
             videoResources.push({name: cs.name, date: cs.date || '', url: cs.recordingUrl || '', source: 'Recording'});
@@ -8876,7 +8902,7 @@ function buildStudentPages() {
     <div id="studentExamListView">
       <div class="card">
         <div class="card-header"><h3>My Exams</h3></div>
-        ${exams.filter(e => e.course === s.course && (e.status === 'upcoming' || e.status === 'active')).map((e,idx) => {
+        ${exams.filter(e => (e.course === s.course || instructorCourseMatch(e.course, s.course)) && (e.status === 'upcoming' || e.status === 'active')).map((e,idx) => {
           const examIdx = exams.indexOf(e);
           const hasQuestions = e.questionData && e.questionData.length > 0;
           const alreadyTaken = (examResults||[]).some(r => r.examId === e.id && r.studentId === s.id);
@@ -8908,7 +8934,7 @@ function buildStudentPages() {
         ${(function(){
           const myResults = (examResults||[]).filter(r => r.studentId === s.id);
           if(myResults.length === 0) {
-            var completedForCourse = exams.filter(e => e.course === s.course && e.status === 'completed');
+            var completedForCourse = exams.filter(e => (e.course === s.course || instructorCourseMatch(e.course, s.course)) && e.status === 'completed');
             if(completedForCourse.length === 0) {
               return '<p style="color:var(--text-muted);padding:16px;">No past exams yet.</p>';
             }
@@ -9238,11 +9264,11 @@ function buildInstructorPages() {
   <!-- INSTRUCTOR GRADEBOOK -->
   <section class="page" id="page-i-gradebook">
     <div style="display:flex;gap:12px;margin-bottom:20px;">
-      <button class="btn btn-primary" onclick="openModal('createAssignmentModal')">+ New Assignment</button>
+      <button class="btn btn-primary" onclick="openInstructorCreateAssignment()">+ New Assignment</button>
       <button class="btn-export" onclick="exportInstructorStudentsCSV()">📄 Export Grades</button>
     </div>
     ${(function(){
-      var myExamIds = exams.filter(function(e){return e.course===ins.course;}).map(function(e){return e.id;});
+      var myExamIds = exams.filter(function(e){return e.course===ins.course || instructorCourseMatch(e.course, ins.course);}).map(function(e){return e.id;});
       var pendingResults = examResults.filter(function(r){
         return myExamIds.indexOf(r.examId) >= 0 && r.answers && r.answers.some(function(a){return a.needsManualGrade && !a.graded;});
       });
@@ -11707,7 +11733,7 @@ function renderInstructorClassSessions() {
   const container = document.getElementById('iClassSessionsList');
   if(!container) return;
   const ins = currentInstructor;
-  const mySessions = classSessions.filter(s => s.course === ins?.course || s.createdBy === ins?.name);
+  const mySessions = classSessions.filter(s => s.course === ins?.course || instructorCourseMatch(s.course, ins?.course) || s.createdBy === ins?.name);
   const typeLabels = {theory:'Theory Session',practical:'Practical Lab',workshop:'Workshop Review',virtual:'Virtual Class'};
   const typeColors = {theory:'var(--blue)',practical:'var(--green)',workshop:'var(--purple)',virtual:'var(--red)'};
 
@@ -11743,7 +11769,7 @@ function renderInstructorDashboardDynamic() {
   var timeEl = document.getElementById('iDashNextClassTime');
   if (alertEl && msgEl && timeEl) {
     var mySessions = classSessions.filter(function(s) {
-      return s.course === ins.course || s.createdBy === ins.name;
+      return s.course === ins.course || instructorCourseMatch(s.course, ins.course) || s.createdBy === ins.name;
     });
     var today = new Date().toISOString().split('T')[0];
     var todaySessions = mySessions.filter(function(s) { return s.date === today; });
@@ -11954,9 +11980,28 @@ function fileToDataUrl(file) {
   });
 }
 
+function openInstructorCreateAssignment() {
+  populateCourseDropdowns();
+  var courseSel = document.getElementById('assignCourse');
+  if(courseSel && currentInstructor) {
+    // Pre-select the instructor's course
+    courseSel.value = currentInstructor.course || '';
+  }
+  document.getElementById('assignTitle').value = '';
+  document.getElementById('assignDueDate').value = '';
+  document.getElementById('assignMaxPoints').value = '100';
+  document.getElementById('assignWeight').value = '10';
+  document.getElementById('assignInstructions').value = '';
+  if(document.getElementById('assignFileInput')) document.getElementById('assignFileInput').value = '';
+  if(typeof _assignPendingFiles !== 'undefined') _assignPendingFiles = [];
+  if(typeof assignRenderFileList === 'function') assignRenderFileList();
+  openModal('createAssignmentModal');
+}
+
 function createAssignment() {
   const title = document.getElementById('assignTitle')?.value?.trim();
   const type = document.getElementById('assignType')?.value;
+  const assignCourse = document.getElementById('assignCourse')?.value;
   const dueDate = document.getElementById('assignDueDate')?.value;
   const maxPoints = parseInt(document.getElementById('assignMaxPoints')?.value) || 100;
   const weight = parseInt(document.getElementById('assignWeight')?.value) || 10;
@@ -11964,9 +12009,11 @@ function createAssignment() {
   const requireSubmission = document.getElementById('assignRequireSubmission')?.checked !== false;
 
   if(!title) { showToast('Please enter an assignment title'); return; }
+  if(!assignCourse) { showToast('Please select a course'); return; }
   if(!dueDate) { showToast('Please select a due date'); return; }
 
   const ins = currentInstructor;
+  var creatorName = ins?.name || (currentRole === 'admin' ? 'Administrator' : 'Instructor');
 
   // Convert attached files to data URLs for localStorage persistence
   var filePromises = _assignPendingFiles.map(function(f) { return fileToDataUrl(f); });
@@ -11976,14 +12023,14 @@ function createAssignment() {
       id: 'ASN-' + Date.now(),
       title: title,
       type: type,
-      course: ins?.course || 'General',
+      course: assignCourse,
       dueDate: dueDate,
       maxPoints: maxPoints,
       weight: weight,
       instructions: instructions || '',
       attachments: attachments,
       requireSubmission: requireSubmission,
-      createdBy: ins?.name || 'Instructor',
+      createdBy: creatorName,
       createdAt: new Date().toISOString(),
       grades: {}
     };
@@ -12005,6 +12052,10 @@ function createAssignment() {
     assignRenderFileList();
 
     renderInstructorGradebook();
+    // Also refresh admin assignments view if it exists
+    if(typeof renderAdminAssignments === 'function') renderAdminAssignments();
+    // Also refresh student assignments view
+    if(typeof renderStudentAssignments === 'function') renderStudentAssignments();
   });
 }
 
@@ -12012,7 +12063,11 @@ function renderInstructorGradebook() {
   const container = document.getElementById('iCustomAssignmentsList');
   if(!container) return;
   const ins = currentInstructor;
-  const myAssignments = instructorAssignments.filter(a => a.course === ins?.course || a.createdBy === ins?.name);
+  const myAssignments = instructorAssignments.filter(function(a) {
+    if(a.createdBy === ins?.name) return true;
+    if(!a.course || !ins?.course) return false;
+    return a.course === ins.course || instructorCourseMatch(a.course, ins.course);
+  });
   const typeLabels = {quiz:'Quiz',test:'Test',report:'Report',portfolio:'Portfolio',worksheet:'Worksheet',exam:'Exam',project:'Project'};
   const typeIcons = {quiz:'📝',test:'📋',report:'📄',portfolio:'📂',worksheet:'📝',exam:'📝',project:'🔧'};
 
@@ -12121,6 +12176,25 @@ function deleteAssignment(id) {
 }
 
 // ============================== ADMIN ASSIGNMENTS VIEW ==============================
+function openAdminCreateAssignment() {
+  populateCourseDropdowns();
+  var courseSel = document.getElementById('assignCourse');
+  if(courseSel) {
+    // For admin, show all courses; pre-select first
+    var cl = getCourseList();
+    courseSel.innerHTML = cl.map(function(c) { return '<option value="'+c+'">'+c+'</option>'; }).join('');
+  }
+  document.getElementById('assignTitle').value = '';
+  document.getElementById('assignDueDate').value = '';
+  document.getElementById('assignMaxPoints').value = '100';
+  document.getElementById('assignWeight').value = '10';
+  document.getElementById('assignInstructions').value = '';
+  if(document.getElementById('assignFileInput')) document.getElementById('assignFileInput').value = '';
+  if(typeof _assignPendingFiles !== 'undefined') _assignPendingFiles = [];
+  if(typeof assignRenderFileList === 'function') assignRenderFileList();
+  openModal('createAssignmentModal');
+}
+
 function renderAdminAssignments() {
   var container = document.getElementById('adminAssignmentsList');
   if (!container) return;
@@ -12139,8 +12213,13 @@ function renderAdminAssignments() {
   var searchTerm = (document.getElementById('aAssignSearch')?.value || '').toLowerCase().trim();
 
   var filtered = instructorAssignments.filter(function(a) {
-    if (filterCourse !== 'all' && a.course !== filterCourse) return false;
-    if (searchTerm && a.title.toLowerCase().indexOf(searchTerm) === -1 && (a.createdBy||'').toLowerCase().indexOf(searchTerm) === -1) return false;
+    if (filterCourse !== 'all') {
+      if(!a.course) return false;
+      var match = a.course === filterCourse || a.course.toLowerCase().trim() === filterCourse.toLowerCase().trim();
+      if(!match && typeof instructorCourseMatch === 'function') match = instructorCourseMatch(a.course, filterCourse);
+      if(!match) return false;
+    }
+    if (searchTerm && a.title.toLowerCase().indexOf(searchTerm) === -1 && (a.createdBy||'').toLowerCase().indexOf(searchTerm) === -1 && (a.course||'').toLowerCase().indexOf(searchTerm) === -1) return false;
     return true;
   });
 
@@ -12163,7 +12242,7 @@ function renderAdminAssignments() {
   el = document.getElementById('aAssignStatPending'); if (el) el.textContent = pendingCount;
 
   if (filtered.length === 0) {
-    container.innerHTML = '<div class="card" style="text-align:center;padding:40px;"><div style="font-size:48px;opacity:0.3;margin-bottom:12px;">📋</div><h3 style="color:var(--text-muted);margin-bottom:8px;">No Assignments Found</h3><p style="font-size:13px;color:var(--text-muted);">Instructors can create assignments from their Gradebook page.</p></div>';
+    container.innerHTML = '<div class="card" style="text-align:center;padding:40px;"><div style="font-size:48px;opacity:0.3;margin-bottom:12px;">📋</div><h3 style="color:var(--text-muted);margin-bottom:8px;">No Assignments Found</h3><p style="font-size:13px;color:var(--text-muted);">Click "+ Create Assignment" above or instructors can create assignments from their Gradebook page.</p></div>';
     return;
   }
 
@@ -12242,12 +12321,16 @@ function renderStudentAssignments() {
   var s = currentStudent;
   if (!s) { container.innerHTML = ''; return; }
 
-  // Get assignments for this student's course
+  // Get assignments for this student's course (robust matching)
   var myAssignments = instructorAssignments.filter(function(a) {
     if (!a.course || !s.course) return false;
-    return a.course === s.course ||
-      s.course.toLowerCase().indexOf(a.course.toLowerCase().split(' ')[0]) !== -1 ||
-      a.course.toLowerCase().indexOf(s.course.toLowerCase().split(' ')[0]) !== -1;
+    // Exact match
+    if (a.course === s.course) return true;
+    // Case-insensitive match
+    if (a.course.toLowerCase().trim() === s.course.toLowerCase().trim()) return true;
+    // Skill area ID match (handles renamed courses)
+    if (typeof instructorCourseMatch === 'function') return instructorCourseMatch(s.course, a.course);
+    return false;
   });
 
   var submittedCount = 0;
@@ -12455,16 +12538,18 @@ function renderInstructorCustomResources() {
   const container = document.getElementById('iCustomResourcesList');
   if(!container) return;
   const ins = currentInstructor;
-  const myResources = instructorResources.filter(r => r.course === ins?.course || r.createdBy === ins?.name);
+  const myResources = instructorResources.filter(function(r) {
+    if(r.createdBy === ins?.name) return true;
+    if(!r.course || !ins?.course) return false;
+    return r.course === ins.course || instructorCourseMatch(r.course, ins.course);
+  });
   const catLabels = {video:'Video Lectures',guide:'Study Guides & Handbooks',worksheet:'Worksheets & Assignments',rubric:'Assessment Rubrics'};
   const catIcons = {video:'📹',guide:'📄',worksheet:'📝',rubric:'📊'};
 
   // Also get admin-uploaded drive resources for this instructor's course
   var adminResources = driveResources.filter(function(r) {
     if (!r.course || !ins?.course) return false;
-    return r.course === ins.course ||
-      ins.course.toLowerCase().indexOf(r.course.toLowerCase().split(' ')[0]) !== -1 ||
-      r.course.toLowerCase().indexOf(ins.course.toLowerCase().split(' ')[0]) !== -1;
+    return r.course === ins.course || instructorCourseMatch(r.course, ins.course);
   });
 
   var iNoResMsg = document.getElementById('instructorNoResourcesMsg');
@@ -12543,6 +12628,7 @@ function renderInstructorCustomResources() {
         if(r.url) {
           html += '<button class="btn btn-sm btn-secondary" onclick="window.open(\'' + r.url.replace(/'/g,"\\'") + '\',\'_blank\')">' + (r.type==='Video'?'▶ Play':'Open') + '</button>';
         }
+        html += '<button class="btn btn-sm btn-primary" style="margin-left:4px;font-size:10px;" onclick="assignResourceAsAssignment(\'' + r.id + '\')">📋 Assign</button>';
         html += '<button class="btn btn-sm btn-danger" style="margin-left:4px;" onclick="deleteResource(\'' + r.id + '\')">✕</button></li>';
       });
       html += '</ul></div>';
@@ -12550,6 +12636,35 @@ function renderInstructorCustomResources() {
   }
 
   container.innerHTML = html;
+}
+
+// Assign a resource (worksheet, guide, etc.) as an assignment for students
+function assignResourceAsAssignment(resourceId) {
+  var res = instructorResources.find(function(r) { return r.id === resourceId; });
+  if(!res) { res = driveResources.find(function(r) { return r.resourceId === resourceId || r.id === resourceId; }); }
+  if(!res) { showToast('Resource not found'); return; }
+
+  populateCourseDropdowns();
+  var courseSel = document.getElementById('assignCourse');
+  if(courseSel) {
+    var targetCourse = res.course || (currentInstructor ? currentInstructor.course : '');
+    var cl = getCourseList();
+    courseSel.innerHTML = cl.map(function(c) { return '<option value="'+c+'">'+c+'</option>'; }).join('');
+    if(targetCourse) courseSel.value = targetCourse;
+  }
+
+  // Pre-fill the assignment form with resource info
+  document.getElementById('assignTitle').value = res.name || '';
+  document.getElementById('assignType').value = 'worksheet';
+  document.getElementById('assignInstructions').value = (res.description || '') + (res.url ? '\n\nResource link: ' + res.url : '');
+  document.getElementById('assignMaxPoints').value = '100';
+  document.getElementById('assignWeight').value = '10';
+  document.getElementById('assignDueDate').value = '';
+  if(document.getElementById('assignFileInput')) document.getElementById('assignFileInput').value = '';
+  if(typeof _assignPendingFiles !== 'undefined') _assignPendingFiles = [];
+  if(typeof assignRenderFileList === 'function') assignRenderFileList();
+  openModal('createAssignmentModal');
+  showToast('Pre-filled assignment from resource — set due date and create');
 }
 
 function deleteResource(id) {
@@ -13107,9 +13222,14 @@ function renderAdminResources() {
   const searchTerm = (document.getElementById('arSearch')?.value || '').toLowerCase().trim();
 
   let filtered = driveResources.filter(function(r) {
-    if (filterCourse !== 'all' && r.course !== filterCourse) return false;
+    if (filterCourse !== 'all') {
+      if(!r.course) return false;
+      var match = r.course === filterCourse || r.course.toLowerCase().trim() === filterCourse.toLowerCase().trim();
+      if(!match && typeof instructorCourseMatch === 'function') match = instructorCourseMatch(r.course, filterCourse);
+      if(!match) return false;
+    }
     if (filterType !== 'all' && r.category !== filterType) return false;
-    if (searchTerm && r.name.toLowerCase().indexOf(searchTerm) === -1 && r.resourceId.toLowerCase().indexOf(searchTerm) === -1 && (r.description||'').toLowerCase().indexOf(searchTerm) === -1) return false;
+    if (searchTerm && r.name.toLowerCase().indexOf(searchTerm) === -1 && (r.resourceId||'').toLowerCase().indexOf(searchTerm) === -1 && (r.description||'').toLowerCase().indexOf(searchTerm) === -1) return false;
     return true;
   });
 
@@ -13161,6 +13281,7 @@ function renderAdminResources() {
       if (r.url) {
         html += '<button class="btn btn-sm btn-secondary" onclick="window.open(\'' + r.url.replace(/'/g, "\\'") + '\',\'_blank\')" title="Open resource">' + (r.category==='video'?'▶ Play':'Open') + '</button>';
       }
+      html += '<button class="btn btn-sm btn-primary" style="margin-left:4px;font-size:10px;" onclick="assignResourceAsAssignment(\'' + (r.resourceId || r.id) + '\')" title="Assign as student assignment">📋 Assign</button>';
       html += '<button class="btn btn-sm" style="background:var(--bg-input);color:var(--text-secondary);border:1px solid var(--border);margin-left:4px;" onclick="copyResourceId(\'' + r.resourceId + '\')" title="Copy Resource ID">📋 ID</button>';
       html += '<button class="btn btn-sm btn-danger" style="margin-left:4px;" onclick="deleteDriveResource(\'' + r.id + '\')">✕</button>';
       html += '</li>';
@@ -13830,24 +13951,44 @@ function exportExamResults() {
 function renderStudents(data) {
   const tbody = document.getElementById('studentTableBody');
   if(!tbody) return;
-  tbody.innerHTML = data.map(s => `
-    <tr><td><strong>${s.name}</strong></td><td style="font-family:monospace;font-size:12px;color:var(--text-muted);">${s.id}</td><td>${s.course}</td>
-    <td><span class="badge ${stageBadge[s.stage]}"><span class="badge-dot"></span>${stageLabels[s.stage]}</span></td><td>${s.score||'—'}</td>
-    <td><div style="display:flex;align-items:center;gap:8px;"><div class="progress-bar" style="width:80px;"><div class="fill" style="width:${s.progress}%;background:${s.progress>=80?'var(--green)':s.progress>=40?'var(--accent)':'var(--red)'};"></div></div><span style="font-size:12px;color:var(--text-muted);">${s.progress}%</span></div></td>
-    <td><div style="display:flex;gap:6px;"><button class="btn btn-sm btn-secondary" onclick="openUpdateStage(${students.indexOf(s)})">Update</button><button class="btn btn-sm btn-secondary" onclick="openEditStudent(${students.indexOf(s)})" style="font-size:11px;">✎ Edit</button><button class="btn btn-sm" style="background:#e74c3c;color:#fff;font-size:11px;border:none;border-radius:var(--radius-sm);cursor:pointer;" onclick="openDeleteStudent(${students.indexOf(s)})">✕ Delete</button></div></td></tr>
-  `).join('');
+  if(!data || !Array.isArray(data)) { data = []; }
+  tbody.innerHTML = data.map(s => {
+    var idx = students.indexOf(s);
+    var prog = s.progress || 0;
+    return `<tr><td><strong>${s.name||'Unknown'}</strong></td><td style="font-family:monospace;font-size:12px;color:var(--text-muted);">${s.id||'—'}</td><td>${s.course||'—'}</td>
+    <td><span class="badge ${stageBadge[s.stage]||'badge-blue'}"><span class="badge-dot"></span>${stageLabels[s.stage]||s.stage||'—'}</span></td><td>${s.score||'—'}</td>
+    <td><div style="display:flex;align-items:center;gap:8px;"><div class="progress-bar" style="width:80px;"><div class="fill" style="width:${prog}%;background:${prog>=80?'var(--green)':prog>=40?'var(--accent)':'var(--red)'};"></div></div><span style="font-size:12px;color:var(--text-muted);">${prog}%</span></div></td>
+    <td><div style="display:flex;gap:6px;"><button class="btn btn-sm btn-secondary" onclick="openUpdateStage(${idx})">Update</button><button class="btn btn-sm btn-secondary" onclick="openEditStudent(${idx})" style="font-size:11px;">✎ Edit</button><button class="btn btn-sm" style="background:#e74c3c;color:#fff;font-size:11px;border:none;border-radius:var(--radius-sm);cursor:pointer;" onclick="openDeleteStudent(${idx})">✕ Delete</button></div></td></tr>`;
+  }).join('');
   const sc = document.getElementById('studentCount');
-  if(sc) sc.textContent = `Showing ${data.length} students`;
+  if(sc) sc.textContent = `Showing ${data.length} student${data.length!==1?'s':''}`;
 }
 
 function filterStudents() {
   let filtered = [...students];
   const stage = document.getElementById('filterStage')?.value;
   const course = document.getElementById('filterCourse')?.value;
-  const search = document.getElementById('studentSearch')?.value?.toLowerCase();
+  const search = (document.getElementById('studentSearch')?.value || '').toLowerCase().trim();
   if(stage && stage!=='all') filtered = filtered.filter(s => s.stage===stage);
-  if(course && course!=='all') filtered = filtered.filter(s => s.course===course);
-  if(search) filtered = filtered.filter(s => s.name.toLowerCase().includes(search));
+  if(course && course!=='all') filtered = filtered.filter(function(s) {
+    if(!s.course) return false;
+    // Exact match first
+    if(s.course === course) return true;
+    // Case-insensitive match
+    if(s.course.toLowerCase().trim() === course.toLowerCase().trim()) return true;
+    // Skill area ID match (handles renamed courses)
+    var studentSkill = findSkillAreaForCourse(s.course);
+    var filterSkill = findSkillAreaForCourse(course);
+    if(studentSkill && filterSkill && studentSkill.id && filterSkill.id && studentSkill.id === filterSkill.id) return true;
+    return false;
+  });
+  if(search) filtered = filtered.filter(function(s) {
+    // Search by name, ID, or course
+    var name = (s.name || '').toLowerCase();
+    var id = (s.id || '').toLowerCase();
+    var sCourse = (s.course || '').toLowerCase();
+    return name.includes(search) || id.includes(search) || sCourse.includes(search);
+  });
   renderStudents(filtered);
 }
 
@@ -14164,7 +14305,7 @@ var centreViewMode = 'grid';
 function populateCourseDropdowns() {
   courses = getCourseList();
   // IDs of all dropdowns that need course options (no placeholder)
-  var plainIds = ['newStudentCourse','editStudentCourse','examCourse','csCourse','importExamCourse'];
+  var plainIds = ['newStudentCourse','editStudentCourse','examCourse','csCourse','importExamCourse','assignCourse'];
   // IDs that need a "— Select Programme —" placeholder first
   var placeholderIds = ['newUserProgramme','editUserProgramme'];
   plainIds.forEach(function(id) {
@@ -14345,21 +14486,126 @@ function saveTrainingCentre() {
   var id = parseInt(document.getElementById('editCentreId').value);
   var centre = skillAreas.find(function(c) { return c.id === id; });
   if(!centre) return;
-  var name = document.getElementById('editCentreName').value.trim();
-  if(!name) { alert('Please enter a centre name.'); return; }
-  centre.name = name;
+  var newName = document.getElementById('editCentreName').value.trim();
+  if(!newName) { alert('Please enter a centre name.'); return; }
+  var oldName = centre.name;
+  centre.name = newName;
   centre.icon = document.getElementById('editCentreIcon').value.trim() || centre.icon;
   centre.color = document.getElementById('editCentreColor').value || centre.color;
   centre.desc = document.getElementById('editCentreDesc').value.trim();
   centre.students = parseInt(document.getElementById('editCentreStudents').value) || 0;
   centre.materials = parseInt(document.getElementById('editCentreMaterials').value) || 0;
+  // Cascade name change to all references if name changed
+  if(oldName !== newName) {
+    propagateCourseNameChange(oldName, newName);
+  }
   closeModal('editCentreModal');
   renderSkills();
   updateCentreCount();
   if(centreViewMode === 'table') renderCentreTable();
-  showToast(name + ' updated successfully!');
+  showToast(newName + ' updated successfully!');
   populateCourseDropdowns();
   saveState();
+}
+
+// Propagate a course/skill area name change across all data structures
+function propagateCourseNameChange(oldName, newName) {
+  if(!oldName || !newName || oldName === newName) return;
+  var oldLower = oldName.toLowerCase().trim();
+  var count = 0;
+
+  // 1. Update students
+  students.forEach(function(s) {
+    if(s.course && s.course.toLowerCase().trim() === oldLower) { s.course = newName; count++; }
+  });
+
+  // 2. Update user accounts (programme field)
+  userAccounts.forEach(function(u) {
+    if(u.programme && u.programme.toLowerCase().trim() === oldLower) { u.programme = newName; count++; }
+  });
+
+  // 3. Update attendance records
+  (attendanceRecords || []).forEach(function(r) {
+    if(r.course && r.course.toLowerCase().trim() === oldLower) { r.course = newName; count++; }
+  });
+
+  // 4. Update exams
+  (exams || []).forEach(function(e) {
+    if(e.course && e.course.toLowerCase().trim() === oldLower) { e.course = newName; count++; }
+  });
+
+  // 5. Update instructor assignments
+  (instructorAssignments || []).forEach(function(a) {
+    if(a.course && a.course.toLowerCase().trim() === oldLower) { a.course = newName; count++; }
+  });
+
+  // 6. Update assignment submissions
+  (assignmentSubmissions || []).forEach(function(s) {
+    if(s.course && s.course.toLowerCase().trim() === oldLower) { s.course = newName; count++; }
+  });
+
+  // 7. Update instructor resources
+  (instructorResources || []).forEach(function(r) {
+    if(r.course && r.course.toLowerCase().trim() === oldLower) { r.course = newName; count++; }
+  });
+
+  // 8. Update drive resources
+  (driveResources || []).forEach(function(r) {
+    if(r.course && r.course.toLowerCase().trim() === oldLower) { r.course = newName; count++; }
+  });
+
+  // 9. Update class sessions
+  (classSessions || []).forEach(function(cs) {
+    if(cs.course && cs.course.toLowerCase().trim() === oldLower) { cs.course = newName; count++; }
+  });
+
+  // 10. Update cert download approvals
+  (certDownloadApprovals || []).forEach(function(a) {
+    if(a.course && a.course.toLowerCase().trim() === oldLower) { a.course = newName; count++; }
+  });
+
+  // 11. Update cert templates (re-key)
+  if(certTemplates[oldName]) {
+    certTemplates[newName] = certTemplates[oldName];
+    delete certTemplates[oldName];
+    count++;
+  }
+
+  // 12. Update certTemplateCourseMap
+  if(certTemplateCourseMap[oldName]) {
+    certTemplateCourseMap[newName] = certTemplateCourseMap[oldName];
+    delete certTemplateCourseMap[oldName];
+  }
+  // Also update values that point to the old name
+  Object.keys(certTemplateCourseMap).forEach(function(k) {
+    if(certTemplateCourseMap[k] === oldName) certTemplateCourseMap[k] = newName;
+  });
+
+  // 13. Update LMS chat room names
+  (lmsChatRooms || []).forEach(function(room) {
+    if(room.name && room.name.toLowerCase().trim() === oldLower) {
+      room.name = newName;
+      count++;
+    }
+  });
+
+  // 14. Update exam results
+  (typeof examResults !== 'undefined' ? examResults : []).forEach(function(r) {
+    if(r.course && r.course.toLowerCase().trim() === oldLower) { r.course = newName; count++; }
+  });
+
+  // 15. Update calendar events
+  (typeof calendarEvents !== 'undefined' ? calendarEvents : []).forEach(function(ev) {
+    if(ev.course && ev.course.toLowerCase().trim() === oldLower) { ev.course = newName; count++; }
+  });
+
+  // Save chat data separately
+  if(typeof saveLmsChatData === 'function') saveLmsChatData();
+  if(typeof saveUserAccounts === 'function') saveUserAccounts();
+
+  if(count > 0) {
+    console.log('Propagated course name change: "' + oldName + '" → "' + newName + '" — ' + count + ' references updated');
+  }
 }
 
 
@@ -15860,7 +16106,13 @@ function renderAttendancePage() {
   if(!tbody) return;
   const courseFilter = document.getElementById('attendanceCourseFilter')?.value || 'all';
   let records = [...attendanceRecords];
-  if(courseFilter && courseFilter !== 'all') records = records.filter(r=>r.course===courseFilter);
+  if(courseFilter && courseFilter !== 'all') records = records.filter(function(r) {
+    if(!r.course) return false;
+    if(r.course === courseFilter) return true;
+    if(r.course.toLowerCase().trim() === courseFilter.toLowerCase().trim()) return true;
+    if(typeof instructorCourseMatch === 'function') return instructorCourseMatch(r.course, courseFilter);
+    return false;
+  });
   const days = ['Mon','Tue','Wed','Thu','Fri'];
   tbody.innerHTML = records.slice(0,40).map((r,idx) => {
     return `<tr><td><strong>${r.studentName}</strong></td><td style="font-family:monospace;font-size:12px;">${r.studentId}</td><td>${r.course}</td>
@@ -24157,14 +24409,20 @@ function buildAdminStaffPages() {
 
 // ---- Admin Staff Student Filter ----
 function asFilterStudents() {
-  var search = (document.getElementById('asStudentSearch')?.value || '').toLowerCase();
+  var search = (document.getElementById('asStudentSearch')?.value || '').toLowerCase().trim();
   var course = document.getElementById('asStudentCourse')?.value || 'all';
   var rows = document.querySelectorAll('#asStudentTableBody tr');
   rows.forEach(function(row) {
     var name = row.getAttribute('data-name') || '';
     var c = row.getAttribute('data-course') || '';
-    var matchSearch = !search || name.indexOf(search) !== -1;
+    var id = row.getAttribute('data-id') || '';
+    var matchSearch = !search || name.indexOf(search) !== -1 || c.toLowerCase().indexOf(search) !== -1 || id.toLowerCase().indexOf(search) !== -1;
     var matchCourse = course === 'all' || c === course;
+    if(!matchCourse && c && course) {
+      // Try flexible matching
+      matchCourse = c.toLowerCase().trim() === course.toLowerCase().trim();
+      if(!matchCourse && typeof instructorCourseMatch === 'function') matchCourse = instructorCourseMatch(c, course);
+    }
     row.style.display = (matchSearch && matchCourse) ? '' : 'none';
   });
 }
