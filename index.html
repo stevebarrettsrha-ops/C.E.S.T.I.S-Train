@@ -18080,6 +18080,7 @@ function setCloudSyncing(syncing) {
   const statusDot = document.getElementById('cloudStatusDot');
   const statusText = document.getElementById('cloudStatusText');
   const menuIcon = document.getElementById('cloudMenuIcon');
+  if (!statusDot || !statusText) return; // Guard: elements may not exist on login page
 
   if (syncing) {
     statusDot.className = 'cloud-status-dot syncing';
@@ -20675,6 +20676,7 @@ function setLoginSyncBtnState(syncing) {
 
 // Pre-login sync: pull data from all Google Drive folders before user logs in
 async function loginPageSync() {
+  try {
   isLoginPageSync = true;
   var isAdmin = adminLoginShown;
   setLoginSyncBtnState(true);
@@ -20690,18 +20692,20 @@ async function loginPageSync() {
       isCloudConnected = true;
     } else {
       // Need to authenticate — use Google OAuth popup
+      updateLoginSyncStatus('Opening Google sign-in...', '');
       try {
         var token = await loginPageGoogleAuth();
         if (!token) {
-          updateLoginSyncStatus(isAdmin ? 'Google sign-in was cancelled or failed.' : 'Sign-in cancelled.', 'error');
+          updateLoginSyncStatus('Google sign-in was cancelled or failed. Click Sync Now to try again.', 'error');
           setLoginSyncBtnState(false);
           isLoginPageSync = false;
           return;
         }
         googleAccessToken = token;
         isCloudConnected = true;
+        updateLoginSyncStatus('Connected! Syncing data...', '');
       } catch (err) {
-        updateLoginSyncStatus(isAdmin ? 'Failed to connect: ' + err.message : 'Connection failed. Try again.', 'error');
+        updateLoginSyncStatus('Failed to connect: ' + (err.message || 'Unknown error') + '. Try again.', 'error');
         setLoginSyncBtnState(false);
         isLoginPageSync = false;
         return;
@@ -20800,37 +20804,68 @@ async function loginPageSync() {
     setLoginSyncBtnState(false);
     isLoginPageSync = false;
   }
+  } catch(outerErr) {
+    // Catch-all: ensure the button never gets permanently stuck
+    console.error('[LoginSync] Unhandled error:', outerErr);
+    updateLoginSyncStatus('Error: ' + (outerErr.message || 'Unknown error. Check console.'), 'error');
+    setLoginSyncBtnState(false);
+    isLoginPageSync = false;
+    // Still allow login even if sync fails
+    loginSyncCompleted = true;
+    enableLoginButtons();
+  }
 }
 
 // Google OAuth for the login page (returns access token or null)
 function loginPageGoogleAuth() {
   return new Promise(function(resolve, reject) {
+    var resolved = false;
+    function safeResolve(val) { if (!resolved) { resolved = true; resolve(val); } }
+    function safeReject(err) { if (!resolved) { resolved = true; reject(err); } }
+
+    // Timeout: if nothing happens within 60 seconds, fail gracefully
+    var authTimeout = setTimeout(function() {
+      console.warn('[LoginAuth] Auth timed out after 60s');
+      safeResolve(null);
+    }, 60000);
+
+    function resolveWithCleanup(val) { clearTimeout(authTimeout); safeResolve(val); }
+    function rejectWithCleanup(err) { clearTimeout(authTimeout); safeReject(err); }
+
     // Try Google Identity Services first
     if (typeof google !== 'undefined' && google.accounts && google.accounts.oauth2) {
-      var client = google.accounts.oauth2.initTokenClient({
-        client_id: GOOGLE_DRIVE_CONFIG.CLIENT_ID,
-        scope: GOOGLE_DRIVE_CONFIG.SCOPES,
-        callback: function(tokenResponse) {
-          if (tokenResponse.error) {
-            resolve(null);
-            return;
+      try {
+        var client = google.accounts.oauth2.initTokenClient({
+          client_id: GOOGLE_DRIVE_CONFIG.CLIENT_ID,
+          scope: GOOGLE_DRIVE_CONFIG.SCOPES,
+          callback: function(tokenResponse) {
+            if (tokenResponse.error) {
+              resolveWithCleanup(null);
+              return;
+            }
+            // Save token
+            var expiry = new Date();
+            expiry.setSeconds(expiry.getSeconds() + (tokenResponse.expires_in || 3600));
+            localStorage.setItem('schoolDashboardGoogleAccessToken', tokenResponse.access_token);
+            localStorage.setItem('schoolDashboardGoogleTokenExpiry', expiry.toISOString());
+            resolveWithCleanup(tokenResponse.access_token);
+          },
+          error_callback: function(err) {
+            if (err.type === 'popup_closed') {
+              resolveWithCleanup(null);
+            } else {
+              rejectWithCleanup(new Error(err.message || 'Google auth failed'));
+            }
           }
-          // Save token
-          var expiry = new Date();
-          expiry.setSeconds(expiry.getSeconds() + (tokenResponse.expires_in || 3600));
-          localStorage.setItem('schoolDashboardGoogleAccessToken', tokenResponse.access_token);
-          localStorage.setItem('schoolDashboardGoogleTokenExpiry', expiry.toISOString());
-          resolve(tokenResponse.access_token);
-        },
-        error_callback: function(err) {
-          if (err.type === 'popup_closed') {
-            resolve(null);
-          } else {
-            reject(new Error(err.message || 'Google auth failed'));
-          }
-        }
-      });
-      client.requestAccessToken();
+        });
+        client.requestAccessToken();
+      } catch(e) {
+        console.warn('[LoginAuth] GIS initTokenClient error:', e);
+        // Fall back to manual auth modal
+        clearTimeout(authTimeout);
+        window._loginPageAuthResolve = safeResolve;
+        showGoogleAuthModal();
+      }
     } else {
       // Google Identity Services not loaded yet (async defer) — wait for it
       var waitAttempts = 0;
@@ -20840,33 +20875,40 @@ function loginPageGoogleAuth() {
         if (typeof google !== 'undefined' && google.accounts && google.accounts.oauth2) {
           clearInterval(waitInterval);
           // GIS loaded — proceed with OAuth popup
-          var client = google.accounts.oauth2.initTokenClient({
-            client_id: GOOGLE_DRIVE_CONFIG.CLIENT_ID,
-            scope: GOOGLE_DRIVE_CONFIG.SCOPES,
-            callback: function(tokenResponse) {
-              if (tokenResponse.error) {
-                resolve(null);
-                return;
+          try {
+            var client = google.accounts.oauth2.initTokenClient({
+              client_id: GOOGLE_DRIVE_CONFIG.CLIENT_ID,
+              scope: GOOGLE_DRIVE_CONFIG.SCOPES,
+              callback: function(tokenResponse) {
+                if (tokenResponse.error) {
+                  resolveWithCleanup(null);
+                  return;
+                }
+                var expiry = new Date();
+                expiry.setSeconds(expiry.getSeconds() + (tokenResponse.expires_in || 3600));
+                localStorage.setItem('schoolDashboardGoogleAccessToken', tokenResponse.access_token);
+                localStorage.setItem('schoolDashboardGoogleTokenExpiry', expiry.toISOString());
+                resolveWithCleanup(tokenResponse.access_token);
+              },
+              error_callback: function(err) {
+                if (err.type === 'popup_closed') {
+                  resolveWithCleanup(null);
+                } else {
+                  rejectWithCleanup(new Error(err.message || 'Google auth failed'));
+                }
               }
-              var expiry = new Date();
-              expiry.setSeconds(expiry.getSeconds() + (tokenResponse.expires_in || 3600));
-              localStorage.setItem('schoolDashboardGoogleAccessToken', tokenResponse.access_token);
-              localStorage.setItem('schoolDashboardGoogleTokenExpiry', expiry.toISOString());
-              resolve(tokenResponse.access_token);
-            },
-            error_callback: function(err) {
-              if (err.type === 'popup_closed') {
-                resolve(null);
-              } else {
-                reject(new Error(err.message || 'Google auth failed'));
-              }
-            }
-          });
-          client.requestAccessToken();
+            });
+            client.requestAccessToken();
+          } catch(e) {
+            console.warn('[LoginAuth] GIS initTokenClient error (delayed):', e);
+            clearTimeout(authTimeout);
+            window._loginPageAuthResolve = safeResolve;
+            showGoogleAuthModal();
+          }
         } else if (waitAttempts >= maxWaitAttempts) {
           clearInterval(waitInterval);
           // GIS failed to load — show manual auth modal and wait for completion
-          window._loginPageAuthResolve = resolve;
+          window._loginPageAuthResolve = safeResolve;
           showGoogleAuthModal();
         }
       }, 250);
