@@ -18099,20 +18099,20 @@ const GOOGLE_DRIVE_CONFIG = {
   SCOPES: 'https://www.googleapis.com/auth/drive'
 };
 
-// Cloud sync state
-let googleAccessToken = null;
-let isCloudConnected = false;
-let lastSyncTime = null;
-let cloudFileId = null;
-let lastSavedBy = null;
-let cloudFileTimestamp = null;
-let isLoginPageSync = false;
-let loginSyncCompleted = false;
+// Cloud sync state — use var to avoid TDZ errors when hoisted functions access these
+var googleAccessToken = null;
+var isCloudConnected = false;
+var lastSyncTime = null;
+var cloudFileId = null;
+var lastSavedBy = null;
+var cloudFileTimestamp = null;
+var isLoginPageSync = false;
+var loginSyncCompleted = false;
 
 // Auto-sync & auto-save state
-let _autoSaveIntervalId = null;
-let _isAutoSaving = false;
-let _autoSaveFileIds = {}; // { folderId: fileId } for tracking backup files per folder
+var _autoSaveIntervalId = null;
+var _isAutoSaving = false;
+var _autoSaveFileIds = {}; // { folderId: fileId } for tracking backup files per folder
 const AUTO_SAVE_INTERVAL_MS = 5000; // 5 seconds
 var _debouncedCloudSaveTimer = null;
 
