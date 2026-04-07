@@ -4360,7 +4360,7 @@ body.vc-fullscreen-mode.vc-host-only-mode .video-grid .video-tile:not(.vc-hoston
 </div>
 
 <script>
-let skillAreas = [
+var skillAreas = [
   {id:1,name:"Welding & Fabrication",icon:"\uD83D\uDD25",color:"#e74c3c",students:0,materials:0,desc:"SMAW, MIG, TIG welding processes and metal fabrication"},
   {id:2,name:"Electrical Installation",icon:"\u26A1",color:"#f1c40f",students:0,materials:0,desc:"Residential and commercial wiring, conduit bending, circuits"},
   {id:3,name:"Cosmetology",icon:"\uD83D\uDC87",color:"#e91e63",students:0,materials:0,desc:"Hair care, styling, chemical treatments, salon management"},
@@ -4442,9 +4442,9 @@ function findSkillAreaForCourse(courseName) {
 }
 var courses = getCourseList();
 
-let students = [];
-let certDownloadApprovals = []; // {studentId, name, course, certNo, certDate, approved, approvedDate, approvedBy, downloadCount, lastDownloaded}
-let certTemplates = {}; // keyed by course name: {courseFullName, programmeCode, version, developedDate, gender, modules:[], competencies:[], programmeSpecs:{}, signatureLeft, signatureRight, contactEmail, contactPhone}
+var students = [];
+var certDownloadApprovals = []; // {studentId, name, course, certNo, certDate, approved, approvedDate, approvedBy, downloadCount, lastDownloaded}
+var certTemplates = {}; // keyed by course name: {courseFullName, programmeCode, version, developedDate, gender, modules:[], competencies:[], programmeSpecs:{}, signatureLeft, signatureRight, contactEmail, contactPhone}
 
 // Map short student course names to full cert template course names
 var certTemplateCourseMap = {
@@ -4487,11 +4487,11 @@ function getCertTemplateKey(studentCourse) {
   return mapped || studentCourse;
 }
 
-let exams = [];
+var exams = [];
 
-let announcements = [];
+var announcements = [];
 
-let notifications = [];
+var notifications = [];
 
 function playNotificationSound() {
   try {
@@ -4601,17 +4601,17 @@ function loadNotifications() {
   } catch(e) {}
 }
 
-let examResults = [];
+var examResults = [];
 
-let calendarEvents = [];
+var calendarEvents = [];
 
-let attendanceRecords = [];
+var attendanceRecords = [];
 
-let instructorData = [];
+var instructorData = [];
 
-let currentRole = null;
-let currentStudent = null;
-let currentInstructor = null;
+var currentRole = null;
+var currentStudent = null;
+var currentInstructor = null;
 
 // ============================== MAJOR IMPROVEMENTS: SECURITY, PERFORMANCE, ERROR HANDLING, UX ==============================
 
@@ -4974,62 +4974,62 @@ setTimeout(function() { migratePasswordsToHash(); }, 100);
 const SESSION_EXPIRY_MS = 8 * 60 * 60 * 1000; // 8 hours default session duration
 const SESSION_CHECK_INTERVAL_MS = 60 * 1000;   // Check every 60 seconds
 var _sessionCheckIntervalId = null;
-let videoTimerInterval = null;
-let videoSeconds = 0;
+var videoTimerInterval = null;
+var videoSeconds = 0;
 // WebRTC Video Conferencing State
-let rtcPeer = null;
-let localStream = null;
+var rtcPeer = null;
+var localStream = null;
 // Video Recording State
-let vcMediaRecorder = null;
-let vcRecordedChunks = [];
-let vcIsRecording = false;
-let vcRecordingStartTime = null;
-let vcRecordingAudioCtx = null;
-let screenStream = null;
-let isRoomHost = false;
-let currentRoomCode = '';
-let peerConnections = {};
-let peerNames = {};
-let dataConnections = {};
-let vcCurrentRole = '';
-let vcCurrentUserName = '';
-let activeHostRoom = null; // {code, title, role} - persists when host leaves so they can rejoin
-let vcHostReconnectInterval = null; // interval for participants to reconnect to host
-let peerRoles = {}; // track roles: {peerId: 'student'|'instructor'|'admin'}
-let mutedPeers = {}; // track muted peers: {peerId: true}
-let vcCoHosts = {}; // track co-hosts: {peerId: true}
-let vcScreenSharingPeerId = null; // peerId currently sharing screen, or null
-let vcHostPermissions = { screenShare: false, recording: false }; // host-granted permissions for participants
-let calendarMonth = new Date().getMonth();
-let calendarYear = new Date().getFullYear();
-let selectedCalendarDay = null;
-let announcementFormVisible = false;
-let currentAttendanceDate = new Date().toISOString().split('T')[0];
+var vcMediaRecorder = null;
+var vcRecordedChunks = [];
+var vcIsRecording = false;
+var vcRecordingStartTime = null;
+var vcRecordingAudioCtx = null;
+var screenStream = null;
+var isRoomHost = false;
+var currentRoomCode = '';
+var peerConnections = {};
+var peerNames = {};
+var dataConnections = {};
+var vcCurrentRole = '';
+var vcCurrentUserName = '';
+var activeHostRoom = null; // {code, title, role} - persists when host leaves so they can rejoin
+var vcHostReconnectInterval = null; // interval for participants to reconnect to host
+var peerRoles = {}; // track roles: {peerId: 'student'|'instructor'|'admin'}
+var mutedPeers = {}; // track muted peers: {peerId: true}
+var vcCoHosts = {}; // track co-hosts: {peerId: true}
+var vcScreenSharingPeerId = null; // peerId currently sharing screen, or null
+var vcHostPermissions = { screenShare: false, recording: false }; // host-granted permissions for participants
+var calendarMonth = new Date().getMonth();
+var calendarYear = new Date().getFullYear();
+var selectedCalendarDay = null;
+var announcementFormVisible = false;
+var currentAttendanceDate = new Date().toISOString().split('T')[0];
 
 // ============================== PERSISTENT DATA ARRAYS ==============================
-let classSessions = [];
-let adminMeetings = []; // Admin-only meetings (admin + admin staff)
-let instructorAssignments = [];
-let assignmentSubmissions = []; // Student submissions for assignments
-let instructorResources = [];
-let driveResources = []; // Admin-managed resources uploaded to Google Drive
-let documentHubFiles = []; // Document Hub files for staff download
-let studentProfiles = {};
-let instructorProfiles = {};
-let systemSettings = { institutionName: 'C.E.S.T.I.S LMS - Community Training Intervention', adminEmail: 'admin@heartlms.edu.jm', academicYear: '2025/2026', vcProvider: 'Built-in (WebRTC)' };
+var classSessions = [];
+var adminMeetings = []; // Admin-only meetings (admin + admin staff)
+var instructorAssignments = [];
+var assignmentSubmissions = []; // Student submissions for assignments
+var instructorResources = [];
+var driveResources = []; // Admin-managed resources uploaded to Google Drive
+var documentHubFiles = []; // Document Hub files for staff download
+var studentProfiles = {};
+var instructorProfiles = {};
+var systemSettings = { institutionName: 'C.E.S.T.I.S LMS - Community Training Intervention', adminEmail: 'admin@heartlms.edu.jm', academicYear: '2025/2026', vcProvider: 'Built-in (WebRTC)' };
 
 // ============================== LMS CHAT DATA MODEL ==============================
-let lmsChatRooms = [];
-let lmsChatMessages = {};
-let lmsChatProfiles = {};
-let lmsChatFollows = {};   // { userId: [followedUserId, ...] }
-let lmsChatDMNotifThrottle = {}; // prevent duplicate rapid DM notifs
-let lmsChatActiveRoom = null;
-let lmsChatCallState = null;
-let lmsChatCallTimer = null;
-let lmsChatCallSeconds = 0;
-let lmsChatLocalStream = null;
-let lmsChatPeer = null;
+var lmsChatRooms = [];
+var lmsChatMessages = {};
+var lmsChatProfiles = {};
+var lmsChatFollows = {};   // { userId: [followedUserId, ...] }
+var lmsChatDMNotifThrottle = {}; // prevent duplicate rapid DM notifs
+var lmsChatActiveRoom = null;
+var lmsChatCallState = null;
+var lmsChatCallTimer = null;
+var lmsChatCallSeconds = 0;
+var lmsChatLocalStream = null;
+var lmsChatPeer = null;
 
 // Google Drive folder for chat file uploads
 const LMS_CHAT_DRIVE_FOLDER = '1ashmmL0ZS7mW6XrwoxMuamf7yjtVWHyO';
@@ -5896,12 +5896,12 @@ applyGoogleVerificationMeta();
 })();
 
 // ============================== USER ACCOUNTS MANAGEMENT ==============================
-let userAccounts = [
+var userAccounts = [
   {id:'USR-001',name:'Administrator',role:'admin',username:'cestisadmin',password:'cestisadmin123$',email:'admin@heartlms.edu.jm',programme:'',status:'active',createdAt:'2026-01-01'},
   {id:'USR-011',name:'Admin Staff',role:'adminstaff',username:'adminstaff',password:'cestisadmin123$',email:'adminstaff@heartlms.edu.jm',programme:'',status:'active',createdAt:'2026-01-15'},
   {id:'USR-021',name:'Board Chair',role:'cmc',username:'cmcadmin',password:'cestisadmin123$',email:'cmc@heartlms.edu.jm',programme:'',status:'active',createdAt:'2026-01-01'}
 ];
-let umSelectedIds = [];
+var umSelectedIds = [];
 
 function saveUserAccounts() {
   try { localStorage.setItem('voctrain_users', JSON.stringify(userAccounts)); } catch(e) {}
@@ -6480,7 +6480,7 @@ function switchSettingsTab(tab, which) {
   if(which === 'googleverification') loadGoogleVerificationUI();
 }
 
-let adminLoginShown = false, studentLoginShown = false, instructorLoginShown = false, adminStaffLoginShown = false, cmcLoginShown = false;
+var adminLoginShown = false, studentLoginShown = false, instructorLoginShown = false, adminStaffLoginShown = false, cmcLoginShown = false;
 function requireLoginSync() {
   if(loginSyncCompleted) return false;
   // Allow login if user accounts exist locally (beyond the 3 system defaults)
@@ -9739,7 +9739,7 @@ function saveInstructorAttendance() {
   renderInstructorAttendance();
 }
 
-let iAnnouncementFormVisible = false;
+var iAnnouncementFormVisible = false;
 function toggleInstructorAnnouncementForm() {
   iAnnouncementFormVisible = !iAnnouncementFormVisible;
   const form = document.getElementById('iAnnouncementForm');
@@ -11074,7 +11074,7 @@ function vcCopyCode() {
 // ── Video Recording ──
 const VC_RECORDINGS_FOLDER_ID = '1Yp9aLXGGjhojF1J04QxoNG-9yEgaiS-A';
 const ASSIGNMENTS_DRIVE_FOLDER_ID = '1SEjU_-8XOPM-C2q-Vo-EZUgBz3PMg5Ma';
-let vcRecTimerInterval = null;
+var vcRecTimerInterval = null;
 
 function vcGetSupportedMimeType() {
   const types = ['video/webm;codecs=vp9,opus','video/webm;codecs=vp8,opus','video/webm;codecs=h264,opus','video/webm','video/mp4'];
@@ -12700,7 +12700,7 @@ function renderStudentAssignmentsPage() {
 
 // ============================== ASSIGNMENT DRIVE SYNC ==============================
 const ASSIGNMENTS_BACKUP_FILE_NAME = 'CESTIS_ASSIGNMENTS.json';
-let _assignmentsDriveFileId = null;
+var _assignmentsDriveFileId = null;
 
 // Save all assignments + submissions to the dedicated Assignments Drive folder
 async function saveAssignmentsToDrive() {
@@ -13172,7 +13172,7 @@ function deleteResource(id) {
 
 // ============================== ADMIN RESOURCE MANAGER (GOOGLE DRIVE) ==============================
 const DRIVE_RESOURCES_FOLDER_ID = '122aVdNWxJG9ShRWf9Xso0MdXGdQeDuyt';
-let _driveSelectedFile = null;
+var _driveSelectedFile = null;
 
 function generateResourceId() {
   const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
@@ -13854,7 +13854,7 @@ function getResourceById(resourceId) {
   return driveResources.find(r => r.resourceId === resourceId);
 }
 
-let _sResFilter = 'all';
+var _sResFilter = 'all';
 function filterStudentResources(type, tabEl) {
   _sResFilter = type;
   // Update tab active states
@@ -17862,7 +17862,7 @@ const ALL_DRIVE_FOLDERS = [
 
 // Per-user backup folder — each user saves their own data here
 const PER_USER_DRIVE_FOLDER_ID = '1w23WEyGuRduVM9irEkgOjXaIStBy5i0J';
-let _perUserFileId = null; // cached file ID for current user's backup
+var _perUserFileId = null; // cached file ID for current user's backup
 
 // School Fee Management System — Google Drive folder containing fee system backup
 const FEE_SYSTEM_DRIVE_CONFIG = {
@@ -18015,7 +18015,7 @@ async function syncStudentsFromFeeSystem() {
 }
 
 // Google Token Client for OAuth
-let googleTokenClient = null;
+var googleTokenClient = null;
 
 // Helper: get current logged-in user info
 function getCurrentCloudUser() {
@@ -25981,15 +25981,15 @@ const CMC_DRIVE_CONFIG = {
   ]
 };
 
-let cmcData = {
+var cmcData = {
   payslip: null,
   clockin: null,
   cashbook: null,
   virement: null,
   lastRefresh: null
 };
-let cmcChartInstances = {};
-let cmcHtmlContent = { payslip: null, clockin: null, cashbook: null, virement: null };
+var cmcChartInstances = {};
+var cmcHtmlContent = { payslip: null, clockin: null, cashbook: null, virement: null };
 
 // Persist CMC data to localStorage so it survives page refreshes
 function cmcSaveToCache() {
