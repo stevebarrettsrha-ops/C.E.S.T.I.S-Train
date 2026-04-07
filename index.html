@@ -11068,6 +11068,7 @@ function vcCopyCode() {
 
 // ── Video Recording ──
 const VC_RECORDINGS_FOLDER_ID = '1Yp9aLXGGjhojF1J04QxoNG-9yEgaiS-A';
+const ASSIGNMENTS_DRIVE_FOLDER_ID = '1SEjU_-8XOPM-C2q-Vo-EZUgBz3PMg5Ma';
 let vcRecTimerInterval = null;
 
 function vcGetSupportedMimeType() {
@@ -12075,6 +12076,23 @@ function createAssignment() {
 
     instructorAssignments.push(assignment);
     saveState();
+
+    // Upload attachment files to Google Drive Assignments folder
+    if (_assignPendingFiles.length > 0 && isCloudConnected && googleAccessToken) {
+      _assignPendingFiles.forEach(function(f) {
+        uploadAssignmentFileToDrive(f, assignCourse, title).then(function(result) {
+          if (result) {
+            // Store Drive link in assignment for cross-device access
+            if (!assignment.driveAttachments) assignment.driveAttachments = [];
+            assignment.driveAttachments.push({ name: f.name, driveId: result.id, url: result.webViewLink });
+            saveState();
+          }
+        });
+      });
+    }
+    // Save assignment data to dedicated Drive folder
+    if (typeof saveAssignmentsToDrive === 'function') saveAssignmentsToDrive();
+
     closeModal('createAssignmentModal');
     showToast('Assignment "' + title + '" created successfully');
     addNotification('New assignment: "' + title + '" for ' + assignment.course + ' — Due: ' + dueDate, 'exam', null, ['admin','instructor','student']);
@@ -12147,6 +12165,14 @@ function renderInstructorGradebook() {
           '📄 ' + att.name + ' <span style="color:var(--text-muted);">(' + size + ')</span>' +
           '<a href="' + att.dataUrl + '" download="' + att.name + '" class="btn btn-sm" style="padding:1px 6px;font-size:10px;background:var(--accent-dim);color:var(--accent);border:none;">Download</a></div>';
       });
+      // Show Drive links for attachments
+      if (a.driveFiles && a.driveFiles.length > 0) {
+        a.driveFiles.forEach(function(df) {
+          html += '<div style="display:inline-flex;align-items:center;gap:6px;background:var(--accent-dim);padding:4px 10px;border-radius:var(--radius-sm);margin:2px 4px 2px 0;font-size:12px;">' +
+            '☁️ ' + df.name +
+            '<a href="' + df.webViewLink + '" target="_blank" rel="noopener" class="btn btn-sm" style="padding:1px 6px;font-size:10px;background:var(--accent);color:white;border:none;">View on Drive</a></div>';
+        });
+      }
       html += '</div>';
     }
 
@@ -12168,6 +12194,12 @@ function renderInstructorGradebook() {
         if (sub.files && sub.files.length > 0) {
           sub.files.forEach(function(f) {
             html += '<a href="' + f.dataUrl + '" download="' + f.name + '" class="btn btn-sm btn-secondary" style="padding:2px 8px;font-size:11px;">📄 ' + f.name + '</a>';
+          });
+        }
+        // Show Drive-linked files for instructor access
+        if (sub.driveFiles && sub.driveFiles.length > 0) {
+          sub.driveFiles.forEach(function(df) {
+            html += '<a href="' + df.webViewLink + '" target="_blank" rel="noopener" class="btn btn-sm btn-primary" style="padding:2px 8px;font-size:11px;" title="View on Google Drive">☁️ ' + df.name + '</a>';
           });
         }
         if (sub.comment) {
@@ -12196,6 +12228,8 @@ function gradeSubmission(assignmentId, studentId) {
   if (!a.grades) a.grades = {};
   a.grades[studentId] = score;
   saveState();
+  if(typeof scheduleDebouncedCloudSave === 'function') scheduleDebouncedCloudSave();
+  saveAssignmentsToDrive();
   var st = students.find(function(s) { return s.id === studentId; });
   showToast('Graded ' + (st ? st.name : studentId) + ': ' + score + '/' + a.maxPoints);
   addNotification((st ? st.name : 'Student') + ' graded ' + score + '/' + a.maxPoints + ' on "' + a.title + '"', 'grade', null, ['admin','instructor','student']);
@@ -12484,7 +12518,7 @@ function submitStudentAssignment() {
 
   var filePromises = _submitPendingFiles.map(function(f) { return fileToDataUrl(f); });
 
-  Promise.all(filePromises).then(function(files) {
+  Promise.all(filePromises).then(async function(files) {
     // Remove existing submission if re-uploading
     var existingIdx = assignmentSubmissions.findIndex(function(sub) { return sub.assignmentId === assignmentId && sub.studentId === s.id; });
     if (existingIdx !== -1) {
@@ -12498,14 +12532,31 @@ function submitStudentAssignment() {
       studentName: s.name,
       course: s.course,
       files: files,
+      driveFiles: [],
       comment: comment,
       submittedAt: new Date().toISOString()
     };
+
+    // Upload each file to Drive in parallel
+    if (isCloudConnected && googleAccessToken && _submitPendingFiles.length > 0) {
+      try {
+        var driveUploads = _submitPendingFiles.map(function(f) {
+          return uploadSubmissionFileToDrive(f, s.course, s.name, a.title);
+        });
+        var driveResults = await Promise.all(driveUploads);
+        submission.driveFiles = driveResults.filter(function(r) { return r !== null; });
+        console.log('[AssignmentSync] Uploaded ' + submission.driveFiles.length + ' submission files to Drive');
+      } catch(e) {
+        console.warn('[AssignmentSync] Error uploading submission files to Drive:', e);
+      }
+    }
 
     assignmentSubmissions.push(submission);
     saveState();
     // Trigger cloud save so instructors see submission immediately
     if(typeof scheduleDebouncedCloudSave === 'function') scheduleDebouncedCloudSave();
+    // Also save to dedicated assignments Drive folder
+    saveAssignmentsToDrive();
     closeModal('submitAssignmentModal');
     _submitPendingFiles = [];
     showToast('Assignment submitted successfully!');
@@ -12615,6 +12666,14 @@ function renderStudentAssignmentsPage() {
           '📄 ' + f.name +
           '<a href="' + f.dataUrl + '" download="' + f.name + '" style="color:var(--green);font-size:11px;text-decoration:none;">Download</a></div>';
       });
+      // Show Drive-linked files
+      if (mySub.driveFiles && mySub.driveFiles.length > 0) {
+        mySub.driveFiles.forEach(function(df) {
+          html += '<div style="display:inline-flex;align-items:center;gap:6px;background:var(--accent-dim);padding:4px 10px;border-radius:var(--radius-sm);margin:2px 4px 2px 0;font-size:12px;">' +
+            '☁️ ' + df.name +
+            '<a href="' + df.webViewLink + '" target="_blank" rel="noopener" style="color:var(--accent);font-size:11px;text-decoration:none;">View on Drive</a></div>';
+        });
+      }
       if (mySub.comment) {
         html += '<div style="font-size:11px;color:var(--text-muted);margin-top:4px;">💬 ' + mySub.comment + '</div>';
       }
@@ -12632,6 +12691,272 @@ function renderStudentAssignmentsPage() {
   });
 
   container.innerHTML = html;
+}
+
+// ============================== ASSIGNMENT DRIVE SYNC ==============================
+const ASSIGNMENTS_BACKUP_FILE_NAME = 'CESTIS_ASSIGNMENTS.json';
+let _assignmentsDriveFileId = null;
+
+// Save all assignments + submissions to the dedicated Assignments Drive folder
+async function saveAssignmentsToDrive() {
+  if (!isCloudConnected || !googleAccessToken) return;
+  try {
+    var data = {
+      version: '1.0',
+      timestamp: new Date().toISOString(),
+      savedBy: (getCurrentCloudUser() || {}).username || currentRole || 'unknown',
+      assignments: instructorAssignments,
+      submissions: assignmentSubmissions
+    };
+    var jsonContent = JSON.stringify(data);
+    var blob = new Blob([jsonContent], { type: 'application/json' });
+
+    if (!_assignmentsDriveFileId) {
+      // Search for existing file
+      var query = encodeURIComponent("name='" + ASSIGNMENTS_BACKUP_FILE_NAME + "' and '" + ASSIGNMENTS_DRIVE_FOLDER_ID + "' in parents and trashed=false");
+      var searchResp = await fetch('https://www.googleapis.com/drive/v3/files?q=' + query + '&fields=files(id,name)', {
+        headers: { 'Authorization': 'Bearer ' + googleAccessToken }
+      });
+      if (searchResp.ok) {
+        var searchData = await searchResp.json();
+        if (searchData.files && searchData.files.length > 0) {
+          _assignmentsDriveFileId = searchData.files[0].id;
+        }
+      }
+    }
+
+    var response;
+    if (_assignmentsDriveFileId) {
+      response = await fetch('https://www.googleapis.com/upload/drive/v3/files/' + _assignmentsDriveFileId + '?uploadType=media', {
+        method: 'PATCH',
+        headers: { 'Authorization': 'Bearer ' + googleAccessToken, 'Content-Type': 'application/json' },
+        body: blob
+      });
+    } else {
+      var metadata = { name: ASSIGNMENTS_BACKUP_FILE_NAME, parents: [ASSIGNMENTS_DRIVE_FOLDER_ID], mimeType: 'application/json' };
+      var formData = new FormData();
+      formData.append('metadata', new Blob([JSON.stringify(metadata)], { type: 'application/json' }));
+      formData.append('file', blob);
+      response = await fetch('https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart&fields=id,name', {
+        method: 'POST',
+        headers: { 'Authorization': 'Bearer ' + googleAccessToken },
+        body: formData
+      });
+      if (response.ok) {
+        var result = await response.json();
+        _assignmentsDriveFileId = result.id;
+      }
+    }
+    if (response.ok) {
+      console.log('[AssignmentSync] Saved assignments to Drive (' + instructorAssignments.length + ' assignments, ' + assignmentSubmissions.length + ' submissions)');
+    }
+  } catch(e) {
+    console.warn('[AssignmentSync] Error saving assignments to Drive:', e);
+  }
+}
+
+// Upload a student submission file to Drive under a course subfolder
+async function uploadSubmissionFileToDrive(file, courseName, studentName, assignmentTitle) {
+  if (!isCloudConnected || !googleAccessToken) return null;
+  try {
+    // Get or create course folder inside Assignments folder
+    var folderName = (courseName || 'General') + ' - Submissions';
+    var query = encodeURIComponent("name='" + folderName.replace(/'/g, "\\'") + "' and '" + ASSIGNMENTS_DRIVE_FOLDER_ID + "' in parents and mimeType='application/vnd.google-apps.folder' and trashed=false");
+    var searchResp = await fetch('https://www.googleapis.com/drive/v3/files?q=' + query + '&fields=files(id,name)', {
+      headers: { 'Authorization': 'Bearer ' + googleAccessToken }
+    });
+    var folderId = null;
+    if (searchResp.ok) {
+      var searchData = await searchResp.json();
+      if (searchData.files && searchData.files.length > 0) {
+        folderId = searchData.files[0].id;
+      }
+    }
+    if (!folderId) {
+      var createResp = await fetch('https://www.googleapis.com/drive/v3/files', {
+        method: 'POST',
+        headers: { 'Authorization': 'Bearer ' + googleAccessToken, 'Content-Type': 'application/json' },
+        body: JSON.stringify({ name: folderName, mimeType: 'application/vnd.google-apps.folder', parents: [ASSIGNMENTS_DRIVE_FOLDER_ID] })
+      });
+      if (createResp.ok) {
+        var folder = await createResp.json();
+        folderId = folder.id;
+        // Make folder accessible
+        try {
+          await fetch('https://www.googleapis.com/drive/v3/files/' + folderId + '/permissions', {
+            method: 'POST',
+            headers: { 'Authorization': 'Bearer ' + googleAccessToken, 'Content-Type': 'application/json' },
+            body: JSON.stringify({ role: 'reader', type: 'anyone' })
+          });
+        } catch(e) {}
+      }
+    }
+    if (!folderId) return null;
+
+    // Upload the file
+    var safeName = (studentName || 'Student').replace(/[^a-zA-Z0-9\s._-]/g, '') + '_' + (assignmentTitle || 'Assignment').replace(/[^a-zA-Z0-9\s._-]/g, '') + '_' + file.name;
+    var metadata = { name: safeName, parents: [folderId] };
+    var form = new FormData();
+    form.append('metadata', new Blob([JSON.stringify(metadata)], { type: 'application/json' }));
+    form.append('file', file);
+
+    var resp = await fetch('https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart&fields=id,name,webViewLink,webContentLink', {
+      method: 'POST',
+      headers: { 'Authorization': 'Bearer ' + googleAccessToken },
+      body: form
+    });
+    if (!resp.ok) return null;
+    var result = await resp.json();
+
+    // Make file accessible
+    try {
+      await fetch('https://www.googleapis.com/drive/v3/files/' + result.id + '/permissions', {
+        method: 'POST',
+        headers: { 'Authorization': 'Bearer ' + googleAccessToken, 'Content-Type': 'application/json' },
+        body: JSON.stringify({ role: 'reader', type: 'anyone' })
+      });
+    } catch(e) {}
+
+    console.log('[AssignmentSync] Uploaded submission file to Drive: ' + safeName);
+    return { id: result.id, name: result.name, webViewLink: result.webViewLink || ('https://drive.google.com/file/d/' + result.id + '/view') };
+  } catch(e) {
+    console.warn('[AssignmentSync] Error uploading submission file:', e);
+    return null;
+  }
+}
+
+// Upload assignment attachments (by instructor) to Drive
+async function uploadAssignmentFileToDrive(file, courseName, assignmentTitle) {
+  if (!isCloudConnected || !googleAccessToken) return null;
+  try {
+    // Get or create course folder inside Assignments folder
+    var folderName = (courseName || 'General') + ' - Assignments';
+    var query = encodeURIComponent("name='" + folderName.replace(/'/g, "\\'") + "' and '" + ASSIGNMENTS_DRIVE_FOLDER_ID + "' in parents and mimeType='application/vnd.google-apps.folder' and trashed=false");
+    var searchResp = await fetch('https://www.googleapis.com/drive/v3/files?q=' + query + '&fields=files(id,name)', {
+      headers: { 'Authorization': 'Bearer ' + googleAccessToken }
+    });
+    var folderId = null;
+    if (searchResp.ok) {
+      var searchData = await searchResp.json();
+      if (searchData.files && searchData.files.length > 0) {
+        folderId = searchData.files[0].id;
+      }
+    }
+    if (!folderId) {
+      var createResp = await fetch('https://www.googleapis.com/drive/v3/files', {
+        method: 'POST',
+        headers: { 'Authorization': 'Bearer ' + googleAccessToken, 'Content-Type': 'application/json' },
+        body: JSON.stringify({ name: folderName, mimeType: 'application/vnd.google-apps.folder', parents: [ASSIGNMENTS_DRIVE_FOLDER_ID] })
+      });
+      if (createResp.ok) {
+        var folder = await createResp.json();
+        folderId = folder.id;
+        try {
+          await fetch('https://www.googleapis.com/drive/v3/files/' + folderId + '/permissions', {
+            method: 'POST',
+            headers: { 'Authorization': 'Bearer ' + googleAccessToken, 'Content-Type': 'application/json' },
+            body: JSON.stringify({ role: 'reader', type: 'anyone' })
+          });
+        } catch(e) {}
+      }
+    }
+    if (!folderId) return null;
+
+    var safeName = (assignmentTitle || 'Assignment').replace(/[^a-zA-Z0-9\s._-]/g, '') + '_' + file.name;
+    var metadata = { name: safeName, parents: [folderId] };
+    var form = new FormData();
+    form.append('metadata', new Blob([JSON.stringify(metadata)], { type: 'application/json' }));
+    form.append('file', file);
+
+    var resp = await fetch('https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart&fields=id,name,webViewLink,webContentLink', {
+      method: 'POST',
+      headers: { 'Authorization': 'Bearer ' + googleAccessToken },
+      body: form
+    });
+    if (!resp.ok) return null;
+    var result = await resp.json();
+    try {
+      await fetch('https://www.googleapis.com/drive/v3/files/' + result.id + '/permissions', {
+        method: 'POST',
+        headers: { 'Authorization': 'Bearer ' + googleAccessToken, 'Content-Type': 'application/json' },
+        body: JSON.stringify({ role: 'reader', type: 'anyone' })
+      });
+    } catch(e) {}
+
+    console.log('[AssignmentSync] Uploaded assignment file to Drive: ' + safeName);
+    return { id: result.id, name: result.name, webViewLink: result.webViewLink || ('https://drive.google.com/file/d/' + result.id + '/view') };
+  } catch(e) {
+    console.warn('[AssignmentSync] Error uploading assignment file:', e);
+    return null;
+  }
+}
+
+// Sync assignments from Drive — merge cloud assignments with local
+async function syncAssignmentsFromDrive() {
+  if (!isCloudConnected || !googleAccessToken) return false;
+  try {
+    var query = encodeURIComponent("name='" + ASSIGNMENTS_BACKUP_FILE_NAME + "' and '" + ASSIGNMENTS_DRIVE_FOLDER_ID + "' in parents and trashed=false");
+    var searchResp = await fetch('https://www.googleapis.com/drive/v3/files?q=' + query + '&fields=files(id,name)&pageSize=1', {
+      headers: { 'Authorization': 'Bearer ' + googleAccessToken }
+    });
+    if (!searchResp.ok) return false;
+    var searchData = await searchResp.json();
+    if (!searchData.files || searchData.files.length === 0) return false;
+
+    var fileId = searchData.files[0].id;
+    _assignmentsDriveFileId = fileId;
+
+    var fileResp = await fetch('https://www.googleapis.com/drive/v3/files/' + fileId + '?alt=media', {
+      headers: { 'Authorization': 'Bearer ' + googleAccessToken }
+    });
+    if (!fileResp.ok) return false;
+    var cloudData = await fileResp.json();
+
+    var changed = false;
+
+    // Merge assignments
+    if (Array.isArray(cloudData.assignments)) {
+      cloudData.assignments.forEach(function(ca) {
+        if (!ca || !ca.id) return;
+        var existing = instructorAssignments.find(function(la) { return la.id === ca.id; });
+        if (!existing) {
+          instructorAssignments.push(ca);
+          changed = true;
+        } else {
+          // Update grades from cloud if newer
+          if (ca.grades && typeof ca.grades === 'object') {
+            if (!existing.grades) existing.grades = {};
+            Object.keys(ca.grades).forEach(function(sid) {
+              if (existing.grades[sid] === undefined) {
+                existing.grades[sid] = ca.grades[sid];
+                changed = true;
+              }
+            });
+          }
+        }
+      });
+    }
+
+    // Merge submissions
+    if (Array.isArray(cloudData.submissions)) {
+      cloudData.submissions.forEach(function(cs) {
+        if (!cs || !cs.id) return;
+        if (!assignmentSubmissions.some(function(ls) { return ls.id === cs.id; })) {
+          assignmentSubmissions.push(cs);
+          changed = true;
+        }
+      });
+    }
+
+    if (changed) {
+      saveState();
+      console.log('[AssignmentSync] Merged assignments from Drive (' + instructorAssignments.length + ' assignments, ' + assignmentSubmissions.length + ' submissions)');
+    }
+    return changed;
+  } catch(e) {
+    console.warn('[AssignmentSync] Error syncing assignments from Drive:', e);
+    return false;
+  }
 }
 
 // ============================== RESOURCE FUNCTIONS ==============================
@@ -17524,7 +17849,8 @@ const ALL_DRIVE_FOLDERS = [
   { id: GOOGLE_DRIVE_CONFIG.FOLDER_ID, label: 'Main Backup' },
   { id: '18ACBw0kRi0BssLEoZLWoeXNa1EiANeBu', label: 'Online Exams' },
   { id: LMS_CHAT_DRIVE_FOLDER, label: 'LMS Chat' },
-  { id: VC_RECORDINGS_FOLDER_ID, label: 'Class Recording' }
+  { id: VC_RECORDINGS_FOLDER_ID, label: 'Class Recording' },
+  { id: ASSIGNMENTS_DRIVE_FOLDER_ID, label: 'Assignments' }
 ];
 
 // Per-user backup folder — each user saves their own data here
@@ -19893,6 +20219,13 @@ async function autoSaveToAllFolders() {
       await savePerUserBackup();
     } catch (e) {
       console.warn('[AutoSave] Per-user backup error:', e);
+    }
+
+    // Save assignments to dedicated Assignments Drive folder
+    try {
+      await saveAssignmentsToDrive();
+    } catch (e) {
+      console.warn('[AutoSave] Assignments Drive sync error:', e);
     }
 
     const successCount = results.filter(r => r.status === 'fulfilled' && r.value === true).length;
@@ -28987,6 +29320,18 @@ function bulkApproveCertDownloads() {
     origShowPage(pageId);
     if(pageId === 'cert-downloads') {
       renderCertDownloadMgmt();
+    }
+    // Sync assignments from Drive when viewing assignment-related pages
+    if(pageId === 's-assignments' || pageId === 'i-gradebook' || pageId === 'i-assignments') {
+      syncAssignmentsFromDrive().then(function(changed) {
+        if (changed) {
+          if (pageId === 's-assignments') {
+            renderStudentAssignmentsPage();
+          } else {
+            renderInstructorGradebook();
+          }
+        }
+      }).catch(function(e) { console.warn('[AssignmentSync] Page sync error:', e); });
     }
   };
 })();
