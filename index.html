@@ -7391,6 +7391,8 @@ function buildInstructorSidebar() {
     <div class="nav-section-label">Resources</div>
     <div class="nav-item" data-page="i-document-hub" onclick="showPage('i-document-hub')">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><path d="M12 18v-6"/><path d="M9 15l3 3 3-3"/></svg>Document Hub</div>
+    <div class="nav-item" data-page="i-pdf-workshop" onclick="showPage('i-pdf-workshop')">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><path d="M12 18v-6"/><path d="M9 15l3-3 3 3"/></svg>PDF Workshop</div>
     <div class="nav-section-label">Tools</div>
     <div class="nav-item" data-page="i-timetracking" onclick="showPage('i-timetracking')">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>Time Tracking</div>
@@ -7466,7 +7468,7 @@ function showPage(pageId) {
     'timetracking':'Staff Time Tracking','i-timetracking':'Staff Time Tracking','as-timetracking':'Staff Time Tracking',
     'fee-management':'School Fee Management','as-fee-management':'School Fee Management',
     'class-attendance':'Class Attendance','as-class-attendance':'Class Attendance',
-    'cashbook':'Cashbook Management','document-hub':'Document Hub','i-document-hub':'Document Hub','as-document-hub':'Document Hub','pdf-workshop':'PDF Workshop',
+    'cashbook':'Cashbook Management','document-hub':'Document Hub','i-document-hub':'Document Hub','as-document-hub':'Document Hub','pdf-workshop':'PDF Workshop','as-pdf-workshop':'PDF Workshop','i-pdf-workshop':'PDF Workshop',
     'cmc-dashboard':'CMC Analytics Dashboard','cmc-financial':'Financial Overview','cmc-staff':'Staff & HR','cmc-academic':'Academic Performance','cmc-sources':'Source Viewer','cmc-profile':'My Profile'
   };
   document.getElementById('topbarTitle').textContent = titles[pageId]||pageId;
@@ -7481,6 +7483,7 @@ function showPage(pageId) {
   if(pageId === 'as-document-hub') renderDocumentHubAdmin();
   if(pageId === 'a-assignments') renderAdminAssignments();
   if(pageId === 'exams' || pageId === 'i-exams') renderInstructorExams();
+  if(pageId === 'i-resources') renderInstructorCustomResources();
   if(pageId === 's-resources') renderStudentDriveResources();
   if(pageId === 's-progress') renderStudentAssignments();
   if(pageId === 'lms-chat') lmsChatOnPageShow('admin');
@@ -7500,7 +7503,9 @@ function showPage(pageId) {
     'as-timetracking':   {id:'asTimetrackingFrame',  src:'https://stevebarrettsrha-ops.github.io/Staff-Clock-in-System/'},
     'as-fee-management': {id:'asFeeManagementFrame', src:'https://stevebarrettsrha-ops.github.io/School-Fee-Management-System/'},
     'as-class-attendance':{id:'asClassAttendanceFrame',src:'https://stevebarrettsrha-ops.github.io/Class-Attendance-System/'},
-    'pdf-workshop':      {id:'pdfWorkshopFrame',     src:'https://stevebarrettsrha-ops.github.io/PDF-Workshop/'}
+    'pdf-workshop':      {id:'pdfWorkshopFrame',     src:'https://stevebarrettsrha-ops.github.io/PDF-Workshop/'},
+    'as-pdf-workshop':   {id:'asPdfWorkshopFrame',   src:'https://stevebarrettsrha-ops.github.io/PDF-Workshop/'},
+    'i-pdf-workshop':    {id:'iPdfWorkshopFrame',    src:'https://stevebarrettsrha-ops.github.io/PDF-Workshop/'}
   };
   if(iframePageMap[pageId]) {
     var iframeInfo = iframePageMap[pageId];
@@ -9575,6 +9580,15 @@ function buildInstructorPages() {
     </div>
     <div class="stats-grid stats-grid-4" id="iDocHubStats"></div>
     <div id="iDocHubList"></div>
+  </section>
+
+  <!-- PDF WORKSHOP (Instructor) -->
+  <section class="page" id="page-i-pdf-workshop">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;flex-wrap:wrap;gap:12px;">
+      <h3 style="font-family:'Playfair Display',serif;margin:0;">PDF Workshop</h3>
+      <a href="https://stevebarrettsrha-ops.github.io/PDF-Workshop/" target="_blank" rel="noopener noreferrer" class="btn btn-primary" style="text-decoration:none;">Open in New Tab ↗</a>
+    </div>
+    <iframe id="iPdfWorkshopFrame" style="width:100%;height:calc(100vh - 80px);border:none;border-radius:12px;"></iframe>
   </section>
   `;
 
@@ -18027,12 +18041,26 @@ async function mergeFromCloud() {
       }
     }
 
-    // Merge students — add cloud students that don't exist locally (match by id)
+    // Merge students — update existing records AND add new ones (match by id)
     if (backupData.data.students) {
-      const localStudentIds = students.map(s => s.id);
       backupData.data.students.forEach(cloudStudent => {
         if (_demoStudentIds[cloudStudent.id]) return; // Skip legacy demo data
-        if (!localStudentIds.includes(cloudStudent.id)) {
+        var localMatch = students.find(function(s) { return s.id === cloudStudent.id; });
+        if (localMatch) {
+          // Update existing student with cloud data (stage, progress, certifications, etc.)
+          if (cloudStudent.stage && cloudStudent.stage !== localMatch.stage) { localMatch.stage = cloudStudent.stage; }
+          if (cloudStudent.progress !== undefined && cloudStudent.progress !== localMatch.progress) { localMatch.progress = cloudStudent.progress; }
+          if (cloudStudent.name && cloudStudent.name !== localMatch.name) { localMatch.name = cloudStudent.name; }
+          if (cloudStudent.course && cloudStudent.course !== localMatch.course) { localMatch.course = cloudStudent.course; }
+          if (cloudStudent.instructor && cloudStudent.instructor !== localMatch.instructor) { localMatch.instructor = cloudStudent.instructor; }
+          if (cloudStudent.certCollected !== undefined && cloudStudent.certCollected !== localMatch.certCollected) { localMatch.certCollected = cloudStudent.certCollected; }
+          if (cloudStudent.certNumber && cloudStudent.certNumber !== localMatch.certNumber) { localMatch.certNumber = cloudStudent.certNumber; }
+          if (cloudStudent.certDate && cloudStudent.certDate !== localMatch.certDate) { localMatch.certDate = cloudStudent.certDate; }
+          if (cloudStudent.email && cloudStudent.email !== localMatch.email) { localMatch.email = cloudStudent.email; }
+          if (cloudStudent.phone && cloudStudent.phone !== localMatch.phone) { localMatch.phone = cloudStudent.phone; }
+          if (cloudStudent.status && cloudStudent.status !== localMatch.status) { localMatch.status = cloudStudent.status; }
+          mergeStats.studentsAdded++; // count as merged
+        } else {
           students.push(cloudStudent);
           mergeStats.studentsAdded++;
         }
@@ -18568,12 +18596,25 @@ async function silentMergeFromBackup(fileId) {
       if (userAccountsChanged) { changed = true; saveUserAccounts(); }
     }
 
-    // Merge students
+    // Merge students — update existing records AND add new ones
     if (backupData.data.students) {
-      const localStudentIds = students.map(s => s.id);
       backupData.data.students.forEach(cloudStudent => {
         if (_ds[cloudStudent.id]) return;
-        if (!localStudentIds.includes(cloudStudent.id)) {
+        var localMatch = students.find(function(s) { return s.id === cloudStudent.id; });
+        if (localMatch) {
+          // Update existing student with cloud data (stage, progress, certifications, etc.)
+          if (cloudStudent.stage && cloudStudent.stage !== localMatch.stage) { localMatch.stage = cloudStudent.stage; changed = true; }
+          if (cloudStudent.progress !== undefined && cloudStudent.progress !== localMatch.progress) { localMatch.progress = cloudStudent.progress; changed = true; }
+          if (cloudStudent.name && cloudStudent.name !== localMatch.name) { localMatch.name = cloudStudent.name; changed = true; }
+          if (cloudStudent.course && cloudStudent.course !== localMatch.course) { localMatch.course = cloudStudent.course; changed = true; }
+          if (cloudStudent.instructor && cloudStudent.instructor !== localMatch.instructor) { localMatch.instructor = cloudStudent.instructor; changed = true; }
+          if (cloudStudent.certCollected !== undefined && cloudStudent.certCollected !== localMatch.certCollected) { localMatch.certCollected = cloudStudent.certCollected; changed = true; }
+          if (cloudStudent.certNumber && cloudStudent.certNumber !== localMatch.certNumber) { localMatch.certNumber = cloudStudent.certNumber; changed = true; }
+          if (cloudStudent.certDate && cloudStudent.certDate !== localMatch.certDate) { localMatch.certDate = cloudStudent.certDate; changed = true; }
+          if (cloudStudent.email && cloudStudent.email !== localMatch.email) { localMatch.email = cloudStudent.email; changed = true; }
+          if (cloudStudent.phone && cloudStudent.phone !== localMatch.phone) { localMatch.phone = cloudStudent.phone; changed = true; }
+          if (cloudStudent.status && cloudStudent.status !== localMatch.status) { localMatch.status = cloudStudent.status; changed = true; }
+        } else {
           students.push(cloudStudent);
           changed = true;
         }
@@ -23604,7 +23645,8 @@ var asAccessPages = [
   { key:'training', label:'Training Centres', desc:'View training centre information' },
   { key:'exams', label:'Online Exams', desc:'View and manage exams' },
   { key:'video', label:'Video Conference', desc:'Join and manage video sessions' },
-  { key:'resources', label:'Resource Manager', desc:'Access shared resources' }
+  { key:'resources', label:'Resource Manager', desc:'Access shared resources' },
+  { key:'supportmessages', label:'Support Messages', desc:'Send and receive support messages' }
 ];
 
 function loadAdminStaffAccess() {
@@ -23709,12 +23751,14 @@ function buildAdminStaffSidebar() {
     html += '<div class="nav-item" data-page="as-reports" onclick="showPage(\'as-reports\')"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/></svg>Reports</div>';
   }
 
-  // Document Hub always visible for admin staff
+  // Document Hub and PDF Workshop always visible for admin staff
   html += '<div class="nav-section-label">Resources</div>';
   html += '<div class="nav-item" data-page="as-document-hub" onclick="showPage(\'as-document-hub\')">' +
     '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><path d="M12 18v-6"/><path d="M9 15l3 3 3-3"/></svg>Document Hub</div>';
+  html += '<div class="nav-item" data-page="as-pdf-workshop" onclick="showPage(\'as-pdf-workshop\')">' +
+    '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><path d="M12 18v-6"/><path d="M9 15l3-3 3 3"/></svg>PDF Workshop</div>';
 
-  // Time Tracking always visible for admin staff
+  // Time Tracking, School Fee Management, Class Attendance always visible for admin staff
   html += '<div class="nav-section-label">Tools</div>';
   html += '<div class="nav-item" data-page="as-timetracking" onclick="showPage(\'as-timetracking\')">' +
     '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>Time Tracking</div>';
@@ -23723,10 +23767,12 @@ function buildAdminStaffSidebar() {
   html += '<div class="nav-item" data-page="as-class-attendance" onclick="showPage(\'as-class-attendance\')">' +
     '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 5H7a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V7a2 2 0 0 0-2-2h-2"/><rect x="9" y="3" width="6" height="4" rx="1"/><path d="M9 12l2 2 4-4"/></svg>Class Attendance</div>';
 
-  // Support Messages always visible for admin staff
-  html += '<div class="nav-section-label">Support</div>';
-  html += '<div class="nav-item" data-page="as-support-messages" onclick="showPage(\'as-support-messages\')">' +
-    '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"/><polyline points="22,6 12,13 2,6"/></svg>Support Messages<span class="nav-badge" id="supportMsgBadge" style="display:none;background:var(--red);">0</span></div>';
+  // Support Messages — conditionally visible based on access settings
+  if(adminStaffAccessSettings.supportmessages) {
+    html += '<div class="nav-section-label">Support</div>';
+    html += '<div class="nav-item" data-page="as-support-messages" onclick="showPage(\'as-support-messages\')">' +
+      '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"/><polyline points="22,6 12,13 2,6"/></svg>Support Messages<span class="nav-badge" id="supportMsgBadge" style="display:none;background:var(--red);">0</span></div>';
+  }
 
   // Profile always visible
   html += '<div class="nav-section-label">Account</div>';
@@ -24013,6 +24059,15 @@ function buildAdminStaffPages() {
         '<div><div style="font-size:28px;font-weight:700;color:var(--blue);">'+exams.filter(function(e){ return e.status==='upcoming'; }).length+'</div><div style="font-size:12px;color:var(--text-muted);">Upcoming Exams</div></div>' +
       '</div>' +
     '</div>' +
+  '</section>';
+
+  // ---- PDF Workshop Page (Admin Staff) ----
+  html += '<section class="page" id="page-as-pdf-workshop">' +
+    '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;flex-wrap:wrap;gap:12px;">' +
+      '<h3 style="font-family:\'Playfair Display\',serif;margin:0;">PDF Workshop</h3>' +
+      '<a href="https://stevebarrettsrha-ops.github.io/PDF-Workshop/" target="_blank" rel="noopener noreferrer" class="btn btn-primary" style="text-decoration:none;">Open in New Tab ↗</a>' +
+    '</div>' +
+    '<iframe id="asPdfWorkshopFrame" style="width:100%;height:calc(100vh - 80px);border:none;border-radius:12px;"></iframe>' +
   '</section>';
 
   // ---- Profile Page ----
