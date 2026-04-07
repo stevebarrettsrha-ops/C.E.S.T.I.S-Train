@@ -18215,18 +18215,25 @@ function showGoogleAuthModal() {
 
 // Trigger the direct Google Sign-In popup
 function triggerDirectGoogleSignIn() {
-  closeGoogleAuthModal();
+  // Preserve the login page auth promise before closing the modal
+  // (closeGoogleAuthModal would resolve it with null, killing the login sync)
+  var savedResolve = window._loginPageAuthResolve;
+  window._loginPageAuthResolve = null; // Prevent closeGoogleAuthModal from resolving it
+  var modal = document.getElementById('googleAuthModal');
+  if (modal) modal.remove(); // Remove modal without triggering resolve
+  window._loginPageAuthResolve = savedResolve; // Restore so handleGoogleAuthCallback can use it
+
   if (googleTokenClient) {
     googleTokenClient.requestAccessToken();
   } else {
     initGoogleAuth();
-    setTimeout(() => {
+    setTimeout(function() {
       if (googleTokenClient) {
         googleTokenClient.requestAccessToken();
       } else {
         alert('Google Sign-In popup is not available. Please use the manual token method.');
         showGoogleAuthModal();
-        setTimeout(() => showManualTokenForm(), 100);
+        setTimeout(function() { showManualTokenForm(); }, 100);
       }
     }, 500);
   }
