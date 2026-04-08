@@ -1084,7 +1084,7 @@ body.vc-fullscreen-mode.vc-host-only-mode .video-grid .video-tile:not(.vc-hoston
   position:fixed; bottom:28px; right:28px;
   background:var(--bg-card); border:1px solid var(--green);
   border-radius:var(--radius); padding:14px 20px; font-size:13px; color:var(--green);
-  display:flex; align-items:center; gap:10px; z-index:300;
+  display:flex; align-items:center; gap:10px; z-index:100000;
   animation:slideUp 0.3s ease, fadeOut 0.3s ease 2.7s;
   box-shadow:0 8px 30px rgba(0,0,0,0.4);
 }
@@ -28719,7 +28719,8 @@ function checkCertificatePublic() {
     downloadSection = '<div class="cert-detail-item"><div class="label">Download</div><div class="value">' + (canDownload ? 'Approved' : 'Not yet approved') + '</div></div>' +
       '</div>' +
       (canDownload
-        ? '<button class="cert-download-btn" onclick="generateCertificatePDF(\'' + student.id + '\')"><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg> Download Certificate</button>'
+        ? '<button class="cert-download-btn" id="certPublicDownloadBtn" onclick="generateCertificatePDF(\'' + student.id + '\')"><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg> Download Certificate</button>' +
+          '<div id="certPublicDownloadStatus" style="display:none;font-size:13px;margin-top:8px;padding:10px 14px;border-radius:8px;"></div>'
         : '<p style="font-size:13px;color:var(--text-muted);margin-top:4px;">Certificate download has not been approved yet. Please contact the administration office.</p>');
   } else {
     downloadSection = '</div>' +
@@ -28743,28 +28744,50 @@ function checkCertificatePublic() {
 // ============================== CERTIFICATE PDF GENERATION ==============================
 // Matching the official C.E.S.T.I.S certificate design (2-page: front + details)
 
+function _certDownloadStatus(msg, isError) {
+  var statusEl = document.getElementById('certPublicDownloadStatus');
+  if(statusEl) {
+    statusEl.style.display = 'block';
+    statusEl.style.background = isError ? 'rgba(231,76,60,0.15)' : 'rgba(46,204,113,0.15)';
+    statusEl.style.color = isError ? 'var(--red)' : 'var(--green)';
+    statusEl.textContent = msg;
+  }
+  var btn = document.getElementById('certPublicDownloadBtn');
+  if(btn && (isError || msg.indexOf('successfully') > -1)) {
+    btn.disabled = false;
+    btn.innerHTML = '<svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg> Download Certificate';
+  }
+}
+
 function generateCertificatePDF(studentId) {
   var student = students.find(function(s){ return s.id === studentId; });
-  if(!student || !student.certNo) { showToast('Certificate not found'); return; }
+  if(!student || !student.certNo) { showToast('Certificate not found'); _certDownloadStatus('Certificate not found.', true); return; }
+
+  // Disable download button for visual feedback
+  var dlBtn = document.getElementById('certPublicDownloadBtn');
+  if(dlBtn) { dlBtn.disabled = true; dlBtn.innerHTML = '&#9203; Generating...'; }
+  _certDownloadStatus('Preparing certificate...', false);
 
   // Ensure jsPDF is loaded
   if(!window.jspdf || !window.jspdf.jsPDF) {
     showToast('Loading PDF library, please wait...');
+    _certDownloadStatus('Loading PDF library...', false);
     var script = document.createElement('script');
     script.src = 'https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js';
     script.onload = function() { generateCertificatePDF(studentId); };
-    script.onerror = function() { showToast('Failed to load PDF library. Check your internet connection.'); };
+    script.onerror = function() { showToast('Failed to load PDF library. Check your internet connection.'); _certDownloadStatus('Failed to load PDF library. Check your internet connection.', true); };
     document.head.appendChild(script);
     return;
   }
 
-  // Resolve the cert template key (handles "Welding" → "Welding & Fabrication" etc.)
+  // Resolve the cert template key (handles "Welding" -> "Welding & Fabrication" etc.)
   var certKey = getCertTemplateKey(student.course);
   var tpl = certTemplates[certKey] || {};
 
   // Always try to load cert images from IndexedDB if bgPage1 is missing
   if(!tpl.bgPage1) {
     showToast('Loading certificate template...');
+    _certDownloadStatus('Loading certificate template...', false);
     // Step 1: Try IndexedDB
     certImageLoadAll().then(function(images) {
       images.forEach(function(img) {
@@ -28782,6 +28805,7 @@ function generateCertificatePDF(studentId) {
         // Step 2: Try Google Drive
         if(googleAccessToken) {
           showToast('Template not found locally. Checking Google Drive...');
+          _certDownloadStatus('Checking Google Drive for template...', false);
           certImageLoadFromDrive(certKey, 'bgPage1').then(function(data) {
             if(data) {
               // Also try page 2
@@ -28789,15 +28813,18 @@ function generateCertificatePDF(studentId) {
                 _generateCertPDFInner(studentId);
               });
             } else {
-              showToast('No certificate template background image found for ' + (student.course || 'this course') + '. Please upload a certificate template first.', 5000);
+              showToast('No certificate template found for ' + (student.course || 'this course') + '. Please contact administration.');
+              _certDownloadStatus('Certificate template not available for ' + (student.course || 'this course') + '. Please contact administration.', true);
             }
           });
         } else {
-          showToast('No certificate template background image found for ' + (student.course || 'this course') + '. Please upload a certificate template first.', 5000);
+          showToast('No certificate template found for ' + (student.course || 'this course') + '. Please contact administration.');
+          _certDownloadStatus('Certificate template not available for ' + (student.course || 'this course') + '. Please contact administration.', true);
         }
       }
     }).catch(function() {
-      showToast('Error loading certificate template. Please try again.', 5000);
+      showToast('Error loading certificate template. Please try again.');
+      _certDownloadStatus('Error loading certificate template. Please try again.', true);
     });
     return;
   }
@@ -28821,11 +28848,13 @@ function _generateCertPDFInner(studentId) {
 
   try {
   if(!tpl.bgPage1) {
-    showToast('No certificate template background image uploaded for ' + (student.course || 'this course') + '. Please upload a certificate template first.', 5000);
+    showToast('No certificate template found for ' + (student.course || 'this course') + '. Please contact administration.');
+    _certDownloadStatus('Certificate template not available for ' + (student.course || 'this course') + '. Please contact administration.', true);
     return;
   }
 
   showToast('Generating certificate PDF...');
+  _certDownloadStatus('Generating certificate PDF...', false);
 
   // Load Page 1 background image
   var img1 = new Image();
@@ -28845,18 +28874,31 @@ function _generateCertPDFInner(studentId) {
         pdf.addImage(canvas2.toDataURL('image/jpeg', 0.95), 'JPEG', 0, 0, canvas2.width, canvas2.height);
         pdf.save('Certificate_' + student.name.replace(/\s+/g, '_') + '_' + student.certNo + '.pdf');
         showToast('Certificate PDF downloaded for ' + student.name);
+        _certDownloadStatus('Certificate downloaded successfully!', false);
+      };
+      img2.onerror = function() {
+        // Page 2 image failed, save with just page 1
+        pdf.save('Certificate_' + student.name.replace(/\s+/g, '_') + '_' + student.certNo + '.pdf');
+        showToast('Certificate PDF downloaded for ' + student.name);
+        _certDownloadStatus('Certificate downloaded successfully!', false);
       };
       img2.src = tpl.bgPage2;
     } else {
       // Just page 1
       pdf.save('Certificate_' + student.name.replace(/\s+/g, '_') + '_' + student.certNo + '.pdf');
       showToast('Certificate PDF downloaded for ' + student.name);
+      _certDownloadStatus('Certificate downloaded successfully!', false);
     }
+  };
+  img1.onerror = function() {
+    showToast('Error loading certificate template image.');
+    _certDownloadStatus('Error loading certificate template image. Please try again.', true);
   };
   img1.src = tpl.bgPage1;
   } catch(e) {
     console.error('Certificate PDF generation error:', e);
     showToast('Error generating certificate: ' + e.message);
+    _certDownloadStatus('Error generating certificate: ' + e.message, true);
   }
 }
 
