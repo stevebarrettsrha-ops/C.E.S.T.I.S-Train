@@ -8241,6 +8241,23 @@ function buildAdminPages() {
         </div>
       </div>
 
+      <h4 style="font-size:14px;margin-bottom:8px;color:var(--accent);">Page 1 Body Text</h4>
+      <p style="font-size:12px;color:var(--text-muted);margin-bottom:8px;">Customize the wording shown on the certificate above and below the course name. Supported placeholders: <code>{pronoun}</code> (his/her/their, from gender), <code>{courseType}</code> (short course/fulltime course), <code>{course}</code> (course full name), <code>{date}</code> (certificate date).</p>
+      <div style="display:grid;grid-template-columns:1fr;gap:12px;margin-bottom:16px;">
+        <div class="form-group">
+          <label>Completion Line (above course name)</label>
+          <input type="text" id="ctplBodyCompletionLine" placeholder="has successfully completed {pronoun} vocational training in the {courseType}" oninput="updateCertLivePreview()">
+        </div>
+        <div class="form-group">
+          <label>Date Line (below course name)</label>
+          <input type="text" id="ctplBodyDateLine" placeholder="on this day, the {date}, at the" oninput="updateCertLivePreview()">
+        </div>
+        <div class="form-group">
+          <label>Institute Line</label>
+          <input type="text" id="ctplBodyInstituteLine" placeholder="Community Educational and Skills Training Institute and Services Ltd." oninput="updateCertLivePreview()">
+        </div>
+      </div>
+
       <h4 style="font-size:14px;margin-bottom:8px;color:var(--accent);">Programme Specifications</h4>
       <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:16px;">
         <div class="form-group"><label>Duration</label><input type="text" id="ctplSpecDuration" placeholder="e.g. 40 Contact Hours"></div>
@@ -28925,17 +28942,19 @@ function renderCertPage1OnBg(bgImg, student, tpl) {
   ctx.fillStyle = '#222';
 
   var courseType = (tpl.courseType || 'Short Course').toLowerCase();
-  var line1 = 'has successfully completed ' + pronoun + ' vocational training in the ' + courseType;
+  var body = tpl.bodyText || {};
+  var subCtx = { pronoun: pronoun, courseType: courseType, course: courseFullName, date: student.certDate };
+  var line1 = _certBodySub(body.completionLine || 'has successfully completed {pronoun} vocational training in the {courseType}', subCtx);
   ctx.fillText(line1, bodyX, bodyY);
 
   ctx.font = 'bold italic ' + Math.round(bodySize * 1.15) + 'px Georgia, serif';
   ctx.fillText(courseFullName, bodyX, bodyY + bodySize * 1.5);
 
   ctx.font = 'italic ' + bodySize + 'px Georgia, serif';
-  ctx.fillText('on this day, the ' + student.certDate + ', at the', bodyX, bodyY + bodySize * 3);
+  ctx.fillText(_certBodySub(body.dateLine || 'on this day, the {date}, at the', subCtx), bodyX, bodyY + bodySize * 3);
 
   ctx.font = 'bold italic ' + bodySize + 'px Georgia, serif';
-  ctx.fillText('Community Educational and Skills Training Institute and Services Ltd.', bodyX, bodyY + bodySize * 4.3);
+  ctx.fillText(_certBodySub(body.instituteLine || 'Community Educational and Skills Training Institute and Services Ltd.', subCtx), bodyX, bodyY + bodySize * 4.3);
 
   // Certificate number
   ctx.font = 'bold ' + certNoSize + 'px Georgia, serif';
@@ -29186,6 +29205,14 @@ var _certDrag = { active: false, zone: null, canvasId: null };
 function _cpv(id, def) { var el = document.getElementById(id); return el ? (parseFloat(el.value) || def) : def; }
 
 // ===== PAGE 1 PREVIEW =====
+function _certBodySub(str, ctx) {
+  return String(str == null ? '' : str)
+    .replace(/\{pronoun\}/g, ctx.pronoun || 'their')
+    .replace(/\{courseType\}/g, ctx.courseType || 'short course')
+    .replace(/\{course\}/g, ctx.course || '')
+    .replace(/\{date\}/g, ctx.date || '');
+}
+
 function updateCertLivePreview() {
   var container = document.getElementById('certLivePreviewContainer');
   var canvas = document.getElementById('certLivePreviewCanvas');
@@ -29231,15 +29258,24 @@ function _renderCertLivePreview() {
   canvas._hitZones.push({id:'name', x:nameX, y:nameY, xInput:'ctplP1NameX', yInput:'ctplP1NameY', r:nameSize*3});
 
   // --- Body (green) ---
+  var subCtx = {
+    pronoun: 'their',
+    courseType: courseType,
+    course: courseFullName,
+    date: new Date().toLocaleDateString('en-US',{year:'numeric',month:'long',day:'2-digit'})
+  };
+  var bodyCompletion = document.getElementById('ctplBodyCompletionLine')?.value || 'has successfully completed {pronoun} vocational training in the {courseType}';
+  var bodyDate = document.getElementById('ctplBodyDateLine')?.value || 'on this day, the {date}, at the';
+  var bodyInstitute = document.getElementById('ctplBodyInstituteLine')?.value || 'Community Educational and Skills Training Institute and Services Ltd.';
   ctx.font = 'italic ' + bodySize + 'px Georgia, serif';
   ctx.fillStyle = 'rgba(80,200,80,0.9)';
-  ctx.fillText('has successfully completed their vocational training in the ' + courseType, bodyX, bodyY);
+  ctx.fillText(_certBodySub(bodyCompletion, subCtx), bodyX, bodyY);
   ctx.font = 'bold italic ' + Math.round(bodySize*1.15) + 'px Georgia, serif';
   ctx.fillText(courseFullName, bodyX, bodyY + bodySize*1.5);
   ctx.font = 'italic ' + bodySize + 'px Georgia, serif';
-  ctx.fillText('on this day, the ' + new Date().toLocaleDateString('en-US',{year:'numeric',month:'long',day:'2-digit'}) + ', at the', bodyX, bodyY + bodySize*3);
+  ctx.fillText(_certBodySub(bodyDate, subCtx), bodyX, bodyY + bodySize*3);
   ctx.font = 'bold italic ' + bodySize + 'px Georgia, serif';
-  ctx.fillText('Community Educational and Skills Training Institute and Services Ltd.', bodyX, bodyY + bodySize*4.3);
+  ctx.fillText(_certBodySub(bodyInstitute, subCtx), bodyX, bodyY + bodySize*4.3);
   ctx.strokeStyle = 'rgba(80,200,80,0.4)'; ctx.lineWidth = 1; ctx.setLineDash([6,4]);
   ctx.beginPath(); ctx.moveTo(0,bodyY); ctx.lineTo(w,bodyY); ctx.stroke();
   ctx.beginPath(); ctx.moveTo(bodyX,0); ctx.lineTo(bodyX,h); ctx.stroke(); ctx.setLineDash([]);
@@ -29546,6 +29582,11 @@ function openCertTemplateEditor() {
   document.getElementById('ctplContactEmail').value = tpl.contactEmail || 'cestisadmn@gmail.com';
   document.getElementById('ctplContactPhone').value = tpl.contactPhone || '+(876) 679-0111';
 
+  var body = tpl.bodyText || {};
+  document.getElementById('ctplBodyCompletionLine').value = body.completionLine || 'has successfully completed {pronoun} vocational training in the {courseType}';
+  document.getElementById('ctplBodyDateLine').value = body.dateLine || 'on this day, the {date}, at the';
+  document.getElementById('ctplBodyInstituteLine').value = body.instituteLine || 'Community Educational and Skills Training Institute and Services Ltd.';
+
   var specs = tpl.programmeSpecs || {};
   document.getElementById('ctplSpecDuration').value = specs.duration || '';
   document.getElementById('ctplSpecIndustry').value = specs.industry || '';
@@ -29742,6 +29783,11 @@ function saveCertTemplate() {
       p2FooterX: parseInt(document.getElementById('ctplP2FooterX').value) || 50,
       p2FooterY: parseInt(document.getElementById('ctplP2FooterY').value) || 90,
       p2FooterSize: parseInt(document.getElementById('ctplP2FooterSize').value) || 10
+    },
+    bodyText: {
+      completionLine: document.getElementById('ctplBodyCompletionLine').value,
+      dateLine: document.getElementById('ctplBodyDateLine').value,
+      instituteLine: document.getElementById('ctplBodyInstituteLine').value
     },
     programmeSpecs: {
       duration: document.getElementById('ctplSpecDuration').value.trim(),
