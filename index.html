@@ -7474,8 +7474,6 @@ function buildAdminSidebar() {
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>Time Tracking</div>
     <div class="nav-item" data-page="fee-management" onclick="showPage('fee-management')">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="12" y1="1" x2="12" y2="23"/><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg>School Fee Management</div>
-    <div class="nav-item" data-page="class-attendance" onclick="showPage('class-attendance')">
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 5H7a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V7a2 2 0 0 0-2-2h-2"/><rect x="9" y="3" width="6" height="4" rx="1"/><path d="M9 12l2 2 4-4"/></svg>Class Attendance</div>
     <div class="nav-item" data-page="cashbook" onclick="showPage('cashbook')">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="3" width="20" height="14" rx="2"/><line x1="8" y1="21" x2="16" y2="21"/><line x1="12" y1="17" x2="12" y2="21"/></svg>Cashbook Management</div>
     <div class="nav-item" data-page="document-hub" onclick="showPage('document-hub')">
@@ -7620,7 +7618,6 @@ function showPage(pageId) {
     'as-training':'Training Centres','as-exams':'Online Exams','as-video':'Video Conference','as-resources':'Resource Manager',
     'timetracking':'Staff Time Tracking','i-timetracking':'Staff Time Tracking','as-timetracking':'Staff Time Tracking',
     'fee-management':'School Fee Management','as-fee-management':'School Fee Management',
-    'class-attendance':'Class Attendance','as-class-attendance':'Class Attendance',
     'cashbook':'Cashbook Management','document-hub':'Document Hub','i-document-hub':'Document Hub','as-document-hub':'Document Hub','pdf-workshop':'PDF Workshop','as-pdf-workshop':'PDF Workshop','i-pdf-workshop':'PDF Workshop',
     'cmc-dashboard':'CMC Analytics Dashboard','cmc-financial':'Financial Overview','cmc-staff':'Staff & HR','cmc-academic':'Academic Performance','cmc-sources':'Source Viewer','cmc-profile':'My Profile'
   };
@@ -7650,17 +7647,15 @@ function showPage(pageId) {
   // This avoids stale cached error states that appear when iframes are destroyed
   // on logout and recreated on the next login with the same src URL.
   var iframePageMap = {
-    'timetracking':      {id:'timetrackingFrame',    src:'https://stevebarrettsrha-ops.github.io/Staff-Clock-in-System/'},
-    'fee-management':    {id:'feeManagementFrame',   src:'https://stevebarrettsrha-ops.github.io/School-Fee-Management-System/'},
-    'class-attendance':  {id:'classAttendanceFrame', src:'https://stevebarrettsrha-ops.github.io/Class-Attendance-System/'},
-    'cashbook':          {id:'cashbookFrame',        src:'https://stevebarrettsrha-ops.github.io/CESTIS---Cashbook-Dashboard/'},
-    'i-timetracking':    {id:'iTimetrackingFrame',   src:'https://stevebarrettsrha-ops.github.io/Staff-Clock-in-System/'},
-    'as-timetracking':   {id:'asTimetrackingFrame',  src:'https://stevebarrettsrha-ops.github.io/Staff-Clock-in-System/'},
-    'as-fee-management': {id:'asFeeManagementFrame', src:'https://stevebarrettsrha-ops.github.io/School-Fee-Management-System/'},
-    'as-class-attendance':{id:'asClassAttendanceFrame',src:'https://stevebarrettsrha-ops.github.io/Class-Attendance-System/'},
-    'pdf-workshop':      {id:'pdfWorkshopFrame',     src:'https://stevebarrettsrha-ops.github.io/PDF-Workshop/'},
-    'as-pdf-workshop':   {id:'asPdfWorkshopFrame',   src:'https://stevebarrettsrha-ops.github.io/PDF-Workshop/'},
-    'i-pdf-workshop':    {id:'iPdfWorkshopFrame',    src:'https://stevebarrettsrha-ops.github.io/PDF-Workshop/'}
+    'timetracking':      {id:'timetrackingFrame',    src:'Staff.Clock.in.html'},
+    'fee-management':    {id:'feeManagementFrame',   src:'School.Fee.html'},
+    'cashbook':          {id:'cashbookFrame',        src:'CESTIS.Cashbook.html'},
+    'i-timetracking':    {id:'iTimetrackingFrame',   src:'Staff.Clock.in.html'},
+    'as-timetracking':   {id:'asTimetrackingFrame',  src:'Staff.Clock.in.html'},
+    'as-fee-management': {id:'asFeeManagementFrame', src:'School.Fee.html'},
+    'pdf-workshop':      {id:'pdfWorkshopFrame',     src:'PDF.Workshop.html'},
+    'as-pdf-workshop':   {id:'asPdfWorkshopFrame',   src:'PDF.Workshop.html'},
+    'i-pdf-workshop':    {id:'iPdfWorkshopFrame',    src:'PDF.Workshop.html'}
   };
   if(iframePageMap[pageId]) {
     var iframeInfo = iframePageMap[pageId];
@@ -8701,11 +8696,6 @@ function buildAdminPages() {
     <iframe id="feeManagementFrame" style="width:100%;height:calc(100vh - 80px);border:none;border-radius:12px;"></iframe>
   </section>
 
-  <!-- CLASS ATTENDANCE (Admin) -->
-  <section class="page" id="page-class-attendance">
-    <iframe id="classAttendanceFrame" style="width:100%;height:calc(100vh - 80px);border:none;border-radius:12px;"></iframe>
-  </section>
-
   <!-- CASHBOOK MANAGEMENT (Admin) -->
   <section class="page" id="page-cashbook">
     <iframe id="cashbookFrame" style="width:100%;height:calc(100vh - 80px);border:none;border-radius:12px;"></iframe>
@@ -8775,7 +8765,7 @@ function buildAdminPages() {
   <section class="page" id="page-pdf-workshop">
     <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;flex-wrap:wrap;gap:12px;">
       <h3 style="font-family:'Playfair Display',serif;margin:0;">PDF Workshop</h3>
-      <a href="https://stevebarrettsrha-ops.github.io/PDF-Workshop/" target="_blank" rel="noopener noreferrer" class="btn btn-primary" style="text-decoration:none;">Open in New Tab ↗</a>
+      <a href="PDF.Workshop.html" target="_blank" rel="noopener noreferrer" class="btn btn-primary" style="text-decoration:none;">Open in New Tab ↗</a>
     </div>
     <iframe id="pdfWorkshopFrame" style="width:100%;height:calc(100vh - 80px);border:none;border-radius:12px;"></iframe>
   </section>
@@ -9770,7 +9760,7 @@ function buildInstructorPages() {
   <section class="page" id="page-i-pdf-workshop">
     <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;flex-wrap:wrap;gap:12px;">
       <h3 style="font-family:'Playfair Display',serif;margin:0;">PDF Workshop</h3>
-      <a href="https://stevebarrettsrha-ops.github.io/PDF-Workshop/" target="_blank" rel="noopener noreferrer" class="btn btn-primary" style="text-decoration:none;">Open in New Tab ↗</a>
+      <a href="PDF.Workshop.html" target="_blank" rel="noopener noreferrer" class="btn btn-primary" style="text-decoration:none;">Open in New Tab ↗</a>
     </div>
     <iframe id="iPdfWorkshopFrame" style="width:100%;height:calc(100vh - 80px);border:none;border-radius:12px;"></iframe>
   </section>
@@ -25196,14 +25186,12 @@ function buildAdminStaffSidebar() {
   html += '<div class="nav-item" data-page="as-pdf-workshop" onclick="showPage(\'as-pdf-workshop\')">' +
     '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><path d="M12 18v-6"/><path d="M9 15l3-3 3 3"/></svg>PDF Workshop</div>';
 
-  // Time Tracking, School Fee Management, Class Attendance always visible for admin staff
+  // Time Tracking, School Fee Management always visible for admin staff
   html += '<div class="nav-section-label">Tools</div>';
   html += '<div class="nav-item" data-page="as-timetracking" onclick="showPage(\'as-timetracking\')">' +
     '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>Time Tracking</div>';
   html += '<div class="nav-item" data-page="as-fee-management" onclick="showPage(\'as-fee-management\')">' +
     '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="12" y1="1" x2="12" y2="23"/><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg>School Fee Management</div>';
-  html += '<div class="nav-item" data-page="as-class-attendance" onclick="showPage(\'as-class-attendance\')">' +
-    '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 5H7a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V7a2 2 0 0 0-2-2h-2"/><rect x="9" y="3" width="6" height="4" rx="1"/><path d="M9 12l2 2 4-4"/></svg>Class Attendance</div>';
 
   // Support Messages — conditionally visible based on access settings
   if(adminStaffAccessSettings.supportmessages) {
@@ -25503,7 +25491,7 @@ function buildAdminStaffPages() {
   html += '<section class="page" id="page-as-pdf-workshop">' +
     '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;flex-wrap:wrap;gap:12px;">' +
       '<h3 style="font-family:\'Playfair Display\',serif;margin:0;">PDF Workshop</h3>' +
-      '<a href="https://stevebarrettsrha-ops.github.io/PDF-Workshop/" target="_blank" rel="noopener noreferrer" class="btn btn-primary" style="text-decoration:none;">Open in New Tab ↗</a>' +
+      '<a href="PDF.Workshop.html" target="_blank" rel="noopener noreferrer" class="btn btn-primary" style="text-decoration:none;">Open in New Tab ↗</a>' +
     '</div>' +
     '<iframe id="asPdfWorkshopFrame" style="width:100%;height:calc(100vh - 80px);border:none;border-radius:12px;"></iframe>' +
   '</section>';
@@ -25534,11 +25522,6 @@ function buildAdminStaffPages() {
   // ---- School Fee Management Page (Admin Staff) ----
   html += '<section class="page" id="page-as-fee-management">' +
     '<iframe id="asFeeManagementFrame" style="width:100%;height:calc(100vh - 80px);border:none;border-radius:12px;"></iframe>' +
-  '</section>';
-
-  // ---- Class Attendance Page (Admin Staff) ----
-  html += '<section class="page" id="page-as-class-attendance">' +
-    '<iframe id="asClassAttendanceFrame" style="width:100%;height:calc(100vh - 80px);border:none;border-radius:12px;"></iframe>' +
   '</section>';
 
   // ---- Document Hub Page (Admin Staff - same admin view) ----
