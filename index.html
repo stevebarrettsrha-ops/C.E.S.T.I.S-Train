@@ -14902,9 +14902,34 @@ function confirmDeleteStudent() {
   closeModal('deleteStudentModal');
   filterStudents();
   updatePipelineCounts();
+  refreshStudentDependentViews();
   showToast(name + ' has been deleted');
   addNotification('Student removed: ' + name, 'student', null, ['admin']);
   saveState();
+}
+
+// Re-render every view that displays student data so a deleted student
+// disappears immediately from other pages (Attendance, Certificates,
+// Cert Downloads, Verify Users, Instructor views, etc.) without a reload.
+function refreshStudentDependentViews() {
+  var fns = [
+    'renderAttendancePage',
+    'renderInstructorAttendance',
+    'filterCerts',
+    'renderCertDownloadMgmt',
+    'renderVerifyUsersPage',
+    'renderUserAccountsTable',
+    'filterInstructorStudents',
+    'updateInstructorPipeline',
+    'updateSkillAreaCounts',
+    'renderCentreTable'
+  ];
+  fns.forEach(function(name){
+    try {
+      var fn = window[name];
+      if(typeof fn === 'function') fn();
+    } catch(e) { /* one bad render shouldn't block the others */ }
+  });
 }
 
 // Persistent tombstone list for deleted students.
