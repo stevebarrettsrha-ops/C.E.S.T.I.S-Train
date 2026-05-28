@@ -5983,7 +5983,7 @@ function reconcileStudentsFromAccounts() {
         studentName: s.name,
         course: s.course,
         date: new Date().toISOString().split('T')[0],
-        days: {Mon:'absent', Tue:'absent', Wed:'absent', Thu:'absent', Fri:'absent'}
+        days: {Mon:null, Tue:null, Wed:null, Thu:null, Fri:null}
       });
       changed = true;
     }
@@ -6122,6 +6122,32 @@ loadUserAccounts();
   localStorage.setItem('voctrain_dataVersion', String(CURRENT_DATA_VERSION));
   saveState();
   console.log('[Migration] Demo data purge complete. Users: ' + userAccounts.length + ', Students: ' + students.length + ', Exams: ' + exams.length);
+})();
+
+// One-time reset for placeholder attendance records.
+// Older seed code defaulted every student's week to {Mon..Fri:'absent'} which
+// produced fake "Total Absences" numbers on the Attendance page. Records whose
+// five days are still all-absent are almost certainly the untouched default and
+// get reset to nulls so the summary reflects real markings only.
+(function resetPlaceholderAttendance(){
+  if (localStorage.getItem('voctrain_attendanceDefaultsReset') === '1') return;
+  if (!Array.isArray(attendanceRecords) || attendanceRecords.length === 0) {
+    localStorage.setItem('voctrain_attendanceDefaultsReset', '1');
+    return;
+  }
+  var days = ['Mon','Tue','Wed','Thu','Fri'];
+  var resetCount = 0;
+  attendanceRecords.forEach(function(r){
+    if (!r || !r.days) return;
+    var allAbsent = days.every(function(d){ return r.days[d] === 'absent'; });
+    if (allAbsent) {
+      days.forEach(function(d){ r.days[d] = null; });
+      resetCount++;
+    }
+  });
+  if (resetCount > 0) saveState();
+  localStorage.setItem('voctrain_attendanceDefaultsReset', '1');
+  console.log('[Migration] Reset ' + resetCount + ' placeholder attendance records.');
 })();
 
 loadNotifications();
@@ -7181,7 +7207,7 @@ function createStudentDataForAccount(userAccount) {
   };
   students.push(newStudent);
   // Auto-create attendance record so the student appears in attendance pages
-  attendanceRecords.push({studentId:newStudent.id, studentName:newStudent.name, course:newStudent.course, date:new Date().toISOString().split('T')[0], days:{Mon:'absent',Tue:'absent',Wed:'absent',Thu:'absent',Fri:'absent'}});
+  attendanceRecords.push({studentId:newStudent.id, studentName:newStudent.name, course:newStudent.course, date:new Date().toISOString().split('T')[0], days:{Mon:null,Tue:null,Wed:null,Thu:null,Fri:null}});
   updateSkillAreaCounts();
   userAccount.studentDataId = newStudent.id;
   saveState();
@@ -9851,9 +9877,18 @@ function exportInstructorStudentsCSV() {
 
 function renderInstructorAttendance() {
   if(!currentInstructor) return;
-  const myRecords = attendanceRecords.filter(r => {
-    const student = students.find(s => s.id === r.studentId);
-    return student && (student.instructor === currentInstructor.name || instructorCourseMatch(student.course, currentInstructor.course));
+  const recordByStudentId = {};
+  attendanceRecords.forEach(function(r){ if(r && r.studentId && !recordByStudentId[r.studentId]) recordByStudentId[r.studentId] = r; });
+  const myStudents = students.filter(s => s.instructor === currentInstructor.name || instructorCourseMatch(s.course, currentInstructor.course));
+  const myRecords = myStudents.map(function(s){
+    const existing = recordByStudentId[s.id];
+    return {
+      studentId: s.id,
+      studentName: s.name,
+      course: s.course,
+      date: existing && existing.date ? existing.date : new Date().toISOString().split('T')[0],
+      days: (existing && existing.days) ? existing.days : {Mon:null,Tue:null,Wed:null,Thu:null,Fri:null}
+    };
   });
   const tbody = document.getElementById('iAttendanceTableBody');
   if(!tbody) return;
@@ -9862,7 +9897,8 @@ function renderInstructorAttendance() {
     return '<tr><td><strong>' + r.studentName + '</strong></td><td style="font-family:monospace;font-size:12px;">' + r.studentId + '</td>' +
     days.map(d => {
       const st = r.days[d];
-      return '<td><select class="form-control" style="width:90px;padding:4px 6px;font-size:11px;" data-sid="' + r.studentId + '" data-day="' + d + '" onchange="updateAttendanceCell(this)">' +
+      return '<td><select class="form-control" style="width:110px;padding:4px 6px;font-size:11px;" data-sid="' + r.studentId + '" data-day="' + d + '" onchange="updateAttendanceCell(this)">' +
+        '<option value=""' + (!st?' selected':'') + '>— Not Marked</option>' +
         '<option value="present"' + (st==='present'?' selected':'') + '>Present</option>' +
         '<option value="absent"' + (st==='absent'?' selected':'') + '>Absent</option>' +
         '<option value="late"' + (st==='late'?' selected':'') + '>Late</option></select></td>';
@@ -9878,9 +9914,9 @@ function renderInstructorAttSummary(records) {
   const el = document.getElementById('iAttendanceSummary');
   if(!el) return;
   const days = ['Mon','Tue','Wed','Thu','Fri'];
-  let totalPresent = 0, totalAbsent = 0, totalLate = 0, totalSlots = 0;
-  records.forEach(r => { days.forEach(d => { totalSlots++; if(r.days[d]==='present') totalPresent++; else if(r.days[d]==='absent') totalAbsent++; else totalLate++; }); });
-  const pctPresent = totalSlots > 0 ? Math.round(totalPresent/totalSlots*100) : 0;
+  let totalPresent = 0, totalAbsent = 0, totalLate = 0, marked = 0;
+  records.forEach(r => { days.forEach(d => { const v = r.days[d]; if(v==='present'){totalPresent++;marked++;} else if(v==='absent'){totalAbsent++;marked++;} else if(v==='late'){totalLate++;marked++;} }); });
+  const pctPresent = marked > 0 ? Math.round(totalPresent/marked*100) : 0;
   el.innerHTML = '<div class="att-stat"><div class="att-dot" style="background:var(--green);"></div><div><div class="att-val">' + pctPresent + '%</div><div class="att-label">Present Rate</div></div></div>' +
     '<div class="att-stat"><div class="att-dot" style="background:var(--red);"></div><div><div class="att-val">' + totalAbsent + '</div><div class="att-label">Total Absences</div></div></div>' +
     '<div class="att-stat"><div class="att-dot" style="background:var(--accent);"></div><div><div class="att-val">' + totalLate + '</div><div class="att-label">Late Arrivals</div></div></div>' +
@@ -14858,7 +14894,7 @@ function saveEditStudent() {
     attRec.studentName = s.name;
     attRec.course = s.course;
   } else {
-    attendanceRecords.push({studentId:s.id, studentName:s.name, course:s.course, date:new Date().toISOString().split('T')[0], days:{Mon:'absent',Tue:'absent',Wed:'absent',Thu:'absent',Fri:'absent'}});
+    attendanceRecords.push({studentId:s.id, studentName:s.name, course:s.course, date:new Date().toISOString().split('T')[0], days:{Mon:null,Tue:null,Wed:null,Thu:null,Fri:null}});
   }
   s.lastModified = new Date().toISOString();
   updateSkillAreaCounts();
@@ -14911,7 +14947,7 @@ async function addStudent() {
   // Auto-create attendance record so the student appears in attendance pages
   var existingAtt = attendanceRecords.find(function(r){ return r.studentId === studentId; });
   if(!existingAtt) {
-    attendanceRecords.push({studentId:studentId, studentName:name, course:selectedCourse, date:new Date().toISOString().split('T')[0], days:{Mon:'absent',Tue:'absent',Wed:'absent',Thu:'absent',Fri:'absent'}});
+    attendanceRecords.push({studentId:studentId, studentName:name, course:selectedCourse, date:new Date().toISOString().split('T')[0], days:{Mon:null,Tue:null,Wed:null,Thu:null,Fri:null}});
   }
   updateSkillAreaCounts();
 
@@ -16889,7 +16925,22 @@ function renderAttendancePage() {
   const tbody = document.getElementById('attendanceTableBody');
   if(!tbody) return;
   const courseFilter = document.getElementById('attendanceCourseFilter')?.value || 'all';
-  let records = [...attendanceRecords];
+  // Build the record list from the real students array so the count and rows
+  // always match students actually added to the dashboard. Orphan attendance
+  // entries left behind by deleted students or cloud merges are dropped, and
+  // duplicate entries collapse into one row per student.
+  const recordByStudentId = {};
+  attendanceRecords.forEach(function(r){ if(r && r.studentId && !recordByStudentId[r.studentId]) recordByStudentId[r.studentId] = r; });
+  let records = students.map(function(s){
+    const existing = recordByStudentId[s.id];
+    return {
+      studentId: s.id,
+      studentName: s.name,
+      course: s.course,
+      date: existing && existing.date ? existing.date : new Date().toISOString().split('T')[0],
+      days: (existing && existing.days) ? existing.days : {Mon:null,Tue:null,Wed:null,Thu:null,Fri:null}
+    };
+  });
   if(courseFilter && courseFilter !== 'all') records = records.filter(function(r) {
     if(!r.course) return false;
     if(r.course === courseFilter) return true;
@@ -16902,7 +16953,8 @@ function renderAttendancePage() {
     return `<tr><td><strong>${r.studentName}</strong></td><td style="font-family:monospace;font-size:12px;">${r.studentId}</td><td>${r.course}</td>
     ${days.map(d => {
       const st = r.days[d];
-      return `<td><select class="form-control" style="width:90px;padding:4px 6px;font-size:11px;" data-sid="${r.studentId}" data-day="${d}" onchange="updateAttendanceCell(this)">
+      return `<td><select class="form-control" style="width:110px;padding:4px 6px;font-size:11px;" data-sid="${r.studentId}" data-day="${d}" onchange="updateAttendanceCell(this)">
+        <option value="" ${!st?'selected':''}>— Not Marked</option>
         <option value="present" ${st==='present'?'selected':''}>Present</option>
         <option value="absent" ${st==='absent'?'selected':''}>Absent</option>
         <option value="late" ${st==='late'?'selected':''}>Late</option>
@@ -16919,18 +16971,18 @@ function renderAttendanceSummary(records) {
   const el = document.getElementById('attendanceSummary');
   if(!el) return;
   const days = ['Mon','Tue','Wed','Thu','Fri'];
-  let totalPresent = 0, totalAbsent = 0, totalLate = 0, totalSlots = 0;
+  let totalPresent = 0, totalAbsent = 0, totalLate = 0, marked = 0;
   records.forEach(r => {
     days.forEach(d => {
-      totalSlots++;
-      if(r.days[d]==='present') totalPresent++;
-      else if(r.days[d]==='absent') totalAbsent++;
-      else totalLate++;
+      const v = r.days[d];
+      if(v === 'present') { totalPresent++; marked++; }
+      else if(v === 'absent') { totalAbsent++; marked++; }
+      else if(v === 'late') { totalLate++; marked++; }
     });
   });
-  const pctPresent = totalSlots > 0 ? Math.round(totalPresent/totalSlots*100) : 0;
+  const pctPresent = marked > 0 ? Math.round(totalPresent/marked*100) : 0;
   el.innerHTML = `
-    <div class="att-stat"><div class="att-dot" style="background:var(--green);"></div><div><div class="att-val">${pctPresent}%</div><div class="att-label">Present Today</div></div></div>
+    <div class="att-stat"><div class="att-dot" style="background:var(--green);"></div><div><div class="att-val">${pctPresent}%</div><div class="att-label">Present Rate</div></div></div>
     <div class="att-stat"><div class="att-dot" style="background:var(--red);"></div><div><div class="att-val">${totalAbsent}</div><div class="att-label">Total Absences</div></div></div>
     <div class="att-stat"><div class="att-dot" style="background:var(--accent);"></div><div><div class="att-val">${totalLate}</div><div class="att-label">Late Arrivals</div></div></div>
     <div class="att-stat"><div class="att-dot" style="background:var(--blue);"></div><div><div class="att-val">${records.length}</div><div class="att-label">Students Tracked</div></div></div>
@@ -16952,8 +17004,20 @@ function renderWeeklyAttChart(records) {
 function updateAttendanceCell(sel) {
   const sid = sel.getAttribute('data-sid');
   const day = sel.getAttribute('data-day');
-  const rec = attendanceRecords.find(r=>r.studentId===sid);
-  if(rec) rec.days[day] = sel.value;
+  let rec = attendanceRecords.find(r=>r.studentId===sid);
+  if(!rec) {
+    const s = students.find(function(x){ return x.id === sid; });
+    if(!s) return;
+    rec = {
+      studentId: s.id,
+      studentName: s.name,
+      course: s.course,
+      date: new Date().toISOString().split('T')[0],
+      days: {Mon:null,Tue:null,Wed:null,Thu:null,Fri:null}
+    };
+    attendanceRecords.push(rec);
+  }
+  rec.days[day] = sel.value || null;
 }
 
 function saveAttendance() {

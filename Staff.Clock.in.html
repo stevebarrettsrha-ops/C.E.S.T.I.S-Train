@@ -2530,6 +2530,7 @@
                 connectedDiv.style.display = 'block';
                 statusDot.className = 'cloud-status-dot connected';
                 statusText.textContent = 'Connected';
+                cloudAuthExpiredNotified = false;
             } else {
                 notConnectedDiv.style.display = 'block';
                 connectedDiv.style.display = 'none';
@@ -5017,6 +5018,33 @@
         // Silent auto-sync to cloud (non-blocking, no user prompts)
         let autoSyncInterval = null;
         let isAutoSyncing = false;
+        let cloudAuthExpiredNotified = false;
+
+        // Called when Drive returns 401/403, meaning the OAuth token expired.
+        // Important: local time records (incl. the active clock-in) are NEVER
+        // touched here - we just mark the cloud connection as down so future
+        // syncs stop sending the dead token, and surface a banner asking the
+        // user to reconnect. The next successful Connect Drive run resumes
+        // syncing without losing any in-progress session.
+        function handleCloudAuthExpired() {
+            isCloudConnected = false;
+            googleAccessToken = null;
+            try {
+                localStorage.removeItem('cestisGoogleAccessToken');
+                localStorage.removeItem('cestisGoogleTokenExpiry');
+            } catch (e) { /* ignore */ }
+            if (typeof updateCloudUI === 'function') updateCloudUI(false);
+            if (!cloudAuthExpiredNotified) {
+                cloudAuthExpiredNotified = true;
+                if (typeof showCloudNotification === 'function') {
+                    showCloudNotification('warn', 'Google Drive Session Expired',
+                        'Your cloud connection timed out. Your clock-in is safe locally - click Connect Drive to resume syncing.',
+                        true, 0);
+                } else if (typeof showToast === 'function') {
+                    showToast('Google Drive session expired - reconnect to resume cloud sync. Local data is safe.', 'warning');
+                }
+            }
+        }
 
         async function silentCloudSync() {
             // Only sync if connected to cloud and not already syncing
@@ -5046,6 +5074,10 @@
                             { headers: { 'Authorization': `Bearer ${googleAccessToken}` } }
                         );
 
+                        if (downloadResp.status === 401 || downloadResp.status === 403) {
+                            handleCloudAuthExpired();
+                            return;
+                        }
                         if (downloadResp.ok) {
                             const cloudData = await downloadResp.json();
                             if (cloudData && cloudData.data) {
@@ -5161,6 +5193,9 @@
                     console.log('Auto-sync to cloud completed successfully');
                 } else if (response) {
                     console.warn('Auto-sync failed with status:', response.status);
+                    if (response.status === 401 || response.status === 403) {
+                        handleCloudAuthExpired();
+                    }
                 }
             } catch (error) {
                 console.warn('Silent cloud sync failed:', error.message);
@@ -5857,6 +5892,18 @@
                 const elapsed = Math.floor((new Date() - startTime) / 1000);
                 document.getElementById('currentTimer').textContent = formatSecondsToTime(elapsed);
             }
+
+            // Heartbeat: persist a fresh lastModified once a minute so a crash or
+            // unexpected close still leaves the cloud-merge logic preferring the
+            // local in-progress session over any older cloud copy.
+            const nowMs = Date.now();
+            if (!currentSession._lastHeartbeat || nowMs - currentSession._lastHeartbeat > 60000) {
+                currentSession.lastModified = new Date().toISOString();
+                currentSession._lastHeartbeat = nowMs;
+                const idx = timeRecords.findIndex(r => r.id === currentSession.id);
+                if (idx !== -1) timeRecords[idx] = currentSession;
+                saveTimeRecords();
+            }
         }
 
         // Update Time Summary
@@ -5886,37 +5933,42 @@
         // Load Today's Session
         function loadTodaysSession() {
             const today = new Date().toISOString().split('T')[0];
-            const todaysSessions = timeRecords.filter(r =>
+            // Find any in-progress session for this user (regardless of date) so
+            // sessions that crossed midnight or were left open before a computer
+            // restart still resume instead of being orphaned in localStorage.
+            const openSessions = timeRecords.filter(r =>
                 r.staffId === currentUser.id &&
-                r.date === today &&
                 r.status !== 'completed'
-            );
+            ).sort((a, b) => new Date(a.clockIn) - new Date(b.clockIn));
 
-            // Hide resumed session banner by default
             const resumedBanner = document.getElementById('resumedSessionBanner');
             if (resumedBanner) {
                 resumedBanner.style.display = 'none';
             }
 
-            if (todaysSessions.length > 0) {
-                currentSession = todaysSessions[todaysSessions.length - 1];
+            if (openSessions.length > 0) {
+                currentSession = openSessions[openSessions.length - 1];
                 updateClockInterface();
                 if (currentSession.status === 'working' || currentSession.status === 'break') {
                     startTimer();
 
-                    // Show resumed session indicator
-                    const clockInTime = new Date(currentSession.clockIn).toLocaleTimeString();
+                    const clockInDate = new Date(currentSession.clockIn);
+                    const isFromToday = currentSession.date === today;
+                    const clockInLabel = isFromToday
+                        ? clockInDate.toLocaleTimeString()
+                        : clockInDate.toLocaleString();
                     if (resumedBanner) {
-                        document.getElementById('resumedSessionTime').textContent = clockInTime;
+                        document.getElementById('resumedSessionTime').textContent = clockInLabel;
                         resumedBanner.style.display = 'block';
                     }
 
-                    // Show toast notification for resumed session
                     setTimeout(() => {
-                        showToast(`Session resumed from ${clockInTime}. Your timer continues from where you left off.`, 'info');
+                        const msg = isFromToday
+                            ? `Session resumed from ${clockInLabel}. Your timer continues from where you left off.`
+                            : `Open session from ${clockInLabel} restored. Clock out when ready - your time is still being tracked.`;
+                        showToast(msg, 'info');
                     }, 500);
 
-                    // Resume periodic auto-sync for active session
                     startAutoSync();
                 }
             }
@@ -8022,8 +8074,18 @@
 
         // Auto-sync on page unload to prevent data loss
         window.addEventListener('beforeunload', function() {
+            // Step 1 (always): snapshot the running session to localStorage with a
+            // fresh lastModified so the next launch (or any other device) sees the
+            // most recent state as authoritative when the cloud-merge runs.
+            if (currentSession && currentSession.status !== 'completed') {
+                currentSession.lastModified = new Date().toISOString();
+                const idx = timeRecords.findIndex(r => r.id === currentSession.id);
+                if (idx !== -1) timeRecords[idx] = currentSession;
+                try { saveTimeRecords(); } catch (e) { /* localStorage full or unavailable */ }
+            }
+
+            // Step 2 (best effort): push to cloud if we have a live connection.
             if (isCloudConnected && googleAccessToken && currentSession && currentSession.status !== 'completed') {
-                // Use sendBeacon for reliable unload sync
                 const backupData = {
                     version: '1.0',
                     timestamp: new Date().toISOString(),
@@ -8033,19 +8095,16 @@
                         timeRecords: timeRecords
                     }
                 };
-
                 const jsonContent = JSON.stringify(backupData, null, 2);
-
-                // sendBeacon doesn't support auth headers, so fall back to sync XHR for cloud save
                 if (cloudFileId) {
                     try {
                         const xhr = new XMLHttpRequest();
-                        xhr.open('PATCH', `https://www.googleapis.com/upload/drive/v3/files/${cloudFileId}?uploadType=media`, false); // synchronous
+                        xhr.open('PATCH', `https://www.googleapis.com/upload/drive/v3/files/${cloudFileId}?uploadType=media`, false);
                         xhr.setRequestHeader('Authorization', `Bearer ${googleAccessToken}`);
                         xhr.setRequestHeader('Content-Type', 'application/json');
                         xhr.send(jsonContent);
                     } catch (e) {
-                        // Best-effort; localStorage is already saved
+                        // Best-effort; localStorage was already saved above.
                     }
                 }
             }
