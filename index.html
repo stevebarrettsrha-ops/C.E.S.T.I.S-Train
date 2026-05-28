@@ -8705,17 +8705,17 @@ function buildAdminPages() {
 
   <!-- TIME TRACKING (Admin) -->
   <section class="page" id="page-timetracking">
-    <iframe id="timetrackingFrame" style="width:100%;height:calc(100vh - 80px);border:none;border-radius:12px;"></iframe>
+    <iframe id="timetrackingFrame" style="width:100%;height:calc(100vh - var(--topbar-h) - 56px);border:none;border-radius:12px;"></iframe>
   </section>
 
   <!-- SCHOOL FEE MANAGEMENT (Admin) -->
   <section class="page" id="page-fee-management">
-    <iframe id="feeManagementFrame" style="width:100%;height:calc(100vh - 80px);border:none;border-radius:12px;"></iframe>
+    <iframe id="feeManagementFrame" style="width:100%;height:calc(100vh - var(--topbar-h) - 56px);border:none;border-radius:12px;"></iframe>
   </section>
 
   <!-- CASHBOOK MANAGEMENT (Admin) -->
   <section class="page" id="page-cashbook">
-    <iframe id="cashbookFrame" style="width:100%;height:calc(100vh - 80px);border:none;border-radius:12px;"></iframe>
+    <iframe id="cashbookFrame" style="width:100%;height:calc(100vh - var(--topbar-h) - 56px);border:none;border-radius:12px;"></iframe>
   </section>
 
   <!-- DOCUMENT HUB (Admin) -->
@@ -8784,7 +8784,7 @@ function buildAdminPages() {
       <h3 style="font-family:'Playfair Display',serif;margin:0;">PDF Workshop</h3>
       <a href="PDF.Workshop.html" target="_blank" rel="noopener noreferrer" class="btn btn-primary" style="text-decoration:none;">Open in New Tab ↗</a>
     </div>
-    <iframe id="pdfWorkshopFrame" style="width:100%;height:calc(100vh - 80px);border:none;border-radius:12px;"></iframe>
+    <iframe id="pdfWorkshopFrame" style="width:100%;height:calc(100vh - var(--topbar-h) - 56px);border:none;border-radius:12px;"></iframe>
   </section>
   `;
 
@@ -9720,7 +9720,7 @@ function buildInstructorPages() {
 
   <!-- TIME TRACKING (Instructor) -->
   <section class="page" id="page-i-timetracking">
-    <iframe id="iTimetrackingFrame" style="width:100%;height:calc(100vh - 80px);border:none;border-radius:12px;"></iframe>
+    <iframe id="iTimetrackingFrame" style="width:100%;height:calc(100vh - var(--topbar-h) - 56px);border:none;border-radius:12px;"></iframe>
   </section>
 
   <!-- INSTRUCTOR ONLINE EXAMS -->
@@ -9779,7 +9779,7 @@ function buildInstructorPages() {
       <h3 style="font-family:'Playfair Display',serif;margin:0;">PDF Workshop</h3>
       <a href="PDF.Workshop.html" target="_blank" rel="noopener noreferrer" class="btn btn-primary" style="text-decoration:none;">Open in New Tab ↗</a>
     </div>
-    <iframe id="iPdfWorkshopFrame" style="width:100%;height:calc(100vh - 80px);border:none;border-radius:12px;"></iframe>
+    <iframe id="iPdfWorkshopFrame" style="width:100%;height:calc(100vh - var(--topbar-h) - 56px);border:none;border-radius:12px;"></iframe>
   </section>
   `;
 
@@ -25510,7 +25510,7 @@ function buildAdminStaffPages() {
       '<h3 style="font-family:\'Playfair Display\',serif;margin:0;">PDF Workshop</h3>' +
       '<a href="PDF.Workshop.html" target="_blank" rel="noopener noreferrer" class="btn btn-primary" style="text-decoration:none;">Open in New Tab ↗</a>' +
     '</div>' +
-    '<iframe id="asPdfWorkshopFrame" style="width:100%;height:calc(100vh - 80px);border:none;border-radius:12px;"></iframe>' +
+    '<iframe id="asPdfWorkshopFrame" style="width:100%;height:calc(100vh - var(--topbar-h) - 56px);border:none;border-radius:12px;"></iframe>' +
   '</section>';
 
   // ---- Profile Page ----
@@ -25533,12 +25533,12 @@ function buildAdminStaffPages() {
 
   // ---- Time Tracking Page (Admin Staff) ----
   html += '<section class="page" id="page-as-timetracking">' +
-    '<iframe id="asTimetrackingFrame" style="width:100%;height:calc(100vh - 80px);border:none;border-radius:12px;"></iframe>' +
+    '<iframe id="asTimetrackingFrame" style="width:100%;height:calc(100vh - var(--topbar-h) - 56px);border:none;border-radius:12px;"></iframe>' +
   '</section>';
 
   // ---- School Fee Management Page (Admin Staff) ----
   html += '<section class="page" id="page-as-fee-management">' +
-    '<iframe id="asFeeManagementFrame" style="width:100%;height:calc(100vh - 80px);border:none;border-radius:12px;"></iframe>' +
+    '<iframe id="asFeeManagementFrame" style="width:100%;height:calc(100vh - var(--topbar-h) - 56px);border:none;border-radius:12px;"></iframe>' +
   '</section>';
 
   // ---- Document Hub Page (Admin Staff - same admin view) ----
