@@ -1700,128 +1700,8 @@
     </script>
 </head>
 <body>
-    <!-- Login Page -->
-    <div id="loginPage" class="login-container">
-        <div class="login-box">
-            <div class="login-header">
-                <h1 class="login-title">CESTIS Time Tracking</h1>
-                <p class="login-subtitle">Community Educational and Skills Training Institute</p>
-                <p class="login-subtitle">and Services Limited</p>
-                <p class="login-subtitle" style="margin-top: 1rem; font-weight: 600;">Staff Login System</p>
-            </div>
-
-            <div class="login-error" id="loginError"></div>
-
-            <!-- First-Time User Sync Prompt -->
-            <div class="first-time-sync-prompt" id="firstTimeSyncPrompt">
-                <div class="sync-prompt-icon">☁️</div>
-                <h3>First Time Here?</h3>
-                <p>If you're logging in for the first time or on a new device, please sync with Google Cloud first to get your account data.</p>
-                <button type="button" class="sync-prompt-btn" onclick="initiateLoginPageSync()">
-                    <span>🔄</span> Connect & Sync with Google
-                </button>
-                <div class="sync-prompt-dismiss">
-                    <a onclick="dismissFirstTimePrompt()">I already have local data - skip this</a>
-                </div>
-                <div class="sync-status-message" id="loginSyncStatus" style="display: none;">
-                    <span class="sync-status-icon">⏳</span>
-                    <span class="sync-status-text" id="loginSyncStatusText">Connecting...</span>
-                </div>
-            </div>
-
-            <!-- Step 1: Normal Login -->
-            <div id="loginStepNormal">
-                <form onsubmit="handleLogin(event)">
-                    <div class="input-group">
-                        <label>Employee ID / Username</label>
-                        <input type="text" id="loginUsername" class="login-input" required autocomplete="username">
-                    </div>
-
-                    <div class="input-group">
-                        <label>Password</label>
-                        <input type="password" id="loginPassword" class="login-input" required autocomplete="current-password">
-                    </div>
-
-                    <button type="submit" class="login-btn">🔐 Login</button>
-                </form>
-
-                <div class="forgot-password-link">
-                    <a href="#" onclick="showForgotPasswordStep(); return false;">Forgot Password?</a>
-                </div>
-            </div>
-
-            <!-- Step 2: Forgot Password - Enter Email -->
-            <div id="loginStepForgotPassword" style="display: none;">
-                <a class="back-link" onclick="cancelForgotPassword()">
-                    <span>←</span> Back to Login
-                </a>
-
-                <h2 style="color: var(--primary-blue); font-size: 20px; font-weight: 700; margin-bottom: 8px;">Reset Password</h2>
-                <p style="color: #64748b; font-size: 14px; margin-bottom: 24px;">Enter your email address to receive a one-time password (OTP).</p>
-
-                <div class="login-error" id="forgotPasswordError"></div>
-
-                <div class="input-group">
-                    <label>Email Address</label>
-                    <input type="email" id="forgotPasswordEmail" class="login-input" placeholder="Enter your registered email">
-                </div>
-
-                <button type="button" class="login-btn" onclick="sendOTPEmail()">📧 Send OTP</button>
-            </div>
-
-            <!-- Step 3: Enter OTP -->
-            <div id="loginStepOTP" style="display: none;">
-                <a class="back-link" onclick="cancelForgotPassword()">
-                    <span>←</span> Back to Login
-                </a>
-
-                <h2 style="color: var(--primary-blue); font-size: 20px; font-weight: 700; margin-bottom: 8px;">Enter OTP</h2>
-                <p class="otp-info">We sent a 6-digit code to <strong id="otpEmailDisplay"></strong></p>
-
-                <div class="login-error" id="otpError"></div>
-
-                <div class="input-group">
-                    <label>One-Time Password</label>
-                    <input type="text" id="otpCode" class="otp-input" maxlength="6" placeholder="000000" autocomplete="one-time-code">
-                </div>
-
-                <button type="button" class="login-btn" onclick="verifyOTP()">✓ Verify OTP</button>
-
-                <div class="resend-link">
-                    <a onclick="resendOTP()">Didn't receive the code? Resend OTP</a>
-                </div>
-            </div>
-
-            <!-- Step 4: Set New Password -->
-            <div id="loginStepNewPassword" style="display: none;">
-                <a class="back-link" onclick="cancelForgotPassword()">
-                    <span>←</span> Back to Login
-                </a>
-
-                <h2 style="color: var(--primary-blue); font-size: 20px; font-weight: 700; margin-bottom: 8px;">Set New Password</h2>
-                <p style="color: #64748b; font-size: 14px; margin-bottom: 24px;">Create a new password for your account.</p>
-
-                <div class="login-error" id="newPasswordError"></div>
-
-                <div class="new-password-form">
-                    <div class="input-group">
-                        <label>New Password</label>
-                        <input type="password" id="newPassword" class="login-input" placeholder="Enter new password">
-                    </div>
-
-                    <div class="input-group">
-                        <label>Confirm New Password</label>
-                        <input type="password" id="confirmNewPassword" class="login-input" placeholder="Confirm new password">
-                    </div>
-                </div>
-
-                <button type="button" class="login-btn" onclick="resetPassword()">🔐 Reset Password</button>
-            </div>
-        </div>
-    </div>
-
     <!-- Main Dashboard -->
-    <div id="mainDashboard" style="display: none;">
+    <div id="mainDashboard">
         <div class="container">
             <!-- Header -->
             <div class="header">
@@ -5315,7 +5195,6 @@
             currentUser = staff;
             localStorage.setItem('cestisCurrentUser', JSON.stringify(staff));
 
-            document.getElementById('loginPage').style.display = 'none';
             document.getElementById('mainDashboard').style.display = 'block';
             document.getElementById('currentUserDisplay').textContent = `👤 ${staff.fullName} (${staff.workType})`;
 
@@ -5695,10 +5574,7 @@
                     resumedBanner.style.display = 'none';
                 }
 
-                document.getElementById('loginPage').style.display = 'flex';
-                document.getElementById('mainDashboard').style.display = 'none';
-                document.getElementById('loginUsername').value = '';
-                document.getElementById('loginPassword').value = '';
+                location.reload();
             }
         }
 
@@ -8159,15 +8035,19 @@
             initializeDefaultAdmin();
             loadTimeRecords();
 
-            // Check session
+            // Auto-load user (no login required — page is embedded in authenticated dashboard)
             const savedUser = localStorage.getItem('cestisCurrentUser');
             if (savedUser) {
                 currentUser = JSON.parse(savedUser);
-                document.getElementById('loginPage').style.display = 'none';
+            } else {
+                currentUser = staffMembers.find(s => s.role === 'Admin') || staffMembers[0];
+                if (currentUser) localStorage.setItem('cestisCurrentUser', JSON.stringify(currentUser));
+            }
+            if (currentUser) {
                 document.getElementById('mainDashboard').style.display = 'block';
                 document.getElementById('currentUserDisplay').textContent = `👤 ${currentUser.fullName} (${currentUser.workType})`;
                 updateUIForRole();
-                
+
                 if (currentUser.role !== 'Viewer') {
                     loadTodaysSession();
                     renderTodayLog();
