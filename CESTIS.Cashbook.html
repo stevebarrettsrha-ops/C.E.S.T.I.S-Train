@@ -2292,7 +2292,7 @@ tbody tr.bank-charge { color:var(--text3); font-style:italic; }
             <div class="nav-item" data-page="reports" onclick="showPage('reports')"><span class="icon">📑</span> Reports</div>
         </div>
         <div class="nav-section">
-            <div class="nav-label">External Links</div>
+            <div class="nav-label">Linked Dashboards</div>
             <div class="nav-item" data-page="staff-payslip" onclick="showPageDirect('staff-payslip')"><span class="icon">💳</span> Staff Payslip</div>
             <div class="nav-item" data-page="virement-request" onclick="showPageDirect('virement-request')"><span class="icon">📤</span> Virement Request</div>
         </div>
@@ -2906,7 +2906,7 @@ tbody tr.bank-charge { color:var(--text3); font-style:italic; }
                     <button class="btn btn-ghost btn-sm" onclick="window.open(EXTERNAL_LINKS.staffPayslip, '_blank', 'noopener,noreferrer')">Open in New Tab ↗</button>
                 </div>
             </div>
-            <iframe src="https://stevebarrettsrha-ops.github.io/Staff-Payslip---Dashboard/" style="width:100%;height:calc(100vh - 120px);border:none;border-radius:8px;"></iframe>
+            <iframe src="Staff.Payslip.html" style="width:100%;height:calc(100vh - 120px);border:none;border-radius:8px;"></iframe>
         </div>
 
         <div id="page-virement-request" class="page">
@@ -2919,7 +2919,7 @@ tbody tr.bank-charge { color:var(--text3); font-style:italic; }
                     <button class="btn btn-ghost btn-sm" onclick="window.open(EXTERNAL_LINKS.virementRequest, '_blank', 'noopener,noreferrer')">Open in New Tab ↗</button>
                 </div>
             </div>
-            <iframe src="https://stevebarrettsrha-ops.github.io/CESTIS---Virement-Request/" style="width:100%;height:calc(100vh - 120px);border:none;border-radius:8px;"></iframe>
+            <iframe src="Virement.Request.html" style="width:100%;height:calc(100vh - 120px);border:none;border-radius:8px;"></iframe>
         </div>
 
     </main>
@@ -3063,8 +3063,8 @@ tbody tr.bank-charge { color:var(--text3); font-style:italic; }
 // CONFIGURATION: External Links
 // ============================================================
 const EXTERNAL_LINKS = {
-    staffPayslip: 'https://stevebarrettsrha-ops.github.io/Staff-Payslip---Dashboard/',
-    virementRequest: 'https://stevebarrettsrha-ops.github.io/CESTIS---Virement-Request/'
+    staffPayslip: 'Staff.Payslip.html',
+    virementRequest: 'Virement.Request.html'
 };
 
 // ============================================================
