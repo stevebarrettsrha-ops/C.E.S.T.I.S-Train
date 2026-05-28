@@ -9877,9 +9877,18 @@ function exportInstructorStudentsCSV() {
 
 function renderInstructorAttendance() {
   if(!currentInstructor) return;
-  const myRecords = attendanceRecords.filter(r => {
-    const student = students.find(s => s.id === r.studentId);
-    return student && (student.instructor === currentInstructor.name || instructorCourseMatch(student.course, currentInstructor.course));
+  const recordByStudentId = {};
+  attendanceRecords.forEach(function(r){ if(r && r.studentId && !recordByStudentId[r.studentId]) recordByStudentId[r.studentId] = r; });
+  const myStudents = students.filter(s => s.instructor === currentInstructor.name || instructorCourseMatch(s.course, currentInstructor.course));
+  const myRecords = myStudents.map(function(s){
+    const existing = recordByStudentId[s.id];
+    return {
+      studentId: s.id,
+      studentName: s.name,
+      course: s.course,
+      date: existing && existing.date ? existing.date : new Date().toISOString().split('T')[0],
+      days: (existing && existing.days) ? existing.days : {Mon:null,Tue:null,Wed:null,Thu:null,Fri:null}
+    };
   });
   const tbody = document.getElementById('iAttendanceTableBody');
   if(!tbody) return;
@@ -16916,7 +16925,22 @@ function renderAttendancePage() {
   const tbody = document.getElementById('attendanceTableBody');
   if(!tbody) return;
   const courseFilter = document.getElementById('attendanceCourseFilter')?.value || 'all';
-  let records = [...attendanceRecords];
+  // Build the record list from the real students array so the count and rows
+  // always match students actually added to the dashboard. Orphan attendance
+  // entries left behind by deleted students or cloud merges are dropped, and
+  // duplicate entries collapse into one row per student.
+  const recordByStudentId = {};
+  attendanceRecords.forEach(function(r){ if(r && r.studentId && !recordByStudentId[r.studentId]) recordByStudentId[r.studentId] = r; });
+  let records = students.map(function(s){
+    const existing = recordByStudentId[s.id];
+    return {
+      studentId: s.id,
+      studentName: s.name,
+      course: s.course,
+      date: existing && existing.date ? existing.date : new Date().toISOString().split('T')[0],
+      days: (existing && existing.days) ? existing.days : {Mon:null,Tue:null,Wed:null,Thu:null,Fri:null}
+    };
+  });
   if(courseFilter && courseFilter !== 'all') records = records.filter(function(r) {
     if(!r.course) return false;
     if(r.course === courseFilter) return true;
@@ -16980,8 +17004,20 @@ function renderWeeklyAttChart(records) {
 function updateAttendanceCell(sel) {
   const sid = sel.getAttribute('data-sid');
   const day = sel.getAttribute('data-day');
-  const rec = attendanceRecords.find(r=>r.studentId===sid);
-  if(rec) rec.days[day] = sel.value || null;
+  let rec = attendanceRecords.find(r=>r.studentId===sid);
+  if(!rec) {
+    const s = students.find(function(x){ return x.id === sid; });
+    if(!s) return;
+    rec = {
+      studentId: s.id,
+      studentName: s.name,
+      course: s.course,
+      date: new Date().toISOString().split('T')[0],
+      days: {Mon:null,Tue:null,Wed:null,Thu:null,Fri:null}
+    };
+    attendanceRecords.push(rec);
+  }
+  rec.days[day] = sel.value || null;
 }
 
 function saveAttendance() {
