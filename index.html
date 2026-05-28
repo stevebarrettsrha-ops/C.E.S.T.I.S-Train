@@ -9878,9 +9878,9 @@ function renderInstructorAttSummary(records) {
   const el = document.getElementById('iAttendanceSummary');
   if(!el) return;
   const days = ['Mon','Tue','Wed','Thu','Fri'];
-  let totalPresent = 0, totalAbsent = 0, totalLate = 0, totalSlots = 0;
-  records.forEach(r => { days.forEach(d => { totalSlots++; if(r.days[d]==='present') totalPresent++; else if(r.days[d]==='absent') totalAbsent++; else totalLate++; }); });
-  const pctPresent = totalSlots > 0 ? Math.round(totalPresent/totalSlots*100) : 0;
+  let totalPresent = 0, totalAbsent = 0, totalLate = 0, marked = 0;
+  records.forEach(r => { days.forEach(d => { const v = r.days && r.days[d]; if(v === 'present'){totalPresent++;marked++;} else if(v === 'absent'){totalAbsent++;marked++;} else if(v === 'late'){totalLate++;marked++;} }); });
+  const pctPresent = marked > 0 ? Math.round(totalPresent/marked*100) : 0;
   el.innerHTML = '<div class="att-stat"><div class="att-dot" style="background:var(--green);"></div><div><div class="att-val">' + pctPresent + '%</div><div class="att-label">Present Rate</div></div></div>' +
     '<div class="att-stat"><div class="att-dot" style="background:var(--red);"></div><div><div class="att-val">' + totalAbsent + '</div><div class="att-label">Total Absences</div></div></div>' +
     '<div class="att-stat"><div class="att-dot" style="background:var(--accent);"></div><div><div class="att-val">' + totalLate + '</div><div class="att-label">Late Arrivals</div></div></div>' +
@@ -13660,6 +13660,7 @@ async function recoverCourseDataFromCloud(courseName) {
     // Recover students from cloud that match this course
     if (Array.isArray(backupData.data.students)) {
       backupData.data.students.forEach(function(cloudStudent) {
+        if (isStudentDeleted(cloudStudent && cloudStudent.id)) return;
         if (!cloudStudent.course || cloudStudent.course.toLowerCase().trim() !== courseNameLower) return;
         // Skip if already exists locally (by ID or by name+course)
         var exists = students.some(function(s) {
@@ -14880,12 +14881,57 @@ function confirmDeleteStudent() {
   var sid = s.id;
   students.splice(idx, 1);
   if(studentProfiles[sid]) delete studentProfiles[sid];
+  // Cascade-remove derived records so they don't bloat counts (e.g.
+  // Students Tracked) and so cloud-merge does not have stale data to
+  // resurrect.
+  if(Array.isArray(attendanceRecords)) {
+    attendanceRecords = attendanceRecords.filter(function(r){ return r.studentId !== sid; });
+  }
+  if(typeof examResults !== 'undefined' && Array.isArray(examResults)) {
+    examResults = examResults.filter(function(r){ return r.studentId !== sid; });
+  }
+  if(typeof certDownloadApprovals !== 'undefined' && Array.isArray(certDownloadApprovals)) {
+    certDownloadApprovals = certDownloadApprovals.filter(function(a){ return a.studentId !== sid; });
+  }
+  if(typeof userAccounts !== 'undefined' && Array.isArray(userAccounts)) {
+    userAccounts = userAccounts.filter(function(u){ return u.studentDataId !== sid; });
+    if(typeof saveUserAccounts === 'function') saveUserAccounts();
+  }
+  // Tombstone the ID so cloud-merge skips it instead of resurrecting it.
+  recordDeletedStudent(sid);
   closeModal('deleteStudentModal');
   filterStudents();
   updatePipelineCounts();
   showToast(name + ' has been deleted');
   addNotification('Student removed: ' + name, 'student', null, ['admin']);
   saveState();
+}
+
+// Persistent tombstone list for deleted students.
+// Loaded lazily so it survives reloads, and consulted by every cloud merge
+// path that might otherwise push a deleted student back into the local list.
+function _getDeletedStudentIds() {
+  try {
+    var raw = localStorage.getItem('voctrain_deletedStudentIds');
+    if(!raw) return {};
+    var arr = JSON.parse(raw);
+    if(!Array.isArray(arr)) return {};
+    var map = {};
+    arr.forEach(function(id){ if(id) map[id] = true; });
+    return map;
+  } catch(e) { return {}; }
+}
+function isStudentDeleted(id) {
+  if(!id) return false;
+  return _getDeletedStudentIds()[id] === true;
+}
+function recordDeletedStudent(id) {
+  if(!id) return;
+  try {
+    var existing = _getDeletedStudentIds();
+    existing[id] = true;
+    localStorage.setItem('voctrain_deletedStudentIds', JSON.stringify(Object.keys(existing)));
+  } catch(e) { /* ignore */ }
 }
 function updatePipelineCounts() {
   stages.forEach(s => {
@@ -16919,21 +16965,34 @@ function renderAttendanceSummary(records) {
   const el = document.getElementById('attendanceSummary');
   if(!el) return;
   const days = ['Mon','Tue','Wed','Thu','Fri'];
-  let totalPresent = 0, totalAbsent = 0, totalLate = 0, totalSlots = 0;
+  let totalPresent = 0, totalAbsent = 0, totalLate = 0, marked = 0;
   records.forEach(r => {
     days.forEach(d => {
-      totalSlots++;
-      if(r.days[d]==='present') totalPresent++;
-      else if(r.days[d]==='absent') totalAbsent++;
-      else totalLate++;
+      const v = r.days && r.days[d];
+      if(v === 'present') { totalPresent++; marked++; }
+      else if(v === 'absent') { totalAbsent++; marked++; }
+      else if(v === 'late') { totalLate++; marked++; }
     });
   });
-  const pctPresent = totalSlots > 0 ? Math.round(totalPresent/totalSlots*100) : 0;
+  const pctPresent = marked > 0 ? Math.round(totalPresent/marked*100) : 0;
+  // Students Tracked reflects the real students enrolled (filtered by the
+  // current course selector), not the orphan attendance-record count.
+  const courseFilter = document.getElementById('attendanceCourseFilter')?.value || 'all';
+  const realStudentCount = (typeof students !== 'undefined' && Array.isArray(students))
+    ? students.filter(function(s){
+        if(!courseFilter || courseFilter === 'all') return true;
+        if(!s.course) return false;
+        if(s.course === courseFilter) return true;
+        if(s.course.toLowerCase().trim() === courseFilter.toLowerCase().trim()) return true;
+        if(typeof instructorCourseMatch === 'function') return instructorCourseMatch(s.course, courseFilter);
+        return false;
+      }).length
+    : records.length;
   el.innerHTML = `
-    <div class="att-stat"><div class="att-dot" style="background:var(--green);"></div><div><div class="att-val">${pctPresent}%</div><div class="att-label">Present Today</div></div></div>
+    <div class="att-stat"><div class="att-dot" style="background:var(--green);"></div><div><div class="att-val">${pctPresent}%</div><div class="att-label">Present Rate</div></div></div>
     <div class="att-stat"><div class="att-dot" style="background:var(--red);"></div><div><div class="att-val">${totalAbsent}</div><div class="att-label">Total Absences</div></div></div>
     <div class="att-stat"><div class="att-dot" style="background:var(--accent);"></div><div><div class="att-val">${totalLate}</div><div class="att-label">Late Arrivals</div></div></div>
-    <div class="att-stat"><div class="att-dot" style="background:var(--blue);"></div><div><div class="att-val">${records.length}</div><div class="att-label">Students Tracked</div></div></div>
+    <div class="att-stat"><div class="att-dot" style="background:var(--blue);"></div><div><div class="att-val">${realStudentCount}</div><div class="att-label">Students Tracked</div></div></div>
   `;
 }
 
@@ -19175,6 +19234,7 @@ async function mergeFromCloud() {
     // Uses lastModified timestamp when available for conflict resolution
     if (backupData.data.students) {
       backupData.data.students.forEach(cloudStudent => {
+        if (isStudentDeleted(cloudStudent.id)) return; // Honor tombstone
         if (_demoStudentIds[cloudStudent.id]) return; // Skip legacy demo data
         var localMatch = students.find(function(s) { return s.id === cloudStudent.id; });
         if (localMatch) {
@@ -19899,6 +19959,7 @@ async function silentMergeFromBackup(fileId) {
     // Merge students — timestamp-based update for existing, add new ones
     if (backupData.data.students) {
       backupData.data.students.forEach(cloudStudent => {
+        if (isStudentDeleted(cloudStudent.id)) return; // Honor tombstone
         if (_ds[cloudStudent.id]) return;
         var localMatch = students.find(function(s) { return s.id === cloudStudent.id; });
         if (localMatch) {
@@ -20552,6 +20613,7 @@ async function autoSyncOnLogin() {
           // Recover students
           if (Array.isArray(_backupData.data.students)) {
             _backupData.data.students.forEach(function(cs) {
+              if (isStudentDeleted(cs && cs.id)) return;
               if (!cs.course || cs.course.toLowerCase().trim() !== _courseNameLower) return;
               var exists = students.some(function(s) {
                 return s.id === cs.id || (s.name === cs.name && s.course && s.course.toLowerCase().trim() === _courseNameLower);
@@ -21289,6 +21351,7 @@ async function studentLightSync(uname, pw) {
 
     // Merge student records
     cloudStudents.forEach(function(cs) {
+      if (isStudentDeleted(cs && cs.id)) return;
       if (!students.find(function(ls) { return ls.id === cs.id; })) {
         students.push(cs);
       } else {
@@ -28590,6 +28653,7 @@ async function fetchCertDataFromDrive() {
     if (backupData.data.students && Array.isArray(backupData.data.students)) {
       backupData.data.students.forEach(function(cloudStudent) {
         if (!cloudStudent || !cloudStudent.id) return;
+        if (isStudentDeleted(cloudStudent.id)) return; // Honor tombstone
         var existing = students.find(function(s) { return s.id === cloudStudent.id; });
         if (existing) {
           // Update cert-relevant fields from cloud
