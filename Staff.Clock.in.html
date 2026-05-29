@@ -2600,13 +2600,15 @@
             return cloudFileId;
         }
         // Admin: pull every per-user file in the subfolder and merge their time records.
-        async function ttAggregateAllUserFiles() {
-            if (!googleAccessToken) return;
+        // Returns { staffCount, newRecords } so callers can surface a summary toast.
+        async function ttAggregateAllUserFiles(notifyOnSuccess) {
+            if (!googleAccessToken) return { staffCount: 0, newRecords: 0 };
+            var staffCount = 0, newRecords = 0;
             try {
                 var folderId = await ttEnsureUserFilesFolder();
                 var q = "'" + folderId + "' in parents and mimeType='application/json' and trashed=false";
                 var resp = await fetch('https://www.googleapis.com/drive/v3/files?q=' + encodeURIComponent(q) + '&fields=files(id,name)', { headers: { 'Authorization': 'Bearer ' + googleAccessToken } });
-                if (!resp.ok) return;
+                if (!resp.ok) return { staffCount: 0, newRecords: 0 };
                 var d = await resp.json();
                 var files = d.files || [];
                 for (var i = 0; i < files.length; i++) {
@@ -2615,14 +2617,21 @@
                         if (!fr.ok) continue;
                         var fd = await fr.json();
                         var recs = (fd && fd.data && Array.isArray(fd.data.timeRecords)) ? fd.data.timeRecords : [];
+                        staffCount++;
                         for (var j = 0; j < recs.length; j++) {
                             var r = recs[j];
-                            if (!timeRecords.find(function(x){ return x.id === r.id; })) timeRecords.push(r);
+                            if (!timeRecords.find(function(x){ return x.id === r.id; })) { timeRecords.push(r); newRecords++; }
                         }
                     } catch (e) {}
                 }
                 saveTimeRecords();
+                if (notifyOnSuccess && typeof showToast === 'function') {
+                    var msg = '🔄 All staff refreshed — ' + staffCount + ' staff file' + (staffCount === 1 ? '' : 's') + ' loaded';
+                    if (newRecords > 0) msg += ', ' + newRecords + ' new record' + (newRecords === 1 ? '' : 's');
+                    showToast(msg, 'success');
+                }
             } catch (e) { console.warn('aggregate all user files failed', e); }
+            return { staffCount: staffCount, newRecords: newRecords };
         }
         // =================================================================
 
@@ -5822,7 +5831,7 @@
                 populateStaffSelect();
                 populateEditStaffSelect();
                 renderStaffTable();
-                if (googleAccessToken) ttAggregateAllUserFiles().then(function(){ try { renderHistory(); renderStaffTable(); } catch(e){} });
+                if (googleAccessToken) ttAggregateAllUserFiles(true).then(function(){ try { renderHistory(); renderStaffTable(); } catch(e){} });
             } else if (currentUser.role === 'Viewer') {
                 // Viewer can see reports but not edit anything
                 document.getElementById('reportsTab').style.display = 'block';
