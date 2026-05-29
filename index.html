@@ -32844,6 +32844,7 @@ function ttUnmount(){
                 expiry.setHours(expiry.getHours() + 1);
                 CESTISStore.setItem('cestisGoogleAccessToken', token);
                 CESTISStore.setItem('cestisGoogleTokenExpiry', expiry.toISOString());
+                preExpiryUploadDone = false;
 
                 ttc_closeGoogleAuthModal();
                 ttc_updateCloudUI(true);
@@ -32868,6 +32869,7 @@ function ttUnmount(){
             expiry.setSeconds(expiry.getSeconds() + (tokenResponse.expires_in || 3600));
             CESTISStore.setItem('cestisGoogleAccessToken', ttc_googleAccessToken);
             CESTISStore.setItem('cestisGoogleTokenExpiry', expiry.toISOString());
+            preExpiryUploadDone = false;
 
             ttc_updateCloudUI(true);
 
@@ -35115,6 +35117,8 @@ function ttUnmount(){
 
         // Silent auto-sync to cloud (non-blocking, no user prompts)
         let autoSyncInterval = null;
+        let preExpiryUploadDone = false;
+        const PRE_EXPIRY_UPLOAD_MS = 2 * 60 * 1000; // full upload when <2 min of token life remains
         let isAutoSyncing = false;
         let cloudAuthExpiredNotified = false;
 
@@ -35144,7 +35148,7 @@ function ttUnmount(){
             }
         }
 
-        async function silentCloudSync() {
+        async function silentCloudSync(notifyOnSuccess) {
             // Only sync if connected to cloud and not already syncing
             if (!ttc_isCloudConnected || !ttc_googleAccessToken || isAutoSyncing) {
                 return;
@@ -35288,6 +35292,9 @@ function ttUnmount(){
                     ttc_cloudFileTimestamp = new Date().toISOString();
                     ttc_updateLastSyncDisplay();
                     ttc_updateLastSavedByDisplay();
+                    if (notifyOnSuccess && typeof ttc_showToast === 'function') {
+                        ttc_showToast('☁️ Your recorded time has been uploaded to the cloud.', 'success');
+                    }
                     console.log('Auto-sync to cloud completed successfully');
                 } else if (response) {
                     console.warn('Auto-sync failed with status:', response.status);
@@ -35305,14 +35312,31 @@ function ttUnmount(){
         // Start periodic auto-sync (every 5 minutes while clocked in)
         function startAutoSync() {
             stopAutoSync();
-            // Immediate sync on clock-in
-            silentCloudSync();
-            // Then every 5 minutes
-            autoSyncInterval = setInterval(() => {
-                if (currentSession && currentSession.status !== 'completed') {
-                    silentCloudSync();
+            autoSaveTick();
+            autoSyncInterval = setInterval(autoSaveTick, 10 * 1000);
+        }
+
+        // Runs every 10 seconds: always persist locally; only do a full upload
+        // to Google Drive when the access token is about to expire. A full
+        // upload also happens on clock-out and can't be lost because the timer
+        // is computed from real clock-in timestamps.
+        function autoSaveTick() {
+            if (currentSession && currentSession.status !== 'completed') {
+                currentSession.lastModified = new Date().toISOString();
+                var idx = timeRecords.findIndex(function(r){ return r.id === currentSession.id; });
+                if (idx !== -1) timeRecords[idx] = currentSession;
+            }
+            saveTimeRecords();
+            try {
+                var exp = CESTISStore.getItem('cestisGoogleTokenExpiry');
+                if (exp) {
+                    var msLeft = new Date(exp).getTime() - Date.now();
+                    if (msLeft > 0 && msLeft <= PRE_EXPIRY_UPLOAD_MS && !preExpiryUploadDone) {
+                        preExpiryUploadDone = true;
+                        silentCloudSync(true);
+                    }
                 }
-            }, 5 * 60 * 1000);
+            } catch(e){}
         }
 
         function stopAutoSync() {
@@ -35829,8 +35853,9 @@ function ttUnmount(){
 
             ttc_showToast('Clocked in successfully! Have a productive day.', 'success');
 
-            // Auto-sync to cloud
+            // Start the 10s local-save loop, then push this clock-in to the cloud now
             startAutoSync();
+            silentCloudSync(true);
         }
 
         // Start Break
@@ -35850,8 +35875,8 @@ function ttUnmount(){
 
             ttc_showToast('Break started. Enjoy your rest!', 'info');
 
-            // Auto-sync to cloud
-            silentCloudSync();
+            // Push this change to the cloud now
+            silentCloudSync(true);
         }
 
         // End Break
@@ -35881,8 +35906,8 @@ function ttUnmount(){
 
             ttc_showToast('Break ended. Back to work!', 'success');
 
-            // Auto-sync to cloud
-            silentCloudSync();
+            // Push this change to the cloud now
+            silentCloudSync(true);
         }
 
         // Clock Out
@@ -35916,9 +35941,9 @@ function ttUnmount(){
 
                 ttc_showToast('Clocked out successfully! Great work today.', 'success');
 
-                // Stop periodic auto-sync and do final sync
+                // Stop periodic auto-sync and do a final upload to the cloud
                 stopAutoSync();
-                silentCloudSync();
+                silentCloudSync(true);
             }
         }
 
@@ -38347,6 +38372,7 @@ function ttInitApp(){
         var tt=document.getElementById('themeText'); if(tt) tt.textContent='Light';
     }
     try { ttc_initializeCloudSync(); } catch(e){}
+    try { startAutoSync(); } catch(e){}  // 10-second Drive auto-sync (self-activates once connected)
     setTimeout(function(){ try{ ttc_initGoogleAuth(); }catch(e){} }, 500);
     setTimeout(function(){ try{ ttc_checkCloudAndNotify('page_load'); ttc_startCloudMonitor(); }catch(e){} }, 2000);
 }
