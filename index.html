@@ -32575,6 +32575,91 @@ function ttUnmount(){
             SCOPES: 'https://www.googleapis.com/auth/drive'
         };
 
+        // ===== Per-user Drive storage =====================================
+        // Each logged-in user keeps updating ONE JSON file named after their
+        // username, all stored together in a dedicated subfolder. The username
+        // is embedded in every save. Admins can aggregate all files for reports.
+        var TT_USER_FILES_FOLDER_NAME = 'Staff Clock-In User Files';
+        var ttUserFilesFolderId = CESTISStore.getItem('cestisUserFilesFolderId') || null;
+        function ttUserKey() {
+            var u = ttc_currentUser && (ttc_currentUser.username || ttc_currentUser.fullName);
+            return String(u || 'user').replace(/[^A-Za-z0-9_-]+/g, '_');
+        }
+        function ttUserBackupName() {
+            return 'Staff_Clock_In_System_' + ttUserKey() + '.json';
+        }
+        function ttUserFilesParent() {
+            return ttUserFilesFolderId || ttc_GOOGLE_DRIVE_CONFIG.FOLDER_ID;
+        }
+        async function ttEnsureUserFilesFolder() {
+            if (ttUserFilesFolderId) return ttUserFilesFolderId;
+            if (!ttc_googleAccessToken) return ttc_GOOGLE_DRIVE_CONFIG.FOLDER_ID;
+            try {
+                var q = "name='" + TT_USER_FILES_FOLDER_NAME + "' and mimeType='application/vnd.google-apps.folder' and '" + ttc_GOOGLE_DRIVE_CONFIG.FOLDER_ID + "' in parents and trashed=false";
+                var resp = await fetch('https://www.googleapis.com/drive/v3/files?q=' + encodeURIComponent(q) + '&fields=files(id,name)', { headers: { 'Authorization': 'Bearer ' + ttc_googleAccessToken } });
+                if (resp.ok) {
+                    var d = await resp.json();
+                    if (d.files && d.files.length > 0) {
+                        ttUserFilesFolderId = d.files[0].id;
+                        CESTISStore.setItem('cestisUserFilesFolderId', ttUserFilesFolderId);
+                        return ttUserFilesFolderId;
+                    }
+                }
+                var cr = await fetch('https://www.googleapis.com/drive/v3/files?fields=id', {
+                    method: 'POST',
+                    headers: { 'Authorization': 'Bearer ' + ttc_googleAccessToken, 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ name: TT_USER_FILES_FOLDER_NAME, mimeType: 'application/vnd.google-apps.folder', parents: [ttc_GOOGLE_DRIVE_CONFIG.FOLDER_ID] })
+                });
+                if (cr.ok) { var cd = await cr.json(); ttUserFilesFolderId = cd.id; CESTISStore.setItem('cestisUserFilesFolderId', ttUserFilesFolderId); return ttUserFilesFolderId; }
+            } catch (e) { console.warn('ensure user-files folder failed', e); }
+            return ttc_GOOGLE_DRIVE_CONFIG.FOLDER_ID;
+        }
+        // Point ttc_cloudFileId at THIS user's file (find it, else leave null so it gets created).
+        async function resolveUserFileId() {
+            var key = 'cestisCloudFileId__' + ttUserKey();
+            var cached = CESTISStore.getItem(key);
+            if (cached) { ttc_cloudFileId = cached; CESTISStore.setItem('cestisCloudFileId', ttc_cloudFileId); return ttc_cloudFileId; }
+            await ttEnsureUserFilesFolder();
+            ttc_cloudFileId = null;
+            try {
+                var q = "name='" + ttUserBackupName() + "' and '" + ttUserFilesParent() + "' in parents and trashed=false";
+                var resp = await fetch('https://www.googleapis.com/drive/v3/files?q=' + encodeURIComponent(q) + '&fields=files(id,name)', { headers: { 'Authorization': 'Bearer ' + ttc_googleAccessToken } });
+                if (resp.ok) {
+                    var d = await resp.json();
+                    if (d.files && d.files.length > 0) { ttc_cloudFileId = d.files[0].id; }
+                }
+            } catch (e) { console.warn('resolveUserFileId failed', e); }
+            if (ttc_cloudFileId) { CESTISStore.setItem(key, ttc_cloudFileId); CESTISStore.setItem('cestisCloudFileId', ttc_cloudFileId); }
+            else { CESTISStore.removeItem('cestisCloudFileId'); }
+            return ttc_cloudFileId;
+        }
+        // Admin: pull every per-user file in the subfolder and merge their time records.
+        async function ttAggregateAllUserFiles() {
+            if (!ttc_googleAccessToken) return;
+            try {
+                var folderId = await ttEnsureUserFilesFolder();
+                var q = "'" + folderId + "' in parents and mimeType='application/json' and trashed=false";
+                var resp = await fetch('https://www.googleapis.com/drive/v3/files?q=' + encodeURIComponent(q) + '&fields=files(id,name)', { headers: { 'Authorization': 'Bearer ' + ttc_googleAccessToken } });
+                if (!resp.ok) return;
+                var d = await resp.json();
+                var files = d.files || [];
+                for (var i = 0; i < files.length; i++) {
+                    try {
+                        var fr = await fetch('https://www.googleapis.com/drive/v3/files/' + files[i].id + '?alt=media', { headers: { 'Authorization': 'Bearer ' + ttc_googleAccessToken } });
+                        if (!fr.ok) continue;
+                        var fd = await fr.json();
+                        var recs = (fd && fd.data && Array.isArray(fd.data.timeRecords)) ? fd.data.timeRecords : [];
+                        for (var j = 0; j < recs.length; j++) {
+                            var r = recs[j];
+                            if (!timeRecords.find(function(x){ return x.id === r.id; })) timeRecords.push(r);
+                        }
+                    } catch (e) {}
+                }
+                saveTimeRecords();
+            } catch (e) { console.warn('aggregate all user files failed', e); }
+        }
+        // =================================================================
+
         // Cloud sync state
         let ttc_googleAccessToken = null;
         let ttc_isCloudConnected = false;
@@ -32916,28 +33001,7 @@ function ttUnmount(){
 
         // Find existing backup file in the folder
         async function ttc_findExistingBackupFile() {
-            try {
-                const query = `name='${ttc_GOOGLE_DRIVE_CONFIG.BACKUP_FILE_NAME}' and '${ttc_GOOGLE_DRIVE_CONFIG.FOLDER_ID}' in parents and trashed=false`;
-                const response = await fetch(
-                    `https://www.googleapis.com/drive/v3/files?q=${encodeURIComponent(query)}&fields=files(id,name,modifiedTime)`,
-                    {
-                        headers: {
-                            'Authorization': `Bearer ${ttc_googleAccessToken}`
-                        }
-                    }
-                );
-
-                if (response.ok) {
-                    const data = await response.json();
-                    if (data.files && data.files.length > 0) {
-                        ttc_cloudFileId = data.files[0].id;
-                        CESTISStore.setItem('cestisCloudFileId', ttc_cloudFileId);
-                        console.log('Found existing backup file:', ttc_cloudFileId);
-                    }
-                }
-            } catch (error) {
-                console.error('Error finding backup file:', error);
-            }
+            await resolveUserFileId();
         }
 
         // Check cloud file for changes before saving (multi-user conflict detection)
@@ -32970,6 +33034,7 @@ function ttUnmount(){
 
         // Save data to Google Drive
         async function ttc_saveToCloud() {
+            await resolveUserFileId();
             if (!ttc_isCloudConnected || !ttc_googleAccessToken) {
                 alert('Please connect to Google Drive first');
                 return;
@@ -33014,9 +33079,10 @@ function ttUnmount(){
                     version: '1.0',
                     timestamp: new Date().toISOString(),
                     savedBy: ttc_currentUser ? ttc_currentUser.fullName : 'Unknown',
+                    username: ttc_currentUser ? (ttc_currentUser.username || ttc_currentUser.fullName) : 'unknown',
                     data: {
-                        staffMembers: staffMembers,
-                        timeRecords: timeRecords
+                        staffMembers: staffMembers.filter(function(s){ return ttc_currentUser && s.id === ttc_currentUser.id; }),
+                        timeRecords: timeRecords.filter(function(r){ return ttc_currentUser && r.staffId === ttc_currentUser.id; })
                     }
                 };
 
@@ -33041,8 +33107,8 @@ function ttUnmount(){
                 } else {
                     // Create new file with metadata
                     const metadata = {
-                        name: ttc_GOOGLE_DRIVE_CONFIG.BACKUP_FILE_NAME,
-                        parents: [ttc_GOOGLE_DRIVE_CONFIG.FOLDER_ID],
+                        name: ttUserBackupName(),
+                        parents: [ttUserFilesParent()],
                         mimeType: 'application/json'
                     };
 
@@ -33767,10 +33833,11 @@ function ttUnmount(){
                     version: '1.0',
                     timestamp: new Date().toISOString(),
                     savedBy: ttc_currentUser ? ttc_currentUser.fullName : 'Unknown',
+                    username: ttc_currentUser ? (ttc_currentUser.username || ttc_currentUser.fullName) : 'unknown',
                     mergedBy: ttc_currentUser ? ttc_currentUser.fullName : 'Unknown',
                     data: {
-                        staffMembers: mergedStaff,
-                        timeRecords: mergedRecords
+                        staffMembers: mergedStaff.filter(function(s){ return ttc_currentUser && s.id === ttc_currentUser.id; }),
+                        timeRecords: mergedRecords.filter(function(r){ return ttc_currentUser && r.staffId === ttc_currentUser.id; })
                     }
                 };
 
@@ -33793,8 +33860,8 @@ function ttUnmount(){
                     );
                 } else {
                     const metadata = {
-                        name: ttc_GOOGLE_DRIVE_CONFIG.BACKUP_FILE_NAME,
-                        parents: [ttc_GOOGLE_DRIVE_CONFIG.FOLDER_ID],
+                        name: ttUserBackupName(),
+                        parents: [ttUserFilesParent()],
                         mimeType: 'application/json'
                     };
 
@@ -33996,10 +34063,11 @@ function ttUnmount(){
                     version: '1.0',
                     timestamp: new Date().toISOString(),
                     savedBy: ttc_currentUser ? ttc_currentUser.fullName : 'Unknown',
+                    username: ttc_currentUser ? (ttc_currentUser.username || ttc_currentUser.fullName) : 'unknown',
                     mergedBy: ttc_currentUser ? ttc_currentUser.fullName : 'Unknown',
                     data: {
-                        staffMembers: mergedStaff,
-                        timeRecords: mergedRecords
+                        staffMembers: mergedStaff.filter(function(s){ return ttc_currentUser && s.id === ttc_currentUser.id; }),
+                        timeRecords: mergedRecords.filter(function(r){ return ttc_currentUser && r.staffId === ttc_currentUser.id; })
                     }
                 };
 
@@ -34022,8 +34090,8 @@ function ttUnmount(){
                     );
                 } else {
                     const metadata = {
-                        name: ttc_GOOGLE_DRIVE_CONFIG.BACKUP_FILE_NAME,
-                        parents: [ttc_GOOGLE_DRIVE_CONFIG.FOLDER_ID],
+                        name: ttUserBackupName(),
+                        parents: [ttUserFilesParent()],
                         mimeType: 'application/json'
                     };
 
@@ -35155,6 +35223,7 @@ function ttUnmount(){
             }
 
             isAutoSyncing = true;
+            await resolveUserFileId();
 
             try {
                 // Resolve cloud file ID if not set
@@ -35232,9 +35301,10 @@ function ttUnmount(){
                     version: '1.0',
                     timestamp: new Date().toISOString(),
                     savedBy: ttc_currentUser ? ttc_currentUser.fullName : 'Unknown',
+                    username: ttc_currentUser ? (ttc_currentUser.username || ttc_currentUser.fullName) : 'unknown',
                     data: {
-                        staffMembers: mergedStaff,
-                        timeRecords: mergedRecords
+                        staffMembers: mergedStaff.filter(function(s){ return ttc_currentUser && s.id === ttc_currentUser.id; }),
+                        timeRecords: mergedRecords.filter(function(r){ return ttc_currentUser && r.staffId === ttc_currentUser.id; })
                     }
                 };
 
@@ -35258,8 +35328,8 @@ function ttUnmount(){
                 } else {
                     // Create new file
                     const metadata = {
-                        name: ttc_GOOGLE_DRIVE_CONFIG.BACKUP_FILE_NAME,
-                        parents: [ttc_GOOGLE_DRIVE_CONFIG.FOLDER_ID],
+                        name: ttUserBackupName(),
+                        parents: [ttUserFilesParent()],
                         mimeType: 'application/json'
                     };
 
@@ -35786,6 +35856,7 @@ function ttUnmount(){
                 populateStaffSelect();
                 populateEditStaffSelect();
                 renderStaffTable();
+                if (ttc_googleAccessToken) ttAggregateAllUserFiles().then(function(){ try { renderHistory(); renderStaffTable(); } catch(e){} });
             } else if (ttc_currentUser.role === 'Viewer') {
                 // Viewer can see reports but not edit anything
                 document.getElementById('reportsTab').style.display = 'block';
@@ -38213,9 +38284,10 @@ function ttUnmount(){
                     version: '1.0',
                     timestamp: new Date().toISOString(),
                     savedBy: ttc_currentUser ? ttc_currentUser.fullName : 'Unknown',
+                    username: ttc_currentUser ? (ttc_currentUser.username || ttc_currentUser.fullName) : 'unknown',
                     data: {
-                        staffMembers: staffMembers,
-                        timeRecords: timeRecords
+                        staffMembers: staffMembers.filter(function(s){ return ttc_currentUser && s.id === ttc_currentUser.id; }),
+                        timeRecords: timeRecords.filter(function(r){ return ttc_currentUser && r.staffId === ttc_currentUser.id; })
                     }
                 };
                 const jsonContent = JSON.stringify(backupData, null, 2);
