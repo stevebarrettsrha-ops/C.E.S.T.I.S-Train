@@ -35853,8 +35853,9 @@ function ttUnmount(){
 
             ttc_showToast('Clocked in successfully! Have a productive day.', 'success');
 
-            // Auto-sync to cloud
+            // Start the 10s local-save loop, then push this clock-in to the cloud now
             startAutoSync();
+            silentCloudSync(true);
         }
 
         // Start Break
@@ -35874,8 +35875,8 @@ function ttUnmount(){
 
             ttc_showToast('Break started. Enjoy your rest!', 'info');
 
-            // Auto-sync to cloud
-            silentCloudSync();
+            // Push this change to the cloud now
+            silentCloudSync(true);
         }
 
         // End Break
@@ -35905,8 +35906,8 @@ function ttUnmount(){
 
             ttc_showToast('Break ended. Back to work!', 'success');
 
-            // Auto-sync to cloud
-            silentCloudSync();
+            // Push this change to the cloud now
+            silentCloudSync(true);
         }
 
         // Clock Out
