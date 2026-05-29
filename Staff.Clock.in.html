@@ -155,6 +155,61 @@
             margin-bottom: 36px;
         }
 
+        .login-logo {
+            width: 76px;
+            height: 76px;
+            margin: 0 auto 18px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 38px;
+            border-radius: 22px;
+            background: linear-gradient(135deg, #0f766e 0%, #0891b2 50%, #6366f1 100%);
+            box-shadow: 0 10px 30px rgba(13, 148, 136, 0.45);
+            animation: pulse 3s ease-in-out infinite;
+        }
+
+        .login-eyebrow {
+            margin-top: 8px;
+            font-size: 11px;
+            font-weight: 700;
+            letter-spacing: 3px;
+            text-transform: uppercase;
+            color: var(--primary-teal);
+        }
+
+        .login-step-title {
+            font-size: 20px;
+            font-weight: 800;
+            color: #1e3a8a;
+            margin-bottom: 8px;
+            letter-spacing: -0.3px;
+        }
+
+        .login-footer {
+            text-align: center;
+            margin-top: 28px;
+            padding-top: 20px;
+            border-top: 1px solid #e2e8f0;
+            color: #94a3b8;
+            font-size: 12px;
+            font-weight: 500;
+        }
+
+        /* Login dark-mode polish */
+        body.dark-mode .login-box {
+            background: rgba(30, 41, 59, 0.92);
+            border-color: rgba(99, 102, 241, 0.25);
+        }
+        body.dark-mode .login-title,
+        body.dark-mode .login-step-title { color: #c7d2fe; }
+        body.dark-mode .login-subtitle,
+        body.dark-mode .otp-info { color: #94a3b8; }
+        body.dark-mode .input-group label { color: #e2e8f0; }
+        body.dark-mode .login-input,
+        body.dark-mode .otp-input { background: #0f172a; border-color: #334155; color: #e2e8f0; }
+        body.dark-mode .login-footer { border-top-color: #334155; }
+
         .login-title {
             font-size: 32px;
             font-weight: 800;
@@ -1735,8 +1790,86 @@
     </script>
 </head>
 <body>
+    <!-- Login Page -->
+    <div class="login-container" id="loginPage" style="display: none;">
+        <div class="login-box">
+            <div class="login-header">
+                <div class="login-logo" aria-hidden="true">⏰</div>
+                <div class="login-title">CESTIS</div>
+                <div class="login-subtitle">Staff Time Tracking System</div>
+                <div class="login-eyebrow">Empowering Communities</div>
+            </div>
+
+            <!-- Step 1: Sign In -->
+            <div class="login-step" id="loginStepNormal" style="display: block;">
+                <div class="login-error" id="loginError"></div>
+                <form onsubmit="handleLogin(event)" autocomplete="on">
+                    <div class="input-group">
+                        <label for="loginUsername">Username</label>
+                        <input type="text" id="loginUsername" class="login-input" placeholder="Enter your username" autocomplete="username" required>
+                    </div>
+                    <div class="input-group">
+                        <label for="loginPassword">Password</label>
+                        <input type="password" id="loginPassword" class="login-input" placeholder="Enter your password" autocomplete="current-password" required>
+                    </div>
+                    <button type="submit" class="login-btn">Sign In</button>
+                </form>
+                <div class="forgot-password-link">
+                    <a onclick="showForgotPasswordStep()" role="button" tabindex="0">Forgot your password?</a>
+                </div>
+            </div>
+
+            <!-- Step 2: Forgot Password — request OTP -->
+            <div class="login-step" id="loginStepForgotPassword" style="display: none;">
+                <a class="back-link" onclick="cancelForgotPassword()" role="button" tabindex="0"><span>←</span> Back to sign in</a>
+                <h3 class="login-step-title">Reset Password</h3>
+                <p class="otp-info">Enter your registered email address and we'll send you a one-time passcode.</p>
+                <div class="login-error" id="forgotPasswordError"></div>
+                <div class="input-group">
+                    <label for="forgotPasswordEmail">Email Address</label>
+                    <input type="email" id="forgotPasswordEmail" class="login-input" placeholder="you@example.com" autocomplete="email">
+                </div>
+                <button type="button" class="login-btn" onclick="sendOTPEmail()">Send Passcode</button>
+            </div>
+
+            <!-- Step 3: Enter OTP -->
+            <div class="login-step" id="loginStepOTP" style="display: none;">
+                <a class="back-link" onclick="cancelForgotPassword()" role="button" tabindex="0"><span>←</span> Back to sign in</a>
+                <h3 class="login-step-title">Enter Passcode</h3>
+                <p class="otp-info">We sent a 6-digit code to <strong id="otpEmailDisplay"></strong></p>
+                <div class="login-error" id="otpError"></div>
+                <div class="input-group">
+                    <input type="text" id="otpCode" class="otp-input" maxlength="6" inputmode="numeric" pattern="[0-9]*" placeholder="––––––">
+                </div>
+                <button type="button" class="login-btn" onclick="verifyOTP()">Verify Code</button>
+                <div class="resend-link">
+                    <a onclick="resendOTP()" role="button" tabindex="0">Didn't get it? Resend code</a>
+                </div>
+            </div>
+
+            <!-- Step 4: Set New Password -->
+            <div class="login-step new-password-form" id="loginStepNewPassword" style="display: none;">
+                <a class="back-link" onclick="cancelForgotPassword()" role="button" tabindex="0"><span>←</span> Back to sign in</a>
+                <h3 class="login-step-title">Create New Password</h3>
+                <p class="otp-info">Choose a new password for your account.</p>
+                <div class="login-error" id="newPasswordError"></div>
+                <div class="input-group">
+                    <label for="newPassword">New Password</label>
+                    <input type="password" id="newPassword" class="login-input" placeholder="New password" autocomplete="new-password">
+                </div>
+                <div class="input-group">
+                    <label for="confirmNewPassword">Confirm Password</label>
+                    <input type="password" id="confirmNewPassword" class="login-input" placeholder="Confirm new password" autocomplete="new-password">
+                </div>
+                <button type="button" class="login-btn" onclick="resetPassword()">Reset Password</button>
+            </div>
+
+            <div class="login-footer">Secure staff access · CESTIS &copy; <span id="loginYear"></span></div>
+        </div>
+    </div>
+
     <!-- Main Dashboard -->
-    <div id="mainDashboard">
+    <div id="mainDashboard" style="display: none;">
         <div class="container">
             <!-- Header -->
             <div class="header">
@@ -5265,6 +5398,12 @@
             currentUser = staff;
             localStorage.setItem('cestisCurrentUser', JSON.stringify(staff));
 
+            // Clear sensitive login fields and hide the login screen
+            const loginPwd = document.getElementById('loginPassword');
+            if (loginPwd) loginPwd.value = '';
+            const loginPageEl = document.getElementById('loginPage');
+            if (loginPageEl) loginPageEl.style.display = 'none';
+
             document.getElementById('mainDashboard').style.display = 'block';
             document.getElementById('currentUserDisplay').textContent = `👤 ${staff.fullName} (${staff.workType})`;
 
@@ -8129,24 +8268,46 @@
             initializeDefaultAdmin();
             loadTimeRecords();
 
-            // Auto-load user (no login required — page is embedded in authenticated dashboard)
-            const savedUser = localStorage.getItem('cestisCurrentUser');
-            if (savedUser) {
-                currentUser = JSON.parse(savedUser);
-            } else {
-                currentUser = staffMembers.find(s => s.role === 'Admin') || staffMembers[0];
-                if (currentUser) localStorage.setItem('cestisCurrentUser', JSON.stringify(currentUser));
-            }
-            if (currentUser) {
-                document.getElementById('mainDashboard').style.display = 'block';
-                document.getElementById('currentUserDisplay').textContent = `👤 ${currentUser.fullName} (${currentUser.workType})`;
-                updateUIForRole();
+            // Stamp the login footer year
+            const loginYearEl = document.getElementById('loginYear');
+            if (loginYearEl) loginYearEl.textContent = new Date().getFullYear();
 
-                if (currentUser.role !== 'Viewer') {
-                    loadTodaysSession();
-                    renderTodayLog();
+            // Require login. An existing session is restored only if the account
+            // still exists and is active; otherwise the staff must sign in so
+            // every clock-in is tied to an accounted-for user.
+            const savedUser = localStorage.getItem('cestisCurrentUser');
+            let sessionRestored = false;
+            if (savedUser) {
+                try {
+                    const parsed = JSON.parse(savedUser);
+                    const match = staffMembers.find(s => s.username === parsed.username);
+                    if (match && match.status !== 'Inactive' && match.status !== 'Suspended') {
+                        currentUser = match;
+                        localStorage.setItem('cestisCurrentUser', JSON.stringify(match));
+                        document.getElementById('loginPage').style.display = 'none';
+                        document.getElementById('mainDashboard').style.display = 'block';
+                        document.getElementById('currentUserDisplay').textContent = `👤 ${currentUser.fullName} (${currentUser.workType})`;
+                        updateUIForRole();
+                        if (currentUser.role !== 'Viewer') {
+                            loadTodaysSession();
+                            renderTodayLog();
+                        }
+                        renderHistory();
+                        sessionRestored = true;
+                    }
+                } catch (e) {
+                    /* corrupt session — fall through to login screen */
                 }
-                renderHistory();
+            }
+
+            if (!sessionRestored) {
+                // No valid session — show the login screen
+                currentUser = null;
+                localStorage.removeItem('cestisCurrentUser');
+                document.getElementById('mainDashboard').style.display = 'none';
+                document.getElementById('loginPage').style.display = 'flex';
+                const usernameInput = document.getElementById('loginUsername');
+                if (usernameInput) setTimeout(() => usernameInput.focus(), 100);
             }
 
             // Check if first-time sync prompt should be shown
