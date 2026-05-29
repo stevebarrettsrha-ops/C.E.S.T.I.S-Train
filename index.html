@@ -4468,6 +4468,157 @@ body.vc-fullscreen-mode.vc-host-only-mode .video-grid .video-tile:not(.vc-hoston
 </div>
 
 <script>
+// ============================================================
+// IndexedDB-backed local storage layer  (removes the ~5 MB localStorage cap)
+// ------------------------------------------------------------
+// All bulk app data is stored under the "voctrain_" prefix. This layer keeps a
+// synchronous in-memory mirror of those keys — so the rest of the app keeps
+// calling localStorage exactly as before — while persisting them to IndexedDB,
+// whose quota is disk-based (hundreds of MB to GBs) instead of ~5 MB.
+// Auth tokens and any non-"voctrain_" keys pass straight through to native
+// localStorage. Google Drive remains the durable off-device backup.
+// ============================================================
+(function(){
+  var PREFIX = 'voctrain_';
+  var DB_NAME = 'CESTIS_AppData';
+  var STORE = 'kv';
+  var mem = Object.create(null);     // key -> string value (synchronous mirror)
+  var memHas = Object.create(null);  // key -> true when present in the mirror
+  var dbPromise = null;
+  var pendingPuts = Object.create(null);
+  var pendingDeletes = Object.create(null);
+  var flushTimer = null;
+
+  var proto = (window.Storage && window.Storage.prototype) || null;
+  if (!proto || typeof indexedDB === 'undefined') return; // unsupported — keep native behavior
+  var nativeGet = proto.getItem, nativeSet = proto.setItem, nativeRemove = proto.removeItem;
+
+  function openDB(){
+    if (dbPromise) return dbPromise;
+    dbPromise = new Promise(function(resolve, reject){
+      try {
+        var req = indexedDB.open(DB_NAME, 1);
+        req.onupgradeneeded = function(e){
+          var db = e.target.result;
+          if (!db.objectStoreNames.contains(STORE)) db.createObjectStore(STORE);
+        };
+        req.onsuccess = function(e){ resolve(e.target.result); };
+        req.onerror = function(e){ reject(e.target.error); };
+      } catch(err){ reject(err); }
+    });
+    return dbPromise;
+  }
+
+  function scheduleFlush(){ if (!flushTimer) flushTimer = setTimeout(flush, 300); }
+  function flush(){
+    flushTimer = null;
+    var puts = pendingPuts, dels = pendingDeletes;
+    pendingPuts = Object.create(null);
+    pendingDeletes = Object.create(null);
+    openDB().then(function(db){
+      var tx = db.transaction(STORE, 'readwrite');
+      var os = tx.objectStore(STORE);
+      Object.keys(puts).forEach(function(k){ try { os.put(puts[k], k); } catch(e){} });
+      Object.keys(dels).forEach(function(k){ try { os.delete(k); } catch(e){} });
+    }).catch(function(e){ console.warn('[AppData] IndexedDB flush failed:', e); });
+  }
+
+  proto.getItem = function(key){
+    if (typeof key === 'string' && key.indexOf(PREFIX) === 0 && memHas[key]) return mem[key];
+    return nativeGet.call(this, key);
+  };
+  proto.setItem = function(key, value){
+    if (typeof key === 'string' && key.indexOf(PREFIX) === 0){
+      var v = String(value);
+      mem[key] = v; memHas[key] = true;
+      pendingPuts[key] = v; delete pendingDeletes[key];
+      scheduleFlush();
+      // Best-effort mirror to native localStorage; ignore quota errors (data is safe in IDB).
+      try { nativeSet.call(this, key, v); } catch(e){}
+      return;
+    }
+    return nativeSet.call(this, key, value);
+  };
+  proto.removeItem = function(key){
+    if (typeof key === 'string' && key.indexOf(PREFIX) === 0){
+      delete mem[key]; delete memHas[key];
+      pendingDeletes[key] = true; delete pendingPuts[key];
+      scheduleFlush();
+      try { nativeRemove.call(this, key); } catch(e){}
+      return;
+    }
+    return nativeRemove.call(this, key);
+  };
+
+  // Helpers for code that enumerates or bulk-clears app data.
+  window.__appDataKeys = function(){ return Object.keys(memHas); };
+  window.__appDataPurge = function(shouldKeep){
+    Object.keys(memHas).forEach(function(k){
+      if (shouldKeep && shouldKeep(k)) return;
+      delete mem[k]; delete memHas[k];
+      pendingDeletes[k] = true; delete pendingPuts[k];
+      try { nativeRemove.call(localStorage, k); } catch(e){}
+    });
+    scheduleFlush();
+  };
+  // Real storage figures for the Storage Usage panel (async).
+  window.__appDataEstimate = function(){
+    if (navigator.storage && navigator.storage.estimate) return navigator.storage.estimate();
+    return Promise.resolve(null);
+  };
+
+  // Ask the browser to keep our data and not evict it under storage pressure.
+  try { if (navigator.storage && navigator.storage.persist) navigator.storage.persist(); } catch(e){}
+
+  // Hydrate the in-memory mirror from IndexedDB, migrating any existing
+  // localStorage data into IDB on first run, then refresh the app's globals
+  // (the login screen is shown until then, so bulk views aren't rendered yet).
+  window.__appDataReady = openDB().then(function(db){
+    return new Promise(function(resolve){
+      var tx = db.transaction(STORE, 'readonly');
+      var os = tx.objectStore(STORE);
+      var keysReq = os.getAllKeys();
+      var valsReq = os.getAll();
+      tx.oncomplete = function(){
+        var keys = keysReq.result || [], vals = valsReq.result || [];
+        for (var i=0;i<keys.length;i++){
+          if (typeof keys[i] === 'string' && keys[i].indexOf(PREFIX) === 0){
+            mem[keys[i]] = String(vals[i]); memHas[keys[i]] = true;
+          }
+        }
+        // First-run migration: copy voctrain_ keys that exist only in localStorage into IDB.
+        try {
+          for (var j=0;j<localStorage.length;j++){
+            var lk = localStorage.key(j);
+            if (lk && lk.indexOf(PREFIX) === 0 && !memHas[lk]){
+              var val = nativeGet.call(localStorage, lk);
+              if (val != null){ mem[lk] = val; memHas[lk] = true; pendingPuts[lk] = val; }
+            }
+          }
+          if (Object.keys(pendingPuts).length) scheduleFlush();
+        } catch(e){}
+        resolve();
+      };
+      tx.onerror = function(){ resolve(); };
+    });
+  }).then(function(){
+    // Reload globals from the now-complete mirror — only while still on the
+    // login screen, so we never clobber freshly synced in-session data.
+    try {
+      if (typeof currentRole === 'undefined' || !currentRole){
+        if (typeof loadState === 'function') loadState();
+        if (typeof loadUserAccounts === 'function') loadUserAccounts();
+        if (typeof loadNotifications === 'function') loadNotifications();
+      }
+      window.dispatchEvent(new Event('appDataHydrated'));
+    } catch(e){ console.warn('[AppData] post-hydrate refresh failed:', e); }
+  }).catch(function(e){ console.warn('[AppData] hydrate failed:', e); });
+
+  // Best-effort flush of any queued writes when the tab is hidden/closed.
+  window.addEventListener('pagehide', function(){ if (flushTimer){ clearTimeout(flushTimer); flush(); } });
+  document.addEventListener('visibilitychange', function(){ if (document.visibilityState === 'hidden' && flushTimer){ clearTimeout(flushTimer); flush(); } });
+})();
+
 // ============================================
 // Configuration constants — declared first to avoid undefined errors
 // ============================================
@@ -4881,23 +5032,42 @@ function safeJsonParse(str, fallback) {
 }
 
 // ---------- ERROR HANDLING: Storage Quota Monitoring ----------
+// Synchronous estimate of app-data size. App data now lives in IndexedDB via
+// the storage layer, so we measure the in-memory mirror when available and fall
+// back to scanning localStorage. The "limit" is now the browser's real,
+// disk-based IndexedDB quota rather than the old ~5 MB localStorage cap.
 function getStorageUsage() {
   var total = 0;
   try {
-    for(var key in localStorage) {
-      if(localStorage.hasOwnProperty(key) && key.startsWith('voctrain_')) {
-        total += localStorage.getItem(key).length * 2; // UTF-16 chars = 2 bytes each
+    if (typeof window.__appDataKeys === 'function') {
+      window.__appDataKeys().forEach(function(key){
+        var v = localStorage.getItem(key);
+        if (v) total += v.length * 2; // UTF-16 chars = 2 bytes each
+      });
+    } else {
+      for(var key in localStorage) {
+        if(localStorage.hasOwnProperty(key) && key.indexOf('voctrain_') === 0) {
+          total += (localStorage.getItem(key) || '').length * 2;
+        }
       }
     }
   } catch(e) {}
-  return { bytes: total, mb: (total / 1024 / 1024).toFixed(2), percent: Math.min(100, (total / (5 * 1024 * 1024) * 100)).toFixed(1) };
+  return { bytes: total, mb: (total / 1024 / 1024).toFixed(2) };
 }
 
+// Check real IndexedDB quota and warn only if genuinely close to the limit.
 function checkStorageQuota() {
   var usage = getStorageUsage();
-  if(parseFloat(usage.percent) > 80) {
-    console.warn('[Storage] Usage at ' + usage.percent + '% (' + usage.mb + ' MB). Consider cleaning up old data.');
-    showToast('Storage usage is at ' + usage.percent + '%. Consider exporting and cleaning old data.');
+  if (typeof window.__appDataEstimate === 'function') {
+    window.__appDataEstimate().then(function(est){
+      if (est && est.quota) {
+        var pct = (est.usage / est.quota) * 100;
+        if (pct > 85) {
+          console.warn('[Storage] Usage at ' + pct.toFixed(1) + '% of browser quota.');
+          showToast('Storage is at ' + pct.toFixed(0) + '% of the browser limit. Export a backup and run an integrity check.', 'warning');
+        }
+      }
+    }).catch(function(){});
   }
   return usage;
 }
@@ -5695,6 +5865,13 @@ function clearAllSessionData() {
     }
   }
   keysToRemove.forEach(function(k) { localStorage.removeItem(k); });
+  // Also purge any voctrain_ data that lives only in the IndexedDB mirror
+  // (overflow that never fit in native localStorage), using the same keep rules.
+  if (typeof window.__appDataPurge === 'function') {
+    window.__appDataPurge(function(k){
+      return k === 'voctrain_users' || k.indexOf('voctrain_user_') === 0;
+    });
+  }
 
   // Clear in-memory arrays to prevent saveState() from restoring data
   students = [];
@@ -30253,15 +30430,39 @@ function bulkApproveCertDownloads() {
 // ============================== DATA MANAGEMENT HELPERS ==============================
 
 function refreshStorageUsage() {
-  var usage = getStorageUsage();
   var infoEl = document.getElementById('storageUsageInfo');
   var barEl = document.getElementById('storageBarFill');
-  if(infoEl) {
-    infoEl.innerHTML = 'Using <strong>' + usage.mb + ' MB</strong> of approximately 5 MB available (' + usage.percent + '%)';
+  var appData = getStorageUsage();
+
+  function render(usedMb, quotaMb, percent, note) {
+    if(infoEl) {
+      infoEl.innerHTML = 'App data: <strong>' + appData.mb + ' MB</strong>' +
+        (quotaMb ? ' &middot; Browser storage: <strong>' + usedMb + ' MB</strong> of ' + quotaMb + ' MB used (' + percent + '%)' : '') +
+        (note ? '<br><span style="font-size:11px;color:var(--text-muted);">' + note + '</span>' : '');
+    }
+    if(barEl) {
+      var p = percent != null ? percent : 0;
+      barEl.style.width = Math.min(100, p) + '%';
+      barEl.className = 'storage-bar-fill ' + (p > 85 ? 'high' : p > 60 ? 'medium' : 'low');
+    }
   }
-  if(barEl) {
-    barEl.style.width = usage.percent + '%';
-    barEl.className = 'storage-bar-fill ' + (parseFloat(usage.percent) > 80 ? 'high' : parseFloat(usage.percent) > 50 ? 'medium' : 'low');
+
+  // Prefer the browser's true storage estimate (IndexedDB-backed, disk-based quota).
+  if (typeof window.__appDataEstimate === 'function') {
+    window.__appDataEstimate().then(function(est){
+      if (est && est.quota) {
+        var usedMb = (est.usage / 1048576).toFixed(2);
+        var quotaMb = (est.quota / 1048576).toFixed(0);
+        var percent = ((est.usage / est.quota) * 100).toFixed(1);
+        render(usedMb, quotaMb, parseFloat(percent), 'Data is stored in IndexedDB and backed up to Google Drive.');
+      } else {
+        render(appData.mb, null, null, 'Stored in IndexedDB (browser quota unavailable).');
+      }
+    }).catch(function(){
+      render(appData.mb, null, null, 'Stored in IndexedDB.');
+    });
+  } else {
+    render(appData.mb, null, null, null);
   }
 }
 
