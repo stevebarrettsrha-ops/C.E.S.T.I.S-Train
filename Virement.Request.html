@@ -6,7 +6,71 @@
     <title>C.E.S.T.I.S — Virement Request Dashboard</title>
     <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=Playfair+Display:wght@700&display=swap" rel="stylesheet">
     <!-- Google Identity Services for OAuth -->
-    <script src="https://accounts.google.com/gsi/client" async defer></script>
+    <script>
+/* ============================================================================
+   CESTISStore — localStorage-compatible API backed by IndexedDB.
+   IndexedDB has a far larger quota than localStorage (~5MB), so large data
+   (e.g. staff records with embedded document blobs) no longer overflows.
+   A synchronous in-memory cache preserves the existing synchronous
+   getItem/setItem/removeItem call sites; writes persist to IndexedDB
+   (durable) and mirror to localStorage when they still fit.
+   ============================================================================ */
+(function(){
+  if (window.CESTISStore) return;
+  var DB_NAME='CESTIS_KV', STORE='kv', LS=null;
+  try { LS = window.localStorage; } catch(e) { LS = null; }
+  var cache = {};
+  // Seed synchronously from localStorage so data is available immediately.
+  try { if(LS){ for(var i=0;i<LS.length;i++){ var k=LS.key(i); cache[k]=LS.getItem(k); } } } catch(e){}
+
+  var db=null, ready=false, wq=[];
+  function drainQueue(){ var q=wq; wq=[]; for(var i=0;i<q.length;i++){ writeIDB(q[i].k,q[i].v,q[i].del); } }
+  function writeIDB(k,v,del){
+    if(!db){ if(!ready){ wq.push({k:k,v:v,del:del}); } return; }
+    try { var os=db.transaction(STORE,'readwrite').objectStore(STORE); if(del){ os.delete(k); } else { os.put(v,k); } } catch(e){}
+  }
+  try {
+    var req = indexedDB.open(DB_NAME,1);
+    req.onupgradeneeded = function(e){ var d=e.target.result; if(!d.objectStoreNames.contains(STORE)){ d.createObjectStore(STORE); } };
+    req.onsuccess = function(e){
+      db = e.target.result;
+      try {
+        var idbKeys = {};
+        var cur = db.transaction(STORE,'readonly').objectStore(STORE).openCursor();
+        cur.onsuccess = function(ev){ var c=ev.target.result;
+          if(c){ idbKeys[c.key]=1; if(!(c.key in cache)){ cache[c.key]=c.value; } c.continue(); }
+          else {
+            // One-time migration: copy any localStorage-seeded keys into IndexedDB.
+            try { var ws=db.transaction(STORE,'readwrite').objectStore(STORE);
+                  for(var kk in cache){ if(Object.prototype.hasOwnProperty.call(cache,kk) && !idbKeys[kk]){ ws.put(cache[kk], kk); } } } catch(_){}
+            ready=true; drainQueue(); try{ window.dispatchEvent(new Event('cestis-store-ready')); }catch(_){}
+          }
+        };
+        cur.onerror = function(){ ready=true; drainQueue(); };
+      } catch(e){ ready=true; drainQueue(); }
+    };
+    req.onerror = function(){ db=null; ready=true; };
+  } catch(e){ db=null; ready=true; }
+
+  var Store = {
+    _cache: cache,
+    getItem: function(k){ k=String(k); return (k in cache) ? cache[k] : null; },
+    setItem: function(k,v){ k=String(k); v=String(v); cache[k]=v; try{ if(LS) LS.setItem(k,v); }catch(e){} writeIDB(k,v,false); },
+    removeItem: function(k){ k=String(k); delete cache[k]; try{ if(LS) LS.removeItem(k); }catch(e){} writeIDB(k,null,true); },
+    clear: function(){ for(var k in cache){ if(Object.prototype.hasOwnProperty.call(cache,k)) delete cache[k]; }
+                       try{ if(LS) LS.clear(); }catch(e){}
+                       if(db){ try{ db.transaction(STORE,'readwrite').objectStore(STORE).clear(); }catch(e){} } },
+    key: function(i){ return Object.keys(cache)[i]; },
+    keys: function(){ return Object.keys(cache); },
+    hasOwnProperty: function(k){ return Object.prototype.hasOwnProperty.call(cache, String(k)); },
+    whenReady: function(cb){ if(ready){ cb(); } else { window.addEventListener('cestis-store-ready', cb, {once:true}); } },
+    get length(){ return Object.keys(cache).length; }
+  };
+  window.CESTISStore = Store;
+})();
+</script>
+
+<script src="https://accounts.google.com/gsi/client" async defer></script>
     <style>
         :root {
             --navy: #0a1628;
@@ -1586,9 +1650,9 @@ function dismissCloudNotification(){
 // Check cloud connection state and notify if needed
 function checkCloudAndNotify(reason){
   // Don't nag if user has never connected (no saved token at all and no saved file)
-  const hasEverConnected = localStorage.getItem('schoolDashboardGoogleAccessToken') ||
-                           localStorage.getItem('schoolDashboardCloudFileId') ||
-                           localStorage.getItem('schoolDashboardLastSyncTime');
+  const hasEverConnected = CESTISStore.getItem('schoolDashboardGoogleAccessToken') ||
+                           CESTISStore.getItem('schoolDashboardCloudFileId') ||
+                           CESTISStore.getItem('schoolDashboardLastSyncTime');
   if (!hasEverConnected) return;
 
   if (!navigator.onLine) {
@@ -1599,8 +1663,8 @@ function checkCloudAndNotify(reason){
   }
 
   if (!isCloudConnected) {
-    const savedExpiry = localStorage.getItem('schoolDashboardGoogleTokenExpiry');
-    const lastSync = localStorage.getItem('schoolDashboardLastSyncTime');
+    const savedExpiry = CESTISStore.getItem('schoolDashboardGoogleTokenExpiry');
+    const lastSync = CESTISStore.getItem('schoolDashboardLastSyncTime');
     let detail = '';
 
     if (savedExpiry && new Date(savedExpiry) <= new Date()) {
@@ -1631,7 +1695,7 @@ function startCloudMonitor(){
   // Check every 60 seconds if the token has expired
   cloudCheckInterval = setInterval(function(){
     if (isCloudConnected && googleAccessToken) {
-      const savedExpiry = localStorage.getItem('schoolDashboardGoogleTokenExpiry');
+      const savedExpiry = CESTISStore.getItem('schoolDashboardGoogleTokenExpiry');
       if (savedExpiry && new Date(savedExpiry) <= new Date()) {
         // Token just expired
         googleAccessToken = null;
@@ -2580,7 +2644,7 @@ function printVirements(){
 // ═══════════════════════════════════════════════════════════
 //  VIREMENT LIVE PRINT PREVIEW (Tab Page)
 // ═══════════════════════════════════════════════════════════
-let virementLogoDataURL = localStorage.getItem('cesti_virement_logo') || '';
+let virementLogoDataURL = CESTISStore.getItem('cesti_virement_logo') || '';
 
 function goToVirementFormPreview() {
     // Switch to the vlpform tab, highlight the correct tab button
@@ -2648,7 +2712,7 @@ function handleVirementLogoUpload(event) {
     var reader = new FileReader();
     reader.onload = function(e) {
         virementLogoDataURL = e.target.result;
-        localStorage.setItem('cesti_virement_logo', virementLogoDataURL);
+        CESTISStore.setItem('cesti_virement_logo', virementLogoDataURL);
         renderVirementFormPreview();
     };
     reader.readAsDataURL(file);
@@ -2657,7 +2721,7 @@ function handleVirementLogoUpload(event) {
 
 function removeVirementLogo() {
     virementLogoDataURL = '';
-    localStorage.removeItem('cesti_virement_logo');
+    CESTISStore.removeItem('cesti_virement_logo');
     renderVirementFormPreview();
 }
 
@@ -3071,13 +3135,13 @@ async function autoSaveApprovalToCloud() {
             if (response.ok) {
                 const result = await response.json();
                 cloudFileId = result.id;
-                localStorage.setItem('schoolDashboardCloudFileId', cloudFileId);
+                CESTISStore.setItem('schoolDashboardCloudFileId', cloudFileId);
             }
         }
 
         if (response.ok) {
             lastSyncTime = new Date();
-            localStorage.setItem('schoolDashboardLastSyncTime', lastSyncTime.toISOString());
+            CESTISStore.setItem('schoolDashboardLastSyncTime', lastSyncTime.toISOString());
             updateLastSyncDisplay();
             lastSavedBy = 'Dashboard User';
             cloudFileTimestamp = new Date().toISOString();
@@ -3122,7 +3186,7 @@ function saveAllData(){
     try {
         // Merge-save: re-read localStorage first so we never silently
         // discard requests that another tab/session added since our last load.
-        const stored = localStorage.getItem('cesti_virements');
+        const stored = CESTISStore.getItem('cesti_virements');
         if (stored) {
             try {
                 const persisted = JSON.parse(stored);
@@ -3153,9 +3217,9 @@ function saveAllData(){
             } catch (_) { /* stored data corrupt — we'll overwrite it */ }
         }
         deduplicateRequests();
-        localStorage.setItem('cesti_virements', JSON.stringify(virementRequests));
+        CESTISStore.setItem('cesti_virements', JSON.stringify(virementRequests));
         // Persist deleted IDs alongside the data
-        localStorage.setItem(DELETED_IDS_KEY, JSON.stringify([...deletedRequestIds]));
+        CESTISStore.setItem(DELETED_IDS_KEY, JSON.stringify([...deletedRequestIds]));
     } catch (e) {
         console.error('saveAllData failed:', e);
         // Surface quota / write errors to the user so data loss doesn't go unnoticed
@@ -3167,14 +3231,14 @@ function saveAllData(){
 
 function loadAllData(){
     try {
-        let saved = localStorage.getItem('cesti_virements');
+        let saved = CESTISStore.getItem('cesti_virements');
         if(saved) virementRequests = JSON.parse(saved);
     } catch(e){
         console.error('loadAllData failed:', e);
     }
     // Load deleted IDs so we never resurrect them during merges
     try {
-        const savedDeleted = localStorage.getItem(DELETED_IDS_KEY);
+        const savedDeleted = CESTISStore.getItem(DELETED_IDS_KEY);
         if (savedDeleted) deletedRequestIds = new Set(JSON.parse(savedDeleted));
     } catch(e){ /* ignore corrupt data */ }
     // Clean up any existing duplicates from prior merge bugs
@@ -3217,19 +3281,19 @@ function captureFormDraft(){
             draft.lines.some(l => l.from || l.to || l.amount) ||
             draft.anyLines.some(l => l.from || l.to || l.amount);
         if (hasContent) {
-            localStorage.setItem(FORM_DRAFT_KEY, JSON.stringify(draft));
+            CESTISStore.setItem(FORM_DRAFT_KEY, JSON.stringify(draft));
         }
     } catch(_){}
 }
 
 function restoreFormDraft(){
     try {
-        const raw = localStorage.getItem(FORM_DRAFT_KEY);
+        const raw = CESTISStore.getItem(FORM_DRAFT_KEY);
         if (!raw) return;
         const draft = JSON.parse(raw);
         // Only restore if the draft is less than 24 hours old
         if (Date.now() - draft.ts > 86400000) {
-            localStorage.removeItem(FORM_DRAFT_KEY);
+            CESTISStore.removeItem(FORM_DRAFT_KEY);
             return;
         }
         // Don't restore if there's already submitted data being edited
@@ -3273,7 +3337,7 @@ function restoreFormDraft(){
 }
 
 function clearFormDraft(){
-    localStorage.removeItem(FORM_DRAFT_KEY);
+    CESTISStore.removeItem(FORM_DRAFT_KEY);
 }
 
 // ── Autosave timer ───────────────────────────────────────
@@ -3493,7 +3557,7 @@ function shiftFiscalYear(direction) {
 // Load cloud cache from localStorage on startup
 function loadCloudCache() {
     try {
-        const cached = localStorage.getItem(VIREMENT_CLOUD_CACHE_KEY);
+        const cached = CESTISStore.getItem(VIREMENT_CLOUD_CACHE_KEY);
         if (cached) cloudQuarterCache = JSON.parse(cached);
     } catch(e) {
         console.error('Error loading cloud cache:', e);
@@ -3504,7 +3568,7 @@ function loadCloudCache() {
 // Save cloud cache to localStorage
 function saveCloudCache() {
     try {
-        localStorage.setItem(VIREMENT_CLOUD_CACHE_KEY, JSON.stringify(cloudQuarterCache));
+        CESTISStore.setItem(VIREMENT_CLOUD_CACHE_KEY, JSON.stringify(cloudQuarterCache));
     } catch(e) {
         console.error('Error saving cloud cache:', e);
     }
@@ -4046,9 +4110,9 @@ let googleTokenClient = null;
 
 // Initialize cloud sync from localStorage
 function initializeCloudSync() {
-    const savedToken = localStorage.getItem('schoolDashboardGoogleAccessToken');
-    const savedExpiry = localStorage.getItem('schoolDashboardGoogleTokenExpiry');
-    const savedLastSync = localStorage.getItem('schoolDashboardLastSyncTime');
+    const savedToken = CESTISStore.getItem('schoolDashboardGoogleAccessToken');
+    const savedExpiry = CESTISStore.getItem('schoolDashboardGoogleTokenExpiry');
+    const savedLastSync = CESTISStore.getItem('schoolDashboardLastSyncTime');
 
     if (savedLastSync) {
         lastSyncTime = new Date(savedLastSync);
@@ -4219,7 +4283,7 @@ async function autoMergeFromCloudOnLoad() {
             if (adminUnlocked) renderAdminApprovals();
 
             lastSyncTime = new Date();
-            localStorage.setItem('schoolDashboardLastSyncTime', lastSyncTime.toISOString());
+            CESTISStore.setItem('schoolDashboardLastSyncTime', lastSyncTime.toISOString());
             updateLastSyncDisplay();
 
             lastSavedBy = backupData.savedBy || 'Unknown';
@@ -4468,8 +4532,8 @@ async function submitGoogleToken() {
 
         const expiry = new Date();
         expiry.setHours(expiry.getHours() + 1);
-        localStorage.setItem('schoolDashboardGoogleAccessToken', token);
-        localStorage.setItem('schoolDashboardGoogleTokenExpiry', expiry.toISOString());
+        CESTISStore.setItem('schoolDashboardGoogleAccessToken', token);
+        CESTISStore.setItem('schoolDashboardGoogleTokenExpiry', expiry.toISOString());
 
         closeGoogleAuthModal();
         updateCloudUI(true);
@@ -4496,8 +4560,8 @@ async function handleGoogleAuthCallback(tokenResponse) {
 
     const expiry = new Date();
     expiry.setSeconds(expiry.getSeconds() + (tokenResponse.expires_in || 3600));
-    localStorage.setItem('schoolDashboardGoogleAccessToken', googleAccessToken);
-    localStorage.setItem('schoolDashboardGoogleTokenExpiry', expiry.toISOString());
+    CESTISStore.setItem('schoolDashboardGoogleAccessToken', googleAccessToken);
+    CESTISStore.setItem('schoolDashboardGoogleTokenExpiry', expiry.toISOString());
 
     updateCloudUI(true);
 
@@ -4538,9 +4602,9 @@ function disconnectFromGoogleDrive() {
         isCloudConnected = false;
         cloudFileId = null;
 
-        localStorage.removeItem('schoolDashboardGoogleAccessToken');
-        localStorage.removeItem('schoolDashboardGoogleTokenExpiry');
-        localStorage.removeItem('schoolDashboardCloudFileId');
+        CESTISStore.removeItem('schoolDashboardGoogleAccessToken');
+        CESTISStore.removeItem('schoolDashboardGoogleTokenExpiry');
+        CESTISStore.removeItem('schoolDashboardCloudFileId');
 
         updateCloudUI(false);
         toggleCloudMenu();
@@ -4562,11 +4626,11 @@ async function findExistingBackupFile() {
             const data = await response.json();
             if (data.files && data.files.length > 0) {
                 cloudFileId = data.files[0].id;
-                localStorage.setItem('schoolDashboardCloudFileId', cloudFileId);
+                CESTISStore.setItem('schoolDashboardCloudFileId', cloudFileId);
                 console.log('Found existing backup file:', cloudFileId);
             } else {
                 cloudFileId = null;
-                localStorage.removeItem('schoolDashboardCloudFileId');
+                CESTISStore.removeItem('schoolDashboardCloudFileId');
                 console.log('No backup file found with name:', GOOGLE_DRIVE_CONFIG.BACKUP_FILE_NAME);
             }
         }
@@ -4804,7 +4868,7 @@ async function saveToCloud() {
             if (response.ok) {
                 const result = await response.json();
                 cloudFileId = result.id;
-                localStorage.setItem('schoolDashboardCloudFileId', cloudFileId);
+                CESTISStore.setItem('schoolDashboardCloudFileId', cloudFileId);
             }
         }
 
@@ -4814,7 +4878,7 @@ async function saveToCloud() {
         }
 
         lastSyncTime = new Date();
-        localStorage.setItem('schoolDashboardLastSyncTime', lastSyncTime.toISOString());
+        CESTISStore.setItem('schoolDashboardLastSyncTime', lastSyncTime.toISOString());
         updateLastSyncDisplay();
 
         lastSavedBy = savedByName;
@@ -4954,11 +5018,11 @@ async function syncFromCloud() {
         updateQuarterTabIndicators();
 
         lastSyncTime = new Date();
-        localStorage.setItem('schoolDashboardLastSyncTime', lastSyncTime.toISOString());
+        CESTISStore.setItem('schoolDashboardLastSyncTime', lastSyncTime.toISOString());
         updateLastSyncDisplay();
 
         // Clear stale form draft after cloud sync
-        localStorage.removeItem(FORM_DRAFT_KEY);
+        CESTISStore.removeItem(FORM_DRAFT_KEY);
 
         // Refresh UI
         renderBudgetOverview();
@@ -5102,7 +5166,7 @@ async function mergeFromCloud() {
         loadBudgetForQuarter();
 
         lastSyncTime = new Date();
-        localStorage.setItem('schoolDashboardLastSyncTime', lastSyncTime.toISOString());
+        CESTISStore.setItem('schoolDashboardLastSyncTime', lastSyncTime.toISOString());
         updateLastSyncDisplay();
 
         lastSavedBy = backupData.savedBy || 'Unknown';
@@ -5326,7 +5390,7 @@ async function deleteBackupFile(fileId, fileName, btnElement) {
         }
         if (fileId === cloudFileId) {
             cloudFileId = null;
-            localStorage.removeItem('schoolDashboardCloudFileId');
+            CESTISStore.removeItem('schoolDashboardCloudFileId');
         }
     } catch (error) {
         console.error('Error deleting file:', error);

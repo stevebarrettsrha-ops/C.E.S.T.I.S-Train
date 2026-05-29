@@ -6,6 +6,70 @@
 <meta name="google-site-verification" content="h1kcrSWbOfqMdqcEuN9crbU73K84WTBd7Qy1lcbcFC4" />
 <title>VocTrain LMS — Vocational Training Management System</title>
 <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=Playfair+Display:wght@500;600;700;800&display=swap" rel="stylesheet">
+<script>
+/* ============================================================================
+   CESTISStore — localStorage-compatible API backed by IndexedDB.
+   IndexedDB has a far larger quota than localStorage (~5MB), so large data
+   (e.g. staff records with embedded document blobs) no longer overflows.
+   A synchronous in-memory cache preserves the existing synchronous
+   getItem/setItem/removeItem call sites; writes persist to IndexedDB
+   (durable) and mirror to localStorage when they still fit.
+   ============================================================================ */
+(function(){
+  if (window.CESTISStore) return;
+  var DB_NAME='CESTIS_KV', STORE='kv', LS=null;
+  try { LS = window.localStorage; } catch(e) { LS = null; }
+  var cache = {};
+  // Seed synchronously from localStorage so data is available immediately.
+  try { if(LS){ for(var i=0;i<LS.length;i++){ var k=LS.key(i); cache[k]=LS.getItem(k); } } } catch(e){}
+
+  var db=null, ready=false, wq=[];
+  function drainQueue(){ var q=wq; wq=[]; for(var i=0;i<q.length;i++){ writeIDB(q[i].k,q[i].v,q[i].del); } }
+  function writeIDB(k,v,del){
+    if(!db){ if(!ready){ wq.push({k:k,v:v,del:del}); } return; }
+    try { var os=db.transaction(STORE,'readwrite').objectStore(STORE); if(del){ os.delete(k); } else { os.put(v,k); } } catch(e){}
+  }
+  try {
+    var req = indexedDB.open(DB_NAME,1);
+    req.onupgradeneeded = function(e){ var d=e.target.result; if(!d.objectStoreNames.contains(STORE)){ d.createObjectStore(STORE); } };
+    req.onsuccess = function(e){
+      db = e.target.result;
+      try {
+        var idbKeys = {};
+        var cur = db.transaction(STORE,'readonly').objectStore(STORE).openCursor();
+        cur.onsuccess = function(ev){ var c=ev.target.result;
+          if(c){ idbKeys[c.key]=1; if(!(c.key in cache)){ cache[c.key]=c.value; } c.continue(); }
+          else {
+            // One-time migration: copy any localStorage-seeded keys into IndexedDB.
+            try { var ws=db.transaction(STORE,'readwrite').objectStore(STORE);
+                  for(var kk in cache){ if(Object.prototype.hasOwnProperty.call(cache,kk) && !idbKeys[kk]){ ws.put(cache[kk], kk); } } } catch(_){}
+            ready=true; drainQueue(); try{ window.dispatchEvent(new Event('cestis-store-ready')); }catch(_){}
+          }
+        };
+        cur.onerror = function(){ ready=true; drainQueue(); };
+      } catch(e){ ready=true; drainQueue(); }
+    };
+    req.onerror = function(){ db=null; ready=true; };
+  } catch(e){ db=null; ready=true; }
+
+  var Store = {
+    _cache: cache,
+    getItem: function(k){ k=String(k); return (k in cache) ? cache[k] : null; },
+    setItem: function(k,v){ k=String(k); v=String(v); cache[k]=v; try{ if(LS) LS.setItem(k,v); }catch(e){} writeIDB(k,v,false); },
+    removeItem: function(k){ k=String(k); delete cache[k]; try{ if(LS) LS.removeItem(k); }catch(e){} writeIDB(k,null,true); },
+    clear: function(){ for(var k in cache){ if(Object.prototype.hasOwnProperty.call(cache,k)) delete cache[k]; }
+                       try{ if(LS) LS.clear(); }catch(e){}
+                       if(db){ try{ db.transaction(STORE,'readwrite').objectStore(STORE).clear(); }catch(e){} } },
+    key: function(i){ return Object.keys(cache)[i]; },
+    keys: function(){ return Object.keys(cache); },
+    hasOwnProperty: function(k){ return Object.prototype.hasOwnProperty.call(cache, String(k)); },
+    whenReady: function(cb){ if(ready){ cb(); } else { window.addEventListener('cestis-store-ready', cb, {once:true}); } },
+    get length(){ return Object.keys(cache).length; }
+  };
+  window.CESTISStore = Store;
+})();
+</script>
+
 <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/mammoth/1.6.0/mammoth.browser.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
@@ -4726,12 +4790,12 @@ function refreshNotificationTimes() {
 }
 
 function saveNotifications() {
-  try { localStorage.setItem('voctrain_notifications', JSON.stringify(notifications)); } catch(e) {}
+  try { CESTISStore.setItem('voctrain_notifications', JSON.stringify(notifications)); } catch(e) {}
 }
 
 function loadNotifications() {
   try {
-    var saved = localStorage.getItem('voctrain_notifications');
+    var saved = CESTISStore.getItem('voctrain_notifications');
     if(saved) { notifications = JSON.parse(saved); refreshNotificationTimes(); }
   } catch(e) {}
 }
@@ -4884,9 +4948,9 @@ function safeJsonParse(str, fallback) {
 function getStorageUsage() {
   var total = 0;
   try {
-    for(var key in localStorage) {
-      if(localStorage.hasOwnProperty(key) && key.startsWith('voctrain_')) {
-        total += localStorage.getItem(key).length * 2; // UTF-16 chars = 2 bytes each
+    for(var key in CESTISStore._cache) {
+      if(CESTISStore.hasOwnProperty(key) && key.startsWith('voctrain_')) {
+        total += CESTISStore.getItem(key).length * 2; // UTF-16 chars = 2 bytes each
       }
     }
   } catch(e) {}
@@ -4993,7 +5057,7 @@ function exportDataBackup() {
     'voctrain_skillAreas','voctrain_certTemplates','voctrain_chatRooms','voctrain_chatMessages',
     'voctrain_chatProfiles','voctrain_chatFollows'];
   keys.forEach(function(k) {
-    var val = localStorage.getItem(k);
+    var val = CESTISStore.getItem(k);
     if(val) backup.data[k] = safeJsonParse(val, null);
   });
   var blob = new Blob([JSON.stringify(backup, null, 2)], { type: 'application/json' });
@@ -5025,7 +5089,7 @@ function importDataBackup() {
         if(!_originalConfirm.call(window, 'This will overwrite ALL current data with the backup from ' + (backup.exportedAt || 'unknown date') + '. Are you sure?')) return;
         Object.keys(backup.data).forEach(function(k) {
           if(backup.data[k] !== null) {
-            localStorage.setItem(k, JSON.stringify(backup.data[k]));
+            CESTISStore.setItem(k, JSON.stringify(backup.data[k]));
           }
         });
         showToast('Backup restored! Reloading...');
@@ -5334,10 +5398,10 @@ function certImageLoadAllFromDrive() {
 
 function initLmsChatData() {
   try {
-    var cr = localStorage.getItem('voctrain_chatRooms');
-    var cm = localStorage.getItem('voctrain_chatMessages');
-    var cp = localStorage.getItem('voctrain_chatProfiles');
-    var cf = localStorage.getItem('voctrain_chatFollows');
+    var cr = CESTISStore.getItem('voctrain_chatRooms');
+    var cm = CESTISStore.getItem('voctrain_chatMessages');
+    var cp = CESTISStore.getItem('voctrain_chatProfiles');
+    var cf = CESTISStore.getItem('voctrain_chatFollows');
     if(cr) lmsChatRooms = JSON.parse(cr);
     if(cm) lmsChatMessages = JSON.parse(cm);
     if(cp) lmsChatProfiles = JSON.parse(cp);
@@ -5483,7 +5547,7 @@ function lmsChatEnsureMembership() {
 
 function saveLmsChatData() {
   try {
-    localStorage.setItem('voctrain_chatRooms', JSON.stringify(lmsChatRooms));
+    CESTISStore.setItem('voctrain_chatRooms', JSON.stringify(lmsChatRooms));
     // Strip large base64 data before saving to localStorage to avoid quota issues
     var msgCopy = {};
     Object.keys(lmsChatMessages).forEach(function(roomId) {
@@ -5494,15 +5558,15 @@ function saveLmsChatData() {
         return clone;
       });
     });
-    localStorage.setItem('voctrain_chatMessages', JSON.stringify(msgCopy));
+    CESTISStore.setItem('voctrain_chatMessages', JSON.stringify(msgCopy));
     // Strip profile pics from localStorage (keep in memory + Drive)
     var profCopy = {};
     Object.keys(lmsChatProfiles).forEach(function(uid) {
       profCopy[uid] = Object.assign({}, lmsChatProfiles[uid]);
       delete profCopy[uid].profilePic;
     });
-    localStorage.setItem('voctrain_chatProfiles', JSON.stringify(profCopy));
-    localStorage.setItem('voctrain_chatFollows', JSON.stringify(lmsChatFollows));
+    CESTISStore.setItem('voctrain_chatProfiles', JSON.stringify(profCopy));
+    CESTISStore.setItem('voctrain_chatFollows', JSON.stringify(lmsChatFollows));
   } catch(e) { console.warn('saveLmsChatData: storage error', e); }
   // Auto-save to Google Drive (debounced)
   lmsChatScheduleDriveSync();
@@ -5525,16 +5589,16 @@ var adminStaffAccessSettings = { attendance:false, announcements:false, calendar
 // Set session expiry timestamp on login
 function setSessionExpiry() {
   var expiry = Date.now() + SESSION_EXPIRY_MS;
-  localStorage.setItem('voctrain_sessionExpiry', String(expiry));
-  localStorage.setItem('voctrain_sessionRole', currentRole || '');
+  CESTISStore.setItem('voctrain_sessionExpiry', String(expiry));
+  CESTISStore.setItem('voctrain_sessionRole', currentRole || '');
   if(currentLoggedInUser) {
-    localStorage.setItem('voctrain_sessionUserId', currentLoggedInUser.id || '');
+    CESTISStore.setItem('voctrain_sessionUserId', currentLoggedInUser.id || '');
   }
 }
 
 // Check if session has expired; if so, clear sensitive data and force logout
 function checkSessionExpiry() {
-  var expiry = localStorage.getItem('voctrain_sessionExpiry');
+  var expiry = CESTISStore.getItem('voctrain_sessionExpiry');
   if(!expiry) return;
   if(Date.now() > Number(expiry)) {
     console.log('[Session] Session expired — clearing sensitive data');
@@ -5560,7 +5624,7 @@ function stopSessionExpiryCheck() {
 // Selectively clear sensitive data while preserving the student's own progress
 // Called on student logout or session expiry
 function clearSensitiveStudentData() {
-  var sessionRole = currentRole || localStorage.getItem('voctrain_sessionRole');
+  var sessionRole = currentRole || CESTISStore.getItem('voctrain_sessionRole');
   // Only do selective clearing for student role; admins/instructors wipe all data
   if(sessionRole !== 'student') {
     clearAllSessionData();
@@ -5569,7 +5633,7 @@ function clearSensitiveStudentData() {
 
   var studentId = currentStudent ? currentStudent.id : null;
   var studentName = currentStudent ? currentStudent.name : null;
-  var userId = currentLoggedInUser ? currentLoggedInUser.id : localStorage.getItem('voctrain_sessionUserId');
+  var userId = currentLoggedInUser ? currentLoggedInUser.id : CESTISStore.getItem('voctrain_sessionUserId');
 
   // --- CLEAR BOTH localStorage AND in-memory arrays ---
   // This prevents data leaking back via saveState() if another user logs in on the same page session.
@@ -5583,8 +5647,8 @@ function clearSensitiveStudentData() {
       return (studentId && s.id === studentId) || (studentName && s.name === studentName);
     });
     students = myStudent;
-    localStorage.setItem('voctrain_students', JSON.stringify(myStudent));
-  } catch(e) { students = []; localStorage.removeItem('voctrain_students'); }
+    CESTISStore.setItem('voctrain_students', JSON.stringify(myStudent));
+  } catch(e) { students = []; CESTISStore.removeItem('voctrain_students'); }
 
   // 3. Keep only this student's exam results
   try {
@@ -5592,16 +5656,16 @@ function clearSensitiveStudentData() {
       return (studentId && r.studentId === studentId) || (studentName && r.studentName === studentName);
     });
     examResults = myResults;
-    localStorage.setItem('voctrain_examResults', JSON.stringify(myResults));
-  } catch(e) { examResults = []; localStorage.removeItem('voctrain_examResults'); }
+    CESTISStore.setItem('voctrain_examResults', JSON.stringify(myResults));
+  } catch(e) { examResults = []; CESTISStore.removeItem('voctrain_examResults'); }
 
   // 4. Keep only this student's profile
   try {
     var myProfile = {};
     if(userId && studentProfiles[userId]) { myProfile[userId] = studentProfiles[userId]; }
     studentProfiles = myProfile;
-    localStorage.setItem('voctrain_studentProfiles', JSON.stringify(myProfile));
-  } catch(e) { studentProfiles = {}; localStorage.removeItem('voctrain_studentProfiles'); }
+    CESTISStore.setItem('voctrain_studentProfiles', JSON.stringify(myProfile));
+  } catch(e) { studentProfiles = {}; CESTISStore.removeItem('voctrain_studentProfiles'); }
 
   // 5. Keep only this student's attendance
   try {
@@ -5609,37 +5673,37 @@ function clearSensitiveStudentData() {
       return (studentId && a.studentId === studentId) || (studentName && a.studentName === studentName);
     });
     attendanceRecords = myAttendance;
-    localStorage.setItem('voctrain_attendance', JSON.stringify(myAttendance));
-  } catch(e) { attendanceRecords = []; localStorage.removeItem('voctrain_attendance'); }
+    CESTISStore.setItem('voctrain_attendance', JSON.stringify(myAttendance));
+  } catch(e) { attendanceRecords = []; CESTISStore.removeItem('voctrain_attendance'); }
 
   // 6. Remove admin/instructor-only data (localStorage + in-memory)
-  localStorage.removeItem('voctrain_adminMeetings');
+  CESTISStore.removeItem('voctrain_adminMeetings');
   adminMeetings = [];
-  localStorage.removeItem('voctrain_adrTasks');
+  CESTISStore.removeItem('voctrain_adrTasks');
   adrTasks = [];
-  localStorage.removeItem('voctrain_adrStaffMeta');
+  CESTISStore.removeItem('voctrain_adrStaffMeta');
   adrStaffMeta = {};
-  localStorage.removeItem('voctrain_adminStaffAccess');
+  CESTISStore.removeItem('voctrain_adminStaffAccess');
   adminStaffAccessSettings = { attendance:false, announcements:false, calendar:false, students:false, certificates:false, reports:false, training:false, exams:false, video:false, resources:false };
-  localStorage.removeItem('voctrain_instructorData');
+  CESTISStore.removeItem('voctrain_instructorData');
   instructorData = [];
-  localStorage.removeItem('voctrain_instructorProfiles');
+  CESTISStore.removeItem('voctrain_instructorProfiles');
   instructorProfiles = {};
-  localStorage.removeItem('voctrain_certDownloadApprovals');
+  CESTISStore.removeItem('voctrain_certDownloadApprovals');
   certDownloadApprovals = [];
-  localStorage.removeItem('voctrain_certTemplates');
+  CESTISStore.removeItem('voctrain_certTemplates');
   certTemplates = {};
 
   // 7. Remove chat messages (may contain sensitive conversations)
-  localStorage.removeItem('voctrain_chatMessages');
+  CESTISStore.removeItem('voctrain_chatMessages');
   lmsChatMessages = {};
-  localStorage.removeItem('voctrain_chatProfiles');
+  CESTISStore.removeItem('voctrain_chatProfiles');
   lmsChatProfiles = {};
-  localStorage.removeItem('voctrain_chatFollows');
+  CESTISStore.removeItem('voctrain_chatFollows');
   lmsChatFollows = {};
 
   // 8. Remove support messages
-  localStorage.removeItem('voctrain_support_messages');
+  CESTISStore.removeItem('voctrain_support_messages');
   if(typeof supportMessages !== 'undefined') supportMessages = [];
 
   // 9. Preserve Google Drive tokens so cloud sync can work on next login
@@ -5649,13 +5713,13 @@ function clearSensitiveStudentData() {
   loginSyncCompleted = false;
 
   // 10. Clear CMC data
-  localStorage.removeItem('cmcDashboardData');
-  localStorage.removeItem('cmcHtmlContent');
+  CESTISStore.removeItem('cmcDashboardData');
+  CESTISStore.removeItem('cmcHtmlContent');
 
   // 11. Clear session tracking
-  localStorage.removeItem('voctrain_sessionExpiry');
-  localStorage.removeItem('voctrain_sessionRole');
-  localStorage.removeItem('voctrain_sessionUserId');
+  CESTISStore.removeItem('voctrain_sessionExpiry');
+  CESTISStore.removeItem('voctrain_sessionRole');
+  CESTISStore.removeItem('voctrain_sessionUserId');
 
   // 12. Clear IndexedDB databases (chat images, cert images)
   try { indexedDB.deleteDatabase('CESTIS_ChatImages'); } catch(e) {}
@@ -5673,7 +5737,7 @@ function clearSensitiveStudentData() {
 
 // Full data wipe for session expiry (when we can't identify the student)
 function clearSensitiveDataOnExpiry() {
-  var sessionRole = localStorage.getItem('voctrain_sessionRole');
+  var sessionRole = CESTISStore.getItem('voctrain_sessionRole');
   if(sessionRole === 'student') {
     clearSensitiveStudentData();
   } else {
@@ -5685,8 +5749,8 @@ function clearSensitiveDataOnExpiry() {
 function clearAllSessionData() {
   // Clear localStorage (preserve user accounts so other users can still log in)
   var keysToRemove = [];
-  for(var i = 0; i < localStorage.length; i++) {
-    var key = localStorage.key(i);
+  for(var i = 0; i < CESTISStore.length; i++) {
+    var key = CESTISStore.key(i);
     if(key === 'voctrain_users') continue; // preserve user accounts for login
     if(key === 'schoolDashboardGoogleAccessToken' || key === 'schoolDashboardGoogleTokenExpiry') continue; // preserve auth tokens for cloud sync
     if(key && key.startsWith('voctrain_user_')) continue; // preserve per-user chat data so messages survive logout/login
@@ -5694,7 +5758,7 @@ function clearAllSessionData() {
       keysToRemove.push(key);
     }
   }
-  keysToRemove.forEach(function(k) { localStorage.removeItem(k); });
+  keysToRemove.forEach(function(k) { CESTISStore.removeItem(k); });
 
   // Clear in-memory arrays to prevent saveState() from restoring data
   students = [];
@@ -5739,31 +5803,31 @@ function clearAllSessionData() {
 function saveState() {
   try {
     var isAdmin = currentRole === 'admin' || currentRole === 'adminstaff';
-    localStorage.setItem('voctrain_students', JSON.stringify(students));
-    localStorage.setItem('voctrain_exams', JSON.stringify(exams));
-    localStorage.setItem('voctrain_announcements', JSON.stringify(announcements));
-    localStorage.setItem('voctrain_attendance', JSON.stringify(attendanceRecords));
-    localStorage.setItem('voctrain_users', JSON.stringify(userAccounts));
-    localStorage.setItem('voctrain_classSessions', JSON.stringify(classSessions));
-    localStorage.setItem('voctrain_adminMeetings', JSON.stringify(adminMeetings));
-    localStorage.setItem('voctrain_assignments', JSON.stringify(instructorAssignments));
-    localStorage.setItem('voctrain_submissions', JSON.stringify(assignmentSubmissions));
-    localStorage.setItem('voctrain_resources', JSON.stringify(instructorResources));
-    localStorage.setItem('voctrain_studentProfiles', JSON.stringify(studentProfiles));
-    localStorage.setItem('voctrain_instructorProfiles', JSON.stringify(instructorProfiles));
-    localStorage.setItem('voctrain_systemSettings', JSON.stringify(systemSettings));
-    localStorage.setItem('voctrain_examResults', JSON.stringify(examResults));
-    localStorage.setItem('voctrain_calendarEvents', JSON.stringify(calendarEvents));
-    localStorage.setItem('voctrain_instructorData', JSON.stringify(instructorData));
-    localStorage.setItem('voctrain_certDownloadApprovals', JSON.stringify(certDownloadApprovals));
+    CESTISStore.setItem('voctrain_students', JSON.stringify(students));
+    CESTISStore.setItem('voctrain_exams', JSON.stringify(exams));
+    CESTISStore.setItem('voctrain_announcements', JSON.stringify(announcements));
+    CESTISStore.setItem('voctrain_attendance', JSON.stringify(attendanceRecords));
+    CESTISStore.setItem('voctrain_users', JSON.stringify(userAccounts));
+    CESTISStore.setItem('voctrain_classSessions', JSON.stringify(classSessions));
+    CESTISStore.setItem('voctrain_adminMeetings', JSON.stringify(adminMeetings));
+    CESTISStore.setItem('voctrain_assignments', JSON.stringify(instructorAssignments));
+    CESTISStore.setItem('voctrain_submissions', JSON.stringify(assignmentSubmissions));
+    CESTISStore.setItem('voctrain_resources', JSON.stringify(instructorResources));
+    CESTISStore.setItem('voctrain_studentProfiles', JSON.stringify(studentProfiles));
+    CESTISStore.setItem('voctrain_instructorProfiles', JSON.stringify(instructorProfiles));
+    CESTISStore.setItem('voctrain_systemSettings', JSON.stringify(systemSettings));
+    CESTISStore.setItem('voctrain_examResults', JSON.stringify(examResults));
+    CESTISStore.setItem('voctrain_calendarEvents', JSON.stringify(calendarEvents));
+    CESTISStore.setItem('voctrain_instructorData', JSON.stringify(instructorData));
+    CESTISStore.setItem('voctrain_certDownloadApprovals', JSON.stringify(certDownloadApprovals));
     // Admin-managed data: only save if admin OR if data is non-empty (prevents wiping admin data)
-    if (isAdmin || driveResources.length > 0) localStorage.setItem('voctrain_driveResources', JSON.stringify(driveResources));
-    if (isAdmin || skillAreas.length > 0) localStorage.setItem('voctrain_skillAreas', JSON.stringify(skillAreas));
-    if (isAdmin || documentHubFiles.length > 0) localStorage.setItem('voctrain_documentHubFiles', JSON.stringify(documentHubFiles));
-    if (isAdmin) localStorage.setItem('voctrain_adminStaffAccess', JSON.stringify(adminStaffAccessSettings));
-    if (isAdmin) localStorage.setItem('voctrain_maintenanceMode', JSON.stringify({ active: systemSettings.maintenanceMode === true, message: systemSettings.maintenanceMessage || '', updatedAt: new Date().toISOString() }));
-    if (isAdmin || adrTasks.length > 0) localStorage.setItem('voctrain_adrTasks', JSON.stringify(adrTasks));
-    if (isAdmin || Object.keys(adrStaffMeta).length > 0) localStorage.setItem('voctrain_adrStaffMeta', JSON.stringify(adrStaffMeta));
+    if (isAdmin || driveResources.length > 0) CESTISStore.setItem('voctrain_driveResources', JSON.stringify(driveResources));
+    if (isAdmin || skillAreas.length > 0) CESTISStore.setItem('voctrain_skillAreas', JSON.stringify(skillAreas));
+    if (isAdmin || documentHubFiles.length > 0) CESTISStore.setItem('voctrain_documentHubFiles', JSON.stringify(documentHubFiles));
+    if (isAdmin) CESTISStore.setItem('voctrain_adminStaffAccess', JSON.stringify(adminStaffAccessSettings));
+    if (isAdmin) CESTISStore.setItem('voctrain_maintenanceMode', JSON.stringify({ active: systemSettings.maintenanceMode === true, message: systemSettings.maintenanceMessage || '', updatedAt: new Date().toISOString() }));
+    if (isAdmin || adrTasks.length > 0) CESTISStore.setItem('voctrain_adrTasks', JSON.stringify(adrTasks));
+    if (isAdmin || Object.keys(adrStaffMeta).length > 0) CESTISStore.setItem('voctrain_adrStaffMeta', JSON.stringify(adrStaffMeta));
     // Strip large base64 images before saving to localStorage (images are in IndexedDB)
     var certTplsClean = {};
     Object.keys(certTemplates).forEach(function(k) {
@@ -5771,9 +5835,9 @@ function saveState() {
       delete certTplsClean[k].bgPage1;
       delete certTplsClean[k].bgPage2;
     });
-    if (isAdmin || Object.keys(certTplsClean).length > 0) localStorage.setItem('voctrain_certTemplates', JSON.stringify(certTplsClean));
+    if (isAdmin || Object.keys(certTplsClean).length > 0) CESTISStore.setItem('voctrain_certTemplates', JSON.stringify(certTplsClean));
     // Persist certTemplateCourseMap (modified by course renames)
-    try { localStorage.setItem('voctrain_certTemplateCourseMap', JSON.stringify(certTemplateCourseMap)); } catch(e) {}
+    try { CESTISStore.setItem('voctrain_certTemplateCourseMap', JSON.stringify(certTemplateCourseMap)); } catch(e) {}
     saveLmsChatData();
     // Save per-user data keyed by user ID
     savePerUserLocalData();
@@ -5792,16 +5856,16 @@ function savePerUserLocalData() {
   if (!userId) return;
   try {
     var prefix = 'voctrain_user_' + userId + '_';
-    localStorage.setItem(prefix + 'chatMessages', JSON.stringify(lmsChatMessages));
-    localStorage.setItem(prefix + 'chatProfiles', JSON.stringify(lmsChatProfiles));
-    localStorage.setItem(prefix + 'chatFollows', JSON.stringify(lmsChatFollows));
-    localStorage.setItem(prefix + 'chatRooms', JSON.stringify(lmsChatRooms));
+    CESTISStore.setItem(prefix + 'chatMessages', JSON.stringify(lmsChatMessages));
+    CESTISStore.setItem(prefix + 'chatProfiles', JSON.stringify(lmsChatProfiles));
+    CESTISStore.setItem(prefix + 'chatFollows', JSON.stringify(lmsChatFollows));
+    CESTISStore.setItem(prefix + 'chatRooms', JSON.stringify(lmsChatRooms));
     if (currentRole === 'student') {
-      localStorage.setItem(prefix + 'studentProfiles', JSON.stringify(studentProfiles));
+      CESTISStore.setItem(prefix + 'studentProfiles', JSON.stringify(studentProfiles));
     } else if (currentRole === 'instructor') {
-      localStorage.setItem(prefix + 'instructorProfiles', JSON.stringify(instructorProfiles));
+      CESTISStore.setItem(prefix + 'instructorProfiles', JSON.stringify(instructorProfiles));
     }
-    localStorage.setItem(prefix + 'notifications', JSON.stringify(notifications || []));
+    CESTISStore.setItem(prefix + 'notifications', JSON.stringify(notifications || []));
   } catch(e) { console.warn('[PerUser] localStorage save error:', e); }
 }
 
@@ -5811,21 +5875,21 @@ function loadPerUserLocalData() {
   if (!userId) return;
   try {
     var prefix = 'voctrain_user_' + userId + '_';
-    var cm = safeJsonParse(localStorage.getItem(prefix + 'chatMessages'), null);
-    var cp = safeJsonParse(localStorage.getItem(prefix + 'chatProfiles'), null);
-    var cf = safeJsonParse(localStorage.getItem(prefix + 'chatFollows'), null);
-    var cr = safeJsonParse(localStorage.getItem(prefix + 'chatRooms'), null);
-    var nt = safeJsonParse(localStorage.getItem(prefix + 'notifications'), null);
+    var cm = safeJsonParse(CESTISStore.getItem(prefix + 'chatMessages'), null);
+    var cp = safeJsonParse(CESTISStore.getItem(prefix + 'chatProfiles'), null);
+    var cf = safeJsonParse(CESTISStore.getItem(prefix + 'chatFollows'), null);
+    var cr = safeJsonParse(CESTISStore.getItem(prefix + 'chatRooms'), null);
+    var nt = safeJsonParse(CESTISStore.getItem(prefix + 'notifications'), null);
     // Merge per-user data (don't overwrite if already loaded from cloud)
     if (cm) { Object.keys(cm).forEach(function(k) { if (!lmsChatMessages[k] || lmsChatMessages[k].length === 0) lmsChatMessages[k] = cm[k]; }); }
     if (cp) { Object.keys(cp).forEach(function(k) { if (!lmsChatProfiles[k]) lmsChatProfiles[k] = cp[k]; }); }
     if (cf) { Object.keys(cf).forEach(function(k) { if (!lmsChatFollows[k]) lmsChatFollows[k] = cf[k]; }); }
     if (cr) { cr.forEach(function(room) { if (!lmsChatRooms.some(function(r) { return r.id === room.id; })) lmsChatRooms.push(room); }); }
     if (currentRole === 'student') {
-      var sp = safeJsonParse(localStorage.getItem(prefix + 'studentProfiles'), null);
+      var sp = safeJsonParse(CESTISStore.getItem(prefix + 'studentProfiles'), null);
       if (sp) { Object.keys(sp).forEach(function(k) { if (!studentProfiles[k]) studentProfiles[k] = sp[k]; }); }
     } else if (currentRole === 'instructor') {
-      var ip = safeJsonParse(localStorage.getItem(prefix + 'instructorProfiles'), null);
+      var ip = safeJsonParse(CESTISStore.getItem(prefix + 'instructorProfiles'), null);
       if (ip) { Object.keys(ip).forEach(function(k) { if (!instructorProfiles[k]) instructorProfiles[k] = ip[k]; }); }
     }
     if (nt && Array.isArray(nt)) { nt.forEach(function(n) { if (!notifications.some(function(l) { return l.id === n.id; })) notifications.push(n); }); }
@@ -5835,54 +5899,54 @@ function loadPerUserLocalData() {
 
 function loadState() {
   try {
-    var s = safeJsonParse(localStorage.getItem('voctrain_students'), null);
-    var e = safeJsonParse(localStorage.getItem('voctrain_exams'), null);
-    var a = safeJsonParse(localStorage.getItem('voctrain_announcements'), null);
-    var at = safeJsonParse(localStorage.getItem('voctrain_attendance'), null);
-    var cs = safeJsonParse(localStorage.getItem('voctrain_classSessions'), null);
-    var ia = safeJsonParse(localStorage.getItem('voctrain_assignments'), null);
-    var asub = safeJsonParse(localStorage.getItem('voctrain_submissions'), null);
-    var ir = safeJsonParse(localStorage.getItem('voctrain_resources'), null);
-    var sp = safeJsonParse(localStorage.getItem('voctrain_studentProfiles'), null);
-    var ss = safeJsonParse(localStorage.getItem('voctrain_systemSettings'), null);
-    var er = safeJsonParse(localStorage.getItem('voctrain_examResults'), null);
-    var ce = safeJsonParse(localStorage.getItem('voctrain_calendarEvents'), null);
+    var s = safeJsonParse(CESTISStore.getItem('voctrain_students'), null);
+    var e = safeJsonParse(CESTISStore.getItem('voctrain_exams'), null);
+    var a = safeJsonParse(CESTISStore.getItem('voctrain_announcements'), null);
+    var at = safeJsonParse(CESTISStore.getItem('voctrain_attendance'), null);
+    var cs = safeJsonParse(CESTISStore.getItem('voctrain_classSessions'), null);
+    var ia = safeJsonParse(CESTISStore.getItem('voctrain_assignments'), null);
+    var asub = safeJsonParse(CESTISStore.getItem('voctrain_submissions'), null);
+    var ir = safeJsonParse(CESTISStore.getItem('voctrain_resources'), null);
+    var sp = safeJsonParse(CESTISStore.getItem('voctrain_studentProfiles'), null);
+    var ss = safeJsonParse(CESTISStore.getItem('voctrain_systemSettings'), null);
+    var er = safeJsonParse(CESTISStore.getItem('voctrain_examResults'), null);
+    var ce = safeJsonParse(CESTISStore.getItem('voctrain_calendarEvents'), null);
     if(s) students = s;
     if(e) exams = e;
     if(a) announcements = a;
     if(at) attendanceRecords = at;
     if(cs) classSessions = cs;
-    var am = safeJsonParse(localStorage.getItem('voctrain_adminMeetings'), null);
+    var am = safeJsonParse(CESTISStore.getItem('voctrain_adminMeetings'), null);
     if(am) adminMeetings = am;
     if(ia) instructorAssignments = ia;
     if(asub) assignmentSubmissions = asub;
     if(ir) instructorResources = ir;
-    var dr = safeJsonParse(localStorage.getItem('voctrain_driveResources'), null);
+    var dr = safeJsonParse(CESTISStore.getItem('voctrain_driveResources'), null);
     if(dr) driveResources = dr;
     if(sp) studentProfiles = sp;
-    var ip = safeJsonParse(localStorage.getItem('voctrain_instructorProfiles'), null);
+    var ip = safeJsonParse(CESTISStore.getItem('voctrain_instructorProfiles'), null);
     if(ip) instructorProfiles = ip;
     if(ss) systemSettings = ss;
     if(er) examResults = er;
     if(ce) { var _cc={class:'var(--blue)',exam:'var(--red)',deadline:'var(--accent)',meeting:'var(--purple)'}; calendarEvents = ce.map(function(e){if(!e.color){e.color=_cc[e.type]||'var(--blue)';}return e;}); }
-    var adrT = safeJsonParse(localStorage.getItem('voctrain_adrTasks'), null);
-    var adrM = safeJsonParse(localStorage.getItem('voctrain_adrStaffMeta'), null);
+    var adrT = safeJsonParse(CESTISStore.getItem('voctrain_adrTasks'), null);
+    var adrM = safeJsonParse(CESTISStore.getItem('voctrain_adrStaffMeta'), null);
     if(adrT) adrTasks = adrT;
     if(adrM) adrStaffMeta = adrM;
-    var asAccess = safeJsonParse(localStorage.getItem('voctrain_adminStaffAccess'), null);
+    var asAccess = safeJsonParse(CESTISStore.getItem('voctrain_adminStaffAccess'), null);
     if(asAccess) adminStaffAccessSettings = asAccess;
-    var idData = safeJsonParse(localStorage.getItem('voctrain_instructorData'), null);
+    var idData = safeJsonParse(CESTISStore.getItem('voctrain_instructorData'), null);
     if(idData) instructorData = idData;
-    var cda = safeJsonParse(localStorage.getItem('voctrain_certDownloadApprovals'), null);
+    var cda = safeJsonParse(CESTISStore.getItem('voctrain_certDownloadApprovals'), null);
     if(cda) certDownloadApprovals = cda;
-    var ct = safeJsonParse(localStorage.getItem('voctrain_certTemplates'), null);
+    var ct = safeJsonParse(CESTISStore.getItem('voctrain_certTemplates'), null);
     if(ct) certTemplates = ct;
-    var sa = safeJsonParse(localStorage.getItem('voctrain_skillAreas'), null);
+    var sa = safeJsonParse(CESTISStore.getItem('voctrain_skillAreas'), null);
     if(sa) skillAreas = sa;
-    var dhf = safeJsonParse(localStorage.getItem('voctrain_documentHubFiles'), null);
+    var dhf = safeJsonParse(CESTISStore.getItem('voctrain_documentHubFiles'), null);
     if(dhf) documentHubFiles = dhf;
     // Load certTemplateCourseMap (modified by course renames)
-    var ctcm = safeJsonParse(localStorage.getItem('voctrain_certTemplateCourseMap'), null);
+    var ctcm = safeJsonParse(CESTISStore.getItem('voctrain_certTemplateCourseMap'), null);
     if(ctcm && typeof ctcm === 'object') certTemplateCourseMap = ctcm;
   } catch(e) { console.warn('[loadState] Error loading data:', e.message); }
   // Migrate any cert template images from localStorage to IndexedDB, then load from IndexedDB
@@ -5899,7 +5963,7 @@ function loadState() {
       cleaned[k] = Object.assign({}, certTemplates[k]);
       delete cleaned[k].bgPage1; delete cleaned[k].bgPage2;
     });
-    try { localStorage.setItem('voctrain_certTemplates', JSON.stringify(cleaned)); } catch(e) {}
+    try { CESTISStore.setItem('voctrain_certTemplates', JSON.stringify(cleaned)); } catch(e) {}
   }
   // Load cert template background images from IndexedDB
   initCertTemplateImages();
@@ -6023,7 +6087,7 @@ checkMaintenanceOnLoad();
 
 // Check for expired session on page load (e.g. user returns to stale tab)
 (function() {
-  var expiry = localStorage.getItem('voctrain_sessionExpiry');
+  var expiry = CESTISStore.getItem('voctrain_sessionExpiry');
   if(expiry && Date.now() > Number(expiry)) {
     console.log('[Session] Expired session detected on page load — clearing sensitive data');
     clearSensitiveDataOnExpiry();
@@ -6039,13 +6103,13 @@ var userAccounts = [
 var umSelectedIds = [];
 
 function saveUserAccounts() {
-  try { localStorage.setItem('voctrain_users', JSON.stringify(userAccounts)); } catch(e) {}
+  try { CESTISStore.setItem('voctrain_users', JSON.stringify(userAccounts)); } catch(e) {}
   // Push changes to Google Drive immediately (debounced)
   scheduleDebouncedCloudSave();
 }
 function loadUserAccounts() {
   try {
-    var u = localStorage.getItem('voctrain_users');
+    var u = CESTISStore.getItem('voctrain_users');
     if(u) userAccounts = JSON.parse(u);
     // Migrate: ensure admin account has current credentials
     var adminAcct = userAccounts.find(function(a){ return a.id === 'USR-001' && a.role === 'admin'; });
@@ -6082,7 +6146,7 @@ loadUserAccounts();
 // the production-ready update. Runs once, then sets a version flag.
 (function purgeLegacyDemoData() {
   var CURRENT_DATA_VERSION = 4;
-  var savedVersion = parseInt(localStorage.getItem('voctrain_dataVersion')) || 0;
+  var savedVersion = parseInt(CESTISStore.getItem('voctrain_dataVersion')) || 0;
   if (savedVersion >= CURRENT_DATA_VERSION) return; // Already purged
 
   console.log('[Migration] Purging legacy demo data (v' + savedVersion + ' -> v' + CURRENT_DATA_VERSION + ')');
@@ -6140,7 +6204,7 @@ loadUserAccounts();
   saveUserAccounts();
 
   // Save cleaned state and set version flag
-  localStorage.setItem('voctrain_dataVersion', String(CURRENT_DATA_VERSION));
+  CESTISStore.setItem('voctrain_dataVersion', String(CURRENT_DATA_VERSION));
   saveState();
   console.log('[Migration] Demo data purge complete. Users: ' + userAccounts.length + ', Students: ' + students.length + ', Exams: ' + exams.length);
 })();
@@ -14560,7 +14624,7 @@ function saveMaintenanceSettings() {
   systemSettings.maintenanceMode = isNowActive;
   systemSettings.maintenanceMessage = msgBox ? msgBox.value.trim() : '';
   // Persist to localStorage immediately so all browser tabs pick it up
-  localStorage.setItem('voctrain_maintenanceMode', JSON.stringify({ active: isNowActive, message: systemSettings.maintenanceMessage, updatedAt: new Date().toISOString() }));
+  CESTISStore.setItem('voctrain_maintenanceMode', JSON.stringify({ active: isNowActive, message: systemSettings.maintenanceMessage, updatedAt: new Date().toISOString() }));
   saveState();
   // Update the overlay state
   applyMaintenanceOverlay();
@@ -14621,7 +14685,7 @@ function maintenanceShowAdminLogin() {
 // Check maintenance mode on page load and on storage events (cross-tab sync)
 function checkMaintenanceOnLoad() {
   // Check from localStorage first for cross-tab awareness
-  var stored = safeJsonParse(localStorage.getItem('voctrain_maintenanceMode'), null);
+  var stored = safeJsonParse(CESTISStore.getItem('voctrain_maintenanceMode'), null);
   if(stored && stored.active === true) {
     systemSettings.maintenanceMode = true;
     if(stored.message) systemSettings.maintenanceMessage = stored.message;
@@ -14961,7 +15025,7 @@ function refreshStudentDependentViews() {
 // path that might otherwise push a deleted student back into the local list.
 function _getDeletedStudentIds() {
   try {
-    var raw = localStorage.getItem('voctrain_deletedStudentIds');
+    var raw = CESTISStore.getItem('voctrain_deletedStudentIds');
     if(!raw) return {};
     var arr = JSON.parse(raw);
     if(!Array.isArray(arr)) return {};
@@ -14979,7 +15043,7 @@ function recordDeletedStudent(id) {
   try {
     var existing = _getDeletedStudentIds();
     existing[id] = true;
-    localStorage.setItem('voctrain_deletedStudentIds', JSON.stringify(Object.keys(existing)));
+    CESTISStore.setItem('voctrain_deletedStudentIds', JSON.stringify(Object.keys(existing)));
   } catch(e) { /* ignore */ }
 }
 function updatePipelineCounts() {
@@ -16105,7 +16169,7 @@ function endExamPreview() {
   if (examTimerInterval) clearInterval(examTimerInterval);
   _isExamPreviewMode = false;
   currentExamSession = null;
-  localStorage.removeItem('voctrain_examInProgress');
+  CESTISStore.removeItem('voctrain_examInProgress');
   // Restore views
   var isInstructor = currentRole === 'instructor' && document.getElementById('iExamResultsView');
   var listView = document.getElementById(isInstructor ? 'iExamListView' : 'examListView');
@@ -16563,7 +16627,7 @@ function autoSaveExamProgress() {
   // Auto-save in localStorage in case of browser crash
   if(!currentExamSession) return;
   try {
-    localStorage.setItem('voctrain_examInProgress', JSON.stringify(currentExamSession));
+    CESTISStore.setItem('voctrain_examInProgress', JSON.stringify(currentExamSession));
   } catch(e) {}
 }
 
@@ -16657,7 +16721,7 @@ function submitExam() {
   if(_isExamPreviewMode) {
     _isExamPreviewMode = false;
     currentExamSession = null;
-    localStorage.removeItem('voctrain_examInProgress');
+    CESTISStore.removeItem('voctrain_examInProgress');
 
     // Show preview results in the admin preview container
     var isInstructor = currentRole === 'instructor' && document.getElementById('iExamResultsView');
@@ -16699,7 +16763,7 @@ function submitExam() {
     exam.students = resultsForExam.length;
   }
 
-  localStorage.removeItem('voctrain_examInProgress');
+  CESTISStore.removeItem('voctrain_examInProgress');
   currentExamSession = null;
   addNotification(result.studentName + ' scored ' + result.score + '% on ' + (exam ? exam.title : 'exam') + (result.passed ? ' — PASSED' : result.needsReview ? ' — pending review' : ' — NOT PASSED'), result.passed ? 'grade' : result.needsReview ? 'info' : 'warning', null, ['admin','instructor','student']);
   saveState();
@@ -17414,13 +17478,13 @@ var supportMessages = [];
 
 function loadSupportMessages() {
   try {
-    var s = localStorage.getItem('voctrain_support_messages');
+    var s = CESTISStore.getItem('voctrain_support_messages');
     if(s) supportMessages = JSON.parse(s);
   } catch(e) { supportMessages = []; }
 }
 
 function saveSupportMessages() {
-  try { localStorage.setItem('voctrain_support_messages', JSON.stringify(supportMessages)); } catch(e) {}
+  try { CESTISStore.setItem('voctrain_support_messages', JSON.stringify(supportMessages)); } catch(e) {}
 }
 
 function submitSupportMessage() {
@@ -18398,10 +18462,10 @@ function getCurrentCloudUser() {
 
 // Initialize cloud sync from localStorage
 function initializeCloudSync() {
-  const savedToken = localStorage.getItem('schoolDashboardGoogleAccessToken');
-  const savedExpiry = localStorage.getItem('schoolDashboardGoogleTokenExpiry');
-  const savedLastSync = localStorage.getItem('schoolDashboardLastSyncTime');
-  const savedFileId = localStorage.getItem('schoolDashboardCloudFileId');
+  const savedToken = CESTISStore.getItem('schoolDashboardGoogleAccessToken');
+  const savedExpiry = CESTISStore.getItem('schoolDashboardGoogleTokenExpiry');
+  const savedLastSync = CESTISStore.getItem('schoolDashboardLastSyncTime');
+  const savedFileId = CESTISStore.getItem('schoolDashboardCloudFileId');
 
   if (savedLastSync) {
     lastSyncTime = new Date(savedLastSync);
@@ -18503,8 +18567,8 @@ function handleCloudAuthExpired() {
   googleAccessToken = null;
   isCloudConnected = false;
   try {
-    localStorage.removeItem('schoolDashboardGoogleAccessToken');
-    localStorage.removeItem('schoolDashboardGoogleTokenExpiry');
+    CESTISStore.removeItem('schoolDashboardGoogleAccessToken');
+    CESTISStore.removeItem('schoolDashboardGoogleTokenExpiry');
   } catch (e) { /* ignore */ }
   if (typeof updateCloudUI === 'function') updateCloudUI(false);
   if (wasConnected && !_cloudAuthExpiredNotified) {
@@ -18518,9 +18582,9 @@ function handleCloudAuthExpired() {
 // Check cloud connection state and notify the user if something needs action.
 function checkCloudAndNotify(reason) {
   // Don't nag users who have never connected to the cloud.
-  var hasEverConnected = localStorage.getItem('schoolDashboardGoogleAccessToken') ||
-                         localStorage.getItem('schoolDashboardCloudFileId') ||
-                         localStorage.getItem('schoolDashboardLastSyncTime');
+  var hasEverConnected = CESTISStore.getItem('schoolDashboardGoogleAccessToken') ||
+                         CESTISStore.getItem('schoolDashboardCloudFileId') ||
+                         CESTISStore.getItem('schoolDashboardLastSyncTime');
   if (!hasEverConnected) return;
 
   if (!navigator.onLine) {
@@ -18531,8 +18595,8 @@ function checkCloudAndNotify(reason) {
   }
 
   if (!isCloudConnected) {
-    var savedExpiry = localStorage.getItem('schoolDashboardGoogleTokenExpiry');
-    var lastSync = localStorage.getItem('schoolDashboardLastSyncTime');
+    var savedExpiry = CESTISStore.getItem('schoolDashboardGoogleTokenExpiry');
+    var lastSync = CESTISStore.getItem('schoolDashboardLastSyncTime');
     var detail;
     if (reason === 'token_expired' || (savedExpiry && new Date(savedExpiry) <= new Date())) {
       detail = 'Your Google account session has expired.';
@@ -18556,7 +18620,7 @@ function startCloudMonitor() {
   if (_cloudCheckInterval) clearInterval(_cloudCheckInterval);
   _cloudCheckInterval = setInterval(function() {
     if (isCloudConnected && googleAccessToken) {
-      var savedExpiry = localStorage.getItem('schoolDashboardGoogleTokenExpiry');
+      var savedExpiry = CESTISStore.getItem('schoolDashboardGoogleTokenExpiry');
       if (savedExpiry && new Date(savedExpiry) <= new Date()) {
         handleCloudAuthExpired();
       }
@@ -18789,8 +18853,8 @@ async function submitGoogleToken() {
 
     const expiry = new Date();
     expiry.setHours(expiry.getHours() + 1);
-    localStorage.setItem('schoolDashboardGoogleAccessToken', token);
-    localStorage.setItem('schoolDashboardGoogleTokenExpiry', expiry.toISOString());
+    CESTISStore.setItem('schoolDashboardGoogleAccessToken', token);
+    CESTISStore.setItem('schoolDashboardGoogleTokenExpiry', expiry.toISOString());
 
     closeGoogleAuthModal();
     updateCloudUI(true);
@@ -18830,8 +18894,8 @@ async function handleGoogleAuthCallback(tokenResponse) {
 
   const expiry = new Date();
   expiry.setSeconds(expiry.getSeconds() + (tokenResponse.expires_in || 3600));
-  localStorage.setItem('schoolDashboardGoogleAccessToken', googleAccessToken);
-  localStorage.setItem('schoolDashboardGoogleTokenExpiry', expiry.toISOString());
+  CESTISStore.setItem('schoolDashboardGoogleAccessToken', googleAccessToken);
+  CESTISStore.setItem('schoolDashboardGoogleTokenExpiry', expiry.toISOString());
 
   updateCloudUI(true);
 
@@ -18873,9 +18937,9 @@ function disconnectFromGoogleDrive() {
     cloudFileId = null;
     _autoSaveFileIds = {};
 
-    localStorage.removeItem('schoolDashboardGoogleAccessToken');
-    localStorage.removeItem('schoolDashboardGoogleTokenExpiry');
-    localStorage.removeItem('schoolDashboardCloudFileId');
+    CESTISStore.removeItem('schoolDashboardGoogleAccessToken');
+    CESTISStore.removeItem('schoolDashboardGoogleTokenExpiry');
+    CESTISStore.removeItem('schoolDashboardCloudFileId');
 
     updateCloudUI(false);
     toggleCloudMenu();
@@ -18897,7 +18961,7 @@ async function findExistingBackupFile() {
       const data = await response.json();
       if (data.files && data.files.length > 0) {
         cloudFileId = data.files[0].id;
-        localStorage.setItem('schoolDashboardCloudFileId', cloudFileId);
+        CESTISStore.setItem('schoolDashboardCloudFileId', cloudFileId);
         console.log('Found existing backup file:', cloudFileId);
       }
     }
@@ -19104,7 +19168,7 @@ async function saveToCloud() {
       if (response.ok) {
         const result = await response.json();
         cloudFileId = result.id;
-        localStorage.setItem('schoolDashboardCloudFileId', cloudFileId);
+        CESTISStore.setItem('schoolDashboardCloudFileId', cloudFileId);
       }
     }
 
@@ -19114,7 +19178,7 @@ async function saveToCloud() {
     }
 
     lastSyncTime = new Date();
-    localStorage.setItem('schoolDashboardLastSyncTime', lastSyncTime.toISOString());
+    CESTISStore.setItem('schoolDashboardLastSyncTime', lastSyncTime.toISOString());
     updateLastSyncDisplay();
 
     lastSavedBy = cloudUser.username;
@@ -19291,7 +19355,7 @@ async function syncFromCloud() {
 
     // Update last sync time
     lastSyncTime = new Date();
-    localStorage.setItem('schoolDashboardLastSyncTime', lastSyncTime.toISOString());
+    CESTISStore.setItem('schoolDashboardLastSyncTime', lastSyncTime.toISOString());
     updateLastSyncDisplay();
 
     lastSavedBy = backupData.savedBy || 'Unknown';
@@ -19869,7 +19933,7 @@ async function mergeFromCloud() {
 
     // Update last sync time
     lastSyncTime = new Date();
-    localStorage.setItem('schoolDashboardLastSyncTime', lastSyncTime.toISOString());
+    CESTISStore.setItem('schoolDashboardLastSyncTime', lastSyncTime.toISOString());
     updateLastSyncDisplay();
 
     lastSavedBy = backupData.savedBy || 'Unknown';
@@ -20860,7 +20924,7 @@ async function autoSyncOnLogin() {
 
     // 4. Update sync timestamp
     lastSyncTime = new Date();
-    localStorage.setItem('schoolDashboardLastSyncTime', lastSyncTime.toISOString());
+    CESTISStore.setItem('schoolDashboardLastSyncTime', lastSyncTime.toISOString());
     updateLastSyncDisplay();
 
     // 5. Keep the main cloudFileId in sync
@@ -20939,7 +21003,7 @@ async function silentSaveToFolder(folderId, folderLabel, blob) {
         // Keep main cloudFileId in sync for the main folder
         if (folderId === GOOGLE_DRIVE_CONFIG.FOLDER_ID) {
           cloudFileId = result.id;
-          localStorage.setItem('schoolDashboardCloudFileId', cloudFileId);
+          CESTISStore.setItem('schoolDashboardCloudFileId', cloudFileId);
         }
       }
     }
@@ -21058,7 +21122,7 @@ async function autoSaveToAllFolders() {
 
     // Update sync metadata
     lastSyncTime = new Date();
-    localStorage.setItem('schoolDashboardLastSyncTime', lastSyncTime.toISOString());
+    CESTISStore.setItem('schoolDashboardLastSyncTime', lastSyncTime.toISOString());
     updateLastSyncDisplay();
 
     lastSavedBy = cloudUser.username;
@@ -21199,8 +21263,8 @@ async function loginPageSync() {
   // Step 1: Ensure we have a Google access token
   if (!isCloudConnected || !googleAccessToken) {
     // Check if token is in localStorage and still valid
-    var savedToken = localStorage.getItem('schoolDashboardGoogleAccessToken');
-    var savedExpiry = localStorage.getItem('schoolDashboardGoogleTokenExpiry');
+    var savedToken = CESTISStore.getItem('schoolDashboardGoogleAccessToken');
+    var savedExpiry = CESTISStore.getItem('schoolDashboardGoogleTokenExpiry');
     if (savedToken && savedExpiry && new Date(savedExpiry) > new Date()) {
       googleAccessToken = savedToken;
       isCloudConnected = true;
@@ -21288,7 +21352,7 @@ async function loginPageSync() {
 
     // Step 5: Update sync timestamp
     lastSyncTime = new Date();
-    localStorage.setItem('schoolDashboardLastSyncTime', lastSyncTime.toISOString());
+    CESTISStore.setItem('schoolDashboardLastSyncTime', lastSyncTime.toISOString());
 
     // Step 6: Show success status — detailed for admin, simple for others
     if (isAdmin) {
@@ -21316,8 +21380,8 @@ async function loginPageSync() {
       updateLoginSyncStatus(isAdmin ? 'Session expired. Please try again.' : 'Session expired. Try again.', 'error');
       googleAccessToken = null;
       isCloudConnected = false;
-      localStorage.removeItem('schoolDashboardGoogleAccessToken');
-      localStorage.removeItem('schoolDashboardGoogleTokenExpiry');
+      CESTISStore.removeItem('schoolDashboardGoogleAccessToken');
+      CESTISStore.removeItem('schoolDashboardGoogleTokenExpiry');
     } else {
       updateLoginSyncStatus(isAdmin ? 'Sync failed: ' + err.message : 'Sync failed. Try again.', 'error');
     }
@@ -21353,8 +21417,8 @@ function loginPageGoogleAuth() {
           // Save token
           var expiry = new Date();
           expiry.setSeconds(expiry.getSeconds() + (tokenResponse.expires_in || 3600));
-          localStorage.setItem('schoolDashboardGoogleAccessToken', tokenResponse.access_token);
-          localStorage.setItem('schoolDashboardGoogleTokenExpiry', expiry.toISOString());
+          CESTISStore.setItem('schoolDashboardGoogleAccessToken', tokenResponse.access_token);
+          CESTISStore.setItem('schoolDashboardGoogleTokenExpiry', expiry.toISOString());
           resolve(tokenResponse.access_token);
         },
         error_callback: function(err) {
@@ -21384,8 +21448,8 @@ function loginPageGoogleAuth() {
               }
               var expiry = new Date();
               expiry.setSeconds(expiry.getSeconds() + (tokenResponse.expires_in || 3600));
-              localStorage.setItem('schoolDashboardGoogleAccessToken', tokenResponse.access_token);
-              localStorage.setItem('schoolDashboardGoogleTokenExpiry', expiry.toISOString());
+              CESTISStore.setItem('schoolDashboardGoogleAccessToken', tokenResponse.access_token);
+              CESTISStore.setItem('schoolDashboardGoogleTokenExpiry', expiry.toISOString());
               resolve(tokenResponse.access_token);
             },
             error_callback: function(err) {
@@ -21423,8 +21487,8 @@ function loginPageGoogleAuth() {
 // so users can sync immediately after navigating to the page without refreshing
 // ============================================
 function revalidateCloudSync() {
-  var savedToken = localStorage.getItem('schoolDashboardGoogleAccessToken');
-  var savedExpiry = localStorage.getItem('schoolDashboardGoogleTokenExpiry');
+  var savedToken = CESTISStore.getItem('schoolDashboardGoogleAccessToken');
+  var savedExpiry = CESTISStore.getItem('schoolDashboardGoogleTokenExpiry');
   if (savedToken && savedExpiry && new Date(savedExpiry) > new Date()) {
     if (!isCloudConnected || googleAccessToken !== savedToken) {
       googleAccessToken = savedToken;
@@ -21434,7 +21498,7 @@ function revalidateCloudSync() {
       updateCloudUI(true);
       console.log('[CloudSync] Token revalidated on page restore/focus');
     }
-  } else if (isCloudConnected || localStorage.getItem('schoolDashboardGoogleAccessToken')) {
+  } else if (isCloudConnected || CESTISStore.getItem('schoolDashboardGoogleAccessToken')) {
     // Token expired — clear stale state and notify the user to reconnect
     console.log('[CloudSync] Token expired — cleared stale connection state');
     handleCloudAuthExpired();
@@ -21477,8 +21541,8 @@ async function studentLightSync(uname, pw) {
     // Step 1: Get a Google access token (use saved or request new)
     var token = googleAccessToken;
     if (!token) {
-      var savedToken = localStorage.getItem('schoolDashboardGoogleAccessToken');
-      var savedExpiry = localStorage.getItem('schoolDashboardGoogleTokenExpiry');
+      var savedToken = CESTISStore.getItem('schoolDashboardGoogleAccessToken');
+      var savedExpiry = CESTISStore.getItem('schoolDashboardGoogleTokenExpiry');
       if (savedToken && savedExpiry && new Date(savedExpiry) > new Date()) {
         token = savedToken;
       } else {
@@ -21637,8 +21701,8 @@ async function studentLightSync(uname, pw) {
 async function studentPushRegistration(newUserAccount) {
   var token = googleAccessToken;
   if (!token) {
-    var savedToken = localStorage.getItem('schoolDashboardGoogleAccessToken');
-    var savedExpiry = localStorage.getItem('schoolDashboardGoogleTokenExpiry');
+    var savedToken = CESTISStore.getItem('schoolDashboardGoogleAccessToken');
+    var savedExpiry = CESTISStore.getItem('schoolDashboardGoogleTokenExpiry');
     if (savedToken && savedExpiry && new Date(savedExpiry) > new Date()) {
       token = savedToken;
     } else {
@@ -21791,8 +21855,8 @@ async function studentRefreshCertData() {
   try {
     var token = googleAccessToken;
     if (!token) {
-      var savedToken = localStorage.getItem('schoolDashboardGoogleAccessToken');
-      var savedExpiry = localStorage.getItem('schoolDashboardGoogleTokenExpiry');
+      var savedToken = CESTISStore.getItem('schoolDashboardGoogleAccessToken');
+      var savedExpiry = CESTISStore.getItem('schoolDashboardGoogleTokenExpiry');
       if (savedToken && savedExpiry && new Date(savedExpiry) > new Date()) {
         token = savedToken;
       } else {
@@ -24125,7 +24189,7 @@ function lmsChatOnPageShow(prefix) {
 
   // Save status (but skip the Drive sync timer — we just fetched)
   try {
-    localStorage.setItem('voctrain_chatProfiles', JSON.stringify(lmsChatProfiles));
+    CESTISStore.setItem('voctrain_chatProfiles', JSON.stringify(lmsChatProfiles));
   } catch(e) {}
 }
 
@@ -24286,10 +24350,10 @@ async function lmsChatSyncFromDrive() {
           return clone;
         });
       });
-      localStorage.setItem('voctrain_chatRooms', JSON.stringify(lmsChatRooms));
-      localStorage.setItem('voctrain_chatMessages', JSON.stringify(msgCopy));
-      localStorage.setItem('voctrain_chatProfiles', JSON.stringify(lmsChatProfiles));
-      localStorage.setItem('voctrain_chatFollows', JSON.stringify(lmsChatFollows));
+      CESTISStore.setItem('voctrain_chatRooms', JSON.stringify(lmsChatRooms));
+      CESTISStore.setItem('voctrain_chatMessages', JSON.stringify(msgCopy));
+      CESTISStore.setItem('voctrain_chatProfiles', JSON.stringify(lmsChatProfiles));
+      CESTISStore.setItem('voctrain_chatFollows', JSON.stringify(lmsChatFollows));
     } catch(e) {}
 
     console.log('Chat data loaded from Google Drive');
@@ -24480,8 +24544,8 @@ function adrInit() {
 
 function adrLoadData() {
   try {
-    var t = localStorage.getItem('voctrain_adrTasks');
-    var m = localStorage.getItem('voctrain_adrStaffMeta');
+    var t = CESTISStore.getItem('voctrain_adrTasks');
+    var m = CESTISStore.getItem('voctrain_adrStaffMeta');
     if(t) adrTasks = JSON.parse(t);
     if(m) adrStaffMeta = JSON.parse(m);
   } catch(e) {}
@@ -24489,8 +24553,8 @@ function adrLoadData() {
 
 function adrSaveData() {
   try {
-    localStorage.setItem('voctrain_adrTasks', JSON.stringify(adrTasks));
-    localStorage.setItem('voctrain_adrStaffMeta', JSON.stringify(adrStaffMeta));
+    CESTISStore.setItem('voctrain_adrTasks', JSON.stringify(adrTasks));
+    CESTISStore.setItem('voctrain_adrStaffMeta', JSON.stringify(adrStaffMeta));
   } catch(e) {}
   saveState();
 }
@@ -25352,7 +25416,7 @@ var asAccessPages = [
 
 function loadAdminStaffAccess() {
   try {
-    var stored = localStorage.getItem('voctrain_adminStaffAccess');
+    var stored = CESTISStore.getItem('voctrain_adminStaffAccess');
     if(stored) adminStaffAccessSettings = JSON.parse(stored);
   } catch(e) {}
 }
@@ -25360,7 +25424,7 @@ loadAdminStaffAccess();
 
 function saveAdminStaffAccessToStorage() {
   try {
-    localStorage.setItem('voctrain_adminStaffAccess', JSON.stringify(adminStaffAccessSettings));
+    CESTISStore.setItem('voctrain_adminStaffAccess', JSON.stringify(adminStaffAccessSettings));
   } catch(e) {}
   saveState();
 }
@@ -26487,7 +26551,7 @@ function cmcSaveToCache() {
       virement: cmcData.virement,
       lastRefresh: cmcData.lastRefresh ? cmcData.lastRefresh.toISOString() : null
     };
-    localStorage.setItem('cmcDashboardData', JSON.stringify(cache));
+    CESTISStore.setItem('cmcDashboardData', JSON.stringify(cache));
   } catch(e) { console.warn('CMC: Failed to cache data', e); }
   try {
     var htmlCache = {};
@@ -26495,14 +26559,14 @@ function cmcSaveToCache() {
       if(cmcHtmlContent[k]) htmlCache[k] = cmcHtmlContent[k];
     });
     if(Object.keys(htmlCache).length > 0) {
-      localStorage.setItem('cmcHtmlContent', JSON.stringify(htmlCache));
+      CESTISStore.setItem('cmcHtmlContent', JSON.stringify(htmlCache));
     }
   } catch(e) { console.warn('CMC: Failed to cache HTML content', e); }
 }
 
 function cmcLoadFromCache() {
   try {
-    var cached = localStorage.getItem('cmcDashboardData');
+    var cached = CESTISStore.getItem('cmcDashboardData');
     if(cached) {
       var parsed = JSON.parse(cached);
       if(parsed.payslip) cmcData.payslip = parsed.payslip;
@@ -26518,7 +26582,7 @@ function cmcLoadFromCache() {
 
 function cmcLoadHtmlFromCache() {
   try {
-    var cached = localStorage.getItem('cmcHtmlContent');
+    var cached = CESTISStore.getItem('cmcHtmlContent');
     if(cached) {
       var parsed = JSON.parse(cached);
       Object.keys(parsed).forEach(function(k) { cmcHtmlContent[k] = parsed[k]; });
@@ -26954,8 +27018,8 @@ function cmcOpenInNewTab(key) {
 
 // Clear cached CMC data
 function cmcClearCache() {
-  localStorage.removeItem('cmcDashboardData');
-  localStorage.removeItem('cmcHtmlContent');
+  CESTISStore.removeItem('cmcDashboardData');
+  CESTISStore.removeItem('cmcHtmlContent');
   cmcData = { payslip: null, clockin: null, cashbook: null, virement: null, lastRefresh: null };
   cmcHtmlContent = { payslip: null, clockin: null, cashbook: null, virement: null };
   buildCmcPages();
@@ -28802,8 +28866,8 @@ async function fetchCertDataFromDrive() {
   // Try to get a Google access token from localStorage (no popup, no login)
   var token = googleAccessToken;
   if (!token) {
-    var savedToken = localStorage.getItem('schoolDashboardGoogleAccessToken');
-    var savedExpiry = localStorage.getItem('schoolDashboardGoogleTokenExpiry');
+    var savedToken = CESTISStore.getItem('schoolDashboardGoogleAccessToken');
+    var savedExpiry = CESTISStore.getItem('schoolDashboardGoogleTokenExpiry');
     if (savedToken && savedExpiry && new Date(savedExpiry) > new Date()) {
       token = savedToken;
     }
@@ -30068,7 +30132,7 @@ function saveCertTemplate() {
     delete allTplsForStorage[key].bgPage1;
     delete allTplsForStorage[key].bgPage2;
   });
-  try { localStorage.setItem('voctrain_certTemplates', JSON.stringify(allTplsForStorage)); } catch(e) { console.warn('certTemplates save error:', e); }
+  try { CESTISStore.setItem('voctrain_certTemplates', JSON.stringify(allTplsForStorage)); } catch(e) { console.warn('certTemplates save error:', e); }
 
   saveState();
   closeModal('certTemplateEditorModal');
@@ -32524,10 +32588,10 @@ function ttUnmount(){
 
         // Initialize cloud sync from localStorage
         function ttc_initializeCloudSync() {
-            const savedToken = localStorage.getItem('cestisGoogleAccessToken');
-            const savedExpiry = localStorage.getItem('cestisGoogleTokenExpiry');
-            const savedLastSync = localStorage.getItem('cestisLastSyncTime');
-            const savedFileId = localStorage.getItem('cestisCloudFileId');
+            const savedToken = CESTISStore.getItem('cestisGoogleAccessToken');
+            const savedExpiry = CESTISStore.getItem('cestisGoogleTokenExpiry');
+            const savedLastSync = CESTISStore.getItem('cestisLastSyncTime');
+            const savedFileId = CESTISStore.getItem('cestisCloudFileId');
 
             if (savedLastSync) {
                 ttc_lastSyncTime = new Date(savedLastSync);
@@ -32778,8 +32842,8 @@ function ttUnmount(){
                 // Save token with 1 hour expiry (typical for OAuth tokens)
                 const expiry = new Date();
                 expiry.setHours(expiry.getHours() + 1);
-                localStorage.setItem('cestisGoogleAccessToken', token);
-                localStorage.setItem('cestisGoogleTokenExpiry', expiry.toISOString());
+                CESTISStore.setItem('cestisGoogleAccessToken', token);
+                CESTISStore.setItem('cestisGoogleTokenExpiry', expiry.toISOString());
 
                 ttc_closeGoogleAuthModal();
                 ttc_updateCloudUI(true);
@@ -32802,8 +32866,8 @@ function ttUnmount(){
 
             const expiry = new Date();
             expiry.setSeconds(expiry.getSeconds() + (tokenResponse.expires_in || 3600));
-            localStorage.setItem('cestisGoogleAccessToken', ttc_googleAccessToken);
-            localStorage.setItem('cestisGoogleTokenExpiry', expiry.toISOString());
+            CESTISStore.setItem('cestisGoogleAccessToken', ttc_googleAccessToken);
+            CESTISStore.setItem('cestisGoogleTokenExpiry', expiry.toISOString());
 
             ttc_updateCloudUI(true);
 
@@ -32837,9 +32901,9 @@ function ttUnmount(){
                 ttc_isCloudConnected = false;
                 ttc_cloudFileId = null;
 
-                localStorage.removeItem('cestisGoogleAccessToken');
-                localStorage.removeItem('cestisGoogleTokenExpiry');
-                localStorage.removeItem('cestisCloudFileId');
+                CESTISStore.removeItem('cestisGoogleAccessToken');
+                CESTISStore.removeItem('cestisGoogleTokenExpiry');
+                CESTISStore.removeItem('cestisCloudFileId');
 
                 ttc_updateCloudUI(false);
                 ttc_toggleCloudMenu();
@@ -32865,7 +32929,7 @@ function ttUnmount(){
                     const data = await response.json();
                     if (data.files && data.files.length > 0) {
                         ttc_cloudFileId = data.files[0].id;
-                        localStorage.setItem('cestisCloudFileId', ttc_cloudFileId);
+                        CESTISStore.setItem('cestisCloudFileId', ttc_cloudFileId);
                         console.log('Found existing backup file:', ttc_cloudFileId);
                     }
                 }
@@ -32998,7 +33062,7 @@ function ttUnmount(){
                     if (response.ok) {
                         const result = await response.json();
                         ttc_cloudFileId = result.id;
-                        localStorage.setItem('cestisCloudFileId', ttc_cloudFileId);
+                        CESTISStore.setItem('cestisCloudFileId', ttc_cloudFileId);
                     }
                 }
 
@@ -33009,7 +33073,7 @@ function ttUnmount(){
 
                 // Update last sync time
                 ttc_lastSyncTime = new Date();
-                localStorage.setItem('cestisLastSyncTime', ttc_lastSyncTime.toISOString());
+                CESTISStore.setItem('cestisLastSyncTime', ttc_lastSyncTime.toISOString());
                 ttc_updateLastSyncDisplay();
 
                 // Update last saved by info
@@ -33103,7 +33167,7 @@ function ttUnmount(){
 
                 // Update last sync time
                 ttc_lastSyncTime = new Date();
-                localStorage.setItem('cestisLastSyncTime', ttc_lastSyncTime.toISOString());
+                CESTISStore.setItem('cestisLastSyncTime', ttc_lastSyncTime.toISOString());
                 ttc_updateLastSyncDisplay();
 
                 // Refresh UI and reload active session
@@ -33750,7 +33814,7 @@ function ttUnmount(){
                     if (response.ok) {
                         const result = await response.json();
                         ttc_cloudFileId = result.id;
-                        localStorage.setItem('cestisCloudFileId', ttc_cloudFileId);
+                        CESTISStore.setItem('cestisCloudFileId', ttc_cloudFileId);
                     }
                 }
 
@@ -33763,7 +33827,7 @@ function ttUnmount(){
 
                 // Update sync tracking
                 ttc_lastSyncTime = new Date();
-                localStorage.setItem('cestisLastSyncTime', ttc_lastSyncTime.toISOString());
+                CESTISStore.setItem('cestisLastSyncTime', ttc_lastSyncTime.toISOString());
                 ttc_updateLastSyncDisplay();
 
                 ttc_lastSavedBy = ttc_currentUser ? ttc_currentUser.fullName : 'Unknown';
@@ -33979,7 +34043,7 @@ function ttUnmount(){
                     if (response.ok) {
                         const result = await response.json();
                         ttc_cloudFileId = result.id;
-                        localStorage.setItem('cestisCloudFileId', ttc_cloudFileId);
+                        CESTISStore.setItem('cestisCloudFileId', ttc_cloudFileId);
                     }
                 }
 
@@ -33992,7 +34056,7 @@ function ttUnmount(){
 
                 // Update sync tracking
                 ttc_lastSyncTime = new Date();
-                localStorage.setItem('cestisLastSyncTime', ttc_lastSyncTime.toISOString());
+                CESTISStore.setItem('cestisLastSyncTime', ttc_lastSyncTime.toISOString());
                 ttc_updateLastSyncDisplay();
 
                 ttc_lastSavedBy = ttc_currentUser ? ttc_currentUser.fullName : 'Unknown';
@@ -34150,8 +34214,8 @@ function ttUnmount(){
         // Prompt user to sync from cloud on login
         function promptSyncOnLogin() {
             // Check if we have a valid Google Drive token
-            const savedToken = localStorage.getItem('cestisGoogleAccessToken');
-            const savedExpiry = localStorage.getItem('cestisGoogleTokenExpiry');
+            const savedToken = CESTISStore.getItem('cestisGoogleAccessToken');
+            const savedExpiry = CESTISStore.getItem('cestisGoogleTokenExpiry');
 
             // Show prompt modal after a brief delay to let dashboard load
             setTimeout(() => {
@@ -34295,7 +34359,7 @@ function ttUnmount(){
         // Perform automatic sync on login
         async function performAutoSyncOnLogin() {
             // Initialize token if not already done
-            const savedToken = localStorage.getItem('cestisGoogleAccessToken');
+            const savedToken = CESTISStore.getItem('cestisGoogleAccessToken');
             if (savedToken) {
                 ttc_googleAccessToken = savedToken;
                 ttc_isCloudConnected = true;
@@ -34312,7 +34376,7 @@ function ttUnmount(){
             try {
                 // First try to find the backup file
                 if (!ttc_cloudFileId) {
-                    const savedFileId = localStorage.getItem('cestisCloudFileId');
+                    const savedFileId = CESTISStore.getItem('cestisCloudFileId');
                     if (savedFileId) {
                         ttc_cloudFileId = savedFileId;
                     } else {
@@ -34367,7 +34431,7 @@ function ttUnmount(){
 
                 // Update sync tracking
                 ttc_lastSyncTime = new Date();
-                localStorage.setItem('cestisLastSyncTime', ttc_lastSyncTime.toISOString());
+                CESTISStore.setItem('cestisLastSyncTime', ttc_lastSyncTime.toISOString());
                 ttc_updateLastSyncDisplay();
 
                 // Update last saved by info
@@ -34397,8 +34461,8 @@ function ttUnmount(){
                 if (error.message.includes('invalid_token') || error.message.includes('Invalid Credentials')) {
                     ttc_showToast('Google Drive session expired', 'error');
                     // Clear invalid token
-                    localStorage.removeItem('cestisGoogleAccessToken');
-                    localStorage.removeItem('cestisGoogleTokenExpiry');
+                    CESTISStore.removeItem('cestisGoogleAccessToken');
+                    CESTISStore.removeItem('cestisGoogleTokenExpiry');
                     ttc_updateCloudUI(false);
                 } else {
                     ttc_showToast(`Sync failed: ${error.message}`, 'error');
@@ -34527,7 +34591,7 @@ function ttUnmount(){
 
                 // Update sync tracking
                 ttc_lastSyncTime = new Date();
-                localStorage.setItem('cestisLastSyncTime', ttc_lastSyncTime.toISOString());
+                CESTISStore.setItem('cestisLastSyncTime', ttc_lastSyncTime.toISOString());
                 ttc_updateLastSyncDisplay();
 
                 // Update last saved by info
@@ -34982,7 +35046,7 @@ function ttUnmount(){
 
                 // Update sync tracking
                 ttc_lastSyncTime = new Date();
-                localStorage.setItem('cestisLastSyncTime', ttc_lastSyncTime.toISOString());
+                CESTISStore.setItem('cestisLastSyncTime', ttc_lastSyncTime.toISOString());
                 ttc_updateLastSyncDisplay();
 
                 // Update last saved by info
@@ -34992,7 +35056,7 @@ function ttUnmount(){
 
                 // Cache the file ID if this becomes our primary sync file
                 ttc_cloudFileId = fileId;
-                localStorage.setItem('cestisCloudFileId', ttc_cloudFileId);
+                CESTISStore.setItem('cestisCloudFileId', ttc_cloudFileId);
 
                 // Refresh UI
                 renderTodayLog();
@@ -35015,7 +35079,7 @@ function ttUnmount(){
 
         // Initialize default admin
         function initializeDefaultAdmin() {
-            const saved = localStorage.getItem('cestisStaffMembers');
+            const saved = CESTISStore.getItem('cestisStaffMembers');
             if (!saved) {
                 staffMembers = [{
                     id: 'ADMIN001',
@@ -35035,15 +35099,15 @@ function ttUnmount(){
 
         // Save functions
         function saveStaffMembers() {
-            localStorage.setItem('cestisStaffMembers', JSON.stringify(staffMembers));
+            CESTISStore.setItem('cestisStaffMembers', JSON.stringify(staffMembers));
         }
 
         function saveTimeRecords() {
-            localStorage.setItem('cestisTimeRecords', JSON.stringify(timeRecords));
+            CESTISStore.setItem('cestisTimeRecords', JSON.stringify(timeRecords));
         }
 
         function loadTimeRecords() {
-            const saved = localStorage.getItem('cestisTimeRecords');
+            const saved = CESTISStore.getItem('cestisTimeRecords');
             if (saved) {
                 timeRecords = JSON.parse(saved);
             }
@@ -35064,8 +35128,8 @@ function ttUnmount(){
             ttc_isCloudConnected = false;
             ttc_googleAccessToken = null;
             try {
-                localStorage.removeItem('cestisGoogleAccessToken');
-                localStorage.removeItem('cestisGoogleTokenExpiry');
+                CESTISStore.removeItem('cestisGoogleAccessToken');
+                CESTISStore.removeItem('cestisGoogleTokenExpiry');
             } catch (e) { /* ignore */ }
             if (typeof ttc_updateCloudUI === 'function') ttc_updateCloudUI(false);
             if (!cloudAuthExpiredNotified) {
@@ -35091,7 +35155,7 @@ function ttUnmount(){
             try {
                 // Resolve cloud file ID if not set
                 if (!ttc_cloudFileId) {
-                    const savedFileId = localStorage.getItem('cestisCloudFileId');
+                    const savedFileId = CESTISStore.getItem('cestisCloudFileId');
                     if (savedFileId) {
                         ttc_cloudFileId = savedFileId;
                     }
@@ -35213,13 +35277,13 @@ function ttUnmount(){
                     if (response.ok) {
                         const result = await response.json();
                         ttc_cloudFileId = result.id;
-                        localStorage.setItem('cestisCloudFileId', ttc_cloudFileId);
+                        CESTISStore.setItem('cestisCloudFileId', ttc_cloudFileId);
                     }
                 }
 
                 if (response && response.ok) {
                     ttc_lastSyncTime = new Date();
-                    localStorage.setItem('cestisLastSyncTime', ttc_lastSyncTime.toISOString());
+                    CESTISStore.setItem('cestisLastSyncTime', ttc_lastSyncTime.toISOString());
                     ttc_lastSavedBy = ttc_currentUser ? ttc_currentUser.fullName : 'Unknown';
                     ttc_cloudFileTimestamp = new Date().toISOString();
                     ttc_updateLastSyncDisplay();
@@ -35297,7 +35361,7 @@ function ttUnmount(){
         // Complete login after password check
         function completeLogin(staff) {
             ttc_currentUser = staff;
-            localStorage.setItem('cestisCurrentUser', JSON.stringify(staff));
+            CESTISStore.setItem('cestisCurrentUser', JSON.stringify(staff));
 
             document.getElementById('mainDashboard').style.display = 'block';
             document.getElementById('currentUserDisplay').textContent = `👤 ${staff.fullName} (${staff.workType})`;
@@ -35669,7 +35733,7 @@ function ttUnmount(){
             if (confirm('Are you sure you want to logout?')) {
                 ttc_currentUser = null;
                 currentSession = null;
-                localStorage.removeItem('cestisCurrentUser');
+                CESTISStore.removeItem('cestisCurrentUser');
                 clearInterval(timerInterval);
 
                 // Hide resumed session banner on logout
@@ -35969,7 +36033,7 @@ function ttUnmount(){
             const today = new Date().toISOString().split('T')[0];
             // Find any in-progress session for this user (regardless of date) so
             // sessions that crossed midnight or were left open before a computer
-            // restart still resume instead of being orphaned in localStorage.
+            // restart still resume instead of being orphaned in CESTISStore.
             const openSessions = timeRecords.filter(r =>
                 r.staffId === ttc_currentUser.id &&
                 r.status !== 'completed'
@@ -37926,19 +37990,19 @@ function ttUnmount(){
                 // Restore staff members (required for login)
                 if (backup.data.staffMembers) {
                     staffMembers = backup.data.staffMembers;
-                    localStorage.setItem('cestisStaffMembers', JSON.stringify(staffMembers));
+                    CESTISStore.setItem('cestisStaffMembers', JSON.stringify(staffMembers));
                 }
 
                 // Restore time records
                 if (backup.data.timeRecords) {
                     timeRecords = backup.data.timeRecords;
-                    localStorage.setItem('cestisTimeRecords', JSON.stringify(timeRecords));
+                    CESTISStore.setItem('cestisTimeRecords', JSON.stringify(timeRecords));
                 }
 
                 // Update sync tracking
                 ttc_lastSyncTime = new Date();
                 ttc_lastSavedBy = backup.savedBy || 'Unknown';
-                localStorage.setItem('cestisLastSyncTime', ttc_lastSyncTime.toISOString());
+                CESTISStore.setItem('cestisLastSyncTime', ttc_lastSyncTime.toISOString());
 
                 return true;
             } catch (error) { console.error('Perform login page sync error:', error); return false; }
@@ -37986,7 +38050,7 @@ function ttUnmount(){
         function toggleDarkMode() {
             ttToggleDark();
             const isDark = ttIsDark();
-            localStorage.setItem('cestisTimeDarkMode', isDark);
+            CESTISStore.setItem('cestisTimeDarkMode', isDark);
             
             document.getElementById('themeIcon').textContent = isDark ? '☀️' : '🌙';
             document.getElementById('themeText').textContent = isDark ? 'Light' : 'Dark';
@@ -38042,9 +38106,9 @@ function ttUnmount(){
         // Check cloud connection state and notify if needed
         function ttc_checkCloudAndNotify(reason){
           // Don't nag if user has never connected (no saved token at all and no saved file)
-          const hasEverConnected = localStorage.getItem('cestisGoogleAccessToken') ||
-                                   localStorage.getItem('cestisCloudFileId') ||
-                                   localStorage.getItem('cestisLastSyncTime');
+          const hasEverConnected = CESTISStore.getItem('cestisGoogleAccessToken') ||
+                                   CESTISStore.getItem('cestisCloudFileId') ||
+                                   CESTISStore.getItem('cestisLastSyncTime');
           if (!hasEverConnected) return;
 
           if (!navigator.onLine) {
@@ -38055,8 +38119,8 @@ function ttUnmount(){
           }
 
           if (!ttc_isCloudConnected) {
-            const savedExpiry = localStorage.getItem('cestisGoogleTokenExpiry');
-            const lastSync = localStorage.getItem('cestisLastSyncTime');
+            const savedExpiry = CESTISStore.getItem('cestisGoogleTokenExpiry');
+            const lastSync = CESTISStore.getItem('cestisLastSyncTime');
             let detail = '';
 
             if (savedExpiry && new Date(savedExpiry) <= new Date()) {
@@ -38087,7 +38151,7 @@ function ttUnmount(){
           // Check every 60 seconds if the token has expired
           cloudCheckInterval = setInterval(function(){
             if (ttc_isCloudConnected && ttc_googleAccessToken) {
-              const savedExpiry = localStorage.getItem('cestisGoogleTokenExpiry');
+              const savedExpiry = CESTISStore.getItem('cestisGoogleTokenExpiry');
               if (savedExpiry && new Date(savedExpiry) <= new Date()) {
                 // Token just expired
                 ttc_googleAccessToken = null;
@@ -38164,12 +38228,12 @@ function ttUnmount(){
             loadTimeRecords();
 
             // Auto-load user (no login required — page is embedded in authenticated dashboard)
-            const savedUser = localStorage.getItem('cestisCurrentUser');
+            const savedUser = CESTISStore.getItem('cestisCurrentUser');
             if (savedUser) {
                 ttc_currentUser = JSON.parse(savedUser);
             } else {
                 ttc_currentUser = staffMembers.find(s => s.role === 'Admin') || staffMembers[0];
-                if (ttc_currentUser) localStorage.setItem('cestisCurrentUser', JSON.stringify(ttc_currentUser));
+                if (ttc_currentUser) CESTISStore.setItem('cestisCurrentUser', JSON.stringify(ttc_currentUser));
             }
             if (ttc_currentUser) {
                 document.getElementById('mainDashboard').style.display = 'block';
@@ -38199,7 +38263,7 @@ function ttUnmount(){
             document.getElementById('editFromDate').value = weekAgo.toISOString().split('T')[0];
 
             // Dark mode
-            const isDark = localStorage.getItem('cestisTimeDarkMode') === 'true';
+            const isDark = CESTISStore.getItem('cestisTimeDarkMode') === 'true';
             if (isDark) {
                 ttToggleDark(true);
                 document.getElementById('themeIcon').textContent = '☀️';
@@ -38277,7 +38341,7 @@ function ttInitApp(){
     var weekAgo = new Date(); weekAgo.setDate(weekAgo.getDate() - 7);
     var wa = weekAgo.toISOString().split('T')[0];
     ['historyFromDate','reportFromDate','editFromDate'].forEach(function(id){ var el=document.getElementById(id); if(el) el.value = wa; });
-    if(localStorage.getItem('cestisTimeDarkMode') === 'true'){
+    if(CESTISStore.getItem('cestisTimeDarkMode') === 'true'){
         ttToggleDark(true);
         var ti=document.getElementById('themeIcon'); if(ti) ti.textContent='☀️';
         var tt=document.getElementById('themeText'); if(tt) tt.textContent='Light';
