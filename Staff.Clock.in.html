@@ -2810,6 +2810,7 @@
                 expiry.setHours(expiry.getHours() + 1);
                 CESTISStore.setItem('cestisGoogleAccessToken', token);
                 CESTISStore.setItem('cestisGoogleTokenExpiry', expiry.toISOString());
+                preExpiryUploadDone = false;
 
                 closeGoogleAuthModal();
                 updateCloudUI(true);
@@ -2834,6 +2835,7 @@
             expiry.setSeconds(expiry.getSeconds() + (tokenResponse.expires_in || 3600));
             CESTISStore.setItem('cestisGoogleAccessToken', googleAccessToken);
             CESTISStore.setItem('cestisGoogleTokenExpiry', expiry.toISOString());
+            preExpiryUploadDone = false;
 
             updateCloudUI(true);
 
@@ -5081,6 +5083,8 @@
 
         // Silent auto-sync to cloud (non-blocking, no user prompts)
         let autoSyncInterval = null;
+        let preExpiryUploadDone = false;
+        const PRE_EXPIRY_UPLOAD_MS = 2 * 60 * 1000; // full upload when <2 min of token life remains
         let isAutoSyncing = false;
         let cloudAuthExpiredNotified = false;
 
@@ -5110,7 +5114,7 @@
             }
         }
 
-        async function silentCloudSync() {
+        async function silentCloudSync(notifyOnSuccess) {
             // Only sync if connected to cloud and not already syncing
             if (!isCloudConnected || !googleAccessToken || isAutoSyncing) {
                 return;
@@ -5254,6 +5258,9 @@
                     cloudFileTimestamp = new Date().toISOString();
                     updateLastSyncDisplay();
                     updateLastSavedByDisplay();
+                    if (notifyOnSuccess && typeof showToast === 'function') {
+                        showToast('☁️ Your recorded time has been uploaded to the cloud.', 'success');
+                    }
                     console.log('Auto-sync to cloud completed successfully');
                 } else if (response) {
                     console.warn('Auto-sync failed with status:', response.status);
@@ -5271,13 +5278,31 @@
         // Start periodic auto-sync (every 5 minutes while clocked in)
         function startAutoSync() {
             stopAutoSync();
-            // Immediate sync
-            silentCloudSync();
-            // Push to Drive every 10 seconds whenever connected
-            // (silentCloudSync no-ops while disconnected, then resumes once connected)
-            autoSyncInterval = setInterval(() => {
-                silentCloudSync();
-            }, 10 * 1000);
+            autoSaveTick();
+            autoSyncInterval = setInterval(autoSaveTick, 10 * 1000);
+        }
+
+        // Runs every 10 seconds: always persist locally; only do a full upload
+        // to Google Drive when the access token is about to expire. A full
+        // upload also happens on clock-out and can't be lost because the timer
+        // is computed from real clock-in timestamps.
+        function autoSaveTick() {
+            if (currentSession && currentSession.status !== 'completed') {
+                currentSession.lastModified = new Date().toISOString();
+                var idx = timeRecords.findIndex(function(r){ return r.id === currentSession.id; });
+                if (idx !== -1) timeRecords[idx] = currentSession;
+            }
+            saveTimeRecords();
+            try {
+                var exp = CESTISStore.getItem('cestisGoogleTokenExpiry');
+                if (exp) {
+                    var msLeft = new Date(exp).getTime() - Date.now();
+                    if (msLeft > 0 && msLeft <= PRE_EXPIRY_UPLOAD_MS && !preExpiryUploadDone) {
+                        preExpiryUploadDone = true;
+                        silentCloudSync(true);
+                    }
+                }
+            } catch(e){}
         }
 
         function stopAutoSync() {
@@ -5881,9 +5906,9 @@
 
                 showToast('Clocked out successfully! Great work today.', 'success');
 
-                // Stop periodic auto-sync and do final sync
+                // Stop periodic auto-sync and do a final upload to the cloud
                 stopAutoSync();
-                silentCloudSync();
+                silentCloudSync(true);
             }
         }
 
