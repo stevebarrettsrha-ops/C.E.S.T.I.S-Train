@@ -5,6 +5,70 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>CESTIS Cash Book Dashboard</title>
 <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<script>
+/* ============================================================================
+   CESTISStore — localStorage-compatible API backed by IndexedDB.
+   IndexedDB has a far larger quota than localStorage (~5MB), so large data
+   (e.g. staff records with embedded document blobs) no longer overflows.
+   A synchronous in-memory cache preserves the existing synchronous
+   getItem/setItem/removeItem call sites; writes persist to IndexedDB
+   (durable) and mirror to localStorage when they still fit.
+   ============================================================================ */
+(function(){
+  if (window.CESTISStore) return;
+  var DB_NAME='CESTIS_KV', STORE='kv', LS=null;
+  try { LS = window.localStorage; } catch(e) { LS = null; }
+  var cache = {};
+  // Seed synchronously from localStorage so data is available immediately.
+  try { if(LS){ for(var i=0;i<LS.length;i++){ var k=LS.key(i); cache[k]=LS.getItem(k); } } } catch(e){}
+
+  var db=null, ready=false, wq=[];
+  function drainQueue(){ var q=wq; wq=[]; for(var i=0;i<q.length;i++){ writeIDB(q[i].k,q[i].v,q[i].del); } }
+  function writeIDB(k,v,del){
+    if(!db){ if(!ready){ wq.push({k:k,v:v,del:del}); } return; }
+    try { var os=db.transaction(STORE,'readwrite').objectStore(STORE); if(del){ os.delete(k); } else { os.put(v,k); } } catch(e){}
+  }
+  try {
+    var req = indexedDB.open(DB_NAME,1);
+    req.onupgradeneeded = function(e){ var d=e.target.result; if(!d.objectStoreNames.contains(STORE)){ d.createObjectStore(STORE); } };
+    req.onsuccess = function(e){
+      db = e.target.result;
+      try {
+        var idbKeys = {};
+        var cur = db.transaction(STORE,'readonly').objectStore(STORE).openCursor();
+        cur.onsuccess = function(ev){ var c=ev.target.result;
+          if(c){ idbKeys[c.key]=1; if(!(c.key in cache)){ cache[c.key]=c.value; } c.continue(); }
+          else {
+            // One-time migration: copy any localStorage-seeded keys into IndexedDB.
+            try { var ws=db.transaction(STORE,'readwrite').objectStore(STORE);
+                  for(var kk in cache){ if(Object.prototype.hasOwnProperty.call(cache,kk) && !idbKeys[kk]){ ws.put(cache[kk], kk); } } } catch(_){}
+            ready=true; drainQueue(); try{ window.dispatchEvent(new Event('cestis-store-ready')); }catch(_){}
+          }
+        };
+        cur.onerror = function(){ ready=true; drainQueue(); };
+      } catch(e){ ready=true; drainQueue(); }
+    };
+    req.onerror = function(){ db=null; ready=true; };
+  } catch(e){ db=null; ready=true; }
+
+  var Store = {
+    _cache: cache,
+    getItem: function(k){ k=String(k); return (k in cache) ? cache[k] : null; },
+    setItem: function(k,v){ k=String(k); v=String(v); cache[k]=v; try{ if(LS) LS.setItem(k,v); }catch(e){} writeIDB(k,v,false); },
+    removeItem: function(k){ k=String(k); delete cache[k]; try{ if(LS) LS.removeItem(k); }catch(e){} writeIDB(k,null,true); },
+    clear: function(){ for(var k in cache){ if(Object.prototype.hasOwnProperty.call(cache,k)) delete cache[k]; }
+                       try{ if(LS) LS.clear(); }catch(e){}
+                       if(db){ try{ db.transaction(STORE,'readwrite').objectStore(STORE).clear(); }catch(e){} } },
+    key: function(i){ return Object.keys(cache)[i]; },
+    keys: function(){ return Object.keys(cache); },
+    hasOwnProperty: function(k){ return Object.prototype.hasOwnProperty.call(cache, String(k)); },
+    whenReady: function(cb){ if(ready){ cb(); } else { window.addEventListener('cestis-store-ready', cb, {once:true}); } },
+    get length(){ return Object.keys(cache).length; }
+  };
+  window.CESTISStore = Store;
+})();
+</script>
+
 <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 <!-- Google Identity Services for OAuth -->
 <script src="https://accounts.google.com/gsi/client" async defer></script>
@@ -3082,8 +3146,8 @@ const GOOGLE_DRIVE_CONFIG = {
 // Cloud sync state
 let isCloudConnected = false;
 let googleAccessToken = null;
-let cloudFileId = localStorage.getItem('cestisCloudFileId') || null;
-let lastSyncTime = localStorage.getItem('cestisLastSyncTime') ? new Date(localStorage.getItem('cestisLastSyncTime')) : null;
+let cloudFileId = CESTISStore.getItem('cestisCloudFileId') || null;
+let lastSyncTime = CESTISStore.getItem('cestisLastSyncTime') ? new Date(CESTISStore.getItem('cestisLastSyncTime')) : null;
 let lastSavedBy = null;
 let cloudFileTimestamp = null;
 let cloudSyncing = false;
@@ -3094,15 +3158,15 @@ const AUTO_SYNC_INTERVAL_MS = 15000; // 15 seconds
 let googleTokenClient = null;
 
 // Staff members and time records for cloud merge
-let staffMembers = JSON.parse(localStorage.getItem('cestisStaffMembers') || '[]');
-let timeRecords = JSON.parse(localStorage.getItem('cestisTimeRecords') || '[]');
+let staffMembers = JSON.parse(CESTISStore.getItem('cestisStaffMembers') || '[]');
+let timeRecords = JSON.parse(CESTISStore.getItem('cestisTimeRecords') || '[]');
 
 // Current user derived from auth session
 let currentUser = null;
 
 function initCurrentUser() {
     try {
-        const session = JSON.parse(localStorage.getItem(AUTH_SESSION_KEY));
+        const session = JSON.parse(CESTISStore.getItem(AUTH_SESSION_KEY));
         if (session && session.loggedIn) {
             currentUser = {
                 username: session.user,
@@ -3117,10 +3181,10 @@ function initCurrentUser() {
 
 // Save/load staff and time records
 function saveStaffMembers() {
-    try { localStorage.setItem('cestisStaffMembers', JSON.stringify(staffMembers)); } catch(e) {}
+    try { CESTISStore.setItem('cestisStaffMembers', JSON.stringify(staffMembers)); } catch(e) {}
 }
 function saveTimeRecords() {
-    try { localStorage.setItem('cestisTimeRecords', JSON.stringify(timeRecords)); } catch(e) {}
+    try { CESTISStore.setItem('cestisTimeRecords', JSON.stringify(timeRecords)); } catch(e) {}
 }
 
 // ============================================
@@ -3232,11 +3296,11 @@ function closeCloudMenuOnClickOutside(e) {
 
 // Initialize cloud sync from localStorage
 function initializeCloudSync() {
-    const savedToken = localStorage.getItem('cestisGoogleAccessToken');
-    const savedExpiry = localStorage.getItem('cestisGoogleTokenExpiry');
-    const savedLastSync = localStorage.getItem('cestisLastSyncTime');
-    const savedFileId = localStorage.getItem('cestisCloudFileId');
-    const savedFolderId = localStorage.getItem('cestisCloudFolderId');
+    const savedToken = CESTISStore.getItem('cestisGoogleAccessToken');
+    const savedExpiry = CESTISStore.getItem('cestisGoogleTokenExpiry');
+    const savedLastSync = CESTISStore.getItem('cestisLastSyncTime');
+    const savedFileId = CESTISStore.getItem('cestisCloudFileId');
+    const savedFolderId = CESTISStore.getItem('cestisCloudFolderId');
 
     if (savedLastSync) {
         lastSyncTime = new Date(savedLastSync);
@@ -3246,8 +3310,8 @@ function initializeCloudSync() {
     // If the configured folder has changed, clear the cached file ID
     // so data is saved to the correct new folder
     if (savedFolderId !== GOOGLE_DRIVE_CONFIG.FOLDER_ID) {
-        localStorage.removeItem('cestisCloudFileId');
-        localStorage.setItem('cestisCloudFolderId', GOOGLE_DRIVE_CONFIG.FOLDER_ID);
+        CESTISStore.removeItem('cestisCloudFileId');
+        CESTISStore.setItem('cestisCloudFolderId', GOOGLE_DRIVE_CONFIG.FOLDER_ID);
         cloudFileId = null;
     } else if (savedFileId) {
         cloudFileId = savedFileId;
@@ -3404,8 +3468,8 @@ async function submitGoogleToken() {
 
         var expiry = new Date();
         expiry.setHours(expiry.getHours() + 1);
-        localStorage.setItem('cestisGoogleAccessToken', token);
-        localStorage.setItem('cestisGoogleTokenExpiry', expiry.toISOString());
+        CESTISStore.setItem('cestisGoogleAccessToken', token);
+        CESTISStore.setItem('cestisGoogleTokenExpiry', expiry.toISOString());
 
         closeGoogleAuthModal();
         updateCloudUI(true);
@@ -3425,8 +3489,8 @@ async function handleGoogleAuthCallback(tokenResponse) {
 
     var expiry = new Date();
     expiry.setSeconds(expiry.getSeconds() + (tokenResponse.expires_in || 3600));
-    localStorage.setItem('cestisGoogleAccessToken', googleAccessToken);
-    localStorage.setItem('cestisGoogleTokenExpiry', expiry.toISOString());
+    CESTISStore.setItem('cestisGoogleAccessToken', googleAccessToken);
+    CESTISStore.setItem('cestisGoogleTokenExpiry', expiry.toISOString());
 
     if (isLoginPageSync) {
         await handleLoginPageSyncCallback();
@@ -3469,9 +3533,9 @@ function disconnectFromGoogleDrive() {
         isCloudConnected = false;
         cloudFileId = null;
 
-        localStorage.removeItem('cestisGoogleAccessToken');
-        localStorage.removeItem('cestisGoogleTokenExpiry');
-        localStorage.removeItem('cestisCloudFileId');
+        CESTISStore.removeItem('cestisGoogleAccessToken');
+        CESTISStore.removeItem('cestisGoogleTokenExpiry');
+        CESTISStore.removeItem('cestisCloudFileId');
 
         updateCloudUI(false);
 
@@ -3501,13 +3565,13 @@ async function findExistingBackupFile() {
             if (data.files && data.files.length > 0) {
                 cloudFileId = data.files[0].id;
                 cloudFileTimestamp = data.files[0].modifiedTime;
-                localStorage.setItem('cestisCloudFileId', cloudFileId);
-                localStorage.setItem('cestisCloudFolderId', GOOGLE_DRIVE_CONFIG.FOLDER_ID);
+                CESTISStore.setItem('cestisCloudFileId', cloudFileId);
+                CESTISStore.setItem('cestisCloudFolderId', GOOGLE_DRIVE_CONFIG.FOLDER_ID);
                 console.log('Found existing backup file:', cloudFileId);
             } else {
                 // No file in the configured folder — clear any stale reference
                 cloudFileId = null;
-                localStorage.removeItem('cestisCloudFileId');
+                CESTISStore.removeItem('cestisCloudFileId');
                 console.log('No backup file found in configured folder');
             }
         }
@@ -3553,7 +3617,7 @@ function prepareBackupData() {
         var fyStr = fy + '/' + (fy + 1);
         for (var q = 1; q <= 4; q++) {
             var bKey = getBudgetQuarterKey(fyStr, q);
-            var saved = localStorage.getItem(bKey);
+            var saved = CESTISStore.getItem(bKey);
             if (saved) {
                 try { quarterlyBudgets[bKey] = JSON.parse(saved); } catch(e) {}
             }
@@ -3568,7 +3632,7 @@ function prepareBackupData() {
         var fyStr2 = fy2 + '/' + (fy2 + 1);
         for (var q2 = 1; q2 <= 4; q2++) {
             var tKey = getQuarterKey(fyStr2, q2);
-            var tSaved = localStorage.getItem(tKey);
+            var tSaved = CESTISStore.getItem(tKey);
             if (tSaved) {
                 try { quarterlyTransactions[tKey] = JSON.parse(tSaved); } catch(e) {}
             }
@@ -3617,17 +3681,17 @@ function restoreBackupData(backupData) {
     // Restore per-quarter budget data if available
     if (d.quarterlyBudgets && typeof d.quarterlyBudgets === 'object') {
         Object.keys(d.quarterlyBudgets).forEach(function(key) {
-            try { localStorage.setItem(key, JSON.stringify(d.quarterlyBudgets[key])); } catch(e) {}
+            try { CESTISStore.setItem(key, JSON.stringify(d.quarterlyBudgets[key])); } catch(e) {}
         });
     }
     // Restore per-quarter transaction data if available (ensures ALL quarters are restored)
     if (d.quarterlyTransactions && typeof d.quarterlyTransactions === 'object') {
         Object.keys(d.quarterlyTransactions).forEach(function(key) {
-            try { localStorage.setItem(key, JSON.stringify(d.quarterlyTransactions[key])); } catch(e) {}
+            try { CESTISStore.setItem(key, JSON.stringify(d.quarterlyTransactions[key])); } catch(e) {}
         });
         // Reload the active quarter's transactions from localStorage to ensure consistency
         var activeKey = getQuarterKey(activeFY, activeQ);
-        var activeData = localStorage.getItem(activeKey);
+        var activeData = CESTISStore.getItem(activeKey);
         if (activeData) {
             try {
                 var parsed = JSON.parse(activeData);
@@ -3662,7 +3726,7 @@ function restoreBackupData(backupData) {
 
     // Save to localStorage
     saveToStorage();
-    try { localStorage.setItem('cestis_active_quarter', JSON.stringify({ fy: activeFY, q: activeQ })); } catch(e) {}
+    try { CESTISStore.setItem('cestis_active_quarter', JSON.stringify({ fy: activeFY, q: activeQ })); } catch(e) {}
 
     // Refresh UI
     updateQuarterUI();
@@ -3756,8 +3820,8 @@ async function saveToCloud() {
             if (response.ok) {
                 var result = await response.json();
                 cloudFileId = result.id;
-                localStorage.setItem('cestisCloudFileId', cloudFileId);
-                localStorage.setItem('cestisCloudFolderId', GOOGLE_DRIVE_CONFIG.FOLDER_ID);
+                CESTISStore.setItem('cestisCloudFileId', cloudFileId);
+                CESTISStore.setItem('cestisCloudFolderId', GOOGLE_DRIVE_CONFIG.FOLDER_ID);
             }
         }
 
@@ -3767,7 +3831,7 @@ async function saveToCloud() {
         }
 
         lastSyncTime = new Date();
-        localStorage.setItem('cestisLastSyncTime', lastSyncTime.toISOString());
+        CESTISStore.setItem('cestisLastSyncTime', lastSyncTime.toISOString());
         updateLastSyncDisplay();
 
         lastSavedBy = currentUser ? currentUser.fullName : 'Unknown';
@@ -3837,7 +3901,7 @@ async function syncFromCloud() {
 
         // Update sync info
         lastSyncTime = new Date();
-        localStorage.setItem('cestisLastSyncTime', lastSyncTime.toISOString());
+        CESTISStore.setItem('cestisLastSyncTime', lastSyncTime.toISOString());
         updateLastSyncDisplay();
 
         lastSavedBy = backupData.savedBy || 'Unknown';
@@ -3935,7 +3999,7 @@ async function mergeFromCloud() {
             } else {
                 // Different quarter — merge into the correct localStorage key, skip deleted
                 var cloudKey = getQuarterKey(cloudFY, cloudQ);
-                var localRaw = localStorage.getItem(cloudKey);
+                var localRaw = CESTISStore.getItem(cloudKey);
                 try {
                     var localData = localRaw ? JSON.parse(localRaw) : { openingBalance: d.openingBalance || 0, transactions: [], deletedTxnIds: [] };
                     if (!Array.isArray(localData.transactions)) localData.transactions = [];
@@ -3948,7 +4012,7 @@ async function mergeFromCloud() {
                         }
                     });
                     if (mergeStats.transactionsAdded > 0) {
-                        localStorage.setItem(cloudKey, JSON.stringify(localData));
+                        CESTISStore.setItem(cloudKey, JSON.stringify(localData));
                     }
                 } catch(e) {}
             }
@@ -3976,8 +4040,8 @@ async function mergeFromCloud() {
         // Merge quarterly budget data from cloud
         if (d.quarterlyBudgets && typeof d.quarterlyBudgets === 'object') {
             Object.keys(d.quarterlyBudgets).forEach(function(key) {
-                if (!localStorage.getItem(key)) {
-                    try { localStorage.setItem(key, JSON.stringify(d.quarterlyBudgets[key])); } catch(e) {}
+                if (!CESTISStore.getItem(key)) {
+                    try { CESTISStore.setItem(key, JSON.stringify(d.quarterlyBudgets[key])); } catch(e) {}
                 }
             });
         }
@@ -3986,8 +4050,8 @@ async function mergeFromCloud() {
             var currentQKeyMerge = getCurrentQuarterKey();
             Object.keys(d.quarterlyTransactions).forEach(function(key) {
                 if (key === currentQKeyMerge) return; // Current quarter handled via in-memory merge above
-                if (!localStorage.getItem(key)) {
-                    try { localStorage.setItem(key, JSON.stringify(d.quarterlyTransactions[key])); } catch(e) {}
+                if (!CESTISStore.getItem(key)) {
+                    try { CESTISStore.setItem(key, JSON.stringify(d.quarterlyTransactions[key])); } catch(e) {}
                 }
             });
         }
@@ -4025,7 +4089,7 @@ async function mergeFromCloud() {
 
         // Update sync info
         lastSyncTime = new Date();
-        localStorage.setItem('cestisLastSyncTime', lastSyncTime.toISOString());
+        CESTISStore.setItem('cestisLastSyncTime', lastSyncTime.toISOString());
         updateLastSyncDisplay();
 
         lastSavedBy = backupData.savedBy || 'Unknown';
@@ -4113,7 +4177,7 @@ function sanitizeAllQuarterlyStorage() {
         var fyStr = fy + '/' + (fy + 1);
         for (var q = 1; q <= 4; q++) {
             var key = getQuarterKey(fyStr, q);
-            var raw = localStorage.getItem(key);
+            var raw = CESTISStore.getItem(key);
             if (!raw) continue;
             try {
                 var data = JSON.parse(raw);
@@ -4126,7 +4190,7 @@ function sanitizeAllQuarterlyStorage() {
                     return !m || validMonths.has(m);
                 });
                 if (data.transactions.length !== before) {
-                    localStorage.setItem(key, JSON.stringify(data));
+                    CESTISStore.setItem(key, JSON.stringify(data));
                 }
             } catch(e) {}
         }
@@ -4241,14 +4305,14 @@ function getCurrentBudgetQuarterKey() {
 function saveQuarterBudget() {
     var key = getCurrentBudgetQuarterKey();
     var data = { budget: BUDGET, sections: BUDGET_LINE_SECTIONS };
-    try { localStorage.setItem(key, JSON.stringify(data)); } catch(e) {}
+    try { CESTISStore.setItem(key, JSON.stringify(data)); } catch(e) {}
 }
 
 // Load per-quarter budget from localStorage
 function loadQuarterBudget() {
     var key = getCurrentBudgetQuarterKey();
     try {
-        var saved = localStorage.getItem(key);
+        var saved = CESTISStore.getItem(key);
         if (saved) {
             var data = JSON.parse(saved);
             BUDGET = data.budget || {};
@@ -4264,12 +4328,12 @@ function loadQuarterBudget() {
         BUDGET_LINE_SECTIONS = {};
         // Apply any legacy overrides
         try {
-            var overrides = localStorage.getItem('cestis_budget_overrides');
+            var overrides = CESTISStore.getItem('cestis_budget_overrides');
             if (overrides) {
                 var obj = JSON.parse(overrides);
                 Object.keys(obj).forEach(function(k) { BUDGET[k] = obj[k]; });
             }
-            var deletedKeys = localStorage.getItem('cestis_budget_deleted');
+            var deletedKeys = CESTISStore.getItem('cestis_budget_deleted');
             if (deletedKeys) {
                 JSON.parse(deletedKeys).forEach(function(k) { delete BUDGET[k]; });
             }
@@ -5827,7 +5891,7 @@ function copyBudgetFromQuarter() {
         for (var q = 1; q <= 4; q++) {
             if (fyStr === activeFY && q === activeQ) continue;
             var bKey = getBudgetQuarterKey(fyStr, q);
-            if (localStorage.getItem(bKey)) {
+            if (CESTISStore.getItem(bKey)) {
                 var qm = getQuarterMeta(q);
                 options.push({ fy: fyStr, q: q, label: 'Q' + q + ' ' + qm.shortLabel + ' (FY ' + fyStr + ')' });
             }
@@ -5867,7 +5931,7 @@ function copyBudgetFromQuarter() {
         sourceData = { budget: JSON.parse(JSON.stringify(DEFAULT_BUDGET)), sections: {} };
     } else {
         try {
-            sourceData = JSON.parse(localStorage.getItem(getBudgetQuarterKey(selected.fy, selected.q)));
+            sourceData = JSON.parse(CESTISStore.getItem(getBudgetQuarterKey(selected.fy, selected.q)));
         } catch(e) {
             alert('Error reading source quarter data.');
             return;
@@ -6326,15 +6390,15 @@ function exportCSV() {
 function saveToStorage() {
     const key = getCurrentQuarterKey();
     const data = { openingBalance: OPENING_BALANCE, transactions: transactions, deletedTxnIds: deletedTxnIds };
-    try { localStorage.setItem(key, JSON.stringify(data)); } catch(e) {}
+    try { CESTISStore.setItem(key, JSON.stringify(data)); } catch(e) {}
     // Also save active quarter preference
-    try { localStorage.setItem('cestis_active_quarter', JSON.stringify({ fy: activeFY, q: activeQ })); } catch(e) {}
+    try { CESTISStore.setItem('cestis_active_quarter', JSON.stringify({ fy: activeFY, q: activeQ })); } catch(e) {}
 }
 
 function loadFromStorage() {
     // Load active quarter preference
     try {
-        const pref = localStorage.getItem('cestis_active_quarter');
+        const pref = CESTISStore.getItem('cestis_active_quarter');
         if (pref) {
             const p = JSON.parse(pref);
             activeFY = p.fy;
@@ -6351,7 +6415,7 @@ function loadFromStorage() {
 function loadQuarterData() {
     const key = getCurrentQuarterKey();
     try {
-        const saved = localStorage.getItem(key);
+        const saved = CESTISStore.getItem(key);
         if (saved) {
             const data = JSON.parse(saved);
             OPENING_BALANCE = data.openingBalance || 0;
@@ -6366,7 +6430,7 @@ function loadQuarterData() {
             deletedTxnIds = [];
             nextId = 100;
             // Also migrate old localStorage data if it exists
-            const oldData = localStorage.getItem('cesti_cashbook_data');
+            const oldData = CESTISStore.getItem('cesti_cashbook_data');
             if (oldData) {
                 transactions = JSON.parse(oldData);
                 nextId = transactions.reduce((max, t) => Math.max(max, t.id + 1), 100);
@@ -6481,7 +6545,7 @@ function carryForwardBalance() {
     }
     const prevKey = getQuarterKey(prevFY, prevQ);
     try {
-        const saved = localStorage.getItem(prevKey);
+        const saved = CESTISStore.getItem(prevKey);
         if (saved) {
             const data = JSON.parse(saved);
             const prevOB = data.openingBalance || 0;
@@ -6625,22 +6689,22 @@ function getReconStorageKey(fy, q, monthKey) {
 }
 
 function saveReconBankBalance(fy, q, monthKey, value) {
-    try { localStorage.setItem(getReconStorageKey(fy, q, monthKey), value); } catch(e) {}
+    try { CESTISStore.setItem(getReconStorageKey(fy, q, monthKey), value); } catch(e) {}
 }
 
 function loadReconBankBalance(fy, q, monthKey) {
-    try { return localStorage.getItem(getReconStorageKey(fy, q, monthKey)) || ''; } catch(e) { return ''; }
+    try { return CESTISStore.getItem(getReconStorageKey(fy, q, monthKey)) || ''; } catch(e) { return ''; }
 }
 
 function loadQuarterDataForRecon(fy, q) {
     const key = 'cestis_quarter_' + fy + '_Q' + q;
     try {
-        const saved = localStorage.getItem(key);
+        const saved = CESTISStore.getItem(key);
         if (saved) {
             const data = JSON.parse(saved);
             return { openingBalance: data.openingBalance || 0, transactions: data.transactions || [] };
         } else if (fy === '2025/2026' && q === 3) {
-            const oldData = localStorage.getItem('cesti_cashbook_data');
+            const oldData = CESTISStore.getItem('cesti_cashbook_data');
             if (oldData) {
                 return { openingBalance: 237948.69, transactions: JSON.parse(oldData) };
             }
@@ -6896,12 +6960,12 @@ function getUnclearedKey(fy, q, monthKey) {
 }
 
 function saveUnclearedCheques(fy, q, monthKey, chequeIds) {
-    try { localStorage.setItem(getUnclearedKey(fy, q, monthKey), JSON.stringify(chequeIds)); } catch(e) {}
+    try { CESTISStore.setItem(getUnclearedKey(fy, q, monthKey), JSON.stringify(chequeIds)); } catch(e) {}
 }
 
 function loadUnclearedCheques(fy, q, monthKey) {
     try {
-        const saved = localStorage.getItem(getUnclearedKey(fy, q, monthKey));
+        const saved = CESTISStore.getItem(getUnclearedKey(fy, q, monthKey));
         return saved ? JSON.parse(saved) : [];
     } catch(e) { return []; }
 }
@@ -6921,11 +6985,11 @@ function getDepositNotShownKey(fy, q, monthKey) {
 }
 
 function saveDepositNotShown(fy, q, monthKey, value) {
-    try { localStorage.setItem(getDepositNotShownKey(fy, q, monthKey), value); } catch(e) {}
+    try { CESTISStore.setItem(getDepositNotShownKey(fy, q, monthKey), value); } catch(e) {}
 }
 
 function loadDepositNotShown(fy, q, monthKey) {
-    try { return localStorage.getItem(getDepositNotShownKey(fy, q, monthKey)) || ''; } catch(e) { return ''; }
+    try { return CESTISStore.getItem(getDepositNotShownKey(fy, q, monthKey)) || ''; } catch(e) { return ''; }
 }
 
 function onDepositNotShownInput(fy, q, monthKey, value) {
@@ -6943,7 +7007,7 @@ const RECON_ORG_LINE3 = 'BANK RECONCILIATION';
 const RECON_PROJECT_NAME = 'HAZARD STC - CESTIS';
 
 function getReconLogo() {
-    try { return localStorage.getItem(RECON_LOGO_KEY) || ''; } catch(e) { return ''; }
+    try { return CESTISStore.getItem(RECON_LOGO_KEY) || ''; } catch(e) { return ''; }
 }
 
 function handleReconLogoUpload(event) {
@@ -6952,7 +7016,7 @@ function handleReconLogoUpload(event) {
     if (file.size > 500000) { alert('Logo file must be under 500KB.'); return; }
     var reader = new FileReader();
     reader.onload = function(e) {
-        try { localStorage.setItem(RECON_LOGO_KEY, e.target.result); } catch(ex) { alert('Could not save logo.'); }
+        try { CESTISStore.setItem(RECON_LOGO_KEY, e.target.result); } catch(ex) { alert('Could not save logo.'); }
         renderReconPreviewMonth();
     };
     reader.readAsDataURL(file);
@@ -6960,7 +7024,7 @@ function handleReconLogoUpload(event) {
 }
 
 function removeReconLogo() {
-    try { localStorage.removeItem(RECON_LOGO_KEY); } catch(e) {}
+    try { CESTISStore.removeItem(RECON_LOGO_KEY); } catch(e) {}
     renderReconPreviewMonth();
 }
 
@@ -7240,7 +7304,7 @@ const FIN_ORG_LINE3 = '(CTI)';
 const FIN_INSTITUTION = 'Community Educational and Skills Training Institute and Services Limited \u2013 Hazard STC';
 
 function getFinLogo() {
-    try { return localStorage.getItem(FIN_LOGO_KEY) || ''; } catch(e) { return ''; }
+    try { return CESTISStore.getItem(FIN_LOGO_KEY) || ''; } catch(e) { return ''; }
 }
 
 function handleFinLogoUpload(event) {
@@ -7249,7 +7313,7 @@ function handleFinLogoUpload(event) {
     if (file.size > 500000) { alert('Logo file must be under 500KB.'); return; }
     var reader = new FileReader();
     reader.onload = function(e) {
-        try { localStorage.setItem(FIN_LOGO_KEY, e.target.result); } catch(ex) { alert('Could not save logo.'); }
+        try { CESTISStore.setItem(FIN_LOGO_KEY, e.target.result); } catch(ex) { alert('Could not save logo.'); }
         renderFinPreviewPages();
     };
     reader.readAsDataURL(file);
@@ -7257,7 +7321,7 @@ function handleFinLogoUpload(event) {
 }
 
 function removeFinLogo() {
-    try { localStorage.removeItem(FIN_LOGO_KEY); } catch(e) {}
+    try { CESTISStore.removeItem(FIN_LOGO_KEY); } catch(e) {}
     renderFinPreviewPages();
 }
 
@@ -7524,11 +7588,11 @@ const AUTH_SESSION_KEY = 'cestis_auth_session';
 
 function isAuthenticated() {
     try {
-        const session = JSON.parse(localStorage.getItem(AUTH_SESSION_KEY));
+        const session = JSON.parse(CESTISStore.getItem(AUTH_SESSION_KEY));
         if (!session || !session.loggedIn) return false;
         // Session expires after 8 hours
         if (Date.now() - session.timestamp > 8 * 60 * 60 * 1000) {
-            localStorage.removeItem(AUTH_SESSION_KEY);
+            CESTISStore.removeItem(AUTH_SESSION_KEY);
             return false;
         }
         return true;
@@ -7700,7 +7764,7 @@ function handleLogin(e) {
     setTimeout(function() {
         if (user === AUTH_CREDENTIALS.username && pass === AUTH_CREDENTIALS.password) {
             // Success - store session
-            localStorage.setItem(AUTH_SESSION_KEY, JSON.stringify({
+            CESTISStore.setItem(AUTH_SESSION_KEY, JSON.stringify({
                 loggedIn: true,
                 user: user,
                 timestamp: Date.now()
@@ -7719,7 +7783,7 @@ function handleLogin(e) {
 }
 
 function handleLogout() {
-    localStorage.removeItem(AUTH_SESSION_KEY);
+    CESTISStore.removeItem(AUTH_SESSION_KEY);
     // Reset form
     document.getElementById('loginUser').value = '';
     document.getElementById('loginPass').value = '';
@@ -7810,7 +7874,7 @@ async function performLoginPageSync() {
         // Restore all data from backup (transactions, budgets, quarterly data, staff, etc.)
         restoreBackupData(backup);
         lastSyncTime = new Date(); lastSavedBy = backup.savedBy || 'Unknown';
-        localStorage.setItem('schoolDashboardLastSyncTime', lastSyncTime.toISOString());
+        CESTISStore.setItem('schoolDashboardLastSyncTime', lastSyncTime.toISOString());
         return true;
     } catch (error) { console.error('Perform login page sync error:', error); return false; }
 }
@@ -7906,7 +7970,7 @@ async function performMandatorySync() {
         // Restore all data from backup (transactions, budgets, quarterly data, staff, etc.)
         restoreBackupData(backup);
         lastSyncTime = new Date(); lastSavedBy = backup.savedBy || 'Unknown';
-        localStorage.setItem('schoolDashboardLastSyncTime', lastSyncTime.toISOString());
+        CESTISStore.setItem('schoolDashboardLastSyncTime', lastSyncTime.toISOString());
         updateCloudUI(true);
         return true;
     } catch (error) { console.error('Perform mandatory sync error:', error); return false; }
@@ -7983,9 +8047,9 @@ function dismissCloudNotification(){
 // Check cloud connection state and notify if needed
 function checkCloudAndNotify(reason){
   // Don't nag if user has never connected (no saved token at all and no saved file)
-  const hasEverConnected = localStorage.getItem('cestisGoogleAccessToken') ||
-                           localStorage.getItem('cestisCloudFileId') ||
-                           localStorage.getItem('cestisLastSyncTime');
+  const hasEverConnected = CESTISStore.getItem('cestisGoogleAccessToken') ||
+                           CESTISStore.getItem('cestisCloudFileId') ||
+                           CESTISStore.getItem('cestisLastSyncTime');
   if (!hasEverConnected) return;
 
   if (!navigator.onLine) {
@@ -7996,8 +8060,8 @@ function checkCloudAndNotify(reason){
   }
 
   if (!isCloudConnected) {
-    const savedExpiry = localStorage.getItem('cestisGoogleTokenExpiry');
-    const lastSync = localStorage.getItem('cestisLastSyncTime');
+    const savedExpiry = CESTISStore.getItem('cestisGoogleTokenExpiry');
+    const lastSync = CESTISStore.getItem('cestisLastSyncTime');
     let detail = '';
 
     if (savedExpiry && new Date(savedExpiry) <= new Date()) {
@@ -8031,7 +8095,7 @@ function startCloudMonitor(){
   // Check every 30 seconds for token expiry and 5-minute warning
   cloudCheckInterval = setInterval(function(){
     if (isCloudConnected && googleAccessToken) {
-      const savedExpiry = localStorage.getItem('cestisGoogleTokenExpiry');
+      const savedExpiry = CESTISStore.getItem('cestisGoogleTokenExpiry');
       if (!savedExpiry) return;
 
       const expiryDate = new Date(savedExpiry);
@@ -8088,7 +8152,7 @@ async function autoMergeAndSave() {
     if (!isCloudConnected || !googleAccessToken || cloudSyncing || !navigator.onLine) return;
 
     // Check token expiry before attempting sync
-    var savedExpiry = localStorage.getItem('cestisGoogleTokenExpiry');
+    var savedExpiry = CESTISStore.getItem('cestisGoogleTokenExpiry');
     if (savedExpiry && new Date(savedExpiry) <= new Date()) return;
 
     cloudSyncing = true;
@@ -8155,14 +8219,14 @@ async function autoMergeAndSave() {
             if (pushResponse.ok) {
                 var result = await pushResponse.json();
                 cloudFileId = result.id;
-                localStorage.setItem('cestisCloudFileId', cloudFileId);
-                localStorage.setItem('cestisCloudFolderId', GOOGLE_DRIVE_CONFIG.FOLDER_ID);
+                CESTISStore.setItem('cestisCloudFileId', cloudFileId);
+                CESTISStore.setItem('cestisCloudFolderId', GOOGLE_DRIVE_CONFIG.FOLDER_ID);
             }
         }
 
         if (pushResponse.ok) {
             lastSyncTime = new Date();
-            localStorage.setItem('cestisLastSyncTime', lastSyncTime.toISOString());
+            CESTISStore.setItem('cestisLastSyncTime', lastSyncTime.toISOString());
             lastSavedBy = currentUser ? currentUser.fullName : 'Unknown';
             cloudFileTimestamp = new Date().toISOString();
             updateLastSyncDisplay();
@@ -8227,7 +8291,7 @@ function silentMerge(backupData) {
             var cloudData = d.quarterlyTransactions[key];
             // Skip the current active quarter key — it will be handled via in-memory merge below
             if (key === currentQKey) return;
-            var localRaw = localStorage.getItem(key);
+            var localRaw = CESTISStore.getItem(key);
             if (!localRaw) {
                 // Quarter not present locally — add it entirely, but respect any cloud deletedTxnIds
                 try {
@@ -8235,7 +8299,7 @@ function silentMerge(backupData) {
                         var delSet = new Set(cloudData.deletedTxnIds);
                         cloudData.transactions = cloudData.transactions.filter(function(t) { return !delSet.has(t.id); });
                     }
-                    localStorage.setItem(key, JSON.stringify(cloudData)); changed = true;
+                    CESTISStore.setItem(key, JSON.stringify(cloudData)); changed = true;
                 } catch(e) {}
             } else {
                 // Merge individual transactions by id, respecting deletedTxnIds from both sides
@@ -8266,7 +8330,7 @@ function silentMerge(backupData) {
                         if (added > 0) changed = true;
                     }
                     if (changed) {
-                        localStorage.setItem(key, JSON.stringify(localData));
+                        CESTISStore.setItem(key, JSON.stringify(localData));
                     }
                 } catch(e) {}
             }
@@ -8310,7 +8374,7 @@ function silentMerge(backupData) {
         } else {
             // Different quarter — merge into the correct localStorage key, respecting deletedTxnIds
             var cloudKey = getQuarterKey(cloudFY, cloudQ);
-            var localRaw = localStorage.getItem(cloudKey);
+            var localRaw = CESTISStore.getItem(cloudKey);
             try {
                 var localData = localRaw ? JSON.parse(localRaw) : { openingBalance: d.openingBalance || 0, transactions: [], deletedTxnIds: [] };
                 if (!Array.isArray(localData.transactions)) localData.transactions = [];
@@ -8324,7 +8388,7 @@ function silentMerge(backupData) {
                     }
                 });
                 if (added > 0) {
-                    localStorage.setItem(cloudKey, JSON.stringify(localData));
+                    CESTISStore.setItem(cloudKey, JSON.stringify(localData));
                     changed = true;
                 }
             } catch(e) {}
@@ -8334,8 +8398,8 @@ function silentMerge(backupData) {
     // Merge quarterly budgets
     if (d.quarterlyBudgets && typeof d.quarterlyBudgets === 'object') {
         Object.keys(d.quarterlyBudgets).forEach(function(key) {
-            if (!localStorage.getItem(key)) {
-                try { localStorage.setItem(key, JSON.stringify(d.quarterlyBudgets[key])); } catch(e) {}
+            if (!CESTISStore.getItem(key)) {
+                try { CESTISStore.setItem(key, JSON.stringify(d.quarterlyBudgets[key])); } catch(e) {}
             }
         });
     }
@@ -8367,7 +8431,7 @@ function silentMerge(backupData) {
             }
         });
         if (changed) {
-            try { localStorage.setItem('cestisStaffMembers', JSON.stringify(staffMembers)); } catch(e) {}
+            try { CESTISStore.setItem('cestisStaffMembers', JSON.stringify(staffMembers)); } catch(e) {}
         }
     }
 
@@ -8382,7 +8446,7 @@ function silentMerge(backupData) {
                 timeRecords.push(cloudRecord);
             }
         });
-        try { localStorage.setItem('cestisTimeRecords', JSON.stringify(timeRecords)); } catch(e) {}
+        try { CESTISStore.setItem('cestisTimeRecords', JSON.stringify(timeRecords)); } catch(e) {}
     }
 
     if (changed) {
@@ -8417,7 +8481,7 @@ window.addEventListener('online', function(){
 // ============================================================
 document.addEventListener('DOMContentLoaded', () => {
     // Always require login on page load/refresh
-    localStorage.removeItem(AUTH_SESSION_KEY);
+    CESTISStore.removeItem(AUTH_SESSION_KEY);
 
     // Check for Google OAuth callback token in URL hash (redirect flow fallback)
     const hashParams = new URLSearchParams(window.location.hash.substring(1));
@@ -8430,8 +8494,8 @@ document.addEventListener('DOMContentLoaded', () => {
         // Save token with 1 hour expiry
         const expiry = new Date();
         expiry.setHours(expiry.getHours() + 1);
-        localStorage.setItem('cestisGoogleAccessToken', accessToken);
-        localStorage.setItem('cestisGoogleTokenExpiry', expiry.toISOString());
+        CESTISStore.setItem('cestisGoogleAccessToken', accessToken);
+        CESTISStore.setItem('cestisGoogleTokenExpiry', expiry.toISOString());
 
         findExistingBackupFile();
     }

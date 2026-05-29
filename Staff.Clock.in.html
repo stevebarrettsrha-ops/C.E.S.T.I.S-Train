@@ -1710,7 +1710,71 @@
 
     </style>
     <!-- Google Identity Services -->
-    <script src="https://accounts.google.com/gsi/client" async defer></script>
+    <script>
+/* ============================================================================
+   CESTISStore — localStorage-compatible API backed by IndexedDB.
+   IndexedDB has a far larger quota than localStorage (~5MB), so large data
+   (e.g. staff records with embedded document blobs) no longer overflows.
+   A synchronous in-memory cache preserves the existing synchronous
+   getItem/setItem/removeItem call sites; writes persist to IndexedDB
+   (durable) and mirror to localStorage when they still fit.
+   ============================================================================ */
+(function(){
+  if (window.CESTISStore) return;
+  var DB_NAME='CESTIS_KV', STORE='kv', LS=null;
+  try { LS = window.localStorage; } catch(e) { LS = null; }
+  var cache = {};
+  // Seed synchronously from localStorage so data is available immediately.
+  try { if(LS){ for(var i=0;i<LS.length;i++){ var k=LS.key(i); cache[k]=LS.getItem(k); } } } catch(e){}
+
+  var db=null, ready=false, wq=[];
+  function drainQueue(){ var q=wq; wq=[]; for(var i=0;i<q.length;i++){ writeIDB(q[i].k,q[i].v,q[i].del); } }
+  function writeIDB(k,v,del){
+    if(!db){ if(!ready){ wq.push({k:k,v:v,del:del}); } return; }
+    try { var os=db.transaction(STORE,'readwrite').objectStore(STORE); if(del){ os.delete(k); } else { os.put(v,k); } } catch(e){}
+  }
+  try {
+    var req = indexedDB.open(DB_NAME,1);
+    req.onupgradeneeded = function(e){ var d=e.target.result; if(!d.objectStoreNames.contains(STORE)){ d.createObjectStore(STORE); } };
+    req.onsuccess = function(e){
+      db = e.target.result;
+      try {
+        var idbKeys = {};
+        var cur = db.transaction(STORE,'readonly').objectStore(STORE).openCursor();
+        cur.onsuccess = function(ev){ var c=ev.target.result;
+          if(c){ idbKeys[c.key]=1; if(!(c.key in cache)){ cache[c.key]=c.value; } c.continue(); }
+          else {
+            // One-time migration: copy any localStorage-seeded keys into IndexedDB.
+            try { var ws=db.transaction(STORE,'readwrite').objectStore(STORE);
+                  for(var kk in cache){ if(Object.prototype.hasOwnProperty.call(cache,kk) && !idbKeys[kk]){ ws.put(cache[kk], kk); } } } catch(_){}
+            ready=true; drainQueue(); try{ window.dispatchEvent(new Event('cestis-store-ready')); }catch(_){}
+          }
+        };
+        cur.onerror = function(){ ready=true; drainQueue(); };
+      } catch(e){ ready=true; drainQueue(); }
+    };
+    req.onerror = function(){ db=null; ready=true; };
+  } catch(e){ db=null; ready=true; }
+
+  var Store = {
+    _cache: cache,
+    getItem: function(k){ k=String(k); return (k in cache) ? cache[k] : null; },
+    setItem: function(k,v){ k=String(k); v=String(v); cache[k]=v; try{ if(LS) LS.setItem(k,v); }catch(e){} writeIDB(k,v,false); },
+    removeItem: function(k){ k=String(k); delete cache[k]; try{ if(LS) LS.removeItem(k); }catch(e){} writeIDB(k,null,true); },
+    clear: function(){ for(var k in cache){ if(Object.prototype.hasOwnProperty.call(cache,k)) delete cache[k]; }
+                       try{ if(LS) LS.clear(); }catch(e){}
+                       if(db){ try{ db.transaction(STORE,'readwrite').objectStore(STORE).clear(); }catch(e){} } },
+    key: function(i){ return Object.keys(cache)[i]; },
+    keys: function(){ return Object.keys(cache); },
+    hasOwnProperty: function(k){ return Object.prototype.hasOwnProperty.call(cache, String(k)); },
+    whenReady: function(cb){ if(ready){ cb(); } else { window.addEventListener('cestis-store-ready', cb, {once:true}); } },
+    get length(){ return Object.keys(cache).length; }
+  };
+  window.CESTISStore = Store;
+})();
+</script>
+
+<script src="https://accounts.google.com/gsi/client" async defer></script>
     <!-- EmailJS SDK for OTP Email -->
     <script type="text/javascript" src="https://cdn.jsdelivr.net/npm/@emailjs/browser@4/dist/email.min.js"></script>
     <script type="text/javascript">
@@ -2490,10 +2554,10 @@
 
         // Initialize cloud sync from localStorage
         function initializeCloudSync() {
-            const savedToken = localStorage.getItem('cestisGoogleAccessToken');
-            const savedExpiry = localStorage.getItem('cestisGoogleTokenExpiry');
-            const savedLastSync = localStorage.getItem('cestisLastSyncTime');
-            const savedFileId = localStorage.getItem('cestisCloudFileId');
+            const savedToken = CESTISStore.getItem('cestisGoogleAccessToken');
+            const savedExpiry = CESTISStore.getItem('cestisGoogleTokenExpiry');
+            const savedLastSync = CESTISStore.getItem('cestisLastSyncTime');
+            const savedFileId = CESTISStore.getItem('cestisCloudFileId');
 
             if (savedLastSync) {
                 lastSyncTime = new Date(savedLastSync);
@@ -2744,8 +2808,8 @@
                 // Save token with 1 hour expiry (typical for OAuth tokens)
                 const expiry = new Date();
                 expiry.setHours(expiry.getHours() + 1);
-                localStorage.setItem('cestisGoogleAccessToken', token);
-                localStorage.setItem('cestisGoogleTokenExpiry', expiry.toISOString());
+                CESTISStore.setItem('cestisGoogleAccessToken', token);
+                CESTISStore.setItem('cestisGoogleTokenExpiry', expiry.toISOString());
 
                 closeGoogleAuthModal();
                 updateCloudUI(true);
@@ -2768,8 +2832,8 @@
 
             const expiry = new Date();
             expiry.setSeconds(expiry.getSeconds() + (tokenResponse.expires_in || 3600));
-            localStorage.setItem('cestisGoogleAccessToken', googleAccessToken);
-            localStorage.setItem('cestisGoogleTokenExpiry', expiry.toISOString());
+            CESTISStore.setItem('cestisGoogleAccessToken', googleAccessToken);
+            CESTISStore.setItem('cestisGoogleTokenExpiry', expiry.toISOString());
 
             updateCloudUI(true);
 
@@ -2803,9 +2867,9 @@
                 isCloudConnected = false;
                 cloudFileId = null;
 
-                localStorage.removeItem('cestisGoogleAccessToken');
-                localStorage.removeItem('cestisGoogleTokenExpiry');
-                localStorage.removeItem('cestisCloudFileId');
+                CESTISStore.removeItem('cestisGoogleAccessToken');
+                CESTISStore.removeItem('cestisGoogleTokenExpiry');
+                CESTISStore.removeItem('cestisCloudFileId');
 
                 updateCloudUI(false);
                 toggleCloudMenu();
@@ -2831,7 +2895,7 @@
                     const data = await response.json();
                     if (data.files && data.files.length > 0) {
                         cloudFileId = data.files[0].id;
-                        localStorage.setItem('cestisCloudFileId', cloudFileId);
+                        CESTISStore.setItem('cestisCloudFileId', cloudFileId);
                         console.log('Found existing backup file:', cloudFileId);
                     }
                 }
@@ -2964,7 +3028,7 @@
                     if (response.ok) {
                         const result = await response.json();
                         cloudFileId = result.id;
-                        localStorage.setItem('cestisCloudFileId', cloudFileId);
+                        CESTISStore.setItem('cestisCloudFileId', cloudFileId);
                     }
                 }
 
@@ -2975,7 +3039,7 @@
 
                 // Update last sync time
                 lastSyncTime = new Date();
-                localStorage.setItem('cestisLastSyncTime', lastSyncTime.toISOString());
+                CESTISStore.setItem('cestisLastSyncTime', lastSyncTime.toISOString());
                 updateLastSyncDisplay();
 
                 // Update last saved by info
@@ -3069,7 +3133,7 @@
 
                 // Update last sync time
                 lastSyncTime = new Date();
-                localStorage.setItem('cestisLastSyncTime', lastSyncTime.toISOString());
+                CESTISStore.setItem('cestisLastSyncTime', lastSyncTime.toISOString());
                 updateLastSyncDisplay();
 
                 // Refresh UI and reload active session
@@ -3716,7 +3780,7 @@
                     if (response.ok) {
                         const result = await response.json();
                         cloudFileId = result.id;
-                        localStorage.setItem('cestisCloudFileId', cloudFileId);
+                        CESTISStore.setItem('cestisCloudFileId', cloudFileId);
                     }
                 }
 
@@ -3729,7 +3793,7 @@
 
                 // Update sync tracking
                 lastSyncTime = new Date();
-                localStorage.setItem('cestisLastSyncTime', lastSyncTime.toISOString());
+                CESTISStore.setItem('cestisLastSyncTime', lastSyncTime.toISOString());
                 updateLastSyncDisplay();
 
                 lastSavedBy = currentUser ? currentUser.fullName : 'Unknown';
@@ -3945,7 +4009,7 @@
                     if (response.ok) {
                         const result = await response.json();
                         cloudFileId = result.id;
-                        localStorage.setItem('cestisCloudFileId', cloudFileId);
+                        CESTISStore.setItem('cestisCloudFileId', cloudFileId);
                     }
                 }
 
@@ -3958,7 +4022,7 @@
 
                 // Update sync tracking
                 lastSyncTime = new Date();
-                localStorage.setItem('cestisLastSyncTime', lastSyncTime.toISOString());
+                CESTISStore.setItem('cestisLastSyncTime', lastSyncTime.toISOString());
                 updateLastSyncDisplay();
 
                 lastSavedBy = currentUser ? currentUser.fullName : 'Unknown';
@@ -4116,8 +4180,8 @@
         // Prompt user to sync from cloud on login
         function promptSyncOnLogin() {
             // Check if we have a valid Google Drive token
-            const savedToken = localStorage.getItem('cestisGoogleAccessToken');
-            const savedExpiry = localStorage.getItem('cestisGoogleTokenExpiry');
+            const savedToken = CESTISStore.getItem('cestisGoogleAccessToken');
+            const savedExpiry = CESTISStore.getItem('cestisGoogleTokenExpiry');
 
             // Show prompt modal after a brief delay to let dashboard load
             setTimeout(() => {
@@ -4261,7 +4325,7 @@
         // Perform automatic sync on login
         async function performAutoSyncOnLogin() {
             // Initialize token if not already done
-            const savedToken = localStorage.getItem('cestisGoogleAccessToken');
+            const savedToken = CESTISStore.getItem('cestisGoogleAccessToken');
             if (savedToken) {
                 googleAccessToken = savedToken;
                 isCloudConnected = true;
@@ -4278,7 +4342,7 @@
             try {
                 // First try to find the backup file
                 if (!cloudFileId) {
-                    const savedFileId = localStorage.getItem('cestisCloudFileId');
+                    const savedFileId = CESTISStore.getItem('cestisCloudFileId');
                     if (savedFileId) {
                         cloudFileId = savedFileId;
                     } else {
@@ -4333,7 +4397,7 @@
 
                 // Update sync tracking
                 lastSyncTime = new Date();
-                localStorage.setItem('cestisLastSyncTime', lastSyncTime.toISOString());
+                CESTISStore.setItem('cestisLastSyncTime', lastSyncTime.toISOString());
                 updateLastSyncDisplay();
 
                 // Update last saved by info
@@ -4363,8 +4427,8 @@
                 if (error.message.includes('invalid_token') || error.message.includes('Invalid Credentials')) {
                     showToast('Google Drive session expired', 'error');
                     // Clear invalid token
-                    localStorage.removeItem('cestisGoogleAccessToken');
-                    localStorage.removeItem('cestisGoogleTokenExpiry');
+                    CESTISStore.removeItem('cestisGoogleAccessToken');
+                    CESTISStore.removeItem('cestisGoogleTokenExpiry');
                     updateCloudUI(false);
                 } else {
                     showToast(`Sync failed: ${error.message}`, 'error');
@@ -4493,7 +4557,7 @@
 
                 // Update sync tracking
                 lastSyncTime = new Date();
-                localStorage.setItem('cestisLastSyncTime', lastSyncTime.toISOString());
+                CESTISStore.setItem('cestisLastSyncTime', lastSyncTime.toISOString());
                 updateLastSyncDisplay();
 
                 // Update last saved by info
@@ -4948,7 +5012,7 @@
 
                 // Update sync tracking
                 lastSyncTime = new Date();
-                localStorage.setItem('cestisLastSyncTime', lastSyncTime.toISOString());
+                CESTISStore.setItem('cestisLastSyncTime', lastSyncTime.toISOString());
                 updateLastSyncDisplay();
 
                 // Update last saved by info
@@ -4958,7 +5022,7 @@
 
                 // Cache the file ID if this becomes our primary sync file
                 cloudFileId = fileId;
-                localStorage.setItem('cestisCloudFileId', cloudFileId);
+                CESTISStore.setItem('cestisCloudFileId', cloudFileId);
 
                 // Refresh UI
                 renderTodayLog();
@@ -4981,7 +5045,7 @@
 
         // Initialize default admin
         function initializeDefaultAdmin() {
-            const saved = localStorage.getItem('cestisStaffMembers');
+            const saved = CESTISStore.getItem('cestisStaffMembers');
             if (!saved) {
                 staffMembers = [{
                     id: 'ADMIN001',
@@ -5001,15 +5065,15 @@
 
         // Save functions
         function saveStaffMembers() {
-            localStorage.setItem('cestisStaffMembers', JSON.stringify(staffMembers));
+            CESTISStore.setItem('cestisStaffMembers', JSON.stringify(staffMembers));
         }
 
         function saveTimeRecords() {
-            localStorage.setItem('cestisTimeRecords', JSON.stringify(timeRecords));
+            CESTISStore.setItem('cestisTimeRecords', JSON.stringify(timeRecords));
         }
 
         function loadTimeRecords() {
-            const saved = localStorage.getItem('cestisTimeRecords');
+            const saved = CESTISStore.getItem('cestisTimeRecords');
             if (saved) {
                 timeRecords = JSON.parse(saved);
             }
@@ -5030,8 +5094,8 @@
             isCloudConnected = false;
             googleAccessToken = null;
             try {
-                localStorage.removeItem('cestisGoogleAccessToken');
-                localStorage.removeItem('cestisGoogleTokenExpiry');
+                CESTISStore.removeItem('cestisGoogleAccessToken');
+                CESTISStore.removeItem('cestisGoogleTokenExpiry');
             } catch (e) { /* ignore */ }
             if (typeof updateCloudUI === 'function') updateCloudUI(false);
             if (!cloudAuthExpiredNotified) {
@@ -5057,7 +5121,7 @@
             try {
                 // Resolve cloud file ID if not set
                 if (!cloudFileId) {
-                    const savedFileId = localStorage.getItem('cestisCloudFileId');
+                    const savedFileId = CESTISStore.getItem('cestisCloudFileId');
                     if (savedFileId) {
                         cloudFileId = savedFileId;
                     }
@@ -5179,13 +5243,13 @@
                     if (response.ok) {
                         const result = await response.json();
                         cloudFileId = result.id;
-                        localStorage.setItem('cestisCloudFileId', cloudFileId);
+                        CESTISStore.setItem('cestisCloudFileId', cloudFileId);
                     }
                 }
 
                 if (response && response.ok) {
                     lastSyncTime = new Date();
-                    localStorage.setItem('cestisLastSyncTime', lastSyncTime.toISOString());
+                    CESTISStore.setItem('cestisLastSyncTime', lastSyncTime.toISOString());
                     lastSavedBy = currentUser ? currentUser.fullName : 'Unknown';
                     cloudFileTimestamp = new Date().toISOString();
                     updateLastSyncDisplay();
@@ -5263,7 +5327,7 @@
         // Complete login after password check
         function completeLogin(staff) {
             currentUser = staff;
-            localStorage.setItem('cestisCurrentUser', JSON.stringify(staff));
+            CESTISStore.setItem('cestisCurrentUser', JSON.stringify(staff));
 
             document.getElementById('mainDashboard').style.display = 'block';
             document.getElementById('currentUserDisplay').textContent = `👤 ${staff.fullName} (${staff.workType})`;
@@ -5635,7 +5699,7 @@
             if (confirm('Are you sure you want to logout?')) {
                 currentUser = null;
                 currentSession = null;
-                localStorage.removeItem('cestisCurrentUser');
+                CESTISStore.removeItem('cestisCurrentUser');
                 clearInterval(timerInterval);
 
                 // Hide resumed session banner on logout
@@ -5935,7 +5999,7 @@
             const today = new Date().toISOString().split('T')[0];
             // Find any in-progress session for this user (regardless of date) so
             // sessions that crossed midnight or were left open before a computer
-            // restart still resume instead of being orphaned in localStorage.
+            // restart still resume instead of being orphaned in CESTISStore.
             const openSessions = timeRecords.filter(r =>
                 r.staffId === currentUser.id &&
                 r.status !== 'completed'
@@ -7892,19 +7956,19 @@
                 // Restore staff members (required for login)
                 if (backup.data.staffMembers) {
                     staffMembers = backup.data.staffMembers;
-                    localStorage.setItem('cestisStaffMembers', JSON.stringify(staffMembers));
+                    CESTISStore.setItem('cestisStaffMembers', JSON.stringify(staffMembers));
                 }
 
                 // Restore time records
                 if (backup.data.timeRecords) {
                     timeRecords = backup.data.timeRecords;
-                    localStorage.setItem('cestisTimeRecords', JSON.stringify(timeRecords));
+                    CESTISStore.setItem('cestisTimeRecords', JSON.stringify(timeRecords));
                 }
 
                 // Update sync tracking
                 lastSyncTime = new Date();
                 lastSavedBy = backup.savedBy || 'Unknown';
-                localStorage.setItem('cestisLastSyncTime', lastSyncTime.toISOString());
+                CESTISStore.setItem('cestisLastSyncTime', lastSyncTime.toISOString());
 
                 return true;
             } catch (error) { console.error('Perform login page sync error:', error); return false; }
@@ -7952,7 +8016,7 @@
         function toggleDarkMode() {
             document.body.classList.toggle('dark-mode');
             const isDark = document.body.classList.contains('dark-mode');
-            localStorage.setItem('cestisTimeDarkMode', isDark);
+            CESTISStore.setItem('cestisTimeDarkMode', isDark);
             
             document.getElementById('themeIcon').textContent = isDark ? '☀️' : '🌙';
             document.getElementById('themeText').textContent = isDark ? 'Light' : 'Dark';
@@ -8008,9 +8072,9 @@
         // Check cloud connection state and notify if needed
         function checkCloudAndNotify(reason){
           // Don't nag if user has never connected (no saved token at all and no saved file)
-          const hasEverConnected = localStorage.getItem('cestisGoogleAccessToken') ||
-                                   localStorage.getItem('cestisCloudFileId') ||
-                                   localStorage.getItem('cestisLastSyncTime');
+          const hasEverConnected = CESTISStore.getItem('cestisGoogleAccessToken') ||
+                                   CESTISStore.getItem('cestisCloudFileId') ||
+                                   CESTISStore.getItem('cestisLastSyncTime');
           if (!hasEverConnected) return;
 
           if (!navigator.onLine) {
@@ -8021,8 +8085,8 @@
           }
 
           if (!isCloudConnected) {
-            const savedExpiry = localStorage.getItem('cestisGoogleTokenExpiry');
-            const lastSync = localStorage.getItem('cestisLastSyncTime');
+            const savedExpiry = CESTISStore.getItem('cestisGoogleTokenExpiry');
+            const lastSync = CESTISStore.getItem('cestisLastSyncTime');
             let detail = '';
 
             if (savedExpiry && new Date(savedExpiry) <= new Date()) {
@@ -8053,7 +8117,7 @@
           // Check every 60 seconds if the token has expired
           cloudCheckInterval = setInterval(function(){
             if (isCloudConnected && googleAccessToken) {
-              const savedExpiry = localStorage.getItem('cestisGoogleTokenExpiry');
+              const savedExpiry = CESTISStore.getItem('cestisGoogleTokenExpiry');
               if (savedExpiry && new Date(savedExpiry) <= new Date()) {
                 // Token just expired
                 googleAccessToken = null;
@@ -8130,12 +8194,12 @@
             loadTimeRecords();
 
             // Auto-load user (no login required — page is embedded in authenticated dashboard)
-            const savedUser = localStorage.getItem('cestisCurrentUser');
+            const savedUser = CESTISStore.getItem('cestisCurrentUser');
             if (savedUser) {
                 currentUser = JSON.parse(savedUser);
             } else {
                 currentUser = staffMembers.find(s => s.role === 'Admin') || staffMembers[0];
-                if (currentUser) localStorage.setItem('cestisCurrentUser', JSON.stringify(currentUser));
+                if (currentUser) CESTISStore.setItem('cestisCurrentUser', JSON.stringify(currentUser));
             }
             if (currentUser) {
                 document.getElementById('mainDashboard').style.display = 'block';
@@ -8165,7 +8229,7 @@
             document.getElementById('editFromDate').value = weekAgo.toISOString().split('T')[0];
 
             // Dark mode
-            const isDark = localStorage.getItem('cestisTimeDarkMode') === 'true';
+            const isDark = CESTISStore.getItem('cestisTimeDarkMode') === 'true';
             if (isDark) {
                 document.body.classList.add('dark-mode');
                 document.getElementById('themeIcon').textContent = '☀️';

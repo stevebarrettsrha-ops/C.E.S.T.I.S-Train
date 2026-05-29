@@ -6,7 +6,71 @@
     <title>CESTIS - School Fee Management System</title>
     
     <!-- External Libraries -->
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+    <script>
+/* ============================================================================
+   CESTISStore — localStorage-compatible API backed by IndexedDB.
+   IndexedDB has a far larger quota than localStorage (~5MB), so large data
+   (e.g. staff records with embedded document blobs) no longer overflows.
+   A synchronous in-memory cache preserves the existing synchronous
+   getItem/setItem/removeItem call sites; writes persist to IndexedDB
+   (durable) and mirror to localStorage when they still fit.
+   ============================================================================ */
+(function(){
+  if (window.CESTISStore) return;
+  var DB_NAME='CESTIS_KV', STORE='kv', LS=null;
+  try { LS = window.localStorage; } catch(e) { LS = null; }
+  var cache = {};
+  // Seed synchronously from localStorage so data is available immediately.
+  try { if(LS){ for(var i=0;i<LS.length;i++){ var k=LS.key(i); cache[k]=LS.getItem(k); } } } catch(e){}
+
+  var db=null, ready=false, wq=[];
+  function drainQueue(){ var q=wq; wq=[]; for(var i=0;i<q.length;i++){ writeIDB(q[i].k,q[i].v,q[i].del); } }
+  function writeIDB(k,v,del){
+    if(!db){ if(!ready){ wq.push({k:k,v:v,del:del}); } return; }
+    try { var os=db.transaction(STORE,'readwrite').objectStore(STORE); if(del){ os.delete(k); } else { os.put(v,k); } } catch(e){}
+  }
+  try {
+    var req = indexedDB.open(DB_NAME,1);
+    req.onupgradeneeded = function(e){ var d=e.target.result; if(!d.objectStoreNames.contains(STORE)){ d.createObjectStore(STORE); } };
+    req.onsuccess = function(e){
+      db = e.target.result;
+      try {
+        var idbKeys = {};
+        var cur = db.transaction(STORE,'readonly').objectStore(STORE).openCursor();
+        cur.onsuccess = function(ev){ var c=ev.target.result;
+          if(c){ idbKeys[c.key]=1; if(!(c.key in cache)){ cache[c.key]=c.value; } c.continue(); }
+          else {
+            // One-time migration: copy any localStorage-seeded keys into IndexedDB.
+            try { var ws=db.transaction(STORE,'readwrite').objectStore(STORE);
+                  for(var kk in cache){ if(Object.prototype.hasOwnProperty.call(cache,kk) && !idbKeys[kk]){ ws.put(cache[kk], kk); } } } catch(_){}
+            ready=true; drainQueue(); try{ window.dispatchEvent(new Event('cestis-store-ready')); }catch(_){}
+          }
+        };
+        cur.onerror = function(){ ready=true; drainQueue(); };
+      } catch(e){ ready=true; drainQueue(); }
+    };
+    req.onerror = function(){ db=null; ready=true; };
+  } catch(e){ db=null; ready=true; }
+
+  var Store = {
+    _cache: cache,
+    getItem: function(k){ k=String(k); return (k in cache) ? cache[k] : null; },
+    setItem: function(k,v){ k=String(k); v=String(v); cache[k]=v; try{ if(LS) LS.setItem(k,v); }catch(e){} writeIDB(k,v,false); },
+    removeItem: function(k){ k=String(k); delete cache[k]; try{ if(LS) LS.removeItem(k); }catch(e){} writeIDB(k,null,true); },
+    clear: function(){ for(var k in cache){ if(Object.prototype.hasOwnProperty.call(cache,k)) delete cache[k]; }
+                       try{ if(LS) LS.clear(); }catch(e){}
+                       if(db){ try{ db.transaction(STORE,'readwrite').objectStore(STORE).clear(); }catch(e){} } },
+    key: function(i){ return Object.keys(cache)[i]; },
+    keys: function(){ return Object.keys(cache); },
+    hasOwnProperty: function(k){ return Object.prototype.hasOwnProperty.call(cache, String(k)); },
+    whenReady: function(cb){ if(ready){ cb(); } else { window.addEventListener('cestis-store-ready', cb, {once:true}); } },
+    get length(){ return Object.keys(cache).length; }
+  };
+  window.CESTISStore = Store;
+})();
+</script>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/chart.js@3.9.1/dist/chart.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.5.31/jspdf.plugin.autotable.min.js"></script>
@@ -3021,7 +3085,7 @@
 
         // Initialize default admin account
         function initializeDefaultAdmin() {
-            const savedUsers = localStorage.getItem('cestiUsers');
+            const savedUsers = CESTISStore.getItem('cestiUsers');
             if (!savedUsers) {
                 users = [{
                     id: 'ADMIN001',
@@ -3042,7 +3106,7 @@
 
         // Save users to localStorage
         function saveUsers() {
-            localStorage.setItem('cestiUsers', JSON.stringify(users));
+            CESTISStore.setItem('cestiUsers', JSON.stringify(users));
         }
 
         // Handle login
@@ -3742,14 +3806,14 @@
 
         // Load and save fee structure
         function loadFeeStructure() {
-            const saved = localStorage.getItem('cestiFeeStructure');
+            const saved = CESTISStore.getItem('cestiFeeStructure');
             if (saved) {
                 feeStructure = JSON.parse(saved);
             }
         }
 
         function saveFeeStructure() {
-            localStorage.setItem('cestiFeeStructure', JSON.stringify(feeStructure));
+            CESTISStore.setItem('cestiFeeStructure', JSON.stringify(feeStructure));
         }
 
         // Add new skill area
@@ -4072,9 +4136,9 @@
         // Check cloud connection state and notify if needed
         function checkCloudAndNotify(reason){
           // Don't nag if user has never connected (no saved token at all and no saved file)
-          const hasEverConnected = localStorage.getItem('cestisGoogleAccessToken') ||
-                                   localStorage.getItem('schoolFeeCloudFileId') ||
-                                   localStorage.getItem('cestisLastSyncTime');
+          const hasEverConnected = CESTISStore.getItem('cestisGoogleAccessToken') ||
+                                   CESTISStore.getItem('schoolFeeCloudFileId') ||
+                                   CESTISStore.getItem('cestisLastSyncTime');
           if (!hasEverConnected) return;
 
           if (!navigator.onLine) {
@@ -4085,8 +4149,8 @@
           }
 
           if (!isCloudConnected) {
-            const savedExpiry = localStorage.getItem('cestisGoogleTokenExpiry');
-            const lastSync = localStorage.getItem('cestisLastSyncTime');
+            const savedExpiry = CESTISStore.getItem('cestisGoogleTokenExpiry');
+            const lastSync = CESTISStore.getItem('cestisLastSyncTime');
             let detail = '';
 
             if (savedExpiry && new Date(savedExpiry) <= new Date()) {
@@ -4117,7 +4181,7 @@
           // Check every 60 seconds if the token has expired
           cloudCheckInterval = setInterval(function(){
             if (isCloudConnected && googleAccessToken) {
-              const savedExpiry = localStorage.getItem('cestisGoogleTokenExpiry');
+              const savedExpiry = CESTISStore.getItem('cestisGoogleTokenExpiry');
               if (savedExpiry && new Date(savedExpiry) <= new Date()) {
                 // Token just expired
                 googleAccessToken = null;
@@ -4202,7 +4266,7 @@
             document.getElementById('paymentDate').value = today;
 
             // Load dark mode preference
-            const isDarkMode = localStorage.getItem('darkMode') === 'true';
+            const isDarkMode = CESTISStore.getItem('darkMode') === 'true';
             if (isDarkMode) {
                 document.body.classList.add('dark-mode');
                 updateThemeToggle();
@@ -4265,7 +4329,7 @@
         function toggleDarkMode() {
             document.body.classList.toggle('dark-mode');
             const isDarkMode = document.body.classList.contains('dark-mode');
-            localStorage.setItem('darkMode', isDarkMode);
+            CESTISStore.setItem('darkMode', isDarkMode);
             updateThemeToggle();
             
             // Refresh charts with new theme
@@ -4298,9 +4362,9 @@
 
         // Load data from localStorage
         function loadData() {
-            const savedStudents = localStorage.getItem('cestiSchoolFeeStudents');
-            const savedPayments = localStorage.getItem('cestiSchoolFeePayments');
-            const savedDocuments = localStorage.getItem('cestiSchoolFeeDocuments');
+            const savedStudents = CESTISStore.getItem('cestiSchoolFeeStudents');
+            const savedPayments = CESTISStore.getItem('cestiSchoolFeePayments');
+            const savedDocuments = CESTISStore.getItem('cestiSchoolFeeDocuments');
             
             if (savedStudents) students = JSON.parse(savedStudents);
             if (savedPayments) payments = JSON.parse(savedPayments);
@@ -4309,9 +4373,9 @@
 
         // Save data to localStorage
         function saveData() {
-            localStorage.setItem('cestiSchoolFeeStudents', JSON.stringify(students));
-            localStorage.setItem('cestiSchoolFeePayments', JSON.stringify(payments));
-            localStorage.setItem('cestiSchoolFeeDocuments', JSON.stringify(documents));
+            CESTISStore.setItem('cestiSchoolFeeStudents', JSON.stringify(students));
+            CESTISStore.setItem('cestiSchoolFeePayments', JSON.stringify(payments));
+            CESTISStore.setItem('cestiSchoolFeeDocuments', JSON.stringify(documents));
         }
 
         // Recalculate student totals from actual payment records
@@ -7902,10 +7966,10 @@
 
         // Initialize cloud sync from localStorage
         function initializeCloudSync() {
-            const savedToken = localStorage.getItem('cestisGoogleAccessToken');
-            const savedExpiry = localStorage.getItem('cestisGoogleTokenExpiry');
-            const savedLastSync = localStorage.getItem('cestisLastSyncTime');
-            const savedFileId = localStorage.getItem('schoolFeeCloudFileId');
+            const savedToken = CESTISStore.getItem('cestisGoogleAccessToken');
+            const savedExpiry = CESTISStore.getItem('cestisGoogleTokenExpiry');
+            const savedLastSync = CESTISStore.getItem('cestisLastSyncTime');
+            const savedFileId = CESTISStore.getItem('schoolFeeCloudFileId');
 
             if (savedLastSync) {
                 lastSyncTime = new Date(savedLastSync);
@@ -8155,8 +8219,8 @@
                 // Save token with 1 hour expiry (typical for OAuth tokens)
                 const expiry = new Date();
                 expiry.setHours(expiry.getHours() + 1);
-                localStorage.setItem('cestisGoogleAccessToken', token);
-                localStorage.setItem('cestisGoogleTokenExpiry', expiry.toISOString());
+                CESTISStore.setItem('cestisGoogleAccessToken', token);
+                CESTISStore.setItem('cestisGoogleTokenExpiry', expiry.toISOString());
 
                 closeGoogleAuthModal();
                 updateCloudUI(true);
@@ -8178,8 +8242,8 @@
 
             const expiry = new Date();
             expiry.setSeconds(expiry.getSeconds() + (tokenResponse.expires_in || 3600));
-            localStorage.setItem('cestisGoogleAccessToken', googleAccessToken);
-            localStorage.setItem('cestisGoogleTokenExpiry', expiry.toISOString());
+            CESTISStore.setItem('cestisGoogleAccessToken', googleAccessToken);
+            CESTISStore.setItem('cestisGoogleTokenExpiry', expiry.toISOString());
 
             updateCloudUI(true);
 
@@ -8214,9 +8278,9 @@
                 isCloudConnected = false;
                 cloudFileId = null;
 
-                localStorage.removeItem('cestisGoogleAccessToken');
-                localStorage.removeItem('cestisGoogleTokenExpiry');
-                localStorage.removeItem('schoolFeeCloudFileId');
+                CESTISStore.removeItem('cestisGoogleAccessToken');
+                CESTISStore.removeItem('cestisGoogleTokenExpiry');
+                CESTISStore.removeItem('schoolFeeCloudFileId');
 
                 updateCloudUI(false);
                 toggleCloudMenu();
@@ -8242,7 +8306,7 @@
                     const data = await response.json();
                     if (data.files && data.files.length > 0) {
                         cloudFileId = data.files[0].id;
-                        localStorage.setItem('schoolFeeCloudFileId', cloudFileId);
+                        CESTISStore.setItem('schoolFeeCloudFileId', cloudFileId);
                         console.log('Found existing backup file:', cloudFileId);
                     }
                 }
@@ -8882,7 +8946,7 @@
                     if (response.ok) {
                         const result = await response.json();
                         cloudFileId = result.id;
-                        localStorage.setItem('schoolFeeCloudFileId', cloudFileId);
+                        CESTISStore.setItem('schoolFeeCloudFileId', cloudFileId);
                     }
                 }
 
@@ -8895,7 +8959,7 @@
 
                 // Update sync tracking
                 lastSyncTime = new Date();
-                localStorage.setItem('cestisLastSyncTime', lastSyncTime.toISOString());
+                CESTISStore.setItem('cestisLastSyncTime', lastSyncTime.toISOString());
                 updateLastSyncDisplay();
 
                 lastSavedBy = currentUser ? currentUser.username : 'Unknown';
@@ -9137,7 +9201,7 @@
                     if (response.ok) {
                         const result = await response.json();
                         cloudFileId = result.id;
-                        localStorage.setItem('schoolFeeCloudFileId', cloudFileId);
+                        CESTISStore.setItem('schoolFeeCloudFileId', cloudFileId);
                     }
                 }
 
@@ -9150,7 +9214,7 @@
 
                 // Update sync tracking
                 lastSyncTime = new Date();
-                localStorage.setItem('cestisLastSyncTime', lastSyncTime.toISOString());
+                CESTISStore.setItem('cestisLastSyncTime', lastSyncTime.toISOString());
                 updateLastSyncDisplay();
 
                 lastSavedBy = currentUser ? currentUser.username : 'Unknown';
@@ -9364,17 +9428,17 @@
 
                 if (backupData.data.students) {
                     students = backupData.data.students;
-                    localStorage.setItem('cestiSchoolFeeStudents', JSON.stringify(students));
+                    CESTISStore.setItem('cestiSchoolFeeStudents', JSON.stringify(students));
                 }
 
                 if (backupData.data.payments) {
                     payments = backupData.data.payments;
-                    localStorage.setItem('cestiSchoolFeePayments', JSON.stringify(payments));
+                    CESTISStore.setItem('cestiSchoolFeePayments', JSON.stringify(payments));
                 }
 
                 if (backupData.data.documents) {
                     documents = backupData.data.documents;
-                    localStorage.setItem('cestiSchoolFeeDocuments', JSON.stringify(documents));
+                    CESTISStore.setItem('cestiSchoolFeeDocuments', JSON.stringify(documents));
                 }
 
                 if (backupData.data.feeStructure) {
@@ -9384,7 +9448,7 @@
 
                 // Update last sync time
                 lastSyncTime = new Date();
-                localStorage.setItem('cestisLastSyncTime', lastSyncTime.toISOString());
+                CESTISStore.setItem('cestisLastSyncTime', lastSyncTime.toISOString());
                 updateLastSyncDisplay();
 
                 // Recalculate student totals from actual payments and persist
@@ -9899,7 +9963,7 @@
 
             // Update last sync time
             lastSyncTime = new Date();
-            localStorage.setItem('cestisLastSyncTime', lastSyncTime.toISOString());
+            CESTISStore.setItem('cestisLastSyncTime', lastSyncTime.toISOString());
             updateLastSyncDisplay();
 
             // Refresh UI
@@ -10106,8 +10170,8 @@
         // Prompt user to sync from cloud on login
         function promptSyncOnLogin() {
             // Check if we have a valid Google Drive token
-            const savedToken = localStorage.getItem('cestisGoogleAccessToken');
-            const savedExpiry = localStorage.getItem('cestisGoogleTokenExpiry');
+            const savedToken = CESTISStore.getItem('cestisGoogleAccessToken');
+            const savedExpiry = CESTISStore.getItem('cestisGoogleTokenExpiry');
 
             // Show prompt modal after a brief delay to let dashboard load
             setTimeout(() => {
@@ -10251,7 +10315,7 @@
         // Perform automatic sync on login
         async function performAutoSyncOnLogin() {
             // Initialize token if not already done
-            const savedToken = localStorage.getItem('cestisGoogleAccessToken');
+            const savedToken = CESTISStore.getItem('cestisGoogleAccessToken');
             if (savedToken) {
                 googleAccessToken = savedToken;
                 isCloudConnected = true;
@@ -10268,7 +10332,7 @@
             try {
                 // First try to find the backup file
                 if (!cloudFileId) {
-                    const savedFileId = localStorage.getItem('schoolFeeCloudFileId');
+                    const savedFileId = CESTISStore.getItem('schoolFeeCloudFileId');
                     if (savedFileId) {
                         cloudFileId = savedFileId;
                     } else {
@@ -10311,17 +10375,17 @@
 
                 if (backupData.data.students) {
                     students = backupData.data.students;
-                    localStorage.setItem('cestiSchoolFeeStudents', JSON.stringify(students));
+                    CESTISStore.setItem('cestiSchoolFeeStudents', JSON.stringify(students));
                 }
 
                 if (backupData.data.payments) {
                     payments = backupData.data.payments;
-                    localStorage.setItem('cestiSchoolFeePayments', JSON.stringify(payments));
+                    CESTISStore.setItem('cestiSchoolFeePayments', JSON.stringify(payments));
                 }
 
                 if (backupData.data.documents) {
                     documents = backupData.data.documents;
-                    localStorage.setItem('cestiSchoolFeeDocuments', JSON.stringify(documents));
+                    CESTISStore.setItem('cestiSchoolFeeDocuments', JSON.stringify(documents));
                 }
 
                 if (backupData.data.feeStructure) {
@@ -10331,7 +10395,7 @@
 
                 // Update sync tracking
                 lastSyncTime = new Date();
-                localStorage.setItem('cestisLastSyncTime', lastSyncTime.toISOString());
+                CESTISStore.setItem('cestisLastSyncTime', lastSyncTime.toISOString());
                 updateLastSyncDisplay();
 
                 // Update last saved by info
@@ -10365,8 +10429,8 @@
                 if (error.message.includes('invalid_token') || error.message.includes('Invalid Credentials')) {
                     showNotification('Google Drive session expired', 'error');
                     // Clear invalid token
-                    localStorage.removeItem('cestisGoogleAccessToken');
-                    localStorage.removeItem('cestisGoogleTokenExpiry');
+                    CESTISStore.removeItem('cestisGoogleAccessToken');
+                    CESTISStore.removeItem('cestisGoogleTokenExpiry');
                     updateCloudUI(false);
                 } else {
                     showNotification(`Sync failed: ${error.message}`, 'error');
@@ -10409,7 +10473,7 @@
 
             autoSyncEnabled = true;
             autoSyncSecondsRemaining = AUTO_SYNC_INTERVAL_MS / 1000;
-            localStorage.setItem('cestisAutoSyncEnabled', 'true');
+            CESTISStore.setItem('cestisAutoSyncEnabled', 'true');
 
             // Update UI
             updateAutoSyncUI();
@@ -10433,7 +10497,7 @@
         // Stop the auto-sync engine
         function stopAutoSync() {
             autoSyncEnabled = false;
-            localStorage.setItem('cestisAutoSyncEnabled', 'false');
+            CESTISStore.setItem('cestisAutoSyncEnabled', 'false');
 
             if (autoSyncIntervalId) {
                 clearInterval(autoSyncIntervalId);
@@ -10539,7 +10603,7 @@
             try {
                 // Find backup file if needed
                 if (!cloudFileId) {
-                    const savedFileId = localStorage.getItem('schoolFeeCloudFileId');
+                    const savedFileId = CESTISStore.getItem('schoolFeeCloudFileId');
                     if (savedFileId) {
                         cloudFileId = savedFileId;
                     } else {
@@ -10776,7 +10840,7 @@
                         if (uploadResponse.ok) {
                             const result = await uploadResponse.json();
                             cloudFileId = result.id;
-                            localStorage.setItem('schoolFeeCloudFileId', cloudFileId);
+                            CESTISStore.setItem('schoolFeeCloudFileId', cloudFileId);
                         }
                     }
 
@@ -10788,7 +10852,7 @@
 
                 // --- STEP 5: Update tracking ---
                 lastSyncTime = new Date();
-                localStorage.setItem('cestisLastSyncTime', lastSyncTime.toISOString());
+                CESTISStore.setItem('cestisLastSyncTime', lastSyncTime.toISOString());
                 updateLastSyncDisplay();
 
                 if (currentUser) {
@@ -10811,8 +10875,8 @@
 
                 if (error.message.includes('invalid_token') || error.message.includes('Invalid Credentials')) {
                     showNotification('Auto-sync stopped: Google Drive session expired', 'error');
-                    localStorage.removeItem('cestisGoogleAccessToken');
-                    localStorage.removeItem('cestisGoogleTokenExpiry');
+                    CESTISStore.removeItem('cestisGoogleAccessToken');
+                    CESTISStore.removeItem('cestisGoogleTokenExpiry');
                     updateCloudUI(false);
                     stopAutoSync();
                 } else {
@@ -10943,17 +11007,17 @@
 
                 if (backupData.data.students) {
                     students = backupData.data.students;
-                    localStorage.setItem('cestiSchoolFeeStudents', JSON.stringify(students));
+                    CESTISStore.setItem('cestiSchoolFeeStudents', JSON.stringify(students));
                 }
 
                 if (backupData.data.payments) {
                     payments = backupData.data.payments;
-                    localStorage.setItem('cestiSchoolFeePayments', JSON.stringify(payments));
+                    CESTISStore.setItem('cestiSchoolFeePayments', JSON.stringify(payments));
                 }
 
                 if (backupData.data.documents) {
                     documents = backupData.data.documents;
-                    localStorage.setItem('cestiSchoolFeeDocuments', JSON.stringify(documents));
+                    CESTISStore.setItem('cestiSchoolFeeDocuments', JSON.stringify(documents));
                 }
 
                 if (backupData.data.feeStructure) {
@@ -10963,7 +11027,7 @@
 
                 // Update sync tracking
                 lastSyncTime = new Date();
-                localStorage.setItem('cestisLastSyncTime', lastSyncTime.toISOString());
+                CESTISStore.setItem('cestisLastSyncTime', lastSyncTime.toISOString());
                 updateLastSyncDisplay();
 
                 // Update last saved by info
@@ -11440,17 +11504,17 @@
 
                 if (syncStudents && backupData.data.students) {
                     students = backupData.data.students;
-                    localStorage.setItem('cestiSchoolFeeStudents', JSON.stringify(students));
+                    CESTISStore.setItem('cestiSchoolFeeStudents', JSON.stringify(students));
                 }
 
                 if (syncPayments && backupData.data.payments) {
                     payments = backupData.data.payments;
-                    localStorage.setItem('cestiSchoolFeePayments', JSON.stringify(payments));
+                    CESTISStore.setItem('cestiSchoolFeePayments', JSON.stringify(payments));
                 }
 
                 if (syncDocuments && backupData.data.documents) {
                     documents = backupData.data.documents;
-                    localStorage.setItem('cestiSchoolFeeDocuments', JSON.stringify(documents));
+                    CESTISStore.setItem('cestiSchoolFeeDocuments', JSON.stringify(documents));
                 }
 
                 if (syncFeeStructure && backupData.data.feeStructure) {
@@ -11460,7 +11524,7 @@
 
                 // Update sync tracking
                 lastSyncTime = new Date();
-                localStorage.setItem('cestisLastSyncTime', lastSyncTime.toISOString());
+                CESTISStore.setItem('cestisLastSyncTime', lastSyncTime.toISOString());
                 updateLastSyncDisplay();
 
                 // Update last saved by info
@@ -11470,7 +11534,7 @@
 
                 // Cache the file ID if this becomes our primary sync file
                 cloudFileId = fileId;
-                localStorage.setItem('schoolFeeCloudFileId', cloudFileId);
+                CESTISStore.setItem('schoolFeeCloudFileId', cloudFileId);
 
                 // Recalculate student totals from actual payments and persist
                 recalculateStudentTotals();
@@ -11564,23 +11628,23 @@
                 if (!backup.version || !backup.data) throw new Error('Invalid backup format');
                 if (backup.data.users) {
                     users = backup.data.users;
-                    localStorage.setItem('cestiUsers', JSON.stringify(users));
+                    CESTISStore.setItem('cestiUsers', JSON.stringify(users));
                 }
                 if (backup.data.quickLinks) {
                     quickLinks = backup.data.quickLinks;
-                    localStorage.setItem('quickLinks', JSON.stringify(quickLinks));
+                    CESTISStore.setItem('quickLinks', JSON.stringify(quickLinks));
                 }
                 if (backup.data.mainLinks) {
                     mainLinks = backup.data.mainLinks;
-                    localStorage.setItem('mainLinks', JSON.stringify(mainLinks));
+                    CESTISStore.setItem('mainLinks', JSON.stringify(mainLinks));
                 }
                 if (backup.data.schoolSettings) {
                     schoolSettings = backup.data.schoolSettings;
-                    localStorage.setItem('schoolSettings', JSON.stringify(schoolSettings));
+                    CESTISStore.setItem('schoolSettings', JSON.stringify(schoolSettings));
                 }
                 lastSyncTime = new Date();
                 lastSavedBy = backup.savedBy || 'Unknown';
-                localStorage.setItem('schoolDashboardLastSyncTime', lastSyncTime.toISOString());
+                CESTISStore.setItem('schoolDashboardLastSyncTime', lastSyncTime.toISOString());
                 return true;
             } catch (error) {
                 console.error('Perform login page sync error:', error);
