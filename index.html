@@ -6016,6 +6016,196 @@ function reconcileStudentsFromAccounts() {
   return changed;
 }
 
+// ============================================================================
+// INTERNAL DATA VERIFICATION & DEDUPLICATION SYSTEM
+// ----------------------------------------------------------------------------
+// Scans all core data collections (students, attendance, profiles, exam
+// results, user accounts) and removes duplicated records so that the same
+// person never appears more than once on the dashboard. A duplicate is any
+// record that shares EITHER the same id OR the same normalised name+course as
+// an earlier record. When duplicates are found the most complete record is
+// kept and every reference to the discarded record is remapped to the survivor.
+// Runs automatically on login (see enterApp) and after each cloud sync.
+// ============================================================================
+
+// Normalises a string for safe comparison: lowercase, collapse internal
+// whitespace and trim. Used to detect records that are effectively identical.
+function dedupNormalizeKey(str) {
+  return (str == null ? '' : String(str)).toLowerCase().replace(/\s+/g, ' ').trim();
+}
+
+// Scores how "complete" a student record is so that, when two records describe
+// the same person, we keep the richest one and discard the emptier duplicate.
+function studentCompletenessScore(s) {
+  if (!s) return -1;
+  var score = 0;
+  if (s.certNo) score += 5;
+  if (s.certCollected) score += 2;
+  if (s.score !== '' && s.score != null) score += 2;
+  if (s.gpa && s.gpa !== '0.0') score += 2;
+  if (s.instructor) score += 1;
+  if (s.stage && s.stage !== 'training') score += 1;
+  if (s.gender) score += 0.5;
+  score += (Number(s.progress) || 0) / 1000;     // tie-breaker
+  score += (Number(s.attendance) || 0) / 100000; // finer tie-breaker
+  return score;
+}
+
+// Counts the meaningful (non-absent) marked days on an attendance record so we
+// can keep the record carrying the most real data when collapsing duplicates.
+function attendanceMarkedCount(r) {
+  if (!r || !r.days) return 0;
+  var n = 0;
+  ['Mon','Tue','Wed','Thu','Fri'].forEach(function(d) {
+    if (r.days[d] && r.days[d] !== 'absent') n++;
+  });
+  return n;
+}
+
+// Main verification routine. Returns true if any duplicate data was removed.
+function deduplicateAllData() {
+  var changed = false;
+  var idRemap = {}; // discardedStudentId -> survivingStudentId
+
+  // Resolve remap chains (a->b, b->c => a->c) safely.
+  function resolveId(id) {
+    var seen = {};
+    while (idRemap[id] && !seen[id]) { seen[id] = true; id = idRemap[id]; }
+    return id;
+  }
+
+  // ---- 1. Deduplicate students ----------------------------------------
+  if (Array.isArray(students) && students.length) {
+    var keptStudents = [];
+    var stuById = {};         // id -> kept student
+    var stuByNameCourse = {}; // "name|course" -> kept student
+
+    students.forEach(function(s) {
+      if (!s) return;
+      var hasName = dedupNormalizeKey(s.name) !== '';
+      var nameKey = dedupNormalizeKey(s.name) + '|' + dedupNormalizeKey(s.course);
+
+      var existing = (s.id != null && stuById[s.id]) ? stuById[s.id] : null;
+      if (!existing && hasName && stuByNameCourse[nameKey]) existing = stuByNameCourse[nameKey];
+
+      if (existing) {
+        // Choose the more complete record to survive.
+        var keep = existing, drop = s;
+        if (studentCompletenessScore(s) > studentCompletenessScore(existing)) {
+          keep = s; drop = existing;
+          var pos = keptStudents.indexOf(existing);
+          if (pos !== -1) keptStudents[pos] = s;
+        }
+        // Backfill a few useful fields from the discarded record.
+        if (!keep.certNo && drop.certNo) { keep.certNo = drop.certNo; keep.certDate = drop.certDate; }
+        if (!keep.instructor && drop.instructor) keep.instructor = drop.instructor;
+        if ((!keep.gender) && drop.gender) keep.gender = drop.gender;
+        // Record the id remap so references follow the survivor.
+        if (drop.id != null && keep.id != null && drop.id !== keep.id) {
+          idRemap[drop.id] = keep.id;
+        }
+        // Repoint lookup maps at the survivor.
+        if (keep.id != null) stuById[keep.id] = keep;
+        if (drop.id != null) stuById[drop.id] = keep;
+        if (hasName) stuByNameCourse[nameKey] = keep;
+        changed = true;
+        return;
+      }
+
+      keptStudents.push(s);
+      if (s.id != null) stuById[s.id] = s;
+      if (hasName) stuByNameCourse[nameKey] = s;
+    });
+
+    if (keptStudents.length !== students.length) {
+      students = keptStudents;
+      changed = true;
+    }
+  }
+
+  // ---- 2. Remap references from removed duplicate students ------------
+  if (Object.keys(idRemap).length) {
+    if (Array.isArray(userAccounts)) userAccounts.forEach(function(u) {
+      if (u && u.studentDataId && idRemap[u.studentDataId]) u.studentDataId = resolveId(u.studentDataId);
+    });
+    if (studentProfiles && typeof studentProfiles === 'object') {
+      Object.keys(idRemap).forEach(function(oldId) {
+        var newId = resolveId(oldId);
+        if (studentProfiles[oldId]) {
+          if (!studentProfiles[newId]) studentProfiles[newId] = studentProfiles[oldId];
+          delete studentProfiles[oldId];
+        }
+      });
+    }
+    if (Array.isArray(examResults)) examResults.forEach(function(r) {
+      if (r && r.studentId && idRemap[r.studentId]) r.studentId = resolveId(r.studentId);
+    });
+    if (Array.isArray(attendanceRecords)) attendanceRecords.forEach(function(r) {
+      if (r && r.studentId && idRemap[r.studentId]) r.studentId = resolveId(r.studentId);
+    });
+  }
+
+  // ---- 3. Deduplicate attendance records -----------------------------
+  if (Array.isArray(attendanceRecords) && attendanceRecords.length) {
+    var keptAtt = [];
+    var attById = {};
+    var attByNameCourse = {};
+
+    attendanceRecords.forEach(function(r) {
+      if (!r) return;
+      var hasName = dedupNormalizeKey(r.studentName) !== '';
+      var nameKey = dedupNormalizeKey(r.studentName) + '|' + dedupNormalizeKey(r.course);
+
+      var existing = (r.studentId != null && attById[r.studentId]) ? attById[r.studentId] : null;
+      if (!existing && hasName && attByNameCourse[nameKey]) existing = attByNameCourse[nameKey];
+
+      if (existing) {
+        // Keep whichever record carries more real attendance marks.
+        if (attendanceMarkedCount(r) > attendanceMarkedCount(existing)) {
+          var pos = keptAtt.indexOf(existing);
+          if (pos !== -1) keptAtt[pos] = r;
+          if (existing.studentId != null) attById[existing.studentId] = r;
+          if (r.studentId != null) attById[r.studentId] = r;
+          if (hasName) attByNameCourse[nameKey] = r;
+        }
+        changed = true;
+        return;
+      }
+
+      keptAtt.push(r);
+      if (r.studentId != null) attById[r.studentId] = r;
+      if (hasName) attByNameCourse[nameKey] = r;
+    });
+
+    if (keptAtt.length !== attendanceRecords.length) {
+      attendanceRecords = keptAtt;
+      changed = true;
+    }
+  }
+
+  // ---- 4. Deduplicate user accounts (same username) ------------------
+  if (Array.isArray(userAccounts) && userAccounts.length) {
+    var keptUsers = [];
+    var seenUsername = {};
+    userAccounts.forEach(function(u) {
+      if (!u) return;
+      var uname = dedupNormalizeKey(u.username);
+      if (uname && seenUsername[uname]) { changed = true; return; }
+      if (uname) seenUsername[uname] = true;
+      keptUsers.push(u);
+    });
+    if (keptUsers.length !== userAccounts.length) {
+      userAccounts = keptUsers;
+      changed = true;
+    }
+  }
+
+  if (changed && typeof updateSkillAreaCounts === 'function') {
+    updateSkillAreaCounts();
+  }
+  return changed;
+}
+
 loadState();
 applyGoogleVerificationMeta();
 // Check and apply maintenance mode on page load
@@ -6866,8 +7056,10 @@ function enterApp(role) {
       return;
     }
     currentRole = role;
-    // Ensure all student user accounts have corresponding student records
-    if (reconcileStudentsFromAccounts()) saveState();
+    // Internal verification: scrub duplicated data from the dashboard on login,
+    // then ensure all student user accounts have corresponding student records.
+    var _dedupChanged = deduplicateAllData();
+    if (reconcileStudentsFromAccounts() || _dedupChanged) saveState();
     document.getElementById('landingPage').style.display = 'none';
     document.getElementById('appShell').classList.add('active');
     document.body.style.overflow = 'hidden';
@@ -20661,6 +20853,9 @@ async function silentMergeFromBackup(fileId) {
     var reconciled = reconcileStudentsFromAccounts();
     if (reconciled) changed = true;
 
+    // Remove any duplicates introduced by merging cloud data.
+    if (deduplicateAllData()) changed = true;
+
     if (changed) {
       saveState();
     }
@@ -20853,7 +21048,11 @@ async function autoSyncOnLogin() {
 
     // 3. Reconcile: create student records for any user accounts missing them
     var reconciled = reconcileStudentsFromAccounts();
-    if (reconciled) { anyChanged = true; saveState(); }
+    if (reconciled) anyChanged = true;
+
+    // Remove any duplicates introduced by recovering/merging cloud data.
+    if (deduplicateAllData()) anyChanged = true;
+    if (anyChanged) saveState();
 
     // 4. Update sync timestamp
     lastSyncTime = new Date();
