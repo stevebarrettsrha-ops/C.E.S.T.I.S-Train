@@ -3583,6 +3583,27 @@ body.vc-fullscreen-mode.vc-host-only-mode .video-grid .video-tile:not(.vc-hoston
   font-size:13px; text-align:center; line-height:1.6;
 }
 .maint-preview-box .maint-preview-title { font-family:'Playfair Display',serif; font-size:18px; margin-bottom:6px; }
+/* ===== Google Drive token-expiry / cloud connectivity notification ===== */
+.cloud-notify{position:fixed;top:1.25rem;right:1.25rem;z-index:100000;width:370px;max-width:calc(100vw - 2rem);background:var(--bg-card);border:1px solid var(--border-light);border-radius:14px;box-shadow:0 12px 40px rgba(0,0,0,.55);transform:translateX(120%);transition:transform .4s cubic-bezier(.22,1,.36,1);overflow:hidden}
+.cloud-notify.show{transform:translateX(0)}
+.cloud-notify.warn{border-color:var(--accent)}
+.cloud-notify.error{border-color:var(--red)}
+.cloud-notify-bar{height:4px;width:100%}
+.cloud-notify.warn .cloud-notify-bar{background:var(--accent)}
+.cloud-notify.error .cloud-notify-bar{background:var(--red)}
+.cloud-notify-body{padding:1rem 1.25rem;display:flex;gap:.75rem;align-items:flex-start}
+.cloud-notify-icon{font-size:1.6rem;flex-shrink:0;line-height:1}
+.cloud-notify-content{flex:1;min-width:0}
+.cloud-notify-title{font-size:.9rem;font-weight:700;margin-bottom:.3rem;color:var(--text-primary)}
+.cloud-notify.warn .cloud-notify-title{color:var(--accent)}
+.cloud-notify.error .cloud-notify-title{color:var(--red)}
+.cloud-notify-msg{font-size:.8rem;color:var(--text-secondary);line-height:1.45}
+.cloud-notify-close{background:none;border:none;color:var(--text-muted);font-size:1.2rem;cursor:pointer;padding:0;line-height:1;flex-shrink:0}
+.cloud-notify-close:hover{color:var(--text-primary)}
+.cloud-notify-actions{padding:0 1.25rem 1rem;display:flex;gap:.5rem}
+.cloud-notify-actions .btn{font-size:.8rem;padding:.45rem .9rem}
+@keyframes notifyCountdown{from{width:100%}to{width:0%}}
+.cloud-notify-timer{height:3px;background:var(--text-muted);opacity:.3;border-radius:0 0 14px 14px}
 </style>
 <script src="https://unpkg.com/peerjs@1.5.4/dist/peerjs.min.js"></script>
 <!-- Google Identity Services for OAuth -->
@@ -18421,6 +18442,137 @@ function updateCloudUI(connected) {
   }
 }
 
+// ============================================
+// Google Drive token-expiry notifications
+// Ensures EVERY user is notified the moment their Google account
+// session / OAuth token expires, so they can reconnect and keep
+// data syncing. Local data is always preserved.
+// ============================================
+var _cloudNotifyTimer = null;
+var _cloudCheckInterval = null;
+var _cloudAuthExpiredNotified = false;
+
+function showCloudNotification(type, title, message, showConnect, autoDismissSec) {
+  dismissCloudNotification();
+  var el = document.createElement('div');
+  el.id = 'cloudNotifyPopup';
+  el.className = 'cloud-notify ' + type;
+  var icon = type === 'error' ? '⚠️' : type === 'warn' ? '🔌' : '☁️';
+  el.innerHTML =
+    '<div class="cloud-notify-bar"></div>' +
+    '<div class="cloud-notify-body">' +
+      '<div class="cloud-notify-icon">' + icon + '</div>' +
+      '<div class="cloud-notify-content">' +
+        '<div class="cloud-notify-title">' + title + '</div>' +
+        '<div class="cloud-notify-msg">' + message + '</div>' +
+      '</div>' +
+      '<button class="cloud-notify-close" onclick="dismissCloudNotification()">&times;</button>' +
+    '</div>' +
+    '<div class="cloud-notify-actions">' +
+      (showConnect ? '<button class="btn btn-success" onclick="dismissCloudNotification();connectToGoogleDrive()">Reconnect Now</button>' : '') +
+      '<button class="btn btn-secondary" onclick="dismissCloudNotification()">Dismiss</button>' +
+    '</div>' +
+    (autoDismissSec ? '<div class="cloud-notify-timer" style="animation:notifyCountdown ' + autoDismissSec + 's linear forwards"></div>' : '');
+  document.body.appendChild(el);
+  requestAnimationFrame(function(){ requestAnimationFrame(function(){ el.classList.add('show'); }); });
+  if (autoDismissSec) {
+    _cloudNotifyTimer = setTimeout(dismissCloudNotification, autoDismissSec * 1000);
+  }
+}
+
+function dismissCloudNotification() {
+  clearTimeout(_cloudNotifyTimer);
+  _cloudNotifyTimer = null;
+  var el = document.getElementById('cloudNotifyPopup');
+  if (el) {
+    el.classList.remove('show');
+    setTimeout(function(){ if (el && el.parentNode) el.remove(); }, 400);
+  }
+}
+
+// Called whenever the Google Drive token expires or is rejected (401/403).
+// Marks the cloud connection as down WITHOUT touching local data, stops the
+// background auto-save so it can't keep firing a dead token, and surfaces a
+// clear banner asking the user to reconnect their Google account.
+function handleCloudAuthExpired() {
+  var wasConnected = isCloudConnected || !!googleAccessToken;
+  if (typeof stopAutoSave === 'function') stopAutoSave();
+  googleAccessToken = null;
+  isCloudConnected = false;
+  try {
+    localStorage.removeItem('schoolDashboardGoogleAccessToken');
+    localStorage.removeItem('schoolDashboardGoogleTokenExpiry');
+  } catch (e) { /* ignore */ }
+  if (typeof updateCloudUI === 'function') updateCloudUI(false);
+  if (wasConnected && !_cloudAuthExpiredNotified) {
+    _cloudAuthExpiredNotified = true;
+    showCloudNotification('error', 'Google Session Expired',
+      'Your Google account session has expired and cloud sync has stopped. Your data is safe locally — click Reconnect to resume syncing with Google Drive.',
+      true, 0);
+  }
+}
+
+// Check cloud connection state and notify the user if something needs action.
+function checkCloudAndNotify(reason) {
+  // Don't nag users who have never connected to the cloud.
+  var hasEverConnected = localStorage.getItem('schoolDashboardGoogleAccessToken') ||
+                         localStorage.getItem('schoolDashboardCloudFileId') ||
+                         localStorage.getItem('schoolDashboardLastSyncTime');
+  if (!hasEverConnected) return;
+
+  if (!navigator.onLine) {
+    showCloudNotification('error', 'You Are Offline',
+      'Your internet connection is unavailable. Changes are saved locally and will sync once you reconnect.',
+      false, 0);
+    return;
+  }
+
+  if (!isCloudConnected) {
+    var savedExpiry = localStorage.getItem('schoolDashboardGoogleTokenExpiry');
+    var lastSync = localStorage.getItem('schoolDashboardLastSyncTime');
+    var detail;
+    if (reason === 'token_expired' || (savedExpiry && new Date(savedExpiry) <= new Date())) {
+      detail = 'Your Google account session has expired.';
+    } else if (reason === 'page_load') {
+      detail = 'Google Drive is not connected.';
+    } else {
+      detail = 'Google Drive connection was lost.';
+    }
+    if (lastSync) {
+      try { detail += ' Last sync: ' + getTimeAgo(new Date(lastSync)) + '.'; } catch (e) {}
+    }
+    showCloudNotification('warn', 'Cloud Sync Disconnected',
+      detail + ' Your data is only saved locally. Reconnect to back up and sync with Google Drive.',
+      true, 0);
+  }
+}
+
+// Real-time monitor: every 30s, check whether the saved token has expired
+// while the user is connected, and notify immediately if it has.
+function startCloudMonitor() {
+  if (_cloudCheckInterval) clearInterval(_cloudCheckInterval);
+  _cloudCheckInterval = setInterval(function() {
+    if (isCloudConnected && googleAccessToken) {
+      var savedExpiry = localStorage.getItem('schoolDashboardGoogleTokenExpiry');
+      if (savedExpiry && new Date(savedExpiry) <= new Date()) {
+        handleCloudAuthExpired();
+      }
+    }
+  }, 30000);
+}
+
+// Browser connectivity events
+window.addEventListener('offline', function() {
+  showCloudNotification('error', 'You Are Offline',
+    'Internet connection lost. Changes are saved locally until you reconnect.',
+    false, 10);
+});
+window.addEventListener('online', function() {
+  if (!isCloudConnected) {
+    setTimeout(function(){ checkCloudAndNotify('reconnected'); }, 1500);
+  }
+});
+
 // Update syncing status
 function setCloudSyncing(syncing) {
   const statusDot = document.getElementById('cloudStatusDot');
@@ -18629,6 +18781,8 @@ async function submitGoogleToken() {
 
     googleAccessToken = token;
     isCloudConnected = true;
+    _cloudAuthExpiredNotified = false;
+    dismissCloudNotification();
 
     const expiry = new Date();
     expiry.setHours(expiry.getHours() + 1);
@@ -18668,6 +18822,8 @@ async function submitGoogleToken() {
 async function handleGoogleAuthCallback(tokenResponse) {
   googleAccessToken = tokenResponse.access_token;
   isCloudConnected = true;
+  _cloudAuthExpiredNotified = false;
+  dismissCloudNotification();
 
   const expiry = new Date();
   expiry.setSeconds(expiry.getSeconds() + (tokenResponse.expires_in || 3600));
@@ -20793,10 +20949,9 @@ async function silentSaveToFolder(folderId, folderLabel, blob) {
     return true;
   } catch (err) {
     console.warn('[AutoSave] Error saving to ' + folderLabel + ':', err.message);
-    // Handle expired token
-    if (err.message && (err.message.includes('invalid_token') || err.message.includes('Invalid Credentials'))) {
-      stopAutoSave();
-      disconnectFromGoogleDrive();
+    // Handle expired token — notify the user and stop syncing the dead token.
+    if (err.message && (err.message.includes('invalid_token') || err.message.includes('Invalid Credentials') || err.message.indexOf('401') !== -1 || err.message.indexOf('403') !== -1)) {
+      handleCloudAuthExpired();
     }
     return false;
   }
@@ -20983,6 +21138,12 @@ function getTimeAgo(date) {
 initializeCloudSync();
 setTimeout(() => { initGoogleAuth(); }, 500);
 
+// Start the real-time Google token-expiry monitor, and check the cloud
+// connection shortly after load so previously-connected users are told
+// immediately if their session has expired.
+startCloudMonitor();
+setTimeout(function(){ checkCloudAndNotify('page_load'); }, 2500);
+
 // Disable login buttons until pre-login sync completes — but allow login if local accounts exist
 setTimeout(function() {
   if(loginSyncCompleted) return;
@@ -21040,6 +21201,8 @@ async function loginPageSync() {
     if (savedToken && savedExpiry && new Date(savedExpiry) > new Date()) {
       googleAccessToken = savedToken;
       isCloudConnected = true;
+      _cloudAuthExpiredNotified = false;
+      dismissCloudNotification();
     } else {
       // Need to authenticate — use Google OAuth popup
       updateLoginSyncStatus('Opening Google sign-in...', '');
@@ -21053,6 +21216,8 @@ async function loginPageSync() {
         }
         googleAccessToken = token;
         isCloudConnected = true;
+        _cloudAuthExpiredNotified = false;
+        dismissCloudNotification();
         updateLoginSyncStatus('Connected! Syncing data...', '');
       } catch (err) {
         updateLoginSyncStatus('Failed to connect: ' + (err.message || 'Unknown error') + '. Try again.', 'error');
@@ -21261,15 +21426,15 @@ function revalidateCloudSync() {
     if (!isCloudConnected || googleAccessToken !== savedToken) {
       googleAccessToken = savedToken;
       isCloudConnected = true;
+      _cloudAuthExpiredNotified = false;
+      dismissCloudNotification();
       updateCloudUI(true);
       console.log('[CloudSync] Token revalidated on page restore/focus');
     }
-  } else if (isCloudConnected) {
-    // Token expired — clear stale state so user is prompted to reconnect
-    googleAccessToken = null;
-    isCloudConnected = false;
-    updateCloudUI(false);
+  } else if (isCloudConnected || localStorage.getItem('schoolDashboardGoogleAccessToken')) {
+    // Token expired — clear stale state and notify the user to reconnect
     console.log('[CloudSync] Token expired — cleared stale connection state');
+    handleCloudAuthExpired();
   }
   // Re-initialize Google Identity Services client if needed
   if (!googleTokenClient) {
