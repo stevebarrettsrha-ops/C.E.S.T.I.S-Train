@@ -35305,14 +35305,13 @@ function ttUnmount(){
         // Start periodic auto-sync (every 5 minutes while clocked in)
         function startAutoSync() {
             stopAutoSync();
-            // Immediate sync on clock-in
+            // Immediate sync
             silentCloudSync();
-            // Then every 5 minutes
+            // Push to Drive every 10 seconds whenever connected
+            // (silentCloudSync no-ops while disconnected, then resumes once connected)
             autoSyncInterval = setInterval(() => {
-                if (currentSession && currentSession.status !== 'completed') {
-                    silentCloudSync();
-                }
-            }, 5 * 60 * 1000);
+                silentCloudSync();
+            }, 10 * 1000);
         }
 
         function stopAutoSync() {
@@ -38347,6 +38346,7 @@ function ttInitApp(){
         var tt=document.getElementById('themeText'); if(tt) tt.textContent='Light';
     }
     try { ttc_initializeCloudSync(); } catch(e){}
+    try { startAutoSync(); } catch(e){}  // 10-second Drive auto-sync (self-activates once connected)
     setTimeout(function(){ try{ ttc_initGoogleAuth(); }catch(e){} }, 500);
     setTimeout(function(){ try{ ttc_checkCloudAndNotify('page_load'); ttc_startCloudMonitor(); }catch(e){} }, 2000);
 }

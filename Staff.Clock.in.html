@@ -5271,14 +5271,13 @@
         // Start periodic auto-sync (every 5 minutes while clocked in)
         function startAutoSync() {
             stopAutoSync();
-            // Immediate sync on clock-in
+            // Immediate sync
             silentCloudSync();
-            // Then every 5 minutes
+            // Push to Drive every 10 seconds whenever connected
+            // (silentCloudSync no-ops while disconnected, then resumes once connected)
             autoSyncInterval = setInterval(() => {
-                if (currentSession && currentSession.status !== 'completed') {
-                    silentCloudSync();
-                }
-            }, 5 * 60 * 1000);
+                silentCloudSync();
+            }, 10 * 1000);
         }
 
         function stopAutoSync() {
@@ -8238,6 +8237,9 @@
 
             // Initialize cloud sync
             initializeCloudSync();
+
+            // Start the 10-second auto-sync loop (it self-activates once connected to Drive)
+            startAutoSync();
 
             // Initialize Google Auth after a short delay to ensure GIS library is loaded
             setTimeout(() => {
