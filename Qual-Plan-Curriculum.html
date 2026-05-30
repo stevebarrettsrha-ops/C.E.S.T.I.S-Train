@@ -232,6 +232,7 @@ var qpFileCache = {};       // folderId -> array of items (folders + files), or 
 var qpNav = {};             // programme rootFolderId -> breadcrumb [{id,name}]
 var qpNoticeShown = false;
 var QP_FOLDER_MIME = 'application/vnd.google-apps.folder';
+var QP_SHORTCUT_MIME = 'application/vnd.google-apps.shortcut';
 
 // Read the host LMS's Drive token (same-origin parent). Null if standalone / unset.
 function qpToken() {
@@ -389,8 +390,8 @@ function qpRenderListing(prog, result) {
   }
   var search = (document.getElementById('qpSearch').value || '').toLowerCase().trim();
   var match = function(f){ return !search || f.name.toLowerCase().indexOf(search) !== -1; };
-  var folders = result.filter(function(f){ return f.mimeType === QP_FOLDER_MIME && match(f); });
-  var files   = result.filter(function(f){ return f.mimeType !== QP_FOLDER_MIME && match(f); });
+  var folders = result.filter(function(f){ return f.isFolder && match(f); });
+  var files   = result.filter(function(f){ return !f.isFolder && match(f); });
 
   // Folders sort first, then files; both alphabetical (API already orders by name).
   if (!folders.length && !files.length) {
