@@ -290,7 +290,19 @@ function qpFileIcon(mime) {
   return '📄';
 }
 
-// List the (non-trashed) files inside a Drive folder. Cached per folder.
+// Normalise a Drive item, resolving shortcuts to their real target so that
+// shortcut-folders are navigable and shortcut-files open the underlying doc.
+function qpNormalize(f) {
+  var mime = f.mimeType, id = f.id;
+  if (mime === QP_SHORTCUT_MIME && f.shortcutDetails) {
+    mime = f.shortcutDetails.targetMimeType || mime;
+    id = f.shortcutDetails.targetId || id;
+  }
+  return { id: id, name: f.name, mimeType: mime, isFolder: mime === QP_FOLDER_MIME };
+}
+
+// List the (non-trashed) items inside a Drive folder (folders + files),
+// following pagination. Cached per folder.
 function qpListFolder(folderId) {
   if (qpFileCache[folderId]) return Promise.resolve(qpFileCache[folderId]);
   var token = qpToken();
@@ -298,20 +310,25 @@ function qpListFolder(folderId) {
     var err = new Error('no-auth');
     return Promise.resolve(err);
   }
-  var q = encodeURIComponent("'" + folderId + "' in parents and trashed=false");
-  var url = 'https://www.googleapis.com/drive/v3/files?q=' + q +
-    '&fields=files(id,name,mimeType,modifiedTime)&orderBy=name&pageSize=200' +
-    '&supportsAllDrives=true&includeItemsFromAllDrives=true';
-  if (!token && QP_API_KEY) url += '&key=' + encodeURIComponent(QP_API_KEY);
   var opts = token ? { headers: { 'Authorization': 'Bearer ' + token } } : {};
-  return fetch(url, opts)
-    .then(function(r){ if(!r.ok) throw new Error('http-' + r.status); return r.json(); })
-    .then(function(data){
-      var files = (data.files || []);
-      qpFileCache[folderId] = files;
-      return files;
-    })
-    .catch(function(e){ return e; });
+  var acc = [];
+  function page(pageToken) {
+    var q = encodeURIComponent("'" + folderId + "' in parents and trashed=false");
+    var url = 'https://www.googleapis.com/drive/v3/files?q=' + q +
+      '&fields=nextPageToken,files(id,name,mimeType,shortcutDetails(targetId,targetMimeType))' +
+      '&orderBy=folder,name&pageSize=1000&supportsAllDrives=true&includeItemsFromAllDrives=true';
+    if (pageToken) url += '&pageToken=' + encodeURIComponent(pageToken);
+    if (!token && QP_API_KEY) url += '&key=' + encodeURIComponent(QP_API_KEY);
+    return fetch(url, opts)
+      .then(function(r){ if(!r.ok) throw new Error('http-' + r.status); return r.json(); })
+      .then(function(data){
+        (data.files || []).forEach(function(f){ acc.push(qpNormalize(f)); });
+        if (data.nextPageToken) return page(data.nextPageToken);
+        qpFileCache[folderId] = acc;
+        return acc;
+      });
+  }
+  return page(null).catch(function(e){ return e; });
 }
 
 function qpPopoutUrl(fileId) {
