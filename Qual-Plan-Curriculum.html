@@ -16,6 +16,7 @@
     --green: #2ecc71;
     --green-dim: rgba(46,204,113,0.15);
     --blue: #3498db;
+    --red: #e74c3c;
     --text-primary: #e8edf3;
     --text-secondary: #8899aa;
     --text-muted: #556677;
@@ -57,48 +58,59 @@
   .qp-banner .ic { width:52px; height:52px; border-radius:12px; display:flex; align-items:center; justify-content:center; font-size:26px; flex-shrink:0; }
   .qp-banner h2 { font-size:19px; }
   .qp-banner span.sub { font-size:13px; color:var(--text-secondary); }
-  .qp-grid { display:grid; grid-template-columns:repeat(auto-fill, minmax(340px, 1fr)); gap:16px; margin-bottom:24px; }
+  .qp-grid { display:grid; grid-template-columns:repeat(auto-fill, minmax(360px, 1fr)); gap:16px; margin-bottom:24px; }
   .qp-card {
     background: var(--bg-card);
     border: 1px solid var(--border);
     border-radius: var(--radius);
     overflow: hidden;
-    transition: transform .2s, border-color .2s;
     display:flex; flex-direction:column;
   }
-  .qp-card:hover { border-color: var(--border-light); }
   .qp-card-head { display:flex; align-items:center; gap:12px; padding:16px 18px; border-bottom:1px solid var(--border); }
   .qp-card-head .ic { width:44px; height:44px; border-radius:10px; display:flex; align-items:center; justify-content:center; font-size:22px; flex-shrink:0; }
   .qp-card-head .nm { font-size:15px; font-weight:600; line-height:1.3; }
   .qp-badge { display:inline-block; font-size:10px; font-weight:600; text-transform:uppercase; letter-spacing:0.4px; padding:2px 8px; border-radius:20px; margin-top:5px; }
-  .qp-card-body { padding:14px 18px 16px; display:flex; flex-direction:column; gap:12px; flex:1; }
-  .qp-card-desc { font-size:12px; color:var(--text-muted); line-height:1.5; }
-  .qp-actions { display:flex; gap:8px; flex-wrap:wrap; margin-top:auto; }
-  .qp-btn {
-    background: var(--accent);
-    color: #1a1a1a;
-    border: none;
-    border-radius: var(--radius-sm);
-    padding: 8px 14px;
-    font-size: 12px;
-    font-weight: 600;
-    cursor: pointer;
-    text-decoration: none;
-    display: inline-flex;
-    align-items: center;
-    gap: 6px;
-    white-space: nowrap;
+  .qp-files { display:flex; flex-direction:column; }
+  .qp-file {
+    display:flex; align-items:center; gap:11px;
+    padding:11px 18px;
+    border-bottom:1px solid var(--border);
+    cursor:pointer;
+    transition: background .15s;
   }
-  .qp-btn:hover { filter: brightness(1.08); }
-  .qp-btn.secondary { background: transparent; color: var(--text-secondary); border: 1px solid var(--border-light); }
-  .qp-embed { margin-top:4px; display:none; }
-  .qp-embed.open { display:block; }
-  .qp-embed iframe { width:100%; height:360px; border:none; border-radius:var(--radius-sm); background:#fff; }
+  .qp-file:last-child { border-bottom:none; }
+  .qp-file:hover { background: var(--bg-card-hover); }
+  .qp-file .fic { width:30px; height:30px; border-radius:7px; display:flex; align-items:center; justify-content:center; font-size:15px; flex-shrink:0; }
+  .qp-file .fnm { flex:1; min-width:0; font-size:13px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+  .qp-file .fgo { font-size:11px; color:var(--text-muted); }
+  .qp-file:hover .fgo { color: var(--accent); }
+  .qp-files-msg { padding:16px 18px; font-size:12px; color:var(--text-muted); }
+  .qp-spinner { display:inline-block; width:14px; height:14px; border:2px solid var(--border-light); border-top-color:var(--accent); border-radius:50%; animation:qpspin .7s linear infinite; vertical-align:-2px; margin-right:8px; }
+  @keyframes qpspin { to { transform:rotate(360deg); } }
   .qp-section-title { font-size:13px; text-transform:uppercase; letter-spacing:0.5px; color:var(--text-muted); font-weight:600; margin:6px 0 12px; }
-  .qp-folder-wrap { background:var(--bg-card); border:1px solid var(--border); border-radius:var(--radius); padding:16px; }
-  .qp-folder-wrap iframe { width:100%; height:520px; border:none; border-radius:var(--radius-sm); background:#fff; }
   .qp-empty { text-align:center; color:var(--text-muted); padding:40px; }
-  @media (max-width: 600px) { .qp-grid { grid-template-columns:1fr; } body { padding:14px; } }
+  .qp-notice { background:rgba(231,76,60,0.10); border:1px solid rgba(231,76,60,0.3); color:#f3b6ae; border-radius:var(--radius-sm); padding:12px 14px; font-size:12px; margin-bottom:16px; line-height:1.5; }
+  /* Popout viewer */
+  .qp-modal-overlay {
+    position:fixed; inset:0; background:rgba(4,8,12,0.82); backdrop-filter:blur(3px);
+    display:none; align-items:center; justify-content:center; z-index:9999; padding:24px;
+  }
+  .qp-modal-overlay.open { display:flex; }
+  .qp-modal {
+    background:var(--bg-secondary); border:1px solid var(--border-light); border-radius:var(--radius);
+    width:100%; max-width:980px; height:88vh; display:flex; flex-direction:column;
+    box-shadow:0 24px 64px rgba(0,0,0,0.6); overflow:hidden;
+  }
+  .qp-modal-head { display:flex; align-items:center; gap:12px; padding:14px 18px; border-bottom:1px solid var(--border); }
+  .qp-modal-head .mt { flex:1; min-width:0; font-size:14px; font-weight:600; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+  .qp-modal-close {
+    background:transparent; border:1px solid var(--border-light); color:var(--text-secondary);
+    border-radius:var(--radius-sm); padding:7px 13px; font-size:13px; cursor:pointer; font-weight:600;
+  }
+  .qp-modal-close:hover { color:var(--text-primary); border-color:var(--text-secondary); }
+  .qp-modal-body { flex:1; background:#fff; }
+  .qp-modal-body iframe { width:100%; height:100%; border:none; }
+  @media (max-width: 600px) { .qp-grid { grid-template-columns:1fr; } body { padding:14px; } .qp-modal { height:92vh; } }
 </style>
 </head>
 <body>
@@ -111,6 +123,7 @@
 </div>
 
 <div id="qpBannerHost"></div>
+<div id="qpNoticeHost"></div>
 
 <div class="qp-controls" id="qpControls">
   <input type="text" class="qp-input" id="qpSearch" placeholder="Search programme or skill area…" oninput="qpRender()">
@@ -121,14 +134,15 @@
 
 <div class="qp-grid" id="qpGrid"></div>
 
-<div id="qpBrowseAll" style="display:none;">
-  <div class="qp-section-title">Browse the Full Qual Plan Library</div>
-  <div class="qp-folder-wrap">
-    <p style="font-size:12px;color:var(--text-muted);margin-bottom:10px;">
-      Master folder containing every programme. Documents are named so each qualification plan /
-      curriculum can be matched to its <strong>skill area</strong> and to the individual <strong>user</strong>.
-    </p>
-    <iframe id="qpFolderFrame" title="Qualification Plan Drive Library" loading="lazy"></iframe>
+<!-- Popout document viewer -->
+<div class="qp-modal-overlay" id="qpModal" onclick="if(event.target===this) qpCloseViewer()">
+  <div class="qp-modal">
+    <div class="qp-modal-head">
+      <div class="fic" style="font-size:18px;">📄</div>
+      <div class="mt" id="qpModalTitle">Document</div>
+      <button class="qp-modal-close" onclick="qpCloseViewer()">✕ Close</button>
+    </div>
+    <div class="qp-modal-body"><iframe id="qpModalFrame" title="Document viewer" allow="autoplay"></iframe></div>
   </div>
 </div>
 
@@ -136,22 +150,30 @@
 /* ============================================================================
    Qualification Plan / Curriculum viewer
    ----------------------------------------------------------------------------
-   Hosted as a standalone page and embedded inside the C.E.S.T.I.S LMS via an
-   iframe. Each programme's documents live in a dedicated Google Drive folder.
+   Lists the documents inside each programme's Google Drive folder and opens
+   them in an in-app popout viewer (Google's /preview embed) — users are never
+   redirected to Drive itself.
 
-   Access (driven by the ?role= / ?course= query params set by the LMS):
-     - student / instructor : only the programme folder(s) for their skill area,
-                              plus the general Short Courses (Job Certificate) folder.
-     - admin / adminstaff   : every programme, with a skill-area filter and the
-                              full master-library browser.
+   File enumeration uses, in order of preference:
+     1. The host LMS's Google OAuth token (window.parent.googleAccessToken),
+        available once an admin/staff member has connected Google Drive.
+     2. A Drive API key (QP_API_KEY below) — needed so signed-out users
+        (e.g. students on their own device) can still list the public,
+        "anyone with link" folders.
+
+   Access (from the ?role= / ?course= params set by the LMS):
+     - student / instructor : only their skill area's folder(s) + Short Courses.
+     - admin / adminstaff   : every programme, with a skill-area filter.
    ========================================================================= */
 
-// Master folder ("0000000 - QUAL PLAN") that contains all programme folders.
-var QUAL_PLAN_FOLDER_ID = '1xwBUcgAmiw6LR0oOq4cyqD-VoGQA2P_Z';
-var QUAL_PLAN_FOLDER_URL = 'https://drive.google.com/drive/folders/' + QUAL_PLAN_FOLDER_ID;
+// OPTIONAL: paste a Google Drive API key here so signed-out users can list the
+// public folders. Leave blank to rely solely on the connected admin/staff token.
+var QP_API_KEY = '';
 
-// Programme folders supplied for the qualification plans & curriculums.
-// `skillArea` maps each programme to one of the LMS skill areas; `general:true`
+// Master folder ("0000000 - QUAL PLAN") containing all programme folders.
+var QUAL_PLAN_FOLDER_ID = '1xwBUcgAmiw6LR0oOq4cyqD-VoGQA2P_Z';
+
+// Programme folders for the qualification plans & curriculums. `general:true`
 // programmes (Short Courses) are available to every user.
 var QUAL_PLAN_PROGRAMS = [
   { title:"000 Short Courses (Job Certificate)",            folderId:"1laQ3n9YRMXZ7kmXkAncxPNNlzXDdYqt0", skillArea:null,                      general:true },
@@ -164,7 +186,7 @@ var QUAL_PLAN_PROGRAMS = [
   { title:"Welding L3",                                     folderId:"1W4I6wpXPJ51grRPNW0EwNqjJ5a3wV1lV", skillArea:"Welding & Fabrication" }
 ];
 
-// The skill areas (mirrors the skillAreas list in the main LMS) for icon/colour.
+// Skill areas (mirrors the LMS list) for icon/colour.
 var skillAreas = [
   {id:1,name:"Welding & Fabrication",icon:"🔥",color:"#e74c3c",desc:"SMAW, MIG, TIG welding processes and metal fabrication"},
   {id:2,name:"Electrical Installation",icon:"⚡",color:"#f1c40f",desc:"Residential and commercial wiring, conduit bending, circuits"},
@@ -199,8 +221,19 @@ var qpRole = qpParam('role') || 'admin';
 var qpCourse = qpParam('course');
 var qpUserName = qpParam('student');
 var qpIsStaff = (qpRole === 'admin' || qpRole === 'adminstaff');
+var qpFileCache = {};       // folderId -> array of files (or Error)
+var qpNoticeShown = false;
 
-// Resolve a course / skill-area name to one of the defined skill areas (loose matching).
+// Read the host LMS's Drive token (same-origin parent). Null if standalone / unset.
+function qpToken() {
+  try {
+    if (window.parent && window.parent !== window && window.parent.googleAccessToken) {
+      return window.parent.googleAccessToken;
+    }
+  } catch (e) { /* cross-origin — ignore */ }
+  return null;
+}
+
 function qpFindSkillArea(name) {
   if (!name) return null;
   var cn = name.toLowerCase().trim();
@@ -236,28 +269,99 @@ function qpEsc(s) {
   });
 }
 
-function qpFolderUrl(id) { return 'https://drive.google.com/drive/folders/' + id; }
+function qpFileIcon(mime) {
+  mime = mime || '';
+  if (mime.indexOf('pdf') !== -1) return '📕';
+  if (mime.indexOf('document') !== -1 || mime.indexOf('word') !== -1) return '📄';
+  if (mime.indexOf('spreadsheet') !== -1 || mime.indexOf('excel') !== -1) return '📊';
+  if (mime.indexOf('presentation') !== -1 || mime.indexOf('powerpoint') !== -1) return '📑';
+  if (mime.indexOf('image') !== -1) return '🖼️';
+  if (mime.indexOf('folder') !== -1) return '📁';
+  return '📄';
+}
 
-// Lazy-load + toggle the inline embedded folder view for a programme card.
-function qpToggleEmbed(idx) {
-  var box = document.getElementById('qpEmbed-' + idx);
-  if (!box) return;
-  var frame = box.querySelector('iframe');
-  if (frame && !frame.getAttribute('data-loaded')) {
-    frame.src = 'https://drive.google.com/embeddedfolderview?id=' + frame.getAttribute('data-folder') + '#list';
-    frame.setAttribute('data-loaded', '1');
+// List the (non-trashed) files inside a Drive folder. Cached per folder.
+function qpListFolder(folderId) {
+  if (qpFileCache[folderId]) return Promise.resolve(qpFileCache[folderId]);
+  var token = qpToken();
+  if (!token && !QP_API_KEY) {
+    var err = new Error('no-auth');
+    return Promise.resolve(err);
   }
-  box.classList.toggle('open');
-  var btn = document.getElementById('qpToggleBtn-' + idx);
-  if (btn) btn.textContent = box.classList.contains('open') ? 'Hide documents' : 'Preview documents';
+  var q = encodeURIComponent("'" + folderId + "' in parents and trashed=false");
+  var url = 'https://www.googleapis.com/drive/v3/files?q=' + q +
+    '&fields=files(id,name,mimeType,modifiedTime)&orderBy=name&pageSize=200' +
+    '&supportsAllDrives=true&includeItemsFromAllDrives=true';
+  if (!token && QP_API_KEY) url += '&key=' + encodeURIComponent(QP_API_KEY);
+  var opts = token ? { headers: { 'Authorization': 'Bearer ' + token } } : {};
+  return fetch(url, opts)
+    .then(function(r){ if(!r.ok) throw new Error('http-' + r.status); return r.json(); })
+    .then(function(data){
+      var files = (data.files || []).filter(function(f){ return f.mimeType !== 'application/vnd.google-apps.folder'; });
+      qpFileCache[folderId] = files;
+      return files;
+    })
+    .catch(function(e){ return e; });
+}
+
+function qpPopoutUrl(fileId) {
+  return 'https://drive.google.com/file/d/' + fileId + '/preview';
+}
+
+function qpOpenViewer(fileId, fileName) {
+  document.getElementById('qpModalTitle').textContent = fileName || 'Document';
+  document.getElementById('qpModalFrame').src = qpPopoutUrl(fileId);
+  document.getElementById('qpModal').classList.add('open');
+}
+
+function qpCloseViewer() {
+  document.getElementById('qpModal').classList.remove('open');
+  document.getElementById('qpModalFrame').src = 'about:blank';
+}
+
+document.addEventListener('keydown', function(e){ if(e.key === 'Escape') qpCloseViewer(); });
+
+function qpRenderFiles(prog, idx, result) {
+  var host = document.getElementById('qpFiles-' + idx);
+  if (!host) return;
+  if (result instanceof Error) {
+    if (result.message === 'no-auth') {
+      host.innerHTML = '<div class="qp-files-msg">Documents can\'t be listed yet — sign in to Google Drive (admin) or add a Drive API key.</div>';
+      qpMaybeShowAuthNotice();
+    } else {
+      host.innerHTML = '<div class="qp-files-msg">Couldn\'t load documents for this folder.</div>';
+    }
+    return;
+  }
+  var search = (document.getElementById('qpSearch').value || '').toLowerCase().trim();
+  var files = result.filter(function(f){ return !search || f.name.toLowerCase().indexOf(search) !== -1; });
+  if (!files.length) {
+    host.innerHTML = '<div class="qp-files-msg">' + (result.length ? 'No documents match your search.' : 'No documents in this folder yet.') + '</div>';
+    return;
+  }
+  host.innerHTML = files.map(function(f){
+    return '<div class="qp-file" onclick="qpOpenViewer(\'' + qpEsc(f.id) + '\',\'' + qpEsc(f.name).replace(/'/g,'&#39;') + '\')">' +
+      '<div class="fic" style="background:rgba(240,165,0,0.12);">' + qpFileIcon(f.mimeType) + '</div>' +
+      '<div class="fnm" title="' + qpEsc(f.name) + '">' + qpEsc(f.name) + '</div>' +
+      '<div class="fgo">View ▸</div>' +
+    '</div>';
+  }).join('');
+}
+
+function qpMaybeShowAuthNotice() {
+  if (qpNoticeShown || qpToken() || QP_API_KEY) return;
+  qpNoticeShown = true;
+  document.getElementById('qpNoticeHost').innerHTML =
+    '<div class="qp-notice">Document previews need Google Drive access. An administrator should ' +
+    'connect Google Drive in the LMS, or a Drive API key can be added so signed-out users ' +
+    '(e.g. students) can view the public folders.</div>';
 }
 
 function qpCard(prog, idx) {
   var meta = prog.general
-    ? { name: 'Short Courses', icon: '🎓', color: '#f0a500', desc: 'Job Certificate short courses — open to all learners' }
+    ? { name: 'Short Courses', icon: '🎓', color: '#f0a500' }
     : qpSkillMeta(prog.skillArea);
   var rgb = qpHexToRgb(meta.color);
-  var folderUrl = qpFolderUrl(prog.folderId);
   var badgeLabel = prog.general ? 'All Learners' : meta.name;
   return '' +
     '<div class="qp-card">' +
@@ -268,15 +372,8 @@ function qpCard(prog, idx) {
           '<span class="qp-badge" style="background:rgba(' + rgb + ',0.18);color:' + meta.color + ';">' + qpEsc(badgeLabel) + '</span>' +
         '</div>' +
       '</div>' +
-      '<div class="qp-card-body">' +
-        '<div class="qp-card-desc">📋 Qualification plan &amp; 📚 curriculum documents. Files are named by skill area and user.</div>' +
-        '<div class="qp-actions">' +
-          '<a class="qp-btn" href="' + qpEsc(folderUrl) + '" target="_blank" rel="noopener">📁 Open Folder</a>' +
-          '<button class="qp-btn secondary" id="qpToggleBtn-' + idx + '" onclick="qpToggleEmbed(' + idx + ')">Preview documents</button>' +
-        '</div>' +
-        '<div class="qp-embed" id="qpEmbed-' + idx + '">' +
-          '<iframe data-folder="' + qpEsc(prog.folderId) + '" title="' + qpEsc(prog.title) + ' documents" loading="lazy"></iframe>' +
-        '</div>' +
+      '<div class="qp-files" id="qpFiles-' + idx + '">' +
+        '<div class="qp-files-msg"><span class="qp-spinner"></span>Loading documents…</div>' +
       '</div>' +
     '</div>';
 }
@@ -285,28 +382,28 @@ function qpRender() {
   var grid = document.getElementById('qpGrid');
   var search = (document.getElementById('qpSearch').value || '').toLowerCase().trim();
   var filter = document.getElementById('qpFilter').value;
-
-  // Determine which programmes this viewer may see.
   var allowedSkill = (!qpIsStaff && qpCourse) ? qpSkillMeta(qpCourse) : null;
 
   var list = QUAL_PLAN_PROGRAMS.filter(function(prog){
-    // Student / instructor: only their skill area + general programmes.
     if (allowedSkill && !prog.general && prog.skillArea !== allowedSkill.name) return false;
-    // Staff skill-area dropdown filter.
-    if (qpIsStaff && filter !== 'all' && !prog.general && prog.skillArea !== filter) return false;
-    if (qpIsStaff && filter !== 'all' && prog.general) return false;
-    if (!search) return true;
-    var hay = (prog.title + ' ' + (prog.skillArea || 'short courses')).toLowerCase();
-    return hay.indexOf(search) !== -1;
+    if (qpIsStaff && filter !== 'all' && (prog.general || prog.skillArea !== filter)) return false;
+    return true;
   });
 
-  grid.innerHTML = list.length
-    ? list.map(qpCard).join('')
-    : '<div class="qp-empty">No qualification plans available for this skill area yet.</div>';
+  if (!list.length) {
+    grid.innerHTML = '<div class="qp-empty">No qualification plans available for this skill area yet.</div>';
+    return;
+  }
+
+  grid.innerHTML = list.map(qpCard).join('');
+  // Load + render each visible folder's documents.
+  list.forEach(function(prog, idx){
+    qpListFolder(prog.folderId).then(function(res){ qpRenderFiles(prog, idx, res); });
+  });
 }
 
 function qpInit() {
-  // Build the skill-area filter from skill areas that actually have programmes.
+  // Build skill-area filter from skill areas that actually have programmes.
   var sel = document.getElementById('qpFilter');
   var withPrograms = {};
   QUAL_PLAN_PROGRAMS.forEach(function(p){ if (p.skillArea) withPrograms[p.skillArea] = true; });
@@ -317,15 +414,9 @@ function qpInit() {
   });
 
   if (qpIsStaff) {
-    // Staff: show the full master-library browser too.
-    var browse = document.getElementById('qpBrowseAll');
-    browse.style.display = '';
-    document.getElementById('qpFolderFrame').src =
-      'https://drive.google.com/embeddedfolderview?id=' + QUAL_PLAN_FOLDER_ID + '#list';
     document.getElementById('qpSubtitle').textContent =
       'All qualification plans & curriculums, organised by skill area.';
   } else {
-    // Student / instructor: lock to their skill area and show a welcome banner.
     document.getElementById('qpControls').style.display = 'none';
     var skill = qpCourse ? qpSkillMeta(qpCourse) : null;
     if (skill) {
