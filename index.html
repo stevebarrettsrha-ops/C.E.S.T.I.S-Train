@@ -7678,7 +7678,10 @@ var vcLastPage = '';
 // the SAME document as the rest of the app (native functions, data and session).
 // This mirrors the "mount into the active page" idea used by the Time Tracking app.
 var cestisFragmentCache = {};
+function cestisSafe(fn){ try { if(typeof window[fn] === 'function') window[fn](); } catch(e) { console.warn('[FeatureMount] '+fn+' error', e); } }
 var cestisFeatureConfig = {
+  // LMS Chat — Administrator has its own (richer) layout; student / instructor /
+  // admin-staff share one simpler "member" layout, tokenised by __PREFIX__.
   'lms-chat': {
     file: 'LMS-Chat.html',
     onMount: function(prefix) {
@@ -7687,12 +7690,41 @@ var cestisFeatureConfig = {
       }
     }
   },
+  'lms-chat-member': {
+    file: 'LMS-Chat-Member.html',
+    onMount: function(prefix) {
+      if(typeof lmsChatOnPageShow === 'function') {
+        try { lmsChatOnPageShow(prefix); } catch(e) { console.warn('lms-chat mount init error', e); }
+      }
+    }
+  },
+  // Video Conference — one fragment per role (their layouts differ).
   'video': {
     file: 'Video-Conference.html',
-    onMount: function(prefix) {
-      try { if(typeof renderAdminAllSessions === 'function') renderAdminAllSessions(); } catch(e) {}
-      try { if(typeof renderAdminClassSessions === 'function') renderAdminClassSessions(); } catch(e) {}
-      try { if(typeof renderAdminMeetingsList === 'function') renderAdminMeetingsList(); } catch(e) {}
+    onMount: function() {
+      cestisSafe('renderAdminAllSessions');
+      cestisSafe('renderAdminClassSessions');
+      cestisSafe('renderAdminMeetingsList');
+    }
+  },
+  'video-student': {
+    file: 'Video-Conference-Student.html',
+    onMount: function() {
+      cestisSafe('renderStudentClassSessions');
+      cestisSafe('renderStudentRecordings');
+    }
+  },
+  'video-instructor': {
+    file: 'Video-Conference-Instructor.html',
+    onMount: function() {
+      cestisSafe('renderInstructorClassSessions');
+      cestisSafe('renderInstructorRecordings');
+    }
+  },
+  'video-adminstaff': {
+    file: 'Video-Conference-AdminStaff.html',
+    onMount: function() {
+      cestisSafe('renderAdminMeetingsList');
     }
   }
 };
@@ -7780,13 +7812,10 @@ function showPage(pageId) {
   if(pageId === 'i-resources') renderInstructorCustomResources();
   if(pageId === 's-resources') renderStudentDriveResources();
   if(pageId === 's-assignments') renderStudentAssignmentsPage();
-  if(pageId === 's-video') renderStudentRecordings();
   if(pageId === 's-progress') renderStudentAssignments();
-  // Admin LMS Chat is loaded from LMS-Chat.html and initialised on mount (below).
-  // The other roles still render inline, so initialise them here.
-  if(pageId === 's-lms-chat') lmsChatOnPageShow('student');
-  if(pageId === 'i-lms-chat') lmsChatOnPageShow('instructor');
-  if(pageId === 'as-lms-chat') lmsChatOnPageShow('adminStaff');
+  // LMS Chat and Video Conference for every role are loaded from their own HTML
+  // files and initialised by the mount onMount hooks (see the .cestis-mount block
+  // near the end of showPage), so no inline init is needed here.
   if(pageId === 'training') { initTrainingAdminControls(); renderSkills(); updateCentreCount(); }
   // Mount the inlined Time Tracking app into the active page (replaces the old iframe).
   if(pageId === 'timetracking' || pageId === 'i-timetracking' || pageId === 'as-timetracking'){
@@ -9033,41 +9062,9 @@ function buildStudentPages() {
   </section>
 
   <!-- STUDENT VIDEO -->
+  <!-- C.E.S.T.I.S VIDEO CONFERENCE (STUDENT) — markup lives in Video-Conference-Student.html -->
   <section class="page" id="page-s-video">
-    <div class="card" id="sVideoClassList">
-      <div class="card-header"><h3>My Class Sessions</h3></div>
-      <div id="sClassSessionsList">
-      ${(function(){
-        var today = new Date().toISOString().split('T')[0];
-        var mySessions = classSessions.filter(function(cs) {
-          return instructorCourseMatch(cs.course, s.course) && cs.date >= today;
-        }).sort(function(a,b){ return (a.date+a.time).localeCompare(b.date+b.time); });
-        if(mySessions.length === 0) return '<p style="color:var(--text-muted);padding:16px;text-align:center;">No upcoming class sessions scheduled. Your instructor will create sessions when ready.</p>';
-        return mySessions.map(function(cs) {
-          var isToday = cs.date === today;
-          var hr = parseInt((cs.time||'0').split(':')[0]);
-          var period = hr >= 12 ? 'PM' : 'AM';
-          var displayHr = hr > 12 ? hr-12 : (hr === 0 ? 12 : hr);
-          var min = (cs.time||'00:00').split(':')[1] || '00';
-          var escapedName = (cs.name||cs.course).replace(/'/g,"&#39;");
-          var roomCodeParam = cs.roomCode ? ',\'' + cs.roomCode.replace(/'/g,"&#39;") + '\'' : '';
-          return '<div class="class-schedule-card"' + (isToday && cs.status==='live' ? ' style="border-color:rgba(231,76,60,0.3);"' : '') + '>' +
-            '<div class="class-time-block"' + (isToday && cs.status==='live' ? ' style="background:var(--red-dim);"' : '') + '><div class="time">' + displayHr + ':' + min + '</div><div class="period">' + period + '</div></div>' +
-            '<div style="flex:1;"><div style="font-size:14px;font-weight:600;">' + (cs.name || cs.course) + '</div><div style="font-size:12px;color:var(--text-muted);">' + (cs.createdBy || s.instructor) + ' &bull; ' + (cs.location||'Virtual') + (isToday ? '' : ' &bull; ' + cs.date) + '</div></div>' +
-            (isToday && cs.status==='live' ? '<span class="badge badge-red"><span class="live-dot"></span>&nbsp;Live Now</span><button class="btn btn-blue" onclick="enterVideoRoom(\'' + escapedName + '\',\'student\'' + roomCodeParam + ')">Join Class &rarr;</button>' :
-             '<span class="badge badge-blue">' + (cs.status==='completed'?'Completed':'Scheduled') + '</span>' +
-             (isToday ? '<button class="btn btn-blue btn-sm" onclick="enterVideoRoom(\'' + escapedName + '\',\'student\'' + roomCodeParam + ')">Join</button>' : '<button class="btn btn-secondary btn-sm" disabled>Not Started</button>')) +
-          '</div>';
-        }).join('');
-      })()}
-      </div>
-      <div class="card" style="margin-top:18px;"><div class="card-header"><h3>Past Recordings & Video Resources</h3></div>
-        <div id="sPastRecordingsList">
-          <p style="color:var(--text-muted);padding:16px;text-align:center;">Loading recordings...</p>
-        </div>
-      </div>
-    </div>
-    <div id="sVideoRoom" style="display:none;"></div>
+    <div class="cestis-mount" data-feature="video-student" data-prefix="student"></div>
   </section>
 
   <!-- STUDENT PROGRESS -->
@@ -9320,63 +9317,9 @@ function buildStudentPages() {
   </section>
 
   <!-- C.E.S.T.I.S LMS CHAT PAGE (STUDENT) -->
+  <!-- C.E.S.T.I.S LMS CHAT (STUDENT) — markup lives in LMS-Chat-Member.html -->
   <section class="page" id="page-s-lms-chat">
-    <div class="lms-chat-container" id="studentChatContainer">
-      <div class="lms-chat-sidebar" id="studentChatSidebar">
-        <div class="lms-chat-sidebar-header">
-          <h3>C.E.S.T.I.S Chat</h3>
-          <div class="lms-chat-sidebar-actions">
-            <button onclick="lmsChatOpenProfileModal()" title="My Profile">&#128100;</button>
-            <button onclick="lmsChatOpenMembersDirectory()" title="Members">&#128101;</button>
-          </div>
-        </div>
-        <div class="lms-chat-search">
-          <div class="lms-chat-search-wrap">
-            <input type="text" placeholder="Search chats..." oninput="lmsChatFilterRooms(this.value,'student')">
-          </div>
-        </div>
-        <div class="lms-chat-list" id="studentChatList"></div>
-      </div>
-      <div class="lms-chat-main" id="studentChatMain">
-        <div class="lms-chat-main-empty" id="studentChatEmpty">
-          <div class="empty-icon">&#128172;</div>
-          <h3>C.E.S.T.I.S LMS Chat</h3>
-          <p>Select a class chat to start messaging</p>
-        </div>
-        <div id="studentChatActive" style="display:none;flex:1;flex-direction:column;min-height:0;overflow:hidden;">
-          <div class="lms-chat-main-header">
-            <div class="lms-chat-main-header-left">
-              <button class="back-btn" onclick="lmsChatBack('student')">&#8592;</button>
-              <div class="lms-chat-avatar" id="studentChatHeaderAvatar"></div>
-              <div class="lms-chat-header-info">
-                <h4 id="studentChatHeaderName"></h4>
-                <span id="studentChatHeaderStatus"></span>
-              </div>
-            </div>
-            <div class="lms-chat-header-actions">
-              <button onclick="lmsChatStartVoiceCall()" title="Voice Call">&#128222;</button>
-              <button onclick="lmsChatStartVideoCall()" title="Video Call">&#128249;</button>
-              <button onclick="lmsChatToggleInfoPanel('student')" title="Chat Info">&#9432;</button>
-            </div>
-          </div>
-          <div class="lms-chat-messages" id="studentChatMessages"></div>
-          <div class="lms-chat-input-area">
-            <button class="emoji-btn" onclick="lmsChatToggleEmojiPicker('student')" title="Emoji">&#128522;</button>
-            <button class="attach-btn" onclick="lmsChatAttachFile()" title="Attach File">&#128206;</button>
-            <button class="poll-btn" onclick="lmsChatOpenPollModal('student')" title="Create Poll">&#128202;</button>
-            <textarea class="msg-input" id="studentChatInput" placeholder="Type a message..." rows="1" onkeydown="lmsChatInputKeydown(event,'student')"></textarea>
-            <button class="send-btn" onclick="lmsChatSendMessage('student')" title="Send">&#10148;</button>
-          </div>
-        </div>
-      </div>
-      <div class="lms-chat-info-panel" id="studentChatInfoPanel">
-        <div class="lms-chat-info-panel-header">
-          <h4>Chat Info</h4>
-          <button onclick="lmsChatToggleInfoPanel('student')">&#10005;</button>
-        </div>
-        <div class="lms-chat-info-body" id="studentChatInfoBody"></div>
-      </div>
-    </div>
+    <div class="cestis-mount" data-feature="lms-chat-member" data-prefix="student"></div>
   </section>
   `;
   } catch(err) {
@@ -9473,17 +9416,9 @@ function buildInstructorPages() {
   </section>
 
   <!-- INSTRUCTOR CLASSES -->
+  <!-- C.E.S.T.I.S VIDEO CONFERENCE (INSTRUCTOR) — markup lives in Video-Conference-Instructor.html -->
   <section class="page" id="page-i-classes">
-    <div style="display:flex;gap:12px;margin-bottom:18px;"><button class="btn btn-primary" onclick="openModal('createClassSessionModal')">+ New Class Session</button><button class="btn btn-secondary" onclick="openModal('createClassSessionModal')">Schedule Session</button></div>
-    <div class="card" id="iVideoClassList"><div class="card-header"><h3>My Class Sessions</h3></div>
-      <div id="iClassSessionsList"></div>
-    </div>
-    <div class="card" style="margin-top:18px;"><div class="card-header"><h3>Past Recordings</h3></div>
-      <div id="iPastRecordingsList">
-        <p style="color:var(--text-muted);padding:16px;text-align:center;">No past recordings yet. Completed class sessions will appear here.</p>
-      </div>
-    </div>
-    <div id="iVideoRoom" style="display:none;"></div>
+    <div class="cestis-mount" data-feature="video-instructor" data-prefix="instructor"></div>
   </section>
 
   <!-- INSTRUCTOR STUDENTS -->
@@ -9723,63 +9658,9 @@ function buildInstructorPages() {
   </section>
 
   <!-- C.E.S.T.I.S LMS CHAT PAGE (INSTRUCTOR) -->
+  <!-- C.E.S.T.I.S LMS CHAT (INSTRUCTOR) — markup lives in LMS-Chat-Member.html -->
   <section class="page" id="page-i-lms-chat">
-    <div class="lms-chat-container" id="instructorChatContainer">
-      <div class="lms-chat-sidebar" id="instructorChatSidebar">
-        <div class="lms-chat-sidebar-header">
-          <h3>C.E.S.T.I.S Chat</h3>
-          <div class="lms-chat-sidebar-actions">
-            <button onclick="lmsChatOpenProfileModal()" title="My Profile">&#128100;</button>
-            <button onclick="lmsChatOpenMembersDirectory()" title="Members">&#128101;</button>
-          </div>
-        </div>
-        <div class="lms-chat-search">
-          <div class="lms-chat-search-wrap">
-            <input type="text" placeholder="Search chats..." oninput="lmsChatFilterRooms(this.value,'instructor')">
-          </div>
-        </div>
-        <div class="lms-chat-list" id="instructorChatList"></div>
-      </div>
-      <div class="lms-chat-main" id="instructorChatMain">
-        <div class="lms-chat-main-empty" id="instructorChatEmpty">
-          <div class="empty-icon">&#128172;</div>
-          <h3>C.E.S.T.I.S LMS Chat</h3>
-          <p>Select a class chat to start messaging</p>
-        </div>
-        <div id="instructorChatActive" style="display:none;flex:1;flex-direction:column;min-height:0;overflow:hidden;">
-          <div class="lms-chat-main-header">
-            <div class="lms-chat-main-header-left">
-              <button class="back-btn" onclick="lmsChatBack('instructor')">&#8592;</button>
-              <div class="lms-chat-avatar" id="instructorChatHeaderAvatar"></div>
-              <div class="lms-chat-header-info">
-                <h4 id="instructorChatHeaderName"></h4>
-                <span id="instructorChatHeaderStatus"></span>
-              </div>
-            </div>
-            <div class="lms-chat-header-actions">
-              <button onclick="lmsChatStartVoiceCall()" title="Voice Call">&#128222;</button>
-              <button onclick="lmsChatStartVideoCall()" title="Video Call">&#128249;</button>
-              <button onclick="lmsChatToggleInfoPanel('instructor')" title="Chat Info">&#9432;</button>
-            </div>
-          </div>
-          <div class="lms-chat-messages" id="instructorChatMessages"></div>
-          <div class="lms-chat-input-area">
-            <button class="emoji-btn" onclick="lmsChatToggleEmojiPicker('instructor')" title="Emoji">&#128522;</button>
-            <button class="attach-btn" onclick="lmsChatAttachFile()" title="Attach File">&#128206;</button>
-            <button class="poll-btn" onclick="lmsChatOpenPollModal('instructor')" title="Create Poll">&#128202;</button>
-            <textarea class="msg-input" id="instructorChatInput" placeholder="Type a message..." rows="1" onkeydown="lmsChatInputKeydown(event,'instructor')"></textarea>
-            <button class="send-btn" onclick="lmsChatSendMessage('instructor')" title="Send">&#10148;</button>
-          </div>
-        </div>
-      </div>
-      <div class="lms-chat-info-panel" id="instructorChatInfoPanel">
-        <div class="lms-chat-info-panel-header">
-          <h4>Chat Info</h4>
-          <button onclick="lmsChatToggleInfoPanel('instructor')">&#10005;</button>
-        </div>
-        <div class="lms-chat-info-body" id="instructorChatInfoBody"></div>
-      </div>
-    </div>
+    <div class="cestis-mount" data-feature="lms-chat-member" data-prefix="instructor"></div>
   </section>
 
   <!-- ASSIGNED TASKS (Instructor) -->
@@ -17210,6 +17091,40 @@ function renderCalendar() {
 }
 
 // ============================== STUDENT RECORDINGS (DYNAMIC) ==============================
+// Renders the student "My Class Sessions" list on the Video Conference page.
+// (Previously built inline in the page template; the markup now lives in
+// Video-Conference-Student.html so it is populated here on mount.)
+function renderStudentClassSessions() {
+  var container = document.getElementById('sClassSessionsList');
+  if (!container) return;
+  var s = currentStudent;
+  if (!s) { container.innerHTML = '<p style="color:var(--text-muted);padding:16px;text-align:center;">No student data available.</p>'; return; }
+  var today = new Date().toISOString().split('T')[0];
+  var mySessions = classSessions.filter(function(cs) {
+    return instructorCourseMatch(cs.course, s.course) && cs.date >= today;
+  }).sort(function(a,b){ return (a.date+a.time).localeCompare(b.date+b.time); });
+  if(mySessions.length === 0) {
+    container.innerHTML = '<p style="color:var(--text-muted);padding:16px;text-align:center;">No upcoming class sessions scheduled. Your instructor will create sessions when ready.</p>';
+    return;
+  }
+  container.innerHTML = mySessions.map(function(cs) {
+    var isToday = cs.date === today;
+    var hr = parseInt((cs.time||'0').split(':')[0]);
+    var period = hr >= 12 ? 'PM' : 'AM';
+    var displayHr = hr > 12 ? hr-12 : (hr === 0 ? 12 : hr);
+    var min = (cs.time||'00:00').split(':')[1] || '00';
+    var escapedName = (cs.name||cs.course).replace(/'/g,"&#39;");
+    var roomCodeParam = cs.roomCode ? ',\'' + cs.roomCode.replace(/'/g,"&#39;") + '\'' : '';
+    return '<div class="class-schedule-card"' + (isToday && cs.status==='live' ? ' style="border-color:rgba(231,76,60,0.3);"' : '') + '>' +
+      '<div class="class-time-block"' + (isToday && cs.status==='live' ? ' style="background:var(--red-dim);"' : '') + '><div class="time">' + displayHr + ':' + min + '</div><div class="period">' + period + '</div></div>' +
+      '<div style="flex:1;"><div style="font-size:14px;font-weight:600;">' + (cs.name || cs.course) + '</div><div style="font-size:12px;color:var(--text-muted);">' + (cs.createdBy || s.instructor) + ' &bull; ' + (cs.location||'Virtual') + (isToday ? '' : ' &bull; ' + cs.date) + '</div></div>' +
+      (isToday && cs.status==='live' ? '<span class="badge badge-red"><span class="live-dot"></span>&nbsp;Live Now</span><button class="btn btn-blue" onclick="enterVideoRoom(\'' + escapedName + '\',\'student\'' + roomCodeParam + ')">Join Class &rarr;</button>' :
+       '<span class="badge badge-blue">' + (cs.status==='completed'?'Completed':'Scheduled') + '</span>' +
+       (isToday ? '<button class="btn btn-blue btn-sm" onclick="enterVideoRoom(\'' + escapedName + '\',\'student\'' + roomCodeParam + ')">Join</button>' : '<button class="btn btn-secondary btn-sm" disabled>Not Started</button>')) +
+    '</div>';
+  }).join('');
+}
+
 function renderStudentRecordings() {
   var container = document.getElementById('sPastRecordingsList');
   if (!container) return;
@@ -25642,57 +25557,9 @@ function buildAdminStaffPages() {
   '</section>';
 
   // ---- LMS Chat Page ----
+  // LMS Chat (Admin Staff) — markup lives in LMS-Chat-Member.html, mounted on show.
   html += '<section class="page" id="page-as-lms-chat">' +
-    '<div class="lms-chat-container" id="adminStaffChatContainer">' +
-      '<div class="lms-chat-sidebar" id="adminStaffChatSidebar">' +
-        '<div class="lms-chat-sidebar-header"><h3>C.E.S.T.I.S Chat</h3>' +
-          '<div class="lms-chat-sidebar-actions"><button onclick="lmsChatOpenProfileModal()" title="My Profile">&#128100;</button><button onclick="lmsChatOpenMembersDirectory()" title="Members">&#128101;</button></div>' +
-        '</div>' +
-        '<div class="lms-chat-search"><div class="lms-chat-search-wrap">' +
-          '<input type="text" placeholder="Search chats..." oninput="lmsChatFilterRooms(this.value,\'adminStaff\')">' +
-        '</div></div>' +
-        '<div class="lms-chat-list" id="adminStaffChatList"></div>' +
-      '</div>' +
-      '<div class="lms-chat-main" id="adminStaffChatMain">' +
-        '<div class="lms-chat-main-empty" id="adminStaffChatEmpty">' +
-          '<div class="empty-icon">&#128172;</div>' +
-          '<h3>C.E.S.T.I.S LMS Chat</h3>' +
-          '<p>Select a class chat to start messaging</p>' +
-        '</div>' +
-        '<div id="adminStaffChatActive" style="display:none;flex:1;flex-direction:column;min-height:0;overflow:hidden;">' +
-          '<div class="lms-chat-main-header">' +
-            '<div class="lms-chat-main-header-left">' +
-              '<button class="back-btn" onclick="lmsChatBack(\'adminStaff\')">&#8592;</button>' +
-              '<div class="lms-chat-avatar" id="adminStaffChatHeaderAvatar"></div>' +
-              '<div class="lms-chat-header-info">' +
-                '<h4 id="adminStaffChatHeaderName"></h4>' +
-                '<span id="adminStaffChatHeaderStatus"></span>' +
-              '</div>' +
-            '</div>' +
-            '<div class="lms-chat-header-actions">' +
-              '<button onclick="lmsChatStartVoiceCall()" title="Voice Call">&#128222;</button>' +
-              '<button onclick="lmsChatStartVideoCall()" title="Video Call">&#128249;</button>' +
-              '<button onclick="lmsChatToggleInfoPanel(\'adminStaff\')" title="Chat Info">&#9432;</button>' +
-            '</div>' +
-          '</div>' +
-          '<div class="lms-chat-messages" id="adminStaffChatMessages"></div>' +
-          '<div class="lms-chat-input-area">' +
-            '<button class="emoji-btn" onclick="lmsChatToggleEmojiPicker(\'adminStaff\')" title="Emoji">&#128522;</button>' +
-            '<button class="attach-btn" onclick="lmsChatAttachFile()" title="Attach File">&#128206;</button>' +
-            '<button class="poll-btn" onclick="lmsChatOpenPollModal(\'adminStaff\')" title="Create Poll">&#128202;</button>' +
-            '<textarea class="msg-input" id="adminStaffChatInput" placeholder="Type a message..." rows="1" onkeydown="lmsChatInputKeydown(event,\'adminStaff\')"></textarea>' +
-            '<button class="send-btn" onclick="lmsChatSendMessage(\'adminStaff\')" title="Send">&#10148;</button>' +
-          '</div>' +
-        '</div>' +
-      '</div>' +
-      '<div class="lms-chat-info-panel" id="adminStaffChatInfoPanel">' +
-        '<div class="lms-chat-info-panel-header">' +
-          '<h4>Chat Info</h4>' +
-          '<button onclick="lmsChatToggleInfoPanel(\'adminStaff\')">&#10005;</button>' +
-        '</div>' +
-        '<div class="lms-chat-info-body" id="adminStaffChatInfoBody"></div>' +
-      '</div>' +
-    '</div>' +
+    '<div class="cestis-mount" data-feature="lms-chat-member" data-prefix="adminStaff"></div>' +
   '</section>';
 
   // ---- Support Messages Page ----
@@ -25713,26 +25580,10 @@ function buildAdminStaffPages() {
   // ---- Conditional Access Pages (Admin Staff) ----
 
   // Video Conference
+  // Video Conference (Admin Staff) — markup lives in Video-Conference-AdminStaff.html,
+  // mounted on show; the meetings table is filled by renderAdminMeetingsList().
   html += '<section class="page" id="page-as-video">' +
-    '<div id="asVideoContent">' +
-      '<div class="card" style="margin-bottom:18px;border-color:var(--purple);">' +
-        '<div class="card-header"><h3 style="color:var(--purple);">Admin Meetings</h3><span style="font-size:12px;color:var(--text-muted);">Meetings for Administrator &amp; Admin Staff</span></div>' +
-        '<div class="table-wrapper"><table><thead><tr><th>Meeting</th><th>Scheduled By</th><th>Date &amp; Time</th><th>Duration</th><th>Action</th></tr></thead><tbody id="asAdminMeetingsList">' +
-          (function(){ if(adminMeetings.length===0) return '<tr><td colspan="5" style="text-align:center;color:var(--text-muted);padding:24px;">No admin meetings scheduled.</td></tr>'; return adminMeetings.map(function(m){ var ts=m.time?new Date('2000-01-01T'+m.time).toLocaleTimeString([],{hour:'numeric',minute:'2-digit'}):m.time; var en=m.title.replace(/\'/g,"\\'"); return '<tr><td><strong>'+m.title+'</strong>'+(m.description?'<div style="font-size:11px;color:var(--text-muted);margin-top:2px;">'+m.description.substring(0,60)+(m.description.length>60?'...':'')+'</div>':'')+'</td><td>'+(m.createdBy||'Admin')+'</td><td>'+m.date+' '+ts+'</td><td>'+m.duration+'min</td><td><button class="btn btn-sm btn-primary" onclick="enterVideoRoom(\''+en+'\',\'adminstaff\')">Join</button></td></tr>'; }).join(''); })() +
-        '</tbody></table></div>' +
-      '</div>' +
-      '<div class="card">' +
-        '<div class="card-header"><h3>Join a Meeting</h3></div>' +
-        '<div style="padding:20px;text-align:center;">' +
-          '<p style="color:var(--text-muted);font-size:13px;margin-bottom:16px;">Enter a room code shared by the meeting host to join</p>' +
-          '<div style="display:flex;gap:8px;align-items:center;justify-content:center;">' +
-            '<input type="text" class="form-control" id="as-vc-join-code" placeholder="ABC123" maxlength="6" style="font-family:monospace;font-size:20px;letter-spacing:4px;text-align:center;text-transform:uppercase;width:200px;" onkeyup="this.value=this.value.toUpperCase();if(event.key===\'Enter\')asJoinMeetingByCode()">' +
-            '<button class="btn btn-primary" onclick="asJoinMeetingByCode()">Join</button>' +
-          '</div>' +
-        '</div>' +
-      '</div>' +
-    '</div>' +
-    '<div id="asVideoRoom" style="display:none;"></div>' +
+    '<div class="cestis-mount" data-feature="video-adminstaff" data-prefix="adminstaff"></div>' +
   '</section>';
 
   // Student Progress

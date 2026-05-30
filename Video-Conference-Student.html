@@ -1,0 +1,32 @@
+<!--
+  ============================================================================
+  Video-Conference-Student.html  —  C.E.S.T.I.S Video Conference (Student) UI fragment
+  ----------------------------------------------------------------------------
+  Markup for the Student "My Classes" / Video Conference page. Fetched by
+  index.html and injected into the page's mount slot
+  (<div class="cestis-mount" data-feature="video-student" data-prefix="student">),
+  so it runs inside the main app — no iframe.
+
+  The two lists are filled on mount by renderStudentClassSessions() and
+  renderStudentRecordings() in index.html, so keep the ids
+  sClassSessionsList / sPastRecordingsList and the empty <div id="sVideoRoom"> intact.
+
+  Notes:
+   • All video JavaScript (enterVideoRoom, etc.) and CSS remain in index.html.
+   • This fragment is injected with innerHTML: a <style> block here WILL apply,
+     but <script> tags will NOT run. Put any JS changes in index.html.
+  ============================================================================
+-->
+<div class="card" id="sVideoClassList">
+  <div class="card-header"><h3>My Class Sessions</h3></div>
+  <div id="sClassSessionsList">
+    <p style="color:var(--text-muted);padding:16px;text-align:center;">Loading class sessions...</p>
+  </div>
+  <div class="card" style="margin-top:18px;">
+    <div class="card-header"><h3>Past Recordings &amp; Video Resources</h3></div>
+    <div id="sPastRecordingsList">
+      <p style="color:var(--text-muted);padding:16px;text-align:center;">Loading recordings...</p>
+    </div>
+  </div>
+</div>
+<div id="sVideoRoom" style="display:none;"></div>

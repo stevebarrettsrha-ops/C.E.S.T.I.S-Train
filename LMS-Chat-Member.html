@@ -1,0 +1,81 @@
+<!--
+  ============================================================================
+  LMS-Chat-Member.html  —  C.E.S.T.I.S LMS Chat UI fragment (Student / Instructor / Admin Staff)
+  ----------------------------------------------------------------------------
+  Shared chat layout for the three "member" roles. It is fetched by index.html
+  and injected into the page's mount slot
+  (<div class="cestis-mount" data-feature="lms-chat-member" data-prefix="...">),
+  so it runs inside the main app and uses all the existing lmsChat* functions,
+  data and session — no iframe.
+
+  The literal token __PREFIX__ is replaced on mount with the role prefix:
+    student  ->  page-s-lms-chat
+    instructor -> page-i-lms-chat
+    adminStaff -> page-as-lms-chat
+
+  Edit this one file to change the chat layout for all three member roles.
+
+  Notes:
+   • The Administrator chat has its own (richer) layout in LMS-Chat.html.
+   • All chat JavaScript (lmsChat* functions) and CSS (.lms-chat-*) live in
+     index.html — keep using them via the same onclick handlers.
+   • This fragment is injected with innerHTML: a <style> block here WILL apply,
+     but <script> tags will NOT run. Put any JS changes in index.html.
+  ============================================================================
+-->
+<div class="lms-chat-container" id="__PREFIX__ChatContainer">
+  <div class="lms-chat-sidebar" id="__PREFIX__ChatSidebar">
+    <div class="lms-chat-sidebar-header">
+      <h3>C.E.S.T.I.S Chat</h3>
+      <div class="lms-chat-sidebar-actions">
+        <button onclick="lmsChatOpenProfileModal()" title="My Profile">&#128100;</button>
+        <button onclick="lmsChatOpenMembersDirectory()" title="Members">&#128101;</button>
+      </div>
+    </div>
+    <div class="lms-chat-search">
+      <div class="lms-chat-search-wrap">
+        <input type="text" placeholder="Search chats..." oninput="lmsChatFilterRooms(this.value,'__PREFIX__')">
+      </div>
+    </div>
+    <div class="lms-chat-list" id="__PREFIX__ChatList"></div>
+  </div>
+  <div class="lms-chat-main" id="__PREFIX__ChatMain">
+    <div class="lms-chat-main-empty" id="__PREFIX__ChatEmpty">
+      <div class="empty-icon">&#128172;</div>
+      <h3>C.E.S.T.I.S LMS Chat</h3>
+      <p>Select a class chat to start messaging</p>
+    </div>
+    <div id="__PREFIX__ChatActive" style="display:none;flex:1;flex-direction:column;min-height:0;overflow:hidden;">
+      <div class="lms-chat-main-header">
+        <div class="lms-chat-main-header-left">
+          <button class="back-btn" onclick="lmsChatBack('__PREFIX__')">&#8592;</button>
+          <div class="lms-chat-avatar" id="__PREFIX__ChatHeaderAvatar"></div>
+          <div class="lms-chat-header-info">
+            <h4 id="__PREFIX__ChatHeaderName"></h4>
+            <span id="__PREFIX__ChatHeaderStatus"></span>
+          </div>
+        </div>
+        <div class="lms-chat-header-actions">
+          <button onclick="lmsChatStartVoiceCall()" title="Voice Call">&#128222;</button>
+          <button onclick="lmsChatStartVideoCall()" title="Video Call">&#128249;</button>
+          <button onclick="lmsChatToggleInfoPanel('__PREFIX__')" title="Chat Info">&#9432;</button>
+        </div>
+      </div>
+      <div class="lms-chat-messages" id="__PREFIX__ChatMessages"></div>
+      <div class="lms-chat-input-area">
+        <button class="emoji-btn" onclick="lmsChatToggleEmojiPicker('__PREFIX__')" title="Emoji">&#128522;</button>
+        <button class="attach-btn" onclick="lmsChatAttachFile()" title="Attach File">&#128206;</button>
+        <button class="poll-btn" onclick="lmsChatOpenPollModal('__PREFIX__')" title="Create Poll">&#128202;</button>
+        <textarea class="msg-input" id="__PREFIX__ChatInput" placeholder="Type a message..." rows="1" onkeydown="lmsChatInputKeydown(event,'__PREFIX__')"></textarea>
+        <button class="send-btn" onclick="lmsChatSendMessage('__PREFIX__')" title="Send">&#10148;</button>
+      </div>
+    </div>
+  </div>
+  <div class="lms-chat-info-panel" id="__PREFIX__ChatInfoPanel">
+    <div class="lms-chat-info-panel-header">
+      <h4>Chat Info</h4>
+      <button onclick="lmsChatToggleInfoPanel('__PREFIX__')">&#10005;</button>
+    </div>
+    <div class="lms-chat-info-body" id="__PREFIX__ChatInfoBody"></div>
+  </div>
+</div>

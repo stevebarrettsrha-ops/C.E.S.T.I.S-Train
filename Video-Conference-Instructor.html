@@ -1,0 +1,34 @@
+<!--
+  ============================================================================
+  Video-Conference-Instructor.html  —  C.E.S.T.I.S Video Conference (Instructor) UI fragment
+  ----------------------------------------------------------------------------
+  Markup for the Instructor "My Classes" / Video Conference page. Fetched by
+  index.html and injected into the page's mount slot
+  (<div class="cestis-mount" data-feature="video-instructor" data-prefix="instructor">),
+  so it runs inside the main app — no iframe.
+
+  The two lists are filled on mount by renderInstructorClassSessions() and
+  renderInstructorRecordings() in index.html, so keep the ids
+  iClassSessionsList / iPastRecordingsList and the empty <div id="iVideoRoom"> intact.
+
+  Notes:
+   • All video JavaScript (enterVideoRoom, etc.) and CSS remain in index.html.
+   • This fragment is injected with innerHTML: a <style> block here WILL apply,
+     but <script> tags will NOT run. Put any JS changes in index.html.
+  ============================================================================
+-->
+<div style="display:flex;gap:12px;margin-bottom:18px;">
+  <button class="btn btn-primary" onclick="openModal('createClassSessionModal')">+ New Class Session</button>
+  <button class="btn btn-secondary" onclick="openModal('createClassSessionModal')">Schedule Session</button>
+</div>
+<div class="card" id="iVideoClassList">
+  <div class="card-header"><h3>My Class Sessions</h3></div>
+  <div id="iClassSessionsList"></div>
+</div>
+<div class="card" style="margin-top:18px;">
+  <div class="card-header"><h3>Past Recordings</h3></div>
+  <div id="iPastRecordingsList">
+    <p style="color:var(--text-muted);padding:16px;text-align:center;">No past recordings yet. Completed class sessions will appear here.</p>
+  </div>
+</div>
+<div id="iVideoRoom" style="display:none;"></div>
