@@ -183,7 +183,16 @@ var QUAL_PLAN_FOLDER_ID = '1xwBUcgAmiw6LR0oOq4cyqD-VoGQA2P_Z';
 // Programme folders for the qualification plans & curriculums. `general:true`
 // programmes (Short Courses) are available to every user.
 var QUAL_PLAN_PROGRAMS = [
-  { title:"000 Short Courses (Job Certificate)",            folderId:"1laQ3n9YRMXZ7kmXkAncxPNNlzXDdYqt0", skillArea:null,                      general:true },
+  { title:"000 Short Courses (Job Certificate)",            folderId:"1laQ3n9YRMXZ7kmXkAncxPNNlzXDdYqt0", skillArea:null,                      general:true,
+    subfolders:[
+      { name:"01 Domestic Electrical Technician",   folderId:"1lynuNtNXuiQdEPPk_F0d65YdCGrQi1nW" },
+      { name:"02 Hair Braider and Weaver",          folderId:"1WDe3uU1SXyOv9FjKANKuAmXJNhJkGgQr" },
+      { name:"03 Hair Stylist",                     folderId:"1hTrsWi8nffTX-n7-eKvWf8DYnnMlnBjU" },
+      { name:"04 Makeup Technician",                folderId:"1lh-69VXDpHi-w0QPGxF2RF7nLhog0lyK" },
+      { name:"05 Nail Care Attendant",              folderId:"1d-a6IECJdJgXD9xTbIfu7h1ZOInOhDk_" },
+      { name:"06 Quest Service Practitioner",       folderId:"1axaLeZ6n_AKCIQRrCyLM2EDiX3FqhDOt" },
+      { name:"07 Welding Fabrication Technician",   folderId:"1yPnXugHCvuRGqLM5bRekwpyrqE16mYM5" }
+    ] },
   { title:"Beauty Therapy Level 2",                         folderId:"194qSUzi_BSQE_0QHLYQAQn_hX2JbHFvL", skillArea:"Beauty Therapy" },
   { title:"Cosmetology Level 2",                            folderId:"180HFoONPHB44Dq9hKkyuvvcEaPQG2w3a", skillArea:"Cosmetology" },
   { title:"Electrical Installation and Maintenance L2",     folderId:"1RTYIrphKDbBbNMlWGUhJ5Cmid6cWEgOA", skillArea:"Electrical Installation" },
@@ -232,6 +241,7 @@ var qpFileCache = {};       // folderId -> array of items (folders + files), or 
 var qpNav = {};             // programme rootFolderId -> breadcrumb [{id,name}]
 var qpNoticeShown = false;
 var QP_FOLDER_MIME = 'application/vnd.google-apps.folder';
+var QP_SHORTCUT_MIME = 'application/vnd.google-apps.shortcut';
 
 // Read the host LMS's Drive token (same-origin parent). Null if standalone / unset.
 function qpToken() {
@@ -289,7 +299,19 @@ function qpFileIcon(mime) {
   return '📄';
 }
 
-// List the (non-trashed) files inside a Drive folder. Cached per folder.
+// Normalise a Drive item, resolving shortcuts to their real target so that
+// shortcut-folders are navigable and shortcut-files open the underlying doc.
+function qpNormalize(f) {
+  var mime = f.mimeType, id = f.id;
+  if (mime === QP_SHORTCUT_MIME && f.shortcutDetails) {
+    mime = f.shortcutDetails.targetMimeType || mime;
+    id = f.shortcutDetails.targetId || id;
+  }
+  return { id: id, name: f.name, mimeType: mime, isFolder: mime === QP_FOLDER_MIME };
+}
+
+// List the (non-trashed) items inside a Drive folder (folders + files),
+// following pagination. Cached per folder.
 function qpListFolder(folderId) {
   if (qpFileCache[folderId]) return Promise.resolve(qpFileCache[folderId]);
   var token = qpToken();
@@ -297,27 +319,32 @@ function qpListFolder(folderId) {
     var err = new Error('no-auth');
     return Promise.resolve(err);
   }
-  var q = encodeURIComponent("'" + folderId + "' in parents and trashed=false");
-  var url = 'https://www.googleapis.com/drive/v3/files?q=' + q +
-    '&fields=files(id,name,mimeType,modifiedTime)&orderBy=name&pageSize=200' +
-    '&supportsAllDrives=true&includeItemsFromAllDrives=true';
-  if (!token && QP_API_KEY) url += '&key=' + encodeURIComponent(QP_API_KEY);
   var opts = token ? { headers: { 'Authorization': 'Bearer ' + token } } : {};
-  return fetch(url, opts)
-    .then(function(r){ if(!r.ok) throw new Error('http-' + r.status); return r.json(); })
-    .then(function(data){
-      var files = (data.files || []);
-      qpFileCache[folderId] = files;
-      return files;
-    })
-    .catch(function(e){ return e; });
+  var acc = [];
+  function page(pageToken) {
+    var q = encodeURIComponent("'" + folderId + "' in parents and trashed=false");
+    var url = 'https://www.googleapis.com/drive/v3/files?q=' + q +
+      '&fields=nextPageToken,files(id,name,mimeType,shortcutDetails(targetId,targetMimeType))' +
+      '&orderBy=folder,name&pageSize=1000&supportsAllDrives=true&includeItemsFromAllDrives=true';
+    if (pageToken) url += '&pageToken=' + encodeURIComponent(pageToken);
+    if (!token && QP_API_KEY) url += '&key=' + encodeURIComponent(QP_API_KEY);
+    return fetch(url, opts)
+      .then(function(r){ if(!r.ok) throw new Error('http-' + r.status); return r.json(); })
+      .then(function(data){
+        (data.files || []).forEach(function(f){ acc.push(qpNormalize(f)); });
+        if (data.nextPageToken) return page(data.nextPageToken);
+        qpFileCache[folderId] = acc;
+        return acc;
+      });
+  }
+  return page(null).catch(function(e){ return e; });
 }
 
 function qpPopoutUrl(fileId) {
   return 'https://drive.google.com/file/d/' + fileId + '/preview';
 }
 
-// Look up an item's name from any cached folder listing (files or subfolders).
+// Look up an item's name from cached listings or the manual subfolder registry.
 function qpItemName(itemId) {
   for (var k in qpFileCache) {
     var arr = qpFileCache[k];
@@ -326,7 +353,33 @@ function qpItemName(itemId) {
       if (hit) return hit.name;
     }
   }
+  // Manual subfolder registry (used when the parent can't be enumerated).
+  for (var i = 0; i < QUAL_PLAN_PROGRAMS.length; i++) {
+    var subs = QUAL_PLAN_PROGRAMS[i].subfolders || [];
+    for (var j = 0; j < subs.length; j++) {
+      if (subs[j].folderId === itemId) return subs[j].name;
+    }
+  }
   return null;
+}
+
+// Merge a folder's dynamic listing with any manually-registered subfolders so
+// known subfolders always appear, even if the parent can't be enumerated.
+function qpMergeManual(result, manual) {
+  var arr = (result instanceof Error) ? [] : result.slice();
+  var seen = {};
+  arr.forEach(function(f){ seen[f.id] = true; });
+  (manual || []).forEach(function(m){
+    if (!seen[m.folderId]) {
+      arr.push({ id: m.folderId, name: m.name, mimeType: QP_FOLDER_MIME, isFolder: true });
+      seen[m.folderId] = true;
+    }
+  });
+  arr.sort(function(a, b){
+    if (a.isFolder !== b.isFolder) return a.isFolder ? -1 : 1;
+    return a.name.localeCompare(b.name);
+  });
+  return arr;
 }
 
 function qpOpenViewer(fileId) {
@@ -389,8 +442,8 @@ function qpRenderListing(prog, result) {
   }
   var search = (document.getElementById('qpSearch').value || '').toLowerCase().trim();
   var match = function(f){ return !search || f.name.toLowerCase().indexOf(search) !== -1; };
-  var folders = result.filter(function(f){ return f.mimeType === QP_FOLDER_MIME && match(f); });
-  var files   = result.filter(function(f){ return f.mimeType !== QP_FOLDER_MIME && match(f); });
+  var folders = result.filter(function(f){ return f.isFolder && match(f); });
+  var files   = result.filter(function(f){ return !f.isFolder && match(f); });
 
   // Folders sort first, then files; both alphabetical (API already orders by name).
   if (!folders.length && !files.length) {
@@ -423,7 +476,12 @@ function qpLoadCard(prog) {
   if (host) host.innerHTML = '<div class="qp-files-msg"><span class="qp-spinner"></span>Loading documents…</div>';
   var bc = qpNav[prog.folderId];
   var current = bc[bc.length - 1].id;
+  var atRoot = bc.length === 1;
   qpListFolder(current).then(function(res){
+    // At the programme root, fold in any manually-registered subfolders.
+    if (atRoot && prog.subfolders && prog.subfolders.length) {
+      res = qpMergeManual(res, prog.subfolders);
+    }
     qpRenderCrumbs(prog);
     qpRenderListing(prog, res);
   });
