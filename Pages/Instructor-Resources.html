@@ -1,0 +1,21 @@
+<!--
+  ============================================================================
+  Pages/Instructor-Resources.html  —  C.E.S.T.I.S Course Resources (Instructor) UI fragment
+  ----------------------------------------------------------------------------
+  Fetched by index.html and injected into the mount slot
+  (<div class="cestis-mount" data-feature="i-resources" data-prefix="instructor">).
+  Rendered on mount by: cestisSafe('renderInstructorCustomResources') (in index.html).
+  All JS and CSS remain in index.html. Injected via innerHTML — <script> won't run.
+  ============================================================================
+-->
+    <div style="display:flex;gap:12px;margin-bottom:18px;">
+      <button class="btn btn-primary" onclick="openModal('uploadResourceModal')">+ Upload Resource</button>
+      <button class="btn btn-secondary" onclick="openModal('createFolderModal')">+ New Folder</button>
+    </div>
+    <div id="iCustomResourcesList" style="margin-bottom:18px;"></div>
+    <div class="card" style="text-align:center;padding:32px;" id="instructorNoResourcesMsg">
+      <div style="font-size:48px;margin-bottom:12px;opacity:0.3;">📁</div>
+      <h3 style="color:var(--text-muted);margin-bottom:8px;">No Resources Uploaded Yet</h3>
+      <p style="font-size:13px;color:var(--text-muted);">Use the buttons above to upload resources to Google Drive for your students.</p>
+    </div>
+  

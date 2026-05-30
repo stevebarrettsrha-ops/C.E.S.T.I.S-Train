@@ -7806,6 +7806,36 @@ var cestisFeatureConfig = {
     onMount: function() {
       cestisSafe('adrOnPageShow');
     }
+  },
+  'i-resources': {
+    file: 'Pages/Instructor-Resources.html',
+    onMount: function() {
+      cestisSafe('renderInstructorCustomResources');
+    }
+  },
+  'i-exams': {
+    file: 'Pages/Instructor-Exams.html',
+    onMount: function() {
+      cestisSafe('renderInstructorExams');
+    }
+  },
+  'i-attendance': {
+    file: 'Pages/Instructor-Attendance.html',
+    onMount: function() {
+      cestisInitIAttendance();
+    }
+  },
+  'i-announcements': {
+    file: 'Pages/Instructor-Announcements.html',
+    onMount: function() {
+      cestisSafe('renderInstructorAnnouncements');
+    }
+  },
+  'i-calendar': {
+    file: 'Pages/Instructor-Calendar.html',
+    onMount: function() {
+      cestisSafe('renderInstructorCalendar');
+    }
   }
 };
 
@@ -7813,6 +7843,7 @@ var cestisFeatureConfig = {
 function cestisSetAttDate(){ var el=document.getElementById('attendanceDate'); if(el && !el.value){ el.value=new Date().toISOString().split('T')[0]; } }
 function renderExamsUpcoming(){ if(typeof renderExams==='function'){ try{ renderExams('upcoming'); }catch(e){} } }
 function cestisCertsAll(){ if(typeof renderCerts==='function'){ try{ renderCerts('all',''); }catch(e){} } }
+function cestisInitIAttendance(){ var d=document.getElementById('iAttendanceDate'); if(d && !d.value){ d.value=new Date().toISOString().split('T')[0]; } var lbl=document.getElementById('iAttCourseLabel'); if(lbl && typeof currentInstructor!=='undefined' && currentInstructor){ lbl.textContent='— '+currentInstructor.course; } if(typeof renderInstructorAttendance==='function'){ try{ renderInstructorAttendance(); }catch(e){} } }
 
 // Fetch (once) and inject an external feature file into its page mount slot.
 function cestisMountFeature(slot) {
@@ -7889,8 +7920,6 @@ function showPage(pageId) {
   if(pageId === 'document-hub') renderDocumentHubAdmin();
   if(pageId === 'i-document-hub') renderDocumentHubInstructor();
   if(pageId === 'as-document-hub') renderDocumentHubAdmin();
-  if(pageId === 'i-exams') renderInstructorExams();
-  if(pageId === 'i-resources') renderInstructorCustomResources();
   if(pageId === 's-resources') renderStudentDriveResources();
   if(pageId === 's-assignments') renderStudentAssignmentsPage();
   if(pageId === 's-progress') renderStudentAssignments();
@@ -9051,18 +9080,7 @@ function buildInstructorPages() {
 
   <!-- INSTRUCTOR ATTENDANCE -->
   <section class="page" id="page-i-attendance">
-    <div class="attendance-summary" id="iAttendanceSummary"></div>
-    <div style="display:flex;gap:12px;margin-bottom:20px;align-items:center;">
-      <label style="font-size:13px;font-weight:600;">Date:</label>
-      <input type="date" class="form-control" style="width:180px;" id="iAttendanceDate" value="${new Date().toISOString().split('T')[0]}">
-      <button class="btn btn-primary" onclick="saveInstructorAttendance()">Save Attendance</button>
-    </div>
-    <div class="card"><div class="card-header"><h3>Class Attendance &mdash; ${ins.course}</h3><span style="font-size:13px;color:var(--text-muted);" id="iAttCount">${myStudents.length} students</span></div>
-      <div class="table-wrapper"><table class="attendance-table"><thead><tr><th>Student</th><th>ID</th><th>Mon</th><th>Tue</th><th>Wed</th><th>Thu</th><th>Fri</th></tr></thead><tbody id="iAttendanceTableBody"></tbody></table></div>
-    </div>
-    <div class="card"><div class="card-header"><h3>Attendance Overview</h3></div>
-      <div class="bar-chart" id="iWeeklyAttChart"></div>
-    </div>
+    <div class="cestis-mount" data-feature="i-attendance" data-prefix="instructor"></div>
   </section>
 
   <!-- INSTRUCTOR GRADEBOOK -->
@@ -9175,63 +9193,17 @@ function buildInstructorPages() {
 
   <!-- INSTRUCTOR RESOURCES -->
   <section class="page" id="page-i-resources">
-    <div style="display:flex;gap:12px;margin-bottom:18px;">
-      <button class="btn btn-primary" onclick="openModal('uploadResourceModal')">+ Upload Resource</button>
-      <button class="btn btn-secondary" onclick="openModal('createFolderModal')">+ New Folder</button>
-    </div>
-    <div id="iCustomResourcesList" style="margin-bottom:18px;"></div>
-    <div class="card" style="text-align:center;padding:32px;" id="instructorNoResourcesMsg">
-      <div style="font-size:48px;margin-bottom:12px;opacity:0.3;">📁</div>
-      <h3 style="color:var(--text-muted);margin-bottom:8px;">No Resources Uploaded Yet</h3>
-      <p style="font-size:13px;color:var(--text-muted);">Use the buttons above to upload resources to Google Drive for your students.</p>
-    </div>
+    <div class="cestis-mount" data-feature="i-resources" data-prefix="instructor"></div>
   </section>
 
   <!-- INSTRUCTOR ANNOUNCEMENTS -->
   <section class="page" id="page-i-announcements">
-    <div style="display:flex;gap:12px;margin-bottom:20px;align-items:center;">
-      <button class="btn btn-primary" onclick="toggleInstructorAnnouncementForm()">+ New Announcement</button>
-      <select class="form-control" style="width:200px;" id="iAnnPriorityFilter" onchange="renderInstructorAnnouncements()"><option value="all">All Priorities</option><option value="urgent">Urgent</option><option value="info">Info</option><option value="general">General</option></select>
-    </div>
-    <div id="iAnnouncementForm" style="display:none;">
-      <div class="announcement-form">
-        <div class="ann-form-header"><h3>Create Announcement</h3><button class="btn btn-sm btn-secondary" onclick="toggleInstructorAnnouncementForm()">\u2715 Close</button></div>
-        <div class="form-group"><label>Title</label><input type="text" class="form-control" id="iAnnTitle" placeholder="Announcement title..."></div>
-        <div class="form-group"><label>Body</label><textarea class="form-control" id="iAnnBody" placeholder="Announcement details..."></textarea></div>
-        <div class="ann-form-row">
-          <div class="form-group"><label>Priority</label><select class="form-control" id="iAnnPriority"><option value="general">General</option><option value="info">Info</option><option value="urgent">Urgent</option></select></div>
-        </div>
-        <div class="form-group"><label>Target Audience</label>
-          <div style="display:flex;gap:16px;margin-top:6px;">
-            <label style="display:flex;align-items:center;gap:6px;font-size:13px;cursor:pointer;"><input type="checkbox" id="iAnnRoleInstructor" checked> <span style="background:var(--green-dim);color:var(--green);padding:2px 8px;border-radius:10px;font-size:11px;font-weight:600;">Instructor</span></label>
-            <label style="display:flex;align-items:center;gap:6px;font-size:13px;cursor:pointer;"><input type="checkbox" id="iAnnRoleStudent" checked> <span style="background:var(--blue-dim);color:var(--blue);padding:2px 8px;border-radius:10px;font-size:11px;font-weight:600;">Student</span></label>
-            <label style="display:flex;align-items:center;gap:6px;font-size:13px;cursor:pointer;"><input type="checkbox" id="iAnnRoleAdmin"> <span style="background:var(--accent-dim);color:var(--accent);padding:2px 8px;border-radius:10px;font-size:11px;font-weight:600;">Admin</span></label>
-            <label style="display:flex;align-items:center;gap:6px;font-size:13px;cursor:pointer;"><input type="checkbox" id="iAnnRoleAdminStaff"> <span style="background:var(--purple-dim);color:var(--purple);padding:2px 8px;border-radius:10px;font-size:11px;font-weight:600;">Admin Staff</span></label>
-          </div>
-        </div>
-        <button class="btn btn-primary" onclick="createInstructorAnnouncement()">Publish Announcement</button>
-      </div>
-    </div>
-    <div id="iAnnouncementsList"></div>
+    <div class="cestis-mount" data-feature="i-announcements" data-prefix="instructor"></div>
   </section>
 
   <!-- INSTRUCTOR CALENDAR -->
   <section class="page" id="page-i-calendar">
-    <div class="grid-sidebar">
-      <div class="card">
-        <div class="cal-header">
-          <div class="cal-nav"><button onclick="changeCalMonth(-1)">\u2190</button></div>
-          <div class="cal-title" id="iCalTitle"></div>
-          <div class="cal-nav"><button onclick="changeCalMonth(1)">\u2192</button></div>
-        </div>
-        <div class="calendar-grid" id="iCalGrid"></div>
-      </div>
-      <div>
-        <div class="card"><div class="card-header"><h3 id="iCalDayTitle">Select a Day</h3></div><div id="iCalDayEvents"><p style="font-size:13px;color:var(--text-muted);">Click a day to see events</p></div></div>
-        <button class="btn btn-primary" style="width:100%;margin-top:8px;" onclick="promptAddEvent()">+ Add Event</button>
-        <div class="card" style="margin-top:12px;"><div class="card-header"><h3>My Schedule</h3></div><div id="iCalEventList"></div></div>
-      </div>
-    </div>
+    <div class="cestis-mount" data-feature="i-calendar" data-prefix="instructor"></div>
   </section>
 
   <!-- INSTRUCTOR PROFILE -->
@@ -9310,28 +9282,7 @@ function buildInstructorPages() {
 
   <!-- INSTRUCTOR ONLINE EXAMS -->
   <section class="page" id="page-i-exams">
-    <div id="iExamListView">
-      <div class="stats-grid" id="iExamStatsGrid"></div>
-      <div style="display:flex;gap:12px;margin-bottom:18px;flex-wrap:wrap;align-items:center;">
-        <button class="btn btn-primary" onclick="openModal('createExamModal')">+ Create Exam</button>
-        <button class="btn btn-secondary" onclick="exportExamResults()">Export Results</button>
-      </div>
-      <div class="tabs" style="margin-bottom:16px;">
-        <div class="tab active" onclick="switchInstructorExamTab(this,'upcoming')">Upcoming</div>
-        <div class="tab" onclick="switchInstructorExamTab(this,'active')">Active Now</div>
-        <div class="tab" onclick="switchInstructorExamTab(this,'completed')">Completed</div>
-      </div>
-      <div class="card">
-        <div class="table-wrapper">
-          <table>
-            <thead><tr><th>Exam Title</th><th>Course</th><th>Date & Time</th><th>Duration</th><th>Questions</th><th>Status</th><th>Actions</th></tr></thead>
-            <tbody id="iExamTableBody"></tbody>
-          </table>
-        </div>
-      </div>
-    </div>
-    <div id="iExamResultsView" style="display:none;"></div>
-    <div id="iAdminExamPreviewView" style="display:none;"></div>
+    <div class="cestis-mount" data-feature="i-exams" data-prefix="instructor"></div>
   </section>
 
   <!-- DOCUMENT HUB (Instructor - Download Only) -->

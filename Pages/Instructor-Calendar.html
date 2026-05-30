@@ -1,0 +1,26 @@
+<!--
+  ============================================================================
+  Pages/Instructor-Calendar.html  —  C.E.S.T.I.S Calendar (Instructor) UI fragment
+  ----------------------------------------------------------------------------
+  Fetched by index.html and injected into the mount slot
+  (<div class="cestis-mount" data-feature="i-calendar" data-prefix="instructor">).
+  Rendered on mount by: cestisSafe('renderInstructorCalendar') (in index.html).
+  All JS and CSS remain in index.html. Injected via innerHTML — <script> won't run.
+  ============================================================================
+-->
+    <div class="grid-sidebar">
+      <div class="card">
+        <div class="cal-header">
+          <div class="cal-nav"><button onclick="changeCalMonth(-1)">←</button></div>
+          <div class="cal-title" id="iCalTitle"></div>
+          <div class="cal-nav"><button onclick="changeCalMonth(1)">→</button></div>
+        </div>
+        <div class="calendar-grid" id="iCalGrid"></div>
+      </div>
+      <div>
+        <div class="card"><div class="card-header"><h3 id="iCalDayTitle">Select a Day</h3></div><div id="iCalDayEvents"><p style="font-size:13px;color:var(--text-muted);">Click a day to see events</p></div></div>
+        <button class="btn btn-primary" style="width:100%;margin-top:8px;" onclick="promptAddEvent()">+ Add Event</button>
+        <div class="card" style="margin-top:12px;"><div class="card-header"><h3>My Schedule</h3></div><div id="iCalEventList"></div></div>
+      </div>
+    </div>
+  

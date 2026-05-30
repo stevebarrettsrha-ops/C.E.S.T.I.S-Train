@@ -1,0 +1,33 @@
+<!--
+  ============================================================================
+  Pages/Instructor-Exams.html  —  C.E.S.T.I.S Online Exams (Instructor) UI fragment
+  ----------------------------------------------------------------------------
+  Fetched by index.html and injected into the mount slot
+  (<div class="cestis-mount" data-feature="i-exams" data-prefix="instructor">).
+  Rendered on mount by: cestisSafe('renderInstructorExams') (in index.html).
+  All JS and CSS remain in index.html. Injected via innerHTML — <script> won't run.
+  ============================================================================
+-->
+    <div id="iExamListView">
+      <div class="stats-grid" id="iExamStatsGrid"></div>
+      <div style="display:flex;gap:12px;margin-bottom:18px;flex-wrap:wrap;align-items:center;">
+        <button class="btn btn-primary" onclick="openModal('createExamModal')">+ Create Exam</button>
+        <button class="btn btn-secondary" onclick="exportExamResults()">Export Results</button>
+      </div>
+      <div class="tabs" style="margin-bottom:16px;">
+        <div class="tab active" onclick="switchInstructorExamTab(this,'upcoming')">Upcoming</div>
+        <div class="tab" onclick="switchInstructorExamTab(this,'active')">Active Now</div>
+        <div class="tab" onclick="switchInstructorExamTab(this,'completed')">Completed</div>
+      </div>
+      <div class="card">
+        <div class="table-wrapper">
+          <table>
+            <thead><tr><th>Exam Title</th><th>Course</th><th>Date & Time</th><th>Duration</th><th>Questions</th><th>Status</th><th>Actions</th></tr></thead>
+            <tbody id="iExamTableBody"></tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+    <div id="iExamResultsView" style="display:none;"></div>
+    <div id="iAdminExamPreviewView" style="display:none;"></div>
+  
