@@ -1,0 +1,40 @@
+<!--
+  ============================================================================
+  Video-Conference-AdminStaff.html  —  C.E.S.T.I.S Video Conference (Admin Staff) UI fragment
+  ----------------------------------------------------------------------------
+  Markup for the Admin Staff Video Conference page. Fetched by index.html and
+  injected into the page's mount slot
+  (<div class="cestis-mount" data-feature="video-adminstaff" data-prefix="adminstaff">),
+  so it runs inside the main app — no iframe.
+
+  The meetings table is filled on mount by renderAdminMeetingsList() in
+  index.html (it targets #asAdminMeetingsList), so keep that tbody id and the
+  empty <div id="asVideoRoom"> intact.
+
+  Notes:
+   • All video JavaScript (enterVideoRoom, asJoinMeetingByCode, etc.) and CSS
+     remain in index.html.
+   • This fragment is injected with innerHTML: a <style> block here WILL apply,
+     but <script> tags will NOT run. Put any JS changes in index.html.
+  ============================================================================
+-->
+<div id="asVideoContent">
+  <div class="card" style="margin-bottom:18px;border-color:var(--purple);">
+    <div class="card-header"><h3 style="color:var(--purple);">Admin Meetings</h3><span style="font-size:12px;color:var(--text-muted);">Meetings for Administrator &amp; Admin Staff</span></div>
+    <div class="table-wrapper"><table>
+      <thead><tr><th>Meeting</th><th>Scheduled By</th><th>Date &amp; Time</th><th>Duration</th><th>Action</th></tr></thead>
+      <tbody id="asAdminMeetingsList"></tbody>
+    </table></div>
+  </div>
+  <div class="card">
+    <div class="card-header"><h3>Join a Meeting</h3></div>
+    <div style="padding:20px;text-align:center;">
+      <p style="color:var(--text-muted);font-size:13px;margin-bottom:16px;">Enter a room code shared by the meeting host to join</p>
+      <div style="display:flex;gap:8px;align-items:center;justify-content:center;">
+        <input type="text" class="form-control" id="as-vc-join-code" placeholder="ABC123" maxlength="6" style="font-family:monospace;font-size:20px;letter-spacing:4px;text-align:center;text-transform:uppercase;width:200px;" onkeyup="this.value=this.value.toUpperCase();if(event.key==='Enter')asJoinMeetingByCode()">
+        <button class="btn btn-primary" onclick="asJoinMeetingByCode()">Join</button>
+      </div>
+    </div>
+  </div>
+</div>
+<div id="asVideoRoom" style="display:none;"></div>
