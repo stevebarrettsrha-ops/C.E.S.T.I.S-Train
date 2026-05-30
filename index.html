@@ -1002,20 +1002,6 @@ textarea.form-control { resize:vertical; min-height:80px; }
   position:relative; bottom:auto; right:auto; align-self:flex-end;
   box-shadow:none;
 }
-/* ============================== EMBEDDED FEATURE MODE (iframe) ============================== */
-/* When LMS-Chat.html / Video-Conference.html run inside an <iframe> embedded by
-   index.html, the host chrome (sidebar/topbar/landing) is hidden so only the
-   feature panel shows. The same code runs in both contexts; the ?embed= URL
-   flag is the only difference. */
-body.cestis-embed-mode .sidebar { display:none !important; }
-body.cestis-embed-mode .topbar { display:none !important; }
-body.cestis-embed-mode #landingPage { display:none !important; }
-body.cestis-embed-mode .main-content {
-  left:0 !important; top:0 !important; right:0; bottom:0; padding:16px !important;
-}
-body.cestis-embed-mode .page { padding:0; }
-body.cestis-embed-mode .lms-chat-container { height:calc(100vh - 32px) !important; }
-
 /* ============================== FULLSCREEN CONFERENCE MODE ============================== */
 body.vc-fullscreen-mode .sidebar { transform:translateX(-100%) !important; }
 body.vc-fullscreen-mode .topbar { display:none !important; }
@@ -7685,79 +7671,64 @@ function vcCleanupMediaIfNeeded() {
 var vcVideoPages = ['video','s-video','i-classes','as-video'];
 var vcLastPage = '';
 
-// ============================== EMBEDDED FEATURE MODE ==============================
-// LMS Chat and Video Conference each live in their own editable HTML file
-// (LMS-Chat.html / Video-Conference.html). Those files are the SAME application
-// run with an ?embed= flag: index.html embeds them as <iframe>s (same pattern as
-// School.Fee.html / CESTIS.Cashbook.html / PDF.Workshop.html). In embed mode the
-// host chrome is hidden and the app jumps straight to the requested feature,
-// adopting the parent's logged-in session via the shared session keys.
-(function() {
-  var p;
-  try { p = new URLSearchParams(location.search); } catch(e) { p = null; }
-  window.CESTIS_EMBED = p ? (p.get('embed') || null) : null;        // 'lms-chat' | 'video' | null
-  window.CESTIS_EMBED_ROLE = p ? (p.get('role') || null) : null;    // optional explicit role
-})();
-
-// Feature page -> standalone file mapping used to embed each feature as an iframe.
-var cestisFeatureFrames = {
-  'lms-chat':    { file:'LMS-Chat.html',          embed:'lms-chat', role:'admin' },
-  's-lms-chat':  { file:'LMS-Chat.html',          embed:'lms-chat', role:'student' },
-  'i-lms-chat':  { file:'LMS-Chat.html',          embed:'lms-chat', role:'instructor' },
-  'as-lms-chat': { file:'LMS-Chat.html',          embed:'lms-chat', role:'adminstaff' },
-  'video':       { file:'Video-Conference.html',  embed:'video',    role:'admin' },
-  'as-video':    { file:'Video-Conference.html',  embed:'video',    role:'adminstaff' }
-};
-
-// Re-establish the logged-in identity inside an embedded iframe from the shared
-// session keys written by the main app on login.
-function cestisRestoreEmbeddedSession() {
-  var role = window.CESTIS_EMBED_ROLE || CESTISStore.getItem('voctrain_sessionRole') || 'admin';
-  var userId = CESTISStore.getItem('voctrain_sessionUserId') || '';
-  try {
-    if(role === 'admin') {
-      currentLoggedInUser = userAccounts.find(function(u){ return u.role==='admin'; }) || currentLoggedInUser;
-    } else if(role === 'adminstaff') {
-      currentLoggedInUser = userAccounts.find(function(u){ return u.id===userId && u.role==='adminstaff'; }) ||
-                            userAccounts.find(function(u){ return u.role==='adminstaff'; }) || currentLoggedInUser;
-    } else if(role === 'instructor') {
-      currentLoggedInUser = userAccounts.find(function(u){ return u.id===userId && u.role==='instructor'; }) ||
-                            userAccounts.find(function(u){ return u.role==='instructor'; }) || currentLoggedInUser;
-      if(currentLoggedInUser && typeof instructorData !== 'undefined') {
-        currentInstructor = instructorData.find(function(ins){ return ins.name===currentLoggedInUser.name || ins.email===currentLoggedInUser.email; }) || currentInstructor;
-      }
-    } else if(role === 'student') {
-      currentLoggedInUser = userAccounts.find(function(u){ return u.id===userId && u.role==='student'; }) ||
-                            userAccounts.find(function(u){ return u.role==='student'; }) || currentLoggedInUser;
-      if(currentLoggedInUser) {
-        var sid = currentLoggedInUser.studentDataId;
-        currentStudent = (sid && students.find(function(s){ return s.id===sid; })) ||
-                         students.find(function(s){ return s.name===currentLoggedInUser.name; }) || currentStudent;
+// ============================== EXTERNAL FEATURE FILES (load & mount) ==============================
+// LMS Chat and Video Conference live in their own editable HTML files
+// (LMS-Chat.html / Video-Conference.html). Rather than an iframe, their markup is
+// fetched once and injected into a mount slot on the page, so the feature runs in
+// the SAME document as the rest of the app (native functions, data and session).
+// This mirrors the "mount into the active page" idea used by the Time Tracking app.
+var cestisFragmentCache = {};
+var cestisFeatureConfig = {
+  'lms-chat': {
+    file: 'LMS-Chat.html',
+    onMount: function(prefix) {
+      if(typeof lmsChatOnPageShow === 'function') {
+        try { lmsChatOnPageShow(prefix); } catch(e) { console.warn('lms-chat mount init error', e); }
       }
     }
-  } catch(e) { console.warn('Embed session restore error', e); }
-  return role;
+  },
+  'video': {
+    file: 'Video-Conference.html',
+    onMount: function(prefix) {
+      try { if(typeof renderAdminAllSessions === 'function') renderAdminAllSessions(); } catch(e) {}
+      try { if(typeof renderAdminClassSessions === 'function') renderAdminClassSessions(); } catch(e) {}
+      try { if(typeof renderAdminMeetingsList === 'function') renderAdminMeetingsList(); } catch(e) {}
+    }
+  }
+};
+
+// Fetch (once) and inject an external feature file into its page mount slot.
+function cestisMountFeature(slot) {
+  if(!slot) return;
+  var feature = slot.getAttribute('data-feature');
+  var prefix = slot.getAttribute('data-prefix') || 'admin';
+  var cfg = cestisFeatureConfig[feature];
+  if(!cfg) return;
+  function done() { if(cfg.onMount) cfg.onMount(prefix); }
+  // Already mounted — just re-run the init so data refreshes.
+  if(slot.getAttribute('data-mounted') === '1') { done(); return; }
+  function inject(html) {
+    slot.innerHTML = html.split('__PREFIX__').join(prefix);
+    slot.setAttribute('data-mounted', '1');
+    done();
+  }
+  if(cestisFragmentCache[feature]) { inject(cestisFragmentCache[feature]); return; }
+  fetch(cfg.file)
+    .then(function(r) { if(!r.ok) throw new Error('HTTP ' + r.status); return r.text(); })
+    .then(function(t) { cestisFragmentCache[feature] = t; inject(t); })
+    .catch(function(e) {
+      console.warn('[FeatureMount] Could not load ' + cfg.file, e);
+      slot.innerHTML = '<div style="padding:32px;text-align:center;color:var(--text-muted);">' +
+        'Unable to load <strong>' + cfg.file + '</strong>.<br>This page must be served over http(s) (not opened directly as a file).</div>';
+    });
 }
 
-// Boot the app directly into a single feature when running inside an iframe.
-function cestisStartEmbedMode() {
-  var feature = window.CESTIS_EMBED;
-  if(!feature) return;
-  document.body.classList.add('cestis-embed-mode');
-  var role = cestisRestoreEmbeddedSession();
-  var pageMap = {
-    'lms-chat': { admin:'lms-chat', adminstaff:'as-lms-chat', instructor:'i-lms-chat', student:'s-lms-chat' },
-    'video':    { admin:'video',    adminstaff:'as-video' }
-  };
-  var pageId = (pageMap[feature] && pageMap[feature][role]) || (pageMap[feature] && pageMap[feature].admin);
-  if(!pageId) return;
-  try { enterApp(role); } catch(e) { console.warn('Embed enterApp error', e); }
-  try { showPage(pageId); } catch(e) { console.warn('Embed showPage error', e); }
+// Helper: the page id currently shown (used to avoid sync redirects yanking the
+// user off their current page).
+function cestisActivePageId() {
+  var el = document.querySelector('.page.active');
+  return el ? el.id.replace(/^page-/, '') : null;
 }
-
-document.addEventListener('DOMContentLoaded', function() {
-  if(window.CESTIS_EMBED) setTimeout(cestisStartEmbedMode, 0);
-});
 
 function showPage(pageId) {
   // If navigating away from a video page, release camera/mic permissions
@@ -7811,13 +7782,11 @@ function showPage(pageId) {
   if(pageId === 's-assignments') renderStudentAssignmentsPage();
   if(pageId === 's-video') renderStudentRecordings();
   if(pageId === 's-progress') renderStudentAssignments();
-  // Chat UI only renders inline when running embedded; the host shows it via iframe.
-  if(window.CESTIS_EMBED) {
-    if(pageId === 'lms-chat') lmsChatOnPageShow('admin');
-    if(pageId === 's-lms-chat') lmsChatOnPageShow('student');
-    if(pageId === 'i-lms-chat') lmsChatOnPageShow('instructor');
-    if(pageId === 'as-lms-chat') lmsChatOnPageShow('adminStaff');
-  }
+  // Admin LMS Chat is loaded from LMS-Chat.html and initialised on mount (below).
+  // The other roles still render inline, so initialise them here.
+  if(pageId === 's-lms-chat') lmsChatOnPageShow('student');
+  if(pageId === 'i-lms-chat') lmsChatOnPageShow('instructor');
+  if(pageId === 'as-lms-chat') lmsChatOnPageShow('adminStaff');
   if(pageId === 'training') { initTrainingAdminControls(); renderSkills(); updateCentreCount(); }
   // Mount the inlined Time Tracking app into the active page (replaces the old iframe).
   if(pageId === 'timetracking' || pageId === 'i-timetracking' || pageId === 'as-timetracking'){
@@ -7844,14 +7813,11 @@ function showPage(pageId) {
       iframeEl.setAttribute('data-src-loaded', '1');
     }
   }
-  // In the host app, render LMS Chat / Video Conference from their own HTML files
-  // via an iframe (lazy, once per page) instead of the inline markup.
-  if(!window.CESTIS_EMBED && cestisFeatureFrames[pageId] && pg) {
-    var ff = cestisFeatureFrames[pageId];
-    if(!pg.querySelector('iframe.cestis-feature-frame')) {
-      pg.innerHTML = '<iframe class="cestis-feature-frame" src="' + ff.file + '?embed=' + ff.embed + '&role=' + ff.role +
-        '" style="width:100%;height:calc(100vh - var(--topbar-h) - 56px);border:none;border-radius:12px;display:block;"></iframe>';
-    }
+  // Mount any external feature file (LMS Chat / Video Conference) declared on the
+  // active page via a <div class="cestis-mount" data-feature=... data-prefix=...>.
+  if(pg) {
+    var _slot = pg.querySelector('.cestis-mount');
+    if(_slot) cestisMountFeature(_slot);
   }
   setTimeout(animateAllCounters, 50);
 }
@@ -7952,15 +7918,7 @@ function buildAdminPages() {
 
   <!-- VIDEO -->
   <section class="page" id="page-video">
-    <div style="display:flex;gap:12px;margin-bottom:18px;flex-wrap:wrap;"><button class="btn btn-primary" onclick="openModal('createClassSessionModal')">+ New Class Session</button><button class="btn btn-secondary" onclick="document.getElementById('vc-join-code')?.focus();showToast('Enter a room code below and click Join to connect')">Join Existing Class</button><button class="btn btn-primary" style="background:var(--purple);" onclick="openModal('createAdminMeetingModal')">+ Schedule Admin Meeting</button></div>
-    <div class="card" id="videoClassList"><div class="card-header"><h3>Active & Scheduled Classes</h3></div><div class="table-wrapper"><table><thead><tr><th>Class</th><th>Instructor</th><th>Time</th><th>Students</th><th>Status</th><th>Action</th></tr></thead><tbody id="adminAllSessionsList">
-      ${classSessions.length > 0 ? classSessions.map(cs =>
-        '<tr><td><strong>'+cs.name+'</strong></td><td>'+(cs.instructor||'—')+'</td><td>'+(cs.time||'—')+' - '+(cs.endTime||'—')+'</td><td>'+(cs.students||'—')+'</td><td><span class="badge badge-blue"><span class="badge-dot"></span>Scheduled</span>'+(cs.roomCode?'<div style="font-family:monospace;font-size:10px;color:var(--accent);margin-top:2px;">Room: '+cs.roomCode+'</div>':'')+'</td><td><button class="btn btn-sm btn-primary" onclick="enterVideoRoom(\''+cs.name.replace(/'/g,"\\'")+'\',\'admin\',\''+(cs.roomCode||'')+'\')">Join</button></td></tr>'
-      ).join('') : '<tr><td colspan="6" style="text-align:center;color:var(--text-muted);padding:24px;">No class sessions scheduled. Create a new session above.</td></tr>'}
-    </tbody></table></div></div>
-    <div class="card" style="margin-top:18px;"><div class="card-header"><h3>My Scheduled Sessions</h3><span style="font-size:12px;color:var(--text-muted);">Custom created sessions</span></div><div class="table-wrapper"><table><thead><tr><th>Class</th><th>Created By</th><th>Date & Time</th><th>Duration</th><th>Status</th><th>Action</th></tr></thead><tbody id="adminClassSessionsList"></tbody></table></div></div>
-    <div class="card" style="margin-top:18px;border-color:var(--purple);"><div class="card-header"><h3 style="color:var(--purple);">Admin Meetings</h3><span style="font-size:12px;color:var(--text-muted);">Restricted to Administrator &amp; Admin Staff only</span></div><div class="table-wrapper"><table><thead><tr><th>Meeting</th><th>Created By</th><th>Date &amp; Time</th><th>Duration</th><th>Access</th><th>Action</th></tr></thead><tbody id="adminMeetingsList"></tbody></table></div></div>
-    <div id="videoRoom" style="display:none;"></div>
+    <div class="cestis-mount" data-feature="video" data-prefix="admin"></div>
   </section>
 
   <!-- STUDENTS -->
@@ -8827,68 +8785,9 @@ function buildAdminPages() {
     </div>
   </div>
 
-  <!-- C.E.S.T.I.S LMS CHAT PAGE (ADMIN) -->
+  <!-- C.E.S.T.I.S LMS CHAT PAGE (ADMIN) — markup lives in LMS-Chat.html -->
   <section class="page" id="page-lms-chat">
-    <div class="lms-chat-container" id="adminChatContainer">
-      <div class="lms-chat-sidebar" id="adminChatSidebar">
-        <div class="lms-chat-sidebar-header">
-          <h3>C.E.S.T.I.S Chat</h3>
-          <div class="lms-chat-sidebar-actions">
-            <button onclick="lmsChatOpenProfileModal()" title="My Profile">&#128100;</button>
-            <button onclick="lmsChatOpenMembersDirectory()" title="Members">&#128101;</button>
-            <button onclick="lmsChatCreateRoom()" title="New Chat">&#10133;</button>
-          </div>
-        </div>
-        <div class="lms-chat-search">
-          <div class="lms-chat-search-wrap">
-            <input type="text" placeholder="Search chats..." oninput="lmsChatFilterRooms(this.value,'admin')">
-          </div>
-        </div>
-        <div class="lms-chat-list" id="adminChatList"></div>
-      </div>
-      <div class="lms-chat-main" id="adminChatMain">
-        <div class="lms-chat-main-empty" id="adminChatEmpty">
-          <div class="empty-icon">&#128172;</div>
-          <h3>C.E.S.T.I.S LMS Chat</h3>
-          <p>Select a class chat or create a new conversation</p>
-        </div>
-        <div id="adminChatActive" style="display:none;flex:1;flex-direction:column;min-height:0;overflow:hidden;">
-          <div class="lms-chat-main-header">
-            <div class="lms-chat-main-header-left">
-              <button class="back-btn" onclick="lmsChatBack('admin')">&#8592;</button>
-              <div class="lms-chat-avatar" id="adminChatHeaderAvatar"></div>
-              <div class="lms-chat-header-info">
-                <h4 id="adminChatHeaderName"></h4>
-                <span id="adminChatHeaderStatus"></span>
-              </div>
-            </div>
-            <div class="lms-chat-header-actions">
-              <button onclick="lmsChatStartVoiceCall()" title="Voice Call">&#128222;</button>
-              <button onclick="lmsChatStartVideoCall()" title="Video Call">&#128249;</button>
-              <button onclick="lmsChatManageMembers()" title="Manage Members">&#128101;</button>
-              <button onclick="lmsChatToggleInfoPanel('admin')" title="Chat Info">&#9432;</button>
-            </div>
-          </div>
-          <div class="lms-chat-messages" id="adminChatMessages"></div>
-          <div class="lms-chat-input-area">
-            <button class="emoji-btn" onclick="lmsChatToggleEmojiPicker('admin')" title="Emoji">&#128522;</button>
-            <button class="attach-btn" onclick="lmsChatAttachFile()" title="Attach File">&#128206;</button>
-            <button class="poll-btn" onclick="lmsChatOpenPollModal('admin')" title="Create Poll">&#128202;</button>
-            <textarea class="msg-input" id="adminChatInput" placeholder="Type a message..." rows="1" onkeydown="lmsChatInputKeydown(event,'admin')"></textarea>
-            <button class="send-btn" onclick="lmsChatSendMessage('admin')" title="Send">&#10148;</button>
-          </div>
-        </div>
-      </div>
-      <div class="lms-chat-info-panel" id="adminChatInfoPanel">
-        <div class="lms-chat-info-panel-header">
-          <h4>Chat Info</h4>
-          <button onclick="lmsChatToggleInfoPanel('admin')">&#10005;</button>
-        </div>
-        <div class="lms-chat-info-body" id="adminChatInfoBody"></div>
-      </div>
-    </div>
-    <input type="file" id="lmsChatFileInput" style="display:none" onchange="lmsChatHandleFileUpload(event)" accept=".pdf,.doc,.docx,.xls,.xlsx,.ppt,.pptx,.txt,.csv,.zip,.rar,.mp3,.wav,.mp4,.avi,.mov">
-    <input type="file" id="lmsChatProfilePicInput" style="display:none" onchange="lmsChatHandleProfilePic(event)" accept="image/*">
+    <div class="cestis-mount" data-feature="lms-chat" data-prefix="admin"></div>
   </section>
 
   <!-- TIME TRACKING (Admin) -->
@@ -19468,13 +19367,15 @@ async function syncFromCloud() {
     const savedByInfo = backupData.savedBy ? `\nLast saved by: ${backupData.savedBy}` : '';
     alert(`✅ Data synced from cloud successfully!\n\nBackup was created: ${backupTime}${savedByInfo}`);
 
-    // Refresh current dashboard in-place instead of reloading the entire page
+    // Rebuild pages in-place but keep the user on the page they're currently on
+    // (only stay on the dashboard if that's where they already are).
     try {
-      if (currentRole === 'admin') { buildAdminPages(); showPage('dashboard'); }
-      else if (currentRole === 'instructor') { buildInstructorPages(); showPage('i-dashboard'); }
-      else if (currentRole === 'student') { buildStudentPages(); showPage('s-dashboard'); }
-      else if (currentRole === 'adminstaff') { buildAdminStaffPages(); showPage('as-dashboard'); }
-      else if (currentRole === 'cmc') { buildCmcPages(); showPage('cmc-dashboard'); setTimeout(cmcLoadAllData, 300); }
+      var _ap = cestisActivePageId();
+      if (currentRole === 'admin') { buildAdminPages(); showPage(_ap || 'dashboard'); }
+      else if (currentRole === 'instructor') { buildInstructorPages(); showPage(_ap || 'i-dashboard'); }
+      else if (currentRole === 'student') { buildStudentPages(); showPage(_ap || 's-dashboard'); }
+      else if (currentRole === 'adminstaff') { buildAdminStaffPages(); showPage(_ap || 'as-dashboard'); }
+      else if (currentRole === 'cmc') { buildCmcPages(); showPage(_ap || 'cmc-dashboard'); setTimeout(cmcLoadAllData, 300); }
     } catch(e) { console.warn('[SyncFromCloud] Dashboard refresh error:', e); }
 
   } catch (error) {
@@ -20067,14 +19968,16 @@ async function mergeFromCloud() {
 
     alert(summary);
 
-    // Refresh current dashboard in-place instead of reloading the entire page
+    // Rebuild pages in-place but keep the user on the page they're currently on
+    // (only stay on the dashboard if that's where they already are).
     if (totalAdded > 0) {
       try {
-        if (currentRole === 'admin') { buildAdminPages(); showPage('dashboard'); }
-        else if (currentRole === 'instructor') { buildInstructorPages(); showPage('i-dashboard'); }
-        else if (currentRole === 'student') { buildStudentPages(); showPage('s-dashboard'); }
-        else if (currentRole === 'adminstaff') { buildAdminStaffPages(); showPage('as-dashboard'); }
-        else if (currentRole === 'cmc') { buildCmcPages(); showPage('cmc-dashboard'); setTimeout(cmcLoadAllData, 300); }
+        var _ap = cestisActivePageId();
+        if (currentRole === 'admin') { buildAdminPages(); showPage(_ap || 'dashboard'); }
+        else if (currentRole === 'instructor') { buildInstructorPages(); showPage(_ap || 'i-dashboard'); }
+        else if (currentRole === 'student') { buildStudentPages(); showPage(_ap || 's-dashboard'); }
+        else if (currentRole === 'adminstaff') { buildAdminStaffPages(); showPage(_ap || 'as-dashboard'); }
+        else if (currentRole === 'cmc') { buildCmcPages(); showPage(_ap || 'cmc-dashboard'); setTimeout(cmcLoadAllData, 300); }
       } catch(e) { console.warn('[MergeFromCloud] Dashboard refresh error:', e); }
     }
 
@@ -21034,16 +20937,16 @@ async function autoSyncOnLogin() {
 
     console.log('[AutoSync] Auto-sync complete. Data changed: ' + anyChanged);
 
-    // 6. Refresh dashboard display if data changed
+    // 6. Refresh the dashboard display if data changed — but only if the user is
+    // actually on the dashboard. If they've navigated elsewhere, leave them there.
     if (anyChanged) {
-      if (currentRole === 'admin') {
-        try { showPage('dashboard'); } catch (e) {}
-      } else if (currentRole === 'instructor') {
-        try { showPage('i-dashboard'); } catch (e) {}
-      } else if (currentRole === 'student') {
-        try { showPage('s-dashboard'); } catch (e) {}
-      } else if (currentRole === 'cmc') {
-        try { showPage('cmc-dashboard'); } catch (e) {}
+      var _ap = cestisActivePageId();
+      var _dash = currentRole === 'admin' ? 'dashboard'
+                : currentRole === 'instructor' ? 'i-dashboard'
+                : currentRole === 'student' ? 's-dashboard'
+                : currentRole === 'cmc' ? 'cmc-dashboard' : null;
+      if (_dash && _ap === _dash) {
+        try { showPage(_dash); } catch (e) {}
       }
     }
   } catch (err) {
