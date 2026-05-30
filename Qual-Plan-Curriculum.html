@@ -1,0 +1,355 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Qual Plan / Curriculum — C.E.S.T.I.S</title>
+<style>
+  :root {
+    --bg-primary: #0c1117;
+    --bg-secondary: #141b24;
+    --bg-card: #1a2332;
+    --bg-card-hover: #1f2b3d;
+    --bg-input: #0f1820;
+    --accent: #f0a500;
+    --accent-dim: rgba(240,165,0,0.15);
+    --green: #2ecc71;
+    --green-dim: rgba(46,204,113,0.15);
+    --blue: #3498db;
+    --text-primary: #e8edf3;
+    --text-secondary: #8899aa;
+    --text-muted: #556677;
+    --border: rgba(255,255,255,0.06);
+    --border-light: rgba(255,255,255,0.1);
+    --radius: 12px;
+    --radius-sm: 8px;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+    background: var(--bg-primary);
+    color: var(--text-primary);
+    padding: 20px;
+    -webkit-font-smoothing: antialiased;
+  }
+  .qp-header { display:flex; justify-content:space-between; align-items:flex-start; flex-wrap:wrap; gap:12px; margin-bottom:18px; }
+  .qp-header h1 { font-size:22px; font-weight:700; }
+  .qp-header p { font-size:13px; color:var(--text-muted); margin-top:4px; }
+  .qp-controls { display:flex; gap:10px; flex-wrap:wrap; align-items:center; margin-bottom:18px; }
+  .qp-input, .qp-select {
+    background: var(--bg-input);
+    border: 1px solid var(--border-light);
+    color: var(--text-primary);
+    border-radius: var(--radius-sm);
+    padding: 9px 12px;
+    font-size: 13px;
+    outline: none;
+  }
+  .qp-input { min-width: 240px; }
+  .qp-input:focus, .qp-select:focus { border-color: var(--accent); }
+  .qp-banner {
+    border-radius: var(--radius);
+    padding: 18px 20px;
+    margin-bottom: 18px;
+    display:flex; align-items:center; gap:14px;
+    border: 1px solid var(--border-light);
+  }
+  .qp-banner .ic { width:52px; height:52px; border-radius:12px; display:flex; align-items:center; justify-content:center; font-size:26px; flex-shrink:0; }
+  .qp-banner h2 { font-size:19px; }
+  .qp-banner span.sub { font-size:13px; color:var(--text-secondary); }
+  .qp-grid { display:grid; grid-template-columns:repeat(auto-fill, minmax(340px, 1fr)); gap:16px; margin-bottom:24px; }
+  .qp-card {
+    background: var(--bg-card);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    overflow: hidden;
+    transition: transform .2s, border-color .2s;
+    display:flex; flex-direction:column;
+  }
+  .qp-card:hover { border-color: var(--border-light); }
+  .qp-card-head { display:flex; align-items:center; gap:12px; padding:16px 18px; border-bottom:1px solid var(--border); }
+  .qp-card-head .ic { width:44px; height:44px; border-radius:10px; display:flex; align-items:center; justify-content:center; font-size:22px; flex-shrink:0; }
+  .qp-card-head .nm { font-size:15px; font-weight:600; line-height:1.3; }
+  .qp-badge { display:inline-block; font-size:10px; font-weight:600; text-transform:uppercase; letter-spacing:0.4px; padding:2px 8px; border-radius:20px; margin-top:5px; }
+  .qp-card-body { padding:14px 18px 16px; display:flex; flex-direction:column; gap:12px; flex:1; }
+  .qp-card-desc { font-size:12px; color:var(--text-muted); line-height:1.5; }
+  .qp-actions { display:flex; gap:8px; flex-wrap:wrap; margin-top:auto; }
+  .qp-btn {
+    background: var(--accent);
+    color: #1a1a1a;
+    border: none;
+    border-radius: var(--radius-sm);
+    padding: 8px 14px;
+    font-size: 12px;
+    font-weight: 600;
+    cursor: pointer;
+    text-decoration: none;
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    white-space: nowrap;
+  }
+  .qp-btn:hover { filter: brightness(1.08); }
+  .qp-btn.secondary { background: transparent; color: var(--text-secondary); border: 1px solid var(--border-light); }
+  .qp-embed { margin-top:4px; display:none; }
+  .qp-embed.open { display:block; }
+  .qp-embed iframe { width:100%; height:360px; border:none; border-radius:var(--radius-sm); background:#fff; }
+  .qp-section-title { font-size:13px; text-transform:uppercase; letter-spacing:0.5px; color:var(--text-muted); font-weight:600; margin:6px 0 12px; }
+  .qp-folder-wrap { background:var(--bg-card); border:1px solid var(--border); border-radius:var(--radius); padding:16px; }
+  .qp-folder-wrap iframe { width:100%; height:520px; border:none; border-radius:var(--radius-sm); background:#fff; }
+  .qp-empty { text-align:center; color:var(--text-muted); padding:40px; }
+  @media (max-width: 600px) { .qp-grid { grid-template-columns:1fr; } body { padding:14px; } }
+</style>
+</head>
+<body>
+
+<div class="qp-header">
+  <div>
+    <h1>Qualification Plans &amp; Curriculums</h1>
+    <p id="qpSubtitle">Qualification plan and curriculum documents for each skill area.</p>
+  </div>
+</div>
+
+<div id="qpBannerHost"></div>
+
+<div class="qp-controls" id="qpControls">
+  <input type="text" class="qp-input" id="qpSearch" placeholder="Search programme or skill area…" oninput="qpRender()">
+  <select class="qp-select" id="qpFilter" onchange="qpRender()">
+    <option value="all">All Skill Areas</option>
+  </select>
+</div>
+
+<div class="qp-grid" id="qpGrid"></div>
+
+<div id="qpBrowseAll" style="display:none;">
+  <div class="qp-section-title">Browse the Full Qual Plan Library</div>
+  <div class="qp-folder-wrap">
+    <p style="font-size:12px;color:var(--text-muted);margin-bottom:10px;">
+      Master folder containing every programme. Documents are named so each qualification plan /
+      curriculum can be matched to its <strong>skill area</strong> and to the individual <strong>user</strong>.
+    </p>
+    <iframe id="qpFolderFrame" title="Qualification Plan Drive Library" loading="lazy"></iframe>
+  </div>
+</div>
+
+<script>
+/* ============================================================================
+   Qualification Plan / Curriculum viewer
+   ----------------------------------------------------------------------------
+   Hosted as a standalone page and embedded inside the C.E.S.T.I.S LMS via an
+   iframe. Each programme's documents live in a dedicated Google Drive folder.
+
+   Access (driven by the ?role= / ?course= query params set by the LMS):
+     - student / instructor : only the programme folder(s) for their skill area,
+                              plus the general Short Courses (Job Certificate) folder.
+     - admin / adminstaff   : every programme, with a skill-area filter and the
+                              full master-library browser.
+   ========================================================================= */
+
+// Master folder ("0000000 - QUAL PLAN") that contains all programme folders.
+var QUAL_PLAN_FOLDER_ID = '1xwBUcgAmiw6LR0oOq4cyqD-VoGQA2P_Z';
+var QUAL_PLAN_FOLDER_URL = 'https://drive.google.com/drive/folders/' + QUAL_PLAN_FOLDER_ID;
+
+// Programme folders supplied for the qualification plans & curriculums.
+// `skillArea` maps each programme to one of the LMS skill areas; `general:true`
+// programmes (Short Courses) are available to every user.
+var QUAL_PLAN_PROGRAMS = [
+  { title:"000 Short Courses (Job Certificate)",            folderId:"1laQ3n9YRMXZ7kmXkAncxPNNlzXDdYqt0", skillArea:null,                      general:true },
+  { title:"Beauty Therapy Level 2",                         folderId:"194qSUzi_BSQE_0QHLYQAQn_hX2JbHFvL", skillArea:"Beauty Therapy" },
+  { title:"Cosmetology Level 2",                            folderId:"180HFoONPHB44Dq9hKkyuvvcEaPQG2w3a", skillArea:"Cosmetology" },
+  { title:"Electrical Installation and Maintenance L2",     folderId:"1RTYIrphKDbBbNMlWGUhJ5Cmid6cWEgOA", skillArea:"Electrical Installation" },
+  { title:"Electrical Installation and Maintenance L3",     folderId:"1Xf9GXeOS6bJEXwt1V1Wfr__Jhf6h-cq8", skillArea:"Electrical Installation" },
+  { title:"Hospitality Villa.Properties Services L2",       folderId:"1lmeQLq2h-UKhP06dnsyBwxezwfshW5Ll", skillArea:"Hospitality & Tourism" },
+  { title:"Welding L2",                                     folderId:"1A_X9LAGnVGyL-KWAu2rqKcsLoTQqjXEA", skillArea:"Welding & Fabrication" },
+  { title:"Welding L3",                                     folderId:"1W4I6wpXPJ51grRPNW0EwNqjJ5a3wV1lV", skillArea:"Welding & Fabrication" }
+];
+
+// The skill areas (mirrors the skillAreas list in the main LMS) for icon/colour.
+var skillAreas = [
+  {id:1,name:"Welding & Fabrication",icon:"🔥",color:"#e74c3c",desc:"SMAW, MIG, TIG welding processes and metal fabrication"},
+  {id:2,name:"Electrical Installation",icon:"⚡",color:"#f1c40f",desc:"Residential and commercial wiring, conduit bending, circuits"},
+  {id:3,name:"Cosmetology",icon:"💇",color:"#e91e63",desc:"Hair care, styling, chemical treatments, salon management"},
+  {id:4,name:"Business Administration",icon:"💼",color:"#3498db",desc:"Office management, accounting, business communication"},
+  {id:5,name:"Auto Mechanics",icon:"🔧",color:"#e67e22",desc:"Engine repair, diagnostics, brake and suspension systems"},
+  {id:6,name:"Plumbing",icon:"🔩",color:"#1abc9c",desc:"Pipe fitting, drainage systems, water supply installation"},
+  {id:7,name:"Carpentry",icon:"🪚",color:"#8d6e63",desc:"Furniture making, roof framing, cabinet installation"},
+  {id:8,name:"Hospitality & Tourism",icon:"🏨",color:"#9b59b6",desc:"Food & beverage service, front office, housekeeping"},
+  {id:9,name:"Information Technology",icon:"💻",color:"#2196f3",desc:"Networking, hardware repair, software applications"},
+  {id:10,name:"Garment Construction",icon:"🧵",color:"#ff7043",desc:"Pattern drafting, sewing techniques, fashion design basics"},
+  {id:11,name:"Refrigeration & AC",icon:"❄️",color:"#00bcd4",desc:"AC installation, refrigerant handling, system maintenance"},
+  {id:12,name:"Heavy Equipment Ops",icon:"🚜",color:"#ff9800",desc:"Excavator, loader, bulldozer operation and safety"},
+  {id:13,name:"Commercial Cooking",icon:"👨‍🍳",color:"#4caf50",desc:"Culinary arts, food safety, menu planning, pastry arts"},
+  {id:14,name:"Beauty Therapy",icon:"💆",color:"#ce93d8",desc:"Facial treatments, body massage, nail technology"},
+  {id:15,name:"Data Operations",icon:"📊",color:"#42a5f5",desc:"Data entry, spreadsheets, database management"},
+  {id:16,name:"Agriculture",icon:"🌾",color:"#66bb6a",desc:"Crop production, livestock management, agribusiness"},
+  {id:17,name:"Masonry",icon:"🧱",color:"#a1887f",desc:"Block laying, plastering, tiling, concrete work"},
+  {id:18,name:"Solar Energy Tech",icon:"☀️",color:"#fdd835",desc:"PV installation, solar system design, inverter setup"},
+  {id:19,name:"Early Childhood Ed",icon:"👶",color:"#ef9a9a",desc:"Child development, lesson planning, classroom management"},
+  {id:20,name:"Customer Service",icon:"🎯",color:"#7e57c2",desc:"Communication skills, conflict resolution, CRM systems"}
+];
+
+function qpParam(name) {
+  try {
+    var v = new URLSearchParams(window.location.search).get(name);
+    return v ? decodeURIComponent(v) : '';
+  } catch (e) { return ''; }
+}
+
+var qpRole = qpParam('role') || 'admin';
+var qpCourse = qpParam('course');
+var qpUserName = qpParam('student');
+var qpIsStaff = (qpRole === 'admin' || qpRole === 'adminstaff');
+
+// Resolve a course / skill-area name to one of the defined skill areas (loose matching).
+function qpFindSkillArea(name) {
+  if (!name) return null;
+  var cn = name.toLowerCase().trim();
+  var exact = skillAreas.find(function(sk){ return sk.name.toLowerCase().trim() === cn; });
+  if (exact) return exact;
+  var contains = skillAreas.find(function(sk){
+    var sn = sk.name.toLowerCase().trim();
+    return cn.indexOf(sn) !== -1 || sn.indexOf(cn) !== -1;
+  });
+  if (contains) return contains;
+  var firstWord = skillAreas.find(function(sk){
+    var fw = sk.name.split(' ')[0].toLowerCase();
+    return fw.length > 2 && cn.indexOf(fw) !== -1;
+  });
+  return firstWord || null;
+}
+
+function qpSkillMeta(skillAreaName) {
+  return qpFindSkillArea(skillAreaName) ||
+    { name: skillAreaName || 'General', icon: '📚', color: '#3498db', desc: '' };
+}
+
+function qpHexToRgb(hex) {
+  var h = hex.replace('#','');
+  if (h.length === 3) h = h.split('').map(function(c){return c+c;}).join('');
+  var n = parseInt(h, 16);
+  return [(n>>16)&255, (n>>8)&255, n&255].join(',');
+}
+
+function qpEsc(s) {
+  return String(s == null ? '' : s).replace(/[&<>"']/g, function(c){
+    return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c];
+  });
+}
+
+function qpFolderUrl(id) { return 'https://drive.google.com/drive/folders/' + id; }
+
+// Lazy-load + toggle the inline embedded folder view for a programme card.
+function qpToggleEmbed(idx) {
+  var box = document.getElementById('qpEmbed-' + idx);
+  if (!box) return;
+  var frame = box.querySelector('iframe');
+  if (frame && !frame.getAttribute('data-loaded')) {
+    frame.src = 'https://drive.google.com/embeddedfolderview?id=' + frame.getAttribute('data-folder') + '#list';
+    frame.setAttribute('data-loaded', '1');
+  }
+  box.classList.toggle('open');
+  var btn = document.getElementById('qpToggleBtn-' + idx);
+  if (btn) btn.textContent = box.classList.contains('open') ? 'Hide documents' : 'Preview documents';
+}
+
+function qpCard(prog, idx) {
+  var meta = prog.general
+    ? { name: 'Short Courses', icon: '🎓', color: '#f0a500', desc: 'Job Certificate short courses — open to all learners' }
+    : qpSkillMeta(prog.skillArea);
+  var rgb = qpHexToRgb(meta.color);
+  var folderUrl = qpFolderUrl(prog.folderId);
+  var badgeLabel = prog.general ? 'All Learners' : meta.name;
+  return '' +
+    '<div class="qp-card">' +
+      '<div class="qp-card-head">' +
+        '<div class="ic" style="background:rgba(' + rgb + ',0.18);color:' + meta.color + ';">' + meta.icon + '</div>' +
+        '<div>' +
+          '<div class="nm">' + qpEsc(prog.title) + '</div>' +
+          '<span class="qp-badge" style="background:rgba(' + rgb + ',0.18);color:' + meta.color + ';">' + qpEsc(badgeLabel) + '</span>' +
+        '</div>' +
+      '</div>' +
+      '<div class="qp-card-body">' +
+        '<div class="qp-card-desc">📋 Qualification plan &amp; 📚 curriculum documents. Files are named by skill area and user.</div>' +
+        '<div class="qp-actions">' +
+          '<a class="qp-btn" href="' + qpEsc(folderUrl) + '" target="_blank" rel="noopener">📁 Open Folder</a>' +
+          '<button class="qp-btn secondary" id="qpToggleBtn-' + idx + '" onclick="qpToggleEmbed(' + idx + ')">Preview documents</button>' +
+        '</div>' +
+        '<div class="qp-embed" id="qpEmbed-' + idx + '">' +
+          '<iframe data-folder="' + qpEsc(prog.folderId) + '" title="' + qpEsc(prog.title) + ' documents" loading="lazy"></iframe>' +
+        '</div>' +
+      '</div>' +
+    '</div>';
+}
+
+function qpRender() {
+  var grid = document.getElementById('qpGrid');
+  var search = (document.getElementById('qpSearch').value || '').toLowerCase().trim();
+  var filter = document.getElementById('qpFilter').value;
+
+  // Determine which programmes this viewer may see.
+  var allowedSkill = (!qpIsStaff && qpCourse) ? qpSkillMeta(qpCourse) : null;
+
+  var list = QUAL_PLAN_PROGRAMS.filter(function(prog){
+    // Student / instructor: only their skill area + general programmes.
+    if (allowedSkill && !prog.general && prog.skillArea !== allowedSkill.name) return false;
+    // Staff skill-area dropdown filter.
+    if (qpIsStaff && filter !== 'all' && !prog.general && prog.skillArea !== filter) return false;
+    if (qpIsStaff && filter !== 'all' && prog.general) return false;
+    if (!search) return true;
+    var hay = (prog.title + ' ' + (prog.skillArea || 'short courses')).toLowerCase();
+    return hay.indexOf(search) !== -1;
+  });
+
+  grid.innerHTML = list.length
+    ? list.map(qpCard).join('')
+    : '<div class="qp-empty">No qualification plans available for this skill area yet.</div>';
+}
+
+function qpInit() {
+  // Build the skill-area filter from skill areas that actually have programmes.
+  var sel = document.getElementById('qpFilter');
+  var withPrograms = {};
+  QUAL_PLAN_PROGRAMS.forEach(function(p){ if (p.skillArea) withPrograms[p.skillArea] = true; });
+  Object.keys(withPrograms).sort().forEach(function(name){
+    var o = document.createElement('option');
+    o.value = name; o.textContent = name;
+    sel.appendChild(o);
+  });
+
+  if (qpIsStaff) {
+    // Staff: show the full master-library browser too.
+    var browse = document.getElementById('qpBrowseAll');
+    browse.style.display = '';
+    document.getElementById('qpFolderFrame').src =
+      'https://drive.google.com/embeddedfolderview?id=' + QUAL_PLAN_FOLDER_ID + '#list';
+    document.getElementById('qpSubtitle').textContent =
+      'All qualification plans & curriculums, organised by skill area.';
+  } else {
+    // Student / instructor: lock to their skill area and show a welcome banner.
+    document.getElementById('qpControls').style.display = 'none';
+    var skill = qpCourse ? qpSkillMeta(qpCourse) : null;
+    if (skill) {
+      document.getElementById('qpSubtitle').textContent =
+        'Your qualification plan & curriculum for ' + skill.name + '.';
+      var rgb = qpHexToRgb(skill.color);
+      document.getElementById('qpBannerHost').innerHTML =
+        '<div class="qp-banner" style="background:linear-gradient(135deg,rgba(' + rgb + ',0.16),rgba(52,152,219,0.05));">' +
+          '<div class="ic" style="background:' + skill.color + '33;color:' + skill.color + ';">' + skill.icon + '</div>' +
+          '<div>' +
+            '<h2>' + qpEsc(skill.name) + '</h2>' +
+            '<span class="sub">' +
+              (qpUserName ? qpEsc(qpUserName) + ' — ' : '') +
+              'Qualification plan &amp; curriculum for your skill area' +
+            '</span>' +
+          '</div>' +
+        '</div>';
+    }
+  }
+
+  qpRender();
+}
+
+document.addEventListener('DOMContentLoaded', qpInit);
+</script>
+</body>
+</html>
