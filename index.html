@@ -7836,6 +7836,42 @@ var cestisFeatureConfig = {
     onMount: function() {
       cestisSafe('renderInstructorCalendar');
     }
+  },
+  'as-resources': {
+    file: 'Pages/AdminStaff-Resources.html',
+    onMount: function() {
+      cestisSafe('renderAsResources');
+    }
+  },
+  'as-exams': {
+    file: 'Pages/AdminStaff-Exams.html',
+    onMount: function() {
+      cestisSafe('renderAsExams');
+    }
+  },
+  'as-attendance': {
+    file: 'Pages/AdminStaff-Attendance.html',
+    onMount: function() {
+      cestisSafe('renderAsAttendance');
+    }
+  },
+  'as-announcements': {
+    file: 'Pages/AdminStaff-Announcements.html',
+    onMount: function() {
+      cestisSafe('renderAsAnnouncements');
+    }
+  },
+  'as-calendar': {
+    file: 'Pages/AdminStaff-Calendar.html',
+    onMount: function() {
+      cestisSafe('renderAsCalendar');
+    }
+  },
+  'as-certificates': {
+    file: 'Pages/AdminStaff-Certificates.html',
+    onMount: function() {
+      cestisSafe('renderAsCertificates');
+    }
   }
 };
 
@@ -25032,6 +25068,36 @@ function buildAdminStaffSidebar() {
 }
 
 // ============================== BUILD ADMIN STAFF PAGES ==============================
+// ---- Admin-Staff feature page renderers (fill data rows after fragment mount) ----
+function renderAsResources(){
+  var tb=document.getElementById('asResBody'); if(!tb) return;
+  var html=(driveResources.length > 0 ? driveResources.map(function(r){ return '<tr><td>'+r.name+'</td><td>'+(r.type||'File')+'</td><td>'+(r.course||'General')+'</td><td>'+(r.date||'N/A')+'</td></tr>'; }).join('') : '<tr><td colspan="4" style="text-align:center;color:var(--text-muted);">No resources available</td></tr>')
+    + (instructorResources.length > 0 ? instructorResources.map(function(r){ return '<tr><td>'+(r.title||r.name||'Untitled')+'</td><td>'+(r.type||'File')+'</td><td>'+(r.course||'General')+'</td><td>'+(r.date||'N/A')+'</td></tr>'; }).join('') : '');
+  tb.innerHTML=html;
+}
+function renderAsExams(){
+  var tb=document.getElementById('asExamsBody'); if(!tb) return;
+  tb.innerHTML=exams.map(function(ex){ return '<tr><td>'+ex.title+'</td><td>'+ex.course+'</td><td>'+ex.date+'</td><td>'+ex.duration+' min</td><td><span class="badge '+(ex.status==='completed'?'badge-green':ex.status==='active'?'badge-red':'badge-blue')+'">'+ex.status.charAt(0).toUpperCase()+ex.status.slice(1)+'</span></td></tr>'; }).join('');
+}
+function renderAsAttendance(){
+  var tb=document.getElementById('asAttBody'); if(!tb) return;
+  tb.innerHTML=attendanceRecords.slice(0,40).map(function(a){ var days = a.days||{}; function badge(d){ var v=days[d]||'absent'; return '<span class="badge '+(v==='present'?'badge-green':v==='late'?'badge-amber':'badge-red')+'" style="font-size:10px;">'+v.charAt(0).toUpperCase()+v.slice(1)+'</span>'; } return '<tr><td>'+a.studentId+'</td><td>'+a.studentName+'</td><td>'+a.course+'</td><td>'+badge('Mon')+'</td><td>'+badge('Tue')+'</td><td>'+badge('Wed')+'</td><td>'+badge('Thu')+'</td><td>'+badge('Fri')+'</td></tr>'; }).join('');
+}
+function renderAsAnnouncements(){
+  var el=document.getElementById('asAnnouncementsList'); if(!el) return;
+  el.innerHTML=announcements.filter(function(a){ return !a.forRoles || a.forRoles.indexOf('adminstaff') !== -1 || a.forRoles.indexOf('admin') !== -1; }).map(function(a){ return '<div class="card" style="padding:16px;margin-bottom:12px;"><div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;"><strong>'+a.title+'</strong><span class="badge '+(a.priority==='urgent'?'badge-red':a.priority==='info'?'badge-blue':'badge-green')+'">'+a.priority+'</span></div><p style="font-size:13px;color:var(--text-secondary);margin-bottom:8px;">'+a.body+'</p><div style="font-size:11px;color:var(--text-muted);">By '+a.author+' &bull; '+a.date+'</div></div>'; }).join('');
+}
+function renderAsCalendar(){
+  var el=document.getElementById('asCalendarEvents'); if(!el) return;
+  el.innerHTML=calendarEvents.filter(function(e){ return !e.forRoles || e.forRoles.indexOf('adminstaff') !== -1 || e.forRoles.indexOf('admin') !== -1; }).sort(function(a,b){ return new Date(a.date) - new Date(b.date); }).map(function(e){ return '<div class="card" style="padding:14px;margin-bottom:10px;border-left:4px solid '+(e.color||'var(--accent)')+';"><div style="display:flex;justify-content:space-between;align-items:center;"><div><strong style="font-size:14px;">'+e.title+'</strong><div style="font-size:12px;color:var(--text-muted);">'+e.date+' at '+e.time+'</div></div><span class="badge badge-blue" style="font-size:10px;">'+(e.type||'event')+'</span></div></div>'; }).join('');
+}
+function renderAsCertificates(){
+  var tb=document.getElementById('asCertBody'); if(!tb) return;
+  var certd=students.filter(function(st){ return st.stage==='certified'||st.stage==='collected'; });
+  tb.innerHTML=certd.map(function(st){ return '<tr><td>'+st.name+'</td><td>'+st.course+'</td><td><span class="badge '+(st.stage==='collected'?'badge-green':'badge-amber')+'">'+(stageLabels[st.stage]||st.stage)+'</span></td><td>'+(st.certNo||'Pending')+'</td><td>'+(st.certDate||'N/A')+'</td></tr>'; }).join('')
+    + (certd.length === 0 ? '<tr><td colspan="5" style="text-align:center;color:var(--text-muted);">No certified students yet</td></tr>' : '');
+}
+
 function buildAdminStaffPages() {
   var mc = document.getElementById('mainContent');
   var user = currentLoggedInUser;
@@ -25175,54 +25241,22 @@ function buildAdminStaffPages() {
   '</section>';
 
   // Resource Manager
-  html += '<section class="page" id="page-as-resources">' +
-    '<div class="card-header" style="margin-bottom:16px;"><h3 style="font-family:\'Playfair Display\',serif;">Resources</h3></div>' +
-    '<div class="table-wrapper"><table><thead><tr><th>Title</th><th>Type</th><th>Course</th><th>Added</th></tr></thead><tbody>' +
-      (driveResources.length > 0 ? driveResources.map(function(r){ return '<tr><td>'+r.name+'</td><td>'+(r.type||'File')+'</td><td>'+(r.course||'General')+'</td><td>'+(r.date||'N/A')+'</td></tr>'; }).join('') : '<tr><td colspan="4" style="text-align:center;color:var(--text-muted);">No resources available</td></tr>') +
-      (instructorResources.length > 0 ? instructorResources.map(function(r){ return '<tr><td>'+(r.title||r.name||'Untitled')+'</td><td>'+(r.type||'File')+'</td><td>'+(r.course||'General')+'</td><td>'+(r.date||'N/A')+'</td></tr>'; }).join('') : '') +
-    '</tbody></table></div>' +
-  '</section>';
+  html += '<section class="page" id="page-as-resources">' + '<div class="cestis-mount" data-feature="as-resources" data-prefix="adminstaff"></div>' + '</section>';
 
   // Online Exams
-  html += '<section class="page" id="page-as-exams">' +
-    '<div class="card-header" style="margin-bottom:16px;"><h3 style="font-family:\'Playfair Display\',serif;">Online Exams Schedule</h3></div>' +
-    '<div class="table-wrapper"><table><thead><tr><th>Exam</th><th>Course</th><th>Date</th><th>Duration</th><th>Status</th></tr></thead><tbody>' +
-      exams.map(function(ex){ return '<tr><td>'+ex.title+'</td><td>'+ex.course+'</td><td>'+ex.date+'</td><td>'+ex.duration+' min</td><td><span class="badge '+(ex.status==='completed'?'badge-green':ex.status==='active'?'badge-red':'badge-blue')+'">'+ex.status.charAt(0).toUpperCase()+ex.status.slice(1)+'</span></td></tr>'; }).join('') +
-    '</tbody></table></div>' +
-  '</section>';
+  html += '<section class="page" id="page-as-exams">' + '<div class="cestis-mount" data-feature="as-exams" data-prefix="adminstaff"></div>' + '</section>';
 
   // Attendance Management
-  html += '<section class="page" id="page-as-attendance">' +
-    '<div class="card-header" style="margin-bottom:16px;"><h3 style="font-family:\'Playfair Display\',serif;">Attendance Records</h3></div>' +
-    '<div class="table-wrapper"><table><thead><tr><th>Student ID</th><th>Name</th><th>Course</th><th>Mon</th><th>Tue</th><th>Wed</th><th>Thu</th><th>Fri</th></tr></thead><tbody>' +
-      attendanceRecords.slice(0,40).map(function(a){ var days = a.days||{}; function badge(d){ var v=days[d]||'absent'; return '<span class="badge '+(v==='present'?'badge-green':v==='late'?'badge-amber':'badge-red')+'" style="font-size:10px;">'+v.charAt(0).toUpperCase()+v.slice(1)+'</span>'; } return '<tr><td>'+a.studentId+'</td><td>'+a.studentName+'</td><td>'+a.course+'</td><td>'+badge('Mon')+'</td><td>'+badge('Tue')+'</td><td>'+badge('Wed')+'</td><td>'+badge('Thu')+'</td><td>'+badge('Fri')+'</td></tr>'; }).join('') +
-    '</tbody></table></div>' +
-  '</section>';
+  html += '<section class="page" id="page-as-attendance">' + '<div class="cestis-mount" data-feature="as-attendance" data-prefix="adminstaff"></div>' + '</section>';
 
   // Announcements
-  html += '<section class="page" id="page-as-announcements">' +
-    '<div class="card-header" style="margin-bottom:16px;"><h3 style="font-family:\'Playfair Display\',serif;">Announcements</h3></div>' +
-    '<div id="asAnnouncementsList">' +
-      announcements.filter(function(a){ return !a.forRoles || a.forRoles.indexOf('adminstaff') !== -1 || a.forRoles.indexOf('admin') !== -1; }).map(function(a){ return '<div class="card" style="padding:16px;margin-bottom:12px;"><div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;"><strong>'+a.title+'</strong><span class="badge '+(a.priority==='urgent'?'badge-red':a.priority==='info'?'badge-blue':'badge-green')+'">'+a.priority+'</span></div><p style="font-size:13px;color:var(--text-secondary);margin-bottom:8px;">'+a.body+'</p><div style="font-size:11px;color:var(--text-muted);">By '+a.author+' &bull; '+a.date+'</div></div>'; }).join('') +
-    '</div>' +
-  '</section>';
+  html += '<section class="page" id="page-as-announcements">' + '<div class="cestis-mount" data-feature="as-announcements" data-prefix="adminstaff"></div>' + '</section>';
 
   // Calendar
-  html += '<section class="page" id="page-as-calendar">' +
-    '<div class="card-header" style="margin-bottom:16px;"><h3 style="font-family:\'Playfair Display\',serif;">Calendar & Schedule</h3></div>' +
-    '<div id="asCalendarEvents">' +
-      calendarEvents.filter(function(e){ return !e.forRoles || e.forRoles.indexOf('adminstaff') !== -1 || e.forRoles.indexOf('admin') !== -1; }).sort(function(a,b){ return new Date(a.date) - new Date(b.date); }).map(function(e){ return '<div class="card" style="padding:14px;margin-bottom:10px;border-left:4px solid '+(e.color||'var(--accent)')+';"><div style="display:flex;justify-content:space-between;align-items:center;"><div><strong style="font-size:14px;">'+e.title+'</strong><div style="font-size:12px;color:var(--text-muted);">'+e.date+' at '+e.time+'</div></div><span class="badge badge-blue" style="font-size:10px;">'+(e.type||'event')+'</span></div></div>'; }).join('') +
-    '</div>' +
-  '</section>';
+  html += '<section class="page" id="page-as-calendar">' + '<div class="cestis-mount" data-feature="as-calendar" data-prefix="adminstaff"></div>' + '</section>';
 
   // Certificate Tracking
-  html += '<section class="page" id="page-as-certificates">' +
-    '<div class="card-header" style="margin-bottom:16px;"><h3 style="font-family:\'Playfair Display\',serif;">Certificate Tracking</h3></div>' +
-    '<div class="table-wrapper"><table><thead><tr><th>Student</th><th>Course</th><th>Status</th><th>Cert #</th><th>Date</th></tr></thead><tbody>' +
-      students.filter(function(st){ return st.stage==='certified'||st.stage==='collected'; }).map(function(st){ return '<tr><td>'+st.name+'</td><td>'+st.course+'</td><td><span class="badge '+(st.stage==='collected'?'badge-green':'badge-amber')+'">'+(stageLabels[st.stage]||st.stage)+'</span></td><td>'+(st.certNo||'Pending')+'</td><td>'+(st.certDate||'N/A')+'</td></tr>'; }).join('') +
-      (students.filter(function(st){ return st.stage==='certified'||st.stage==='collected'; }).length === 0 ? '<tr><td colspan="5" style="text-align:center;color:var(--text-muted);">No certified students yet</td></tr>' : '') +
-    '</tbody></table></div>' +
-  '</section>';
+  html += '<section class="page" id="page-as-certificates">' + '<div class="cestis-mount" data-feature="as-certificates" data-prefix="adminstaff"></div>' + '</section>';
 
   // Reports
   html += '<section class="page" id="page-as-reports">' +
