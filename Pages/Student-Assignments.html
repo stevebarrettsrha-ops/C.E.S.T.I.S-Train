@@ -1,0 +1,21 @@
+<!--
+  ============================================================================
+  Pages/Student-Assignments.html  —  C.E.S.T.I.S My Assignments (Student) UI fragment
+  ----------------------------------------------------------------------------
+  Fetched by index.html and injected into the mount slot
+  (<div class="cestis-mount" data-feature="s-assignments" data-prefix="student">).
+  Rendered on mount by: cestisSafe('renderStudentAssignmentsPage') (in index.html).
+  All JS and CSS remain in index.html. Injected via innerHTML — <script> won't run.
+  ============================================================================
+-->
+    <div class="stats-grid stats-grid-4" style="margin-bottom:18px;">
+      <div class="stat-card"><div class="stat-icon" style="background:var(--blue-dim);color:var(--blue);">📋</div><div class="stat-value" id="sAssignTotal">0</div><div class="stat-label">Total Assignments</div></div>
+      <div class="stat-card"><div class="stat-icon" style="background:var(--green-dim);color:var(--green);">📤</div><div class="stat-value" id="sAssignSubmitted">0</div><div class="stat-label">Submitted</div></div>
+      <div class="stat-card"><div class="stat-icon" style="background:var(--accent-dim);color:var(--accent);">⭐</div><div class="stat-value" id="sAssignGraded">0</div><div class="stat-label">Graded</div></div>
+      <div class="stat-card"><div class="stat-icon" style="background:var(--red-dim);color:var(--red);">⏳</div><div class="stat-value" id="sAssignPending">0</div><div class="stat-label">Pending</div></div>
+    </div>
+    <div class="card">
+      <div class="card-header"><h3>My Assignments</h3><span id="sAssignPageCount" style="font-size:13px;color:var(--text-muted);"></span></div>
+      <div id="studentAssignmentsPageList"></div>
+    </div>
+  

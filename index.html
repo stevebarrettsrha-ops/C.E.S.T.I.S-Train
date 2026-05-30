@@ -7872,6 +7872,18 @@ var cestisFeatureConfig = {
     onMount: function() {
       cestisSafe('renderAsCertificates');
     }
+  },
+  's-assignments': {
+    file: 'Pages/Student-Assignments.html',
+    onMount: function() {
+      cestisSafe('renderStudentAssignmentsPage');
+    }
+  },
+  's-calendar': {
+    file: 'Pages/Student-Calendar.html',
+    onMount: function() {
+      cestisSafe('renderStudentCalendar');
+    }
   }
 };
 
@@ -7957,7 +7969,6 @@ function showPage(pageId) {
   if(pageId === 'i-document-hub') renderDocumentHubInstructor();
   if(pageId === 'as-document-hub') renderDocumentHubAdmin();
   if(pageId === 's-resources') renderStudentDriveResources();
-  if(pageId === 's-assignments') renderStudentAssignmentsPage();
   if(pageId === 's-progress') renderStudentAssignments();
   // LMS Chat and Video Conference for every role are loaded from their own HTML
   // files and initialised by the mount onMount hooks (see the .cestis-mount block
@@ -8814,16 +8825,7 @@ function buildStudentPages() {
 
   <!-- STUDENT ASSIGNMENTS -->
   <section class="page" id="page-s-assignments">
-    <div class="stats-grid stats-grid-4" style="margin-bottom:18px;">
-      <div class="stat-card"><div class="stat-icon" style="background:var(--blue-dim);color:var(--blue);">📋</div><div class="stat-value" id="sAssignTotal">0</div><div class="stat-label">Total Assignments</div></div>
-      <div class="stat-card"><div class="stat-icon" style="background:var(--green-dim);color:var(--green);">📤</div><div class="stat-value" id="sAssignSubmitted">0</div><div class="stat-label">Submitted</div></div>
-      <div class="stat-card"><div class="stat-icon" style="background:var(--accent-dim);color:var(--accent);">⭐</div><div class="stat-value" id="sAssignGraded">0</div><div class="stat-label">Graded</div></div>
-      <div class="stat-card"><div class="stat-icon" style="background:var(--red-dim);color:var(--red);">⏳</div><div class="stat-value" id="sAssignPending">0</div><div class="stat-label">Pending</div></div>
-    </div>
-    <div class="card">
-      <div class="card-header"><h3>My Assignments</h3><span id="sAssignPageCount" style="font-size:13px;color:var(--text-muted);"></span></div>
-      <div id="studentAssignmentsPageList"></div>
-    </div>
+    <div class="cestis-mount" data-feature="s-assignments" data-prefix="student"></div>
   </section>
 
   <!-- STUDENT EXAMS -->
@@ -8982,20 +8984,7 @@ function buildStudentPages() {
   </section>
 
   <section class="page" id="page-s-calendar">
-    <div class="grid-sidebar-sm">
-      <div class="card">
-        <div class="cal-header">
-          <div class="cal-nav"><button onclick="changeCalMonth(-1)">\u2190</button></div>
-          <div class="cal-title" id="sCalTitle"></div>
-          <div class="cal-nav"><button onclick="changeCalMonth(1)">\u2192</button></div>
-        </div>
-        <div class="calendar-grid" id="sCalGrid"></div>
-      </div>
-      <div>
-        <div class="card"><div class="card-header"><h3 id="sCalDayTitle">Select a Day</h3></div><div id="sCalDayEvents"><p style="font-size:13px;color:var(--text-muted);">Click a day to see events</p></div></div>
-        <div class="card" style="margin-top:12px;"><div class="card-header"><h3>My Events</h3></div><div id="sCalEventList"></div></div>
-      </div>
-    </div>
+    <div class="cestis-mount" data-feature="s-calendar" data-prefix="student"></div>
   </section>
 
   <!-- C.E.S.T.I.S LMS CHAT PAGE (STUDENT) -->

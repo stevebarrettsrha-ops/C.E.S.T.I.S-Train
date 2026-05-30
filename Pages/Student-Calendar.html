@@ -1,0 +1,25 @@
+<!--
+  ============================================================================
+  Pages/Student-Calendar.html  —  C.E.S.T.I.S My Calendar (Student) UI fragment
+  ----------------------------------------------------------------------------
+  Fetched by index.html and injected into the mount slot
+  (<div class="cestis-mount" data-feature="s-calendar" data-prefix="student">).
+  Rendered on mount by: cestisSafe('renderStudentCalendar') (in index.html).
+  All JS and CSS remain in index.html. Injected via innerHTML — <script> won't run.
+  ============================================================================
+-->
+    <div class="grid-sidebar-sm">
+      <div class="card">
+        <div class="cal-header">
+          <div class="cal-nav"><button onclick="changeCalMonth(-1)">←</button></div>
+          <div class="cal-title" id="sCalTitle"></div>
+          <div class="cal-nav"><button onclick="changeCalMonth(1)">→</button></div>
+        </div>
+        <div class="calendar-grid" id="sCalGrid"></div>
+      </div>
+      <div>
+        <div class="card"><div class="card-header"><h3 id="sCalDayTitle">Select a Day</h3></div><div id="sCalDayEvents"><p style="font-size:13px;color:var(--text-muted);">Click a day to see events</p></div></div>
+        <div class="card" style="margin-top:12px;"><div class="card-header"><h3>My Events</h3></div><div id="sCalEventList"></div></div>
+      </div>
+    </div>
+  
