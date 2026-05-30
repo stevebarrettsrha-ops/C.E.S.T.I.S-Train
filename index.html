@@ -5967,6 +5967,10 @@ function loadState() {
   }
   // Load cert template background images from IndexedDB
   initCertTemplateImages();
+  // Recover certified status for students whose stage/id was lost during a
+  // dedup/merge but whose cert download approval records survived. Run this
+  // BEFORE backfill so restored students are picked up by the backfill pass.
+  reconcileCertifiedFromApprovals();
   // Backfill certificate numbers for any certified students missing one so they
   // appear in the admin download-approval list and verify publicly as issued.
   if(backfillCertificateNumbers()) {
@@ -6081,6 +6085,12 @@ function reconcileStudentsFromAccounts() {
 
   if (changed) {
     updateSkillAreaCounts();
+  }
+  // After this dedup/merge pass (which can re-ID or recreate student records),
+  // restore certified status from surviving cert download approvals so a merge
+  // can never strand a previously certified student as "In Training".
+  if (typeof reconcileCertifiedFromApprovals === 'function') {
+    if (reconcileCertifiedFromApprovals()) changed = true;
   }
   return changed;
 }
@@ -28536,6 +28546,47 @@ async function fetchCertDataFromDrive() {
 // public verification reported "Certificate Not Yet Issued" and the admin
 // Certificate Download Management list (which filters on certNo) hid them, so
 // they could never be approved or download their certificate.
+// Recovery: restore certified status onto students[] from surviving
+// certDownloadApprovals records. After dedup/merge can change a student's id
+// (or reset their stage to training), the approval records still hold proof
+// that the student was certified and approved for download. This reapplies
+// that status back onto students[] so the Student Progress page and stat
+// counts recover. Non-destructive: never deletes approvals.
+function reconcileCertifiedFromApprovals() {
+  if(!Array.isArray(certDownloadApprovals) || !Array.isArray(students)) return false;
+  var changed = false;
+  certDownloadApprovals.forEach(function(a) {
+    if(!a) return;
+    // Treat missing `approved` as approved when the entry carries a certNo.
+    var isApproved = (a.approved === true) || (a.approved === undefined && a.certNo);
+    if(!isApproved) return;
+    // Match by studentId first, then fall back to name+course (case-insensitive).
+    var stu = students.find(function(s){ return s && s.id === a.studentId; });
+    if(!stu) {
+      var an = (a.name||'').toLowerCase().trim();
+      var ac = (a.course||'').toLowerCase().trim();
+      stu = students.find(function(s){
+        return s && (s.name||'').toLowerCase().trim() === an && (s.course||'').toLowerCase().trim() === ac;
+      });
+    }
+    if(!stu) return;
+    if(stu.stage === 'certified' || stu.stage === 'collected') {
+      // Already certified; just keep the approval's studentId in sync if dedup re-IDed.
+      if(stu.id !== a.studentId) { a.studentId = stu.id; changed = true; }
+      return;
+    }
+    // Restore certified status.
+    stu.stage = 'certified';
+    if(stu.progress === undefined || stu.progress === null || stu.progress < 90) stu.progress = 90;
+    if((!stu.certNo) && a.certNo) stu.certNo = a.certNo;
+    if((!stu.certDate) && a.certDate) stu.certDate = a.certDate;
+    if(stu.id !== a.studentId) a.studentId = stu.id;
+    changed = true;
+  });
+  if(changed) saveState();
+  return changed;
+}
+
 function backfillCertificateNumbers() {
   if(!Array.isArray(students)) return false;
   var changed = false;
@@ -29717,6 +29768,7 @@ function saveCertTemplate() {
 
 // --- Admin Certificate Download Management ---
 function renderCertDownloadMgmt() {
+  reconcileCertifiedFromApprovals();
   backfillCertificateNumbers();
   populateCertTemplateSkillSelect();
 
