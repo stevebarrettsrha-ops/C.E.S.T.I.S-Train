@@ -5967,6 +5967,14 @@ function loadState() {
   }
   // Load cert template background images from IndexedDB
   initCertTemplateImages();
+  // Recover certified status for students whose stage/id was lost during a
+  // dedup/merge but whose cert download approval records survived. Run this
+  // BEFORE backfill so restored students are picked up by the backfill pass.
+  reconcileCertifiedFromApprovals();
+  // Remove orphaned/duplicate attendance records left behind when students were
+  // deleted or re-IDed during a dedup/merge, so the attendance register shows
+  // one row per real student instead of duplicate names.
+  if(typeof dedupeAttendanceRecords === 'function') dedupeAttendanceRecords();
   // Backfill certificate numbers for any certified students missing one so they
   // appear in the admin download-approval list and verify publicly as issued.
   if(backfillCertificateNumbers()) {
@@ -6079,8 +6087,19 @@ function reconcileStudentsFromAccounts() {
     }
   });
 
+  // Collapse any duplicate/orphaned attendance records created by re-IDed or
+  // removed students so the attendance register shows one row per student.
+  if (typeof dedupeAttendanceRecords === 'function') {
+    if (dedupeAttendanceRecords()) changed = true;
+  }
   if (changed) {
     updateSkillAreaCounts();
+  }
+  // After this dedup/merge pass (which can re-ID or recreate student records),
+  // restore certified status from surviving cert download approvals so a merge
+  // can never strand a previously certified student as "In Training".
+  if (typeof reconcileCertifiedFromApprovals === 'function') {
+    if (reconcileCertifiedFromApprovals()) changed = true;
   }
   return changed;
 }
@@ -9475,6 +9494,7 @@ function exportInstructorStudentsCSV() {
 
 function renderInstructorAttendance() {
   if(!currentInstructor) return;
+  if(typeof dedupeAttendanceRecords === 'function') dedupeAttendanceRecords();
   const myRecords = attendanceRecords.filter(r => {
     const student = students.find(s => s.id === r.studentId);
     return student && (student.instructor === currentInstructor.name || instructorCourseMatch(student.course, currentInstructor.course));
@@ -16580,9 +16600,69 @@ function renderGenderDist() {
   el.innerHTML = html;
 }
 
+// Collapse attendance records down to one row per real student and drop
+// orphans. When students are deleted or re-IDed during a dedup/merge, their
+// old attendance records can be left behind (or a new record created under the
+// new id), which made the attendance register show duplicate student names and
+// inflated the row count (e.g. 379 rows for 27 students). This re-links each
+// record to its current student (by id, falling back to name+course), merges
+// duplicates for the same student into one record (preferring any present/late
+// mark so recorded attendance is never lost), and removes records that no
+// longer match any student. Non-destructive of actual attendance data.
+function dedupeAttendanceRecords() {
+  if(!Array.isArray(attendanceRecords) || !Array.isArray(students)) return false;
+  var byId = {};
+  var byNameCourse = {};
+  students.forEach(function(s){
+    if(!s) return;
+    byId[s.id] = s;
+    if(s.name) byNameCourse[(s.name||'').toLowerCase().trim() + '|' + (s.course||'').toLowerCase().trim()] = s;
+  });
+  var days = ['Mon','Tue','Wed','Thu','Fri'];
+  var merged = {};
+  var order = [];
+  var changed = false;
+  attendanceRecords.forEach(function(r){
+    if(!r){ changed = true; return; }
+    // Resolve to a current student: by id first, then by name+course.
+    var stu = byId[r.studentId];
+    if(!stu){
+      stu = byNameCourse[(r.studentName||'').toLowerCase().trim() + '|' + (r.course||'').toLowerCase().trim()];
+    }
+    if(!stu){ changed = true; return; } // orphan — drop
+    // Re-link the record to the current student.
+    if(r.studentId !== stu.id){ r.studentId = stu.id; changed = true; }
+    if(r.studentName !== stu.name){ r.studentName = stu.name; changed = true; }
+    if(r.course !== stu.course){ r.course = stu.course; changed = true; }
+    var existing = merged[stu.id];
+    if(!existing){
+      merged[stu.id] = r;
+      order.push(stu.id);
+    } else {
+      // Duplicate for the same student — merge day marks, preferring a
+      // present/late mark over absent/blank so we never discard real data.
+      existing.days = existing.days || {};
+      r.days = r.days || {};
+      days.forEach(function(d){
+        var cur = existing.days[d];
+        var alt = r.days[d];
+        if((cur === undefined || cur === 'absent') && (alt === 'present' || alt === 'late')) existing.days[d] = alt;
+        else if(cur === undefined && alt) existing.days[d] = alt;
+      });
+      changed = true; // a duplicate row is being removed
+    }
+  });
+  if(changed){
+    attendanceRecords = order.map(function(id){ return merged[id]; });
+    if(typeof saveState === 'function') saveState();
+  }
+  return changed;
+}
+
 function renderAttendancePage() {
   const tbody = document.getElementById('attendanceTableBody');
   if(!tbody) return;
+  dedupeAttendanceRecords();
   const courseFilter = document.getElementById('attendanceCourseFilter')?.value || 'all';
   let records = [...attendanceRecords];
   if(courseFilter && courseFilter !== 'all') records = records.filter(function(r) {
@@ -16593,7 +16673,7 @@ function renderAttendancePage() {
     return false;
   });
   const days = ['Mon','Tue','Wed','Thu','Fri'];
-  tbody.innerHTML = records.slice(0,40).map((r,idx) => {
+  tbody.innerHTML = records.map((r,idx) => {
     return `<tr><td><strong>${r.studentName}</strong></td><td style="font-family:monospace;font-size:12px;">${r.studentId}</td><td>${r.course}</td>
     ${days.map(d => {
       const st = r.days[d];
@@ -28536,6 +28616,47 @@ async function fetchCertDataFromDrive() {
 // public verification reported "Certificate Not Yet Issued" and the admin
 // Certificate Download Management list (which filters on certNo) hid them, so
 // they could never be approved or download their certificate.
+// Recovery: restore certified status onto students[] from surviving
+// certDownloadApprovals records. After dedup/merge can change a student's id
+// (or reset their stage to training), the approval records still hold proof
+// that the student was certified and approved for download. This reapplies
+// that status back onto students[] so the Student Progress page and stat
+// counts recover. Non-destructive: never deletes approvals.
+function reconcileCertifiedFromApprovals() {
+  if(!Array.isArray(certDownloadApprovals) || !Array.isArray(students)) return false;
+  var changed = false;
+  certDownloadApprovals.forEach(function(a) {
+    if(!a) return;
+    // Treat missing `approved` as approved when the entry carries a certNo.
+    var isApproved = (a.approved === true) || (a.approved === undefined && a.certNo);
+    if(!isApproved) return;
+    // Match by studentId first, then fall back to name+course (case-insensitive).
+    var stu = students.find(function(s){ return s && s.id === a.studentId; });
+    if(!stu) {
+      var an = (a.name||'').toLowerCase().trim();
+      var ac = (a.course||'').toLowerCase().trim();
+      stu = students.find(function(s){
+        return s && (s.name||'').toLowerCase().trim() === an && (s.course||'').toLowerCase().trim() === ac;
+      });
+    }
+    if(!stu) return;
+    if(stu.stage === 'certified' || stu.stage === 'collected') {
+      // Already certified; just keep the approval's studentId in sync if dedup re-IDed.
+      if(stu.id !== a.studentId) { a.studentId = stu.id; changed = true; }
+      return;
+    }
+    // Restore certified status.
+    stu.stage = 'certified';
+    if(stu.progress === undefined || stu.progress === null || stu.progress < 90) stu.progress = 90;
+    if((!stu.certNo) && a.certNo) stu.certNo = a.certNo;
+    if((!stu.certDate) && a.certDate) stu.certDate = a.certDate;
+    if(stu.id !== a.studentId) a.studentId = stu.id;
+    changed = true;
+  });
+  if(changed) saveState();
+  return changed;
+}
+
 function backfillCertificateNumbers() {
   if(!Array.isArray(students)) return false;
   var changed = false;
@@ -29717,6 +29838,7 @@ function saveCertTemplate() {
 
 // --- Admin Certificate Download Management ---
 function renderCertDownloadMgmt() {
+  reconcileCertifiedFromApprovals();
   backfillCertificateNumbers();
   populateCertTemplateSkillSelect();
 
