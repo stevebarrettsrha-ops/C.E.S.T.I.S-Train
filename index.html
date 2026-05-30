@@ -5967,6 +5967,11 @@ function loadState() {
   }
   // Load cert template background images from IndexedDB
   initCertTemplateImages();
+  // Backfill certificate numbers for any certified students missing one so they
+  // appear in the admin download-approval list and verify publicly as issued.
+  if(backfillCertificateNumbers()) {
+    try { CESTISStore.setItem('voctrain_students', JSON.stringify(students)); } catch(e) {}
+  }
   updateSkillAreaCounts();
 }
 
@@ -28417,6 +28422,10 @@ async function fetchCertDataFromDrive() {
       });
     }
 
+    // Backfill certificate numbers for certified students pulled from the cloud
+    // so the verification recognises them as issued.
+    backfillCertificateNumbers();
+
     _certDriveLastFetched = Date.now();
 
     // Show success briefly then hide
@@ -28436,7 +28445,32 @@ async function fetchCertDataFromDrive() {
   }
 }
 
+// Ensure every certified/collected student has a certificate number.
+// Students added via bulk or cloud import can have stage 'certified' without a
+// certNo (only the "Update Stage" dropdown assigned one). Without a certNo the
+// public verification reported "Certificate Not Yet Issued" and the admin
+// Certificate Download Management list (which filters on certNo) hid them, so
+// they could never be approved or download their certificate.
+function backfillCertificateNumbers() {
+  if(!Array.isArray(students)) return false;
+  var changed = false;
+  students.forEach(function(s) {
+    if(!s || !s.course) return;
+    if((s.stage === 'certified' || s.stage === 'collected') && !s.certNo) {
+      var code = (typeof certTemplates !== 'undefined' && certTemplates[s.course] && certTemplates[s.course].programmeCode)
+        ? certTemplates[s.course].programmeCode
+        : s.course.substring(0, 2).toUpperCase();
+      s.certNo = code + '-' + new Date().getFullYear() + '-' + String(Math.floor(Math.random() * 9000) + 1000);
+      if(!s.certDate) s.certDate = new Date().toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: '2-digit' });
+      if(s.stage === 'collected') s.certCollected = true;
+      changed = true;
+    }
+  });
+  return changed;
+}
+
 function checkCertificatePublic() {
+  backfillCertificateNumbers();
   var query = (document.getElementById('certCheckInput').value || '').trim();
   var resultDiv = document.getElementById('certCheckResult');
   if(!query) { resultDiv.innerHTML = '<p style="color:var(--red);font-size:13px;margin-top:8px;">Please enter a Student ID Number or Certificate Number.</p>'; return; }
@@ -29598,6 +29632,7 @@ function saveCertTemplate() {
 
 // --- Admin Certificate Download Management ---
 function renderCertDownloadMgmt() {
+  backfillCertificateNumbers();
   populateCertTemplateSkillSelect();
 
   var search = (document.getElementById('certDlSearch')?.value || '').toLowerCase();
@@ -29717,6 +29752,7 @@ function revokeCertDownload(studentId) {
 }
 
 function openBulkCertApproveModal() {
+  backfillCertificateNumbers();
   var list = document.getElementById('bulkCertList');
   var unapproved = students.filter(function(s) {
     return s.certNo && !certDownloadApprovals.some(function(d){ return d.studentId === s.id && d.approved; });
