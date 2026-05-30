@@ -1,0 +1,37 @@
+<!--
+  ============================================================================
+  Pages/Student-Resources.html  —  C.E.S.T.I.S My Resources (Student) UI fragment
+  ----------------------------------------------------------------------------
+  Fetched by index.html and injected into the mount slot
+  (<div class="cestis-mount" data-feature="s-resources" data-prefix="student">).
+  On mount renderStudentResourcesPage() paints the programme welcome banner
+  (#sResWelcomeBanner) from the current student's skill area, then
+  renderStudentDriveResources() fills #studentDriveResources with Drive items.
+  All JS and CSS remain in index.html. Injected via innerHTML — <script> won't run.
+  ============================================================================
+-->
+    <div id="sResWelcomeBanner"></div>
+
+    <div class="tabs" id="sResourceTabs">
+      <div class="tab active" onclick="filterStudentResources('all',this)">All Materials</div>
+      <div class="tab" onclick="filterStudentResources('video',this)">Videos</div>
+      <div class="tab" onclick="filterStudentResources('document',this)">Documents</div>
+      <div class="tab" onclick="filterStudentResources('worksheet',this)">Worksheets</div>
+    </div>
+
+    <div style="margin-bottom:14px;display:flex;gap:10px;align-items:center;">
+      <input type="text" class="form-control" id="sResSearch" placeholder="Search by name or resource ID..." style="max-width:340px;" oninput="renderStudentDriveResources()">
+    </div>
+
+    <!-- Drive-uploaded resources for this student's class -->
+    <div id="studentDriveResources"></div>
+
+    <!-- Resources are loaded from Google Drive -->
+    <div id="studentStaticResources">
+      <div class="card" style="text-align:center;padding:32px;" id="studentNoResourcesMsg">
+        <div style="font-size:48px;margin-bottom:12px;opacity:0.3;">📁</div>
+        <h3 style="color:var(--text-muted);margin-bottom:8px;">No Resources Available Yet</h3>
+        <p style="font-size:13px;color:var(--text-muted);">Your instructor will upload learning materials to Google Drive. Check back soon.</p>
+      </div>
+    </div>
+  

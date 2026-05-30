@@ -7884,6 +7884,12 @@ var cestisFeatureConfig = {
     onMount: function() {
       cestisSafe('renderStudentCalendar');
     }
+  },
+  's-resources': {
+    file: 'Pages/Student-Resources.html',
+    onMount: function() {
+      cestisSafe('renderStudentResourcesPage');
+    }
   }
 };
 
@@ -7968,7 +7974,7 @@ function showPage(pageId) {
   if(pageId === 'document-hub') renderDocumentHubAdmin();
   if(pageId === 'i-document-hub') renderDocumentHubInstructor();
   if(pageId === 'as-document-hub') renderDocumentHubAdmin();
-  if(pageId === 's-resources') renderStudentDriveResources();
+  if(pageId === 's-resources') renderStudentResourcesPage();
   if(pageId === 's-progress') renderStudentAssignments();
   // LMS Chat and Video Conference for every role are loaded from their own HTML
   // files and initialised by the mount onMount hooks (see the .cestis-mount block
@@ -8625,6 +8631,24 @@ function buildAdminPages() {
 }
 
 // ============================== BUILD STUDENT PAGES ==============================
+// Paint the My Resources (student) programme banner + Drive resource list on mount.
+function renderStudentResourcesPage(){
+  var s = (typeof currentStudent !== 'undefined') ? currentStudent : null;
+  var banner = document.getElementById('sResWelcomeBanner');
+  if(banner && s){
+    var skill = findSkillAreaForCourse(s.course) || {color:'#3498db',icon:'📚',name:(s.course||'Programme')};
+    var rgb = hexToRgb(skill.color);
+    banner.innerHTML =
+      '<div class="student-welcome-banner" style="background:linear-gradient(135deg,rgba('+rgb+',0.15),rgba(52,152,219,0.05));">' +
+        '<div style="display:flex;align-items:center;gap:14px;margin-bottom:8px;">' +
+          '<div style="width:48px;height:48px;border-radius:12px;background:'+skill.color+'33;display:flex;align-items:center;justify-content:center;font-size:24px;">'+skill.icon+'</div>' +
+          '<div><h2 style="font-size:20px;">'+skill.name+' Resources</h2><p style="margin:0;">Your programme-specific learning materials</p></div>' +
+        '</div>' +
+      '</div>';
+  }
+  if(typeof renderStudentDriveResources === 'function'){ try{ renderStudentDriveResources(); }catch(e){} }
+}
+
 function buildStudentPages() {
   try {
   resolveExamStatuses();
@@ -8792,35 +8816,7 @@ function buildStudentPages() {
 
   <!-- STUDENT RESOURCES -->
   <section class="page" id="page-s-resources">
-    <div class="student-welcome-banner" style="background:linear-gradient(135deg,rgba(${skillColorRGB},0.15),rgba(52,152,219,0.05));">
-      <div style="display:flex;align-items:center;gap:14px;margin-bottom:8px;">
-        <div style="width:48px;height:48px;border-radius:12px;background:${skill.color}33;display:flex;align-items:center;justify-content:center;font-size:24px;">${skill.icon}</div>
-        <div><h2 style="font-size:20px;">${skill.name} Resources</h2><p style="margin:0;">Your programme-specific learning materials</p></div>
-      </div>
-    </div>
-
-    <div class="tabs" id="sResourceTabs">
-      <div class="tab active" onclick="filterStudentResources('all',this)">All Materials</div>
-      <div class="tab" onclick="filterStudentResources('video',this)">Videos</div>
-      <div class="tab" onclick="filterStudentResources('document',this)">Documents</div>
-      <div class="tab" onclick="filterStudentResources('worksheet',this)">Worksheets</div>
-    </div>
-
-    <div style="margin-bottom:14px;display:flex;gap:10px;align-items:center;">
-      <input type="text" class="form-control" id="sResSearch" placeholder="Search by name or resource ID..." style="max-width:340px;" oninput="renderStudentDriveResources()">
-    </div>
-
-    <!-- Drive-uploaded resources for this student's class -->
-    <div id="studentDriveResources"></div>
-
-    <!-- Resources are loaded from Google Drive -->
-    <div id="studentStaticResources">
-      <div class="card" style="text-align:center;padding:32px;" id="studentNoResourcesMsg">
-        <div style="font-size:48px;margin-bottom:12px;opacity:0.3;">📁</div>
-        <h3 style="color:var(--text-muted);margin-bottom:8px;">No Resources Available Yet</h3>
-        <p style="font-size:13px;color:var(--text-muted);">Your instructor will upload learning materials to Google Drive. Check back soon.</p>
-      </div>
-    </div>
+    <div class="cestis-mount" data-feature="s-resources" data-prefix="student"></div>
   </section>
 
   <!-- STUDENT ASSIGNMENTS -->
