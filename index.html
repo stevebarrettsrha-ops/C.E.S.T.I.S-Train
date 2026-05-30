@@ -5971,6 +5971,10 @@ function loadState() {
   // dedup/merge but whose cert download approval records survived. Run this
   // BEFORE backfill so restored students are picked up by the backfill pass.
   reconcileCertifiedFromApprovals();
+  // Remove orphaned/duplicate attendance records left behind when students were
+  // deleted or re-IDed during a dedup/merge, so the attendance register shows
+  // one row per real student instead of duplicate names.
+  if(typeof dedupeAttendanceRecords === 'function') dedupeAttendanceRecords();
   // Backfill certificate numbers for any certified students missing one so they
   // appear in the admin download-approval list and verify publicly as issued.
   if(backfillCertificateNumbers()) {
@@ -6083,6 +6087,11 @@ function reconcileStudentsFromAccounts() {
     }
   });
 
+  // Collapse any duplicate/orphaned attendance records created by re-IDed or
+  // removed students so the attendance register shows one row per student.
+  if (typeof dedupeAttendanceRecords === 'function') {
+    if (dedupeAttendanceRecords()) changed = true;
+  }
   if (changed) {
     updateSkillAreaCounts();
   }
@@ -9485,6 +9494,7 @@ function exportInstructorStudentsCSV() {
 
 function renderInstructorAttendance() {
   if(!currentInstructor) return;
+  if(typeof dedupeAttendanceRecords === 'function') dedupeAttendanceRecords();
   const myRecords = attendanceRecords.filter(r => {
     const student = students.find(s => s.id === r.studentId);
     return student && (student.instructor === currentInstructor.name || instructorCourseMatch(student.course, currentInstructor.course));
@@ -16590,9 +16600,69 @@ function renderGenderDist() {
   el.innerHTML = html;
 }
 
+// Collapse attendance records down to one row per real student and drop
+// orphans. When students are deleted or re-IDed during a dedup/merge, their
+// old attendance records can be left behind (or a new record created under the
+// new id), which made the attendance register show duplicate student names and
+// inflated the row count (e.g. 379 rows for 27 students). This re-links each
+// record to its current student (by id, falling back to name+course), merges
+// duplicates for the same student into one record (preferring any present/late
+// mark so recorded attendance is never lost), and removes records that no
+// longer match any student. Non-destructive of actual attendance data.
+function dedupeAttendanceRecords() {
+  if(!Array.isArray(attendanceRecords) || !Array.isArray(students)) return false;
+  var byId = {};
+  var byNameCourse = {};
+  students.forEach(function(s){
+    if(!s) return;
+    byId[s.id] = s;
+    if(s.name) byNameCourse[(s.name||'').toLowerCase().trim() + '|' + (s.course||'').toLowerCase().trim()] = s;
+  });
+  var days = ['Mon','Tue','Wed','Thu','Fri'];
+  var merged = {};
+  var order = [];
+  var changed = false;
+  attendanceRecords.forEach(function(r){
+    if(!r){ changed = true; return; }
+    // Resolve to a current student: by id first, then by name+course.
+    var stu = byId[r.studentId];
+    if(!stu){
+      stu = byNameCourse[(r.studentName||'').toLowerCase().trim() + '|' + (r.course||'').toLowerCase().trim()];
+    }
+    if(!stu){ changed = true; return; } // orphan — drop
+    // Re-link the record to the current student.
+    if(r.studentId !== stu.id){ r.studentId = stu.id; changed = true; }
+    if(r.studentName !== stu.name){ r.studentName = stu.name; changed = true; }
+    if(r.course !== stu.course){ r.course = stu.course; changed = true; }
+    var existing = merged[stu.id];
+    if(!existing){
+      merged[stu.id] = r;
+      order.push(stu.id);
+    } else {
+      // Duplicate for the same student — merge day marks, preferring a
+      // present/late mark over absent/blank so we never discard real data.
+      existing.days = existing.days || {};
+      r.days = r.days || {};
+      days.forEach(function(d){
+        var cur = existing.days[d];
+        var alt = r.days[d];
+        if((cur === undefined || cur === 'absent') && (alt === 'present' || alt === 'late')) existing.days[d] = alt;
+        else if(cur === undefined && alt) existing.days[d] = alt;
+      });
+      changed = true; // a duplicate row is being removed
+    }
+  });
+  if(changed){
+    attendanceRecords = order.map(function(id){ return merged[id]; });
+    if(typeof saveState === 'function') saveState();
+  }
+  return changed;
+}
+
 function renderAttendancePage() {
   const tbody = document.getElementById('attendanceTableBody');
   if(!tbody) return;
+  dedupeAttendanceRecords();
   const courseFilter = document.getElementById('attendanceCourseFilter')?.value || 'all';
   let records = [...attendanceRecords];
   if(courseFilter && courseFilter !== 'all') records = records.filter(function(r) {
@@ -16603,7 +16673,7 @@ function renderAttendancePage() {
     return false;
   });
   const days = ['Mon','Tue','Wed','Thu','Fri'];
-  tbody.innerHTML = records.slice(0,40).map((r,idx) => {
+  tbody.innerHTML = records.map((r,idx) => {
     return `<tr><td><strong>${r.studentName}</strong></td><td style="font-family:monospace;font-size:12px;">${r.studentId}</td><td>${r.course}</td>
     ${days.map(d => {
       const st = r.days[d];
