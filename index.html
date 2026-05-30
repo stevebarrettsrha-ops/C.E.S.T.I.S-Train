@@ -17806,6 +17806,22 @@ var _isAutoSaving = false;
 var _autoSaveFileIds = {}; // { folderId: fileId } for tracking backup files per folder
 var AUTO_SAVE_INTERVAL_MS = 5000; // 5 seconds
 var _debouncedCloudSaveTimer = null;
+var _lastAutoSaveHash = null; // hash of last data successfully pushed to the cloud (dirty-check)
+
+// Fast, non-cryptographic 53-bit string hash (cyrb53) used to detect whether the
+// backup payload actually changed since the last cloud save, so an idle app does
+// not keep re-uploading identical data to every Drive folder.
+function cestisHashString(str) {
+  var h1 = 0xdeadbeef, h2 = 0x41c6ce57;
+  for (var i = 0, ch; i < str.length; i++) {
+    ch = str.charCodeAt(i);
+    h1 = Math.imul(h1 ^ ch, 2654435761);
+    h2 = Math.imul(h2 ^ ch, 1597334677);
+  }
+  h1 = Math.imul(h1 ^ (h1 >>> 16), 2246822507) ^ Math.imul(h2 ^ (h2 >>> 13), 3266489909);
+  h2 = Math.imul(h2 ^ (h2 >>> 16), 2246822507) ^ Math.imul(h1 ^ (h1 >>> 13), 3266489909);
+  return (4294967296 * (2097151 & h2) + (h1 >>> 0)).toString(36);
+}
 
 // Debounced immediate cloud push — called by saveState() and saveUserAccounts()
 // so ANY dashboard data change triggers a cloud save within 2 seconds
@@ -20607,13 +20623,23 @@ async function autoSaveToAllFolders() {
     })();
     if (_isAdminSave || Object.keys(_cleanCertTpls).length > 0) backupData.data.certTemplates = _cleanCertTpls;
 
+    // Persist locally first (cheap, always runs).
+    saveState();
+
+    // Dirty-check: skip ALL cloud uploads when nothing changed since the last
+    // successful save. Hash only backupData.data — not the timestamp/savedBy,
+    // which change on every call — so an idle app stops re-uploading identical
+    // data to all Drive folders (the main cause of slow, constant syncing).
+    const _dataStr = JSON.stringify(backupData.data);
+    const _curHash = cestisHashString(_dataStr);
+    if (_curHash === _lastAutoSaveHash) {
+      return; // unchanged — nothing to push; finally{} clears _isAutoSaving
+    }
+
     const jsonContent = JSON.stringify(backupData);
     const blob = new Blob([jsonContent], { type: 'application/json' });
 
-    // Save to localStorage first
-    saveState();
-
-    // Save to ALL 3 Google Drive folders in parallel
+    // Save to ALL Google Drive folders in parallel
     const results = await Promise.allSettled(
       ALL_DRIVE_FOLDERS.map(folder => silentSaveToFolder(folder.id, folder.label, blob))
     );
@@ -20640,6 +20666,10 @@ async function autoSaveToAllFolders() {
     }
 
     const successCount = results.filter(r => r.status === 'fulfilled' && r.value === true).length;
+
+    // Remember this payload only when the canonical folders actually saved, so a
+    // failed upload is retried on the next tick instead of being skipped.
+    if (successCount >= 1) _lastAutoSaveHash = _curHash;
 
     // Update sync metadata
     lastSyncTime = new Date();
