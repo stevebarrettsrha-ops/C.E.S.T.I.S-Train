@@ -4277,6 +4277,12 @@
             initializeCloudSync();
             startSessionTimer();
 
+            // Privacy screen on entry: drop the black privacy cover the moment
+            // the page loads (i.e. right after login / when the user first
+            // navigates here) so on-screen financial data is never revealed
+            // until the user explicitly clicks "Activate Window".
+            showInactivityScreen();
+
             loadData();
             renderFeeStructure();
             updateDashboard();
@@ -4545,7 +4551,16 @@
         window.addEventListener('message', function (ev) {
             try {
                 const d = ev && ev.data;
-                if (!d || d.type !== 'cestis-lms-students' || !Array.isArray(d.students)) return;
+                if (!d) return;
+                // Parent dashboard asks us to (re)show the privacy screen when
+                // the user navigates back to this page. The iframe is loaded
+                // once and kept alive, so DOMContentLoaded won't fire again —
+                // this message is how we re-cover the page on each visit.
+                if (d.type === 'cestis-show-privacy') {
+                    showInactivityScreen();
+                    return;
+                }
+                if (d.type !== 'cestis-lms-students' || !Array.isArray(d.students)) return;
                 applyStudentsFromParent(d.students);
             } catch (e) { /* ignore */ }
         });

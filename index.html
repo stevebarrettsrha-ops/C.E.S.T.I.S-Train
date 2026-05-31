@@ -8313,6 +8313,12 @@ function showPage(pageId) {
     if(iframeEl && !iframeEl.getAttribute('data-src-loaded')) {
       iframeEl.src = iframeInfo.src;
       iframeEl.setAttribute('data-src-loaded', '1');
+      // First load: the iframe drops its own privacy screen on DOMContentLoaded.
+    } else if(iframeEl && (pageId === 'fee-management' || pageId === 'as-fee-management')) {
+      // Already loaded once and kept alive — ask the School Fee page to re-show
+      // its privacy screen so financial data stays covered until the user
+      // clicks "Activate Window" each time they navigate back to the page.
+      try { iframeEl.contentWindow.postMessage({ type: 'cestis-show-privacy' }, '*'); } catch(e){}
     }
   }
   // Qual Plan / Curriculum is hosted in Qual-Plan-Curriculum.html. The src is built
