@@ -179,7 +179,10 @@
   /* --- Student record merge (pure; identical semantics to the app) -------- */
   var MERGE_FIELDS = ['stage', 'progress', 'score', 'gpa', 'certNo', 'certDate', 'certCollected',
     'attendance', 'assignments', 'instructor', 'email', 'phone', 'address',
-    'dob', 'enrollDate', 'completionDate', 'nqfLevel', 'notes', 'gender'];
+    'dob', 'enrollDate', 'completionDate', 'nqfLevel', 'notes', 'gender',
+    // Cross-system link fields — must survive a merge so the School-Fee <-> LMS
+    // link is not lost when a fee-linked record and a manual record collapse.
+    'schoolFeeId', 'source'];
 
   Core.mergeStudentRecords = function (a, b) {
     var aMod = a && a.lastModified ? new Date(a.lastModified).getTime() : 0;

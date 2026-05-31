@@ -75,6 +75,14 @@ test('mergeStudentRecords prefers the newer record, backfills blanks from the ol
   assert.strictEqual(m.phone, '111');
 });
 
+test('mergeStudentRecords preserves cross-system link fields (schoolFeeId)', function () {
+  var manual = { id: 'STU-1', name: 'A', course: 'C', lastModified: '2026-05-01', progress: 50 };
+  var feeLinked = { id: 'SF-99', name: 'A', course: 'C', lastModified: '2026-01-01', schoolFeeId: '99', source: 'schoolfee' };
+  var m = Core.mergeStudentRecords(manual, feeLinked);
+  assert.strictEqual(m.schoolFeeId, '99', 'fee link survives merge into the newer manual record');
+  assert.strictEqual(m.source, 'schoolfee');
+});
+
 /* ---- dedupe ----------------------------------------------------------- */
 test('dedupeStudents collapses cross-device duplicates and maps old ids', function () {
   var list = [
@@ -152,6 +160,48 @@ test('migrateToStableIds is idempotent (second run changes nothing)', function (
   var res2 = Core.migrateToStableIds(data);
   assert.strictEqual(JSON.stringify(data.students), snapshot, 'no further mutation');
   assert.strictEqual(res2.changed, false, 'reports no change on second run');
+});
+
+/* ---- integration: realistic mixed dataset ----------------------------- */
+test('migration: fee-linked + manual + cross-device dup all collapse correctly', function () {
+  var data = {
+    students: [
+      // Same person, three ways they could enter the system on different devices:
+      { id: 'SF-99', name: 'Mary Jane', course: 'Cosmetology', schoolFeeId: '99', source: 'schoolfee', lastModified: '2026-01-01', progress: 0 },
+      { id: 'STU-LEGACY-1', name: 'mary jane', course: 'cosmetology', lastModified: '2026-03-01', progress: 40, email: 'mary@x.com' },
+      { id: 'STU1700000009999', name: 'Mary  Jane', course: 'Cosmetology', lastModified: '2026-05-01', progress: 75 },
+      // A genuinely different person:
+      { id: 'STU-2', name: 'Sam Okafor', course: 'Welding & Fabrication', lastModified: '2026-02-01' }
+    ],
+    userAccounts: [
+      { username: 'mary', studentDataId: 'SF-99' },
+      { username: 'mary2', studentDataId: 'STU-LEGACY-1' }
+    ],
+    attendanceRecords: [
+      { studentId: 'SF-99' }, { studentId: 'STU-LEGACY-1' }, { studentId: 'STU1700000009999' }
+    ],
+    certDownloadApprovals: [{ studentId: 'STU-LEGACY-1' }],
+    examResults: [{ studentId: 'STU1700000009999', score: 88 }]
+  };
+  var res = Core.migrateToStableIds(data);
+  assert.ok(res.changed);
+  assert.strictEqual(data.students.length, 2, 'Mary collapsed to one; Sam separate');
+
+  var mary = data.students.filter(function (s) { return Core.normName(s.name) === 'mary jane'; })[0];
+  var maryStable = Core.stableStudentId({ name: 'Mary Jane', course: 'Cosmetology' });
+  assert.strictEqual(mary.id, maryStable, 'Mary has the deterministic stable id');
+  assert.strictEqual(mary.progress, 75, 'kept newest progress');
+  assert.strictEqual(mary.email, 'mary@x.com', 'backfilled email from an older copy');
+  assert.strictEqual(mary.schoolFeeId, '99', 'fee link preserved through the collapse');
+
+  // every dependent record now points at the single stable Mary id
+  data.attendanceRecords.forEach(function (r) { assert.strictEqual(r.studentId, maryStable); });
+  assert.strictEqual(data.examResults[0].studentId, maryStable);
+  assert.strictEqual(data.certDownloadApprovals[0].studentId, maryStable);
+  data.userAccounts.forEach(function (u) { assert.strictEqual(u.studentDataId, maryStable, 'accounts relinked'); });
+
+  // second run is a no-op
+  assert.strictEqual(Core.migrateToStableIds(data).changed, false);
 });
 
 /* ---- tombstones (with a mock store) ----------------------------------- */
