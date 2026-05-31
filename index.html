@@ -28786,6 +28786,39 @@ async function fetchCertDataFromDrive() {
 // that the student was certified and approved for download. This reapplies
 // that status back onto students[] so the Student Progress page and stat
 // counts recover. Non-destructive: never deletes approvals.
+function dedupeCertDownloadApprovals() {
+  if(!Array.isArray(certDownloadApprovals)) return false;
+  var byKey = {}, order = [];
+  certDownloadApprovals.forEach(function(a){
+    if(!a) return;
+    var key = a.studentId || a.certNo || ((a.name||'') + '|' + (a.course||''));
+    if(!byKey[key]) {
+      byKey[key] = {
+        studentId: a.studentId, name: a.name, course: a.course,
+        certNo: a.certNo, certDate: a.certDate,
+        approved: !!a.approved, approvedDate: a.approvedDate, approvedBy: a.approvedBy,
+        downloadCount: a.downloadCount || 0, lastDownloaded: a.lastDownloaded || null
+      };
+      order.push(key);
+    } else {
+      // Merge a duplicate into the kept entry: keep the most "complete" state.
+      var m = byKey[key];
+      m.approved = m.approved || !!a.approved;
+      m.downloadCount = Math.max(m.downloadCount || 0, a.downloadCount || 0);
+      if(a.lastDownloaded && (!m.lastDownloaded || new Date(a.lastDownloaded) > new Date(m.lastDownloaded))) m.lastDownloaded = a.lastDownloaded;
+      if(a.approvedDate && (!m.approvedDate || new Date(a.approvedDate) > new Date(m.approvedDate))) m.approvedDate = a.approvedDate;
+      if(!m.certNo && a.certNo) m.certNo = a.certNo;
+      if(!m.certDate && a.certDate) m.certDate = a.certDate;
+      if(!m.approvedBy && a.approvedBy) m.approvedBy = a.approvedBy;
+      if(!m.name && a.name) m.name = a.name;
+      if(!m.course && a.course) m.course = a.course;
+    }
+  });
+  if(order.length === certDownloadApprovals.length) return false; // nothing collapsed
+  certDownloadApprovals = order.map(function(k){ return byKey[k]; });
+  return true;
+}
+
 function reconcileCertifiedFromApprovals() {
   if(!Array.isArray(certDownloadApprovals) || !Array.isArray(students)) return false;
   var changed = false;
@@ -30006,6 +30039,7 @@ function saveCertTemplate() {
 
 // --- Admin Certificate Download Management ---
 function renderCertDownloadMgmt() {
+  if(dedupeCertDownloadApprovals()) { try { saveState(); } catch(e){} }
   reconcileCertifiedFromApprovals();
   backfillCertificateNumbers();
   populateCertTemplateSkillSelect();
@@ -30068,10 +30102,15 @@ function renderCertDownloadMgmt() {
 function renderCertDlStats() {
   var el = document.getElementById('certDlStats');
   if(!el) return;
-  var totalCert = students.filter(function(s){ return s.certNo; }).length;
-  var approved = certDownloadApprovals.filter(function(d){ return d.approved; }).length;
+  var certifiedStudents = students.filter(function(s){ return s.certNo; });
+  var totalCert = certifiedStudents.length;
+  // Count distinct currently-certified students that have an approval, so the
+  // value can never exceed Total Certified (duplicate/orphan approvals ignored).
+  var approved = certifiedStudents.filter(function(s){
+    return certDownloadApprovals.some(function(d){ return d.approved && d.studentId === s.id; });
+  }).length;
   var totalDownloads = certDownloadApprovals.reduce(function(sum, d){ return sum + (d.downloadCount || 0); }, 0);
-  var pending = totalCert - approved;
+  var pending = Math.max(0, totalCert - approved);
   el.innerHTML =
     '<div class="stat-card"><div class="stat-icon" style="background:var(--green-dim);color:var(--green);">&#127891;</div><div class="stat-value">' + totalCert + '</div><div class="stat-label">Total Certified</div></div>' +
     '<div class="stat-card"><div class="stat-icon" style="background:var(--accent-dim);color:var(--accent);">&#10003;</div><div class="stat-value">' + approved + '</div><div class="stat-label">Approved for Download</div></div>' +
