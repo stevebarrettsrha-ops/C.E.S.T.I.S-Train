@@ -24,7 +24,7 @@
 <div style="display:flex;gap:12px;margin-bottom:18px;flex-wrap:wrap;">
   <button class="btn btn-primary" onclick="openModal('createClassSessionModal')">+ New Class Session</button>
   <button class="btn btn-secondary" onclick="document.getElementById('vc-join-code')?.focus();showToast('Enter a room code below and click Join to connect')">Join Existing Class</button>
-  <button class="btn btn-primary" style="background:var(--purple);" onclick="openModal('createAdminMeetingModal')">+ Schedule Admin Meeting</button>
+  <button class="btn btn-primary" style="background:var(--purple);" onclick="openStaffMeetingModal()">+ Schedule Staff Meeting</button>
 </div>
 <div class="card" id="videoClassList">
   <div class="card-header"><h3>Active &amp; Scheduled Classes</h3></div>
@@ -41,7 +41,7 @@
   </table></div>
 </div>
 <div class="card" style="margin-top:18px;border-color:var(--purple);">
-  <div class="card-header"><h3 style="color:var(--purple);">Admin Meetings</h3><span style="font-size:12px;color:var(--text-muted);">Restricted to Administrator &amp; Admin Staff only</span></div>
+  <div class="card-header"><h3 style="color:var(--purple);">Staff Meetings</h3><span style="font-size:12px;color:var(--text-muted);">All-Staff conferences include Teachers; Admin-only meetings are limited to Administrator &amp; Admin Staff</span></div>
   <div class="table-wrapper"><table>
     <thead><tr><th>Meeting</th><th>Created By</th><th>Date &amp; Time</th><th>Duration</th><th>Access</th><th>Action</th></tr></thead>
     <tbody id="adminMeetingsList"></tbody>

@@ -4236,9 +4236,15 @@ body.vc-fullscreen-mode.vc-host-only-mode .video-grid .video-tile:not(.vc-hoston
 <!-- ADMIN MEETING MODAL -->
 <div class="modal-overlay" id="createAdminMeetingModal">
   <div class="modal">
-    <div class="modal-header"><h3>Schedule Admin Meeting</h3><button class="modal-close" onclick="closeModal('createAdminMeetingModal')">&#10005;</button></div>
+    <div class="modal-header"><h3 id="amModalTitle">Schedule Staff Meeting</h3><button class="modal-close" onclick="closeModal('createAdminMeetingModal')">&#10005;</button></div>
     <div class="form-group"><label>Meeting Title</label><input type="text" class="form-control" id="amTitle" placeholder="e.g. Weekly Staff Briefing"></div>
     <div class="form-group"><label>Description / Agenda</label><textarea class="form-control" id="amDescription" rows="3" placeholder="Meeting agenda or notes..."></textarea></div>
+    <div class="form-group"><label>Access</label>
+      <select class="form-control" id="amAccess">
+        <option value="allstaff">All Staff Conference Meeting (Teachers, Admin Staff &amp; Administrator)</option>
+        <option value="adminonly">Admin &amp; Admin Staff Only</option>
+      </select>
+    </div>
     <div class="grid-2col" style="gap:12px;">
       <div class="form-group"><label>Date</label><input type="date" class="form-control" id="amDate"></div>
       <div class="form-group"><label>Start Time</label><input type="time" class="form-control" id="amTime"></div>
@@ -5615,7 +5621,15 @@ function lmsChatScheduleDriveSync() {
   _lmsChatDriveSyncTimer = setTimeout(function() {
     _lmsChatDriveSyncTimer = null;
     lmsChatSyncToDrive();
-  }, 3000);
+  }, 1500);
+}
+
+// Push chat data to the cloud immediately (used right after a user sends a
+// message / file / poll) so recipients see it on their next fast poll instead of
+// waiting for the debounced auto-save. Cancels any pending debounced sync first.
+function lmsChatFlushDriveSyncNow() {
+  if(_lmsChatDriveSyncTimer) { clearTimeout(_lmsChatDriveSyncTimer); _lmsChatDriveSyncTimer = null; }
+  if(typeof lmsChatSyncToDrive === 'function') lmsChatSyncToDrive();
 }
 
 // Admin Staff Access Settings (declared early for saveState/loadState)
@@ -8016,7 +8030,7 @@ function buildInstructorSidebar() {
     <div class="nav-item" data-page="i-lms-chat" onclick="showPage('i-lms-chat')">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>LMS Chat<span class="nav-badge" style="background:var(--green);">NEW</span></div>
     <div class="nav-item" data-page="i-classes" onclick="showPage('i-classes')">
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="23 7 16 12 23 17 23 7"/><rect x="1" y="5" width="15" height="14" rx="2"/></svg>My Classes<span class="nav-badge">LIVE</span></div>
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="23 7 16 12 23 17 23 7"/><rect x="1" y="5" width="15" height="14" rx="2"/></svg>Video Conference<span class="nav-badge">LIVE</span></div>
     <div class="nav-item" data-page="i-students" onclick="showPage('i-students')">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>My Students</div>
     <div class="nav-section-label">Teaching</div>
@@ -8133,6 +8147,7 @@ var cestisFeatureConfig = {
     onMount: function() {
       cestisSafe('renderInstructorClassSessions');
       cestisSafe('renderInstructorRecordings');
+      cestisSafe('renderAdminMeetingsList');
     }
   },
   'video-adminstaff': {
@@ -8397,7 +8412,7 @@ function showPage(pageId) {
     's-dashboard':'My Dashboard','s-video':'My Classes','s-progress':'My Progress',
     's-resources':'My Resources','s-assignments':'My Assignments','s-exams':'My Exams','s-certificate':'My Certificate',
     's-profile':'My Profile','s-calendar':'My Calendar',
-    'i-dashboard':'Instructor Dashboard','i-classes':'My Classes','i-students':'My Students',
+    'i-dashboard':'Instructor Dashboard','i-classes':'Video Conference','i-students':'My Students',
     'i-attendance':'Class Attendance','i-gradebook':'Gradebook','i-resources':'Course Resources','i-exams':'Online Exams',
     'i-duties':'My Assigned Tasks','i-announcements':'Announcements','i-calendar':'Calendar','i-profile':'My Profile',
     'lms-chat':'C.E.S.T.I.S LMS Chat','s-lms-chat':'C.E.S.T.I.S LMS Chat','i-lms-chat':'C.E.S.T.I.S LMS Chat',
@@ -10061,7 +10076,7 @@ function generateRoomCode() {
 function sanitizePeerId(str) { return str.replace(/[^a-zA-Z0-9-]/g, ''); }
 
 function enterVideoRoom(title, role, roomCode) {
-  const listId = role==='admin' ? 'videoClassList' : role==='adminstaff' ? 'asVideoContent' : role==='instructor' ? 'iVideoClassList' : 'sVideoClassList';
+  const listId = role==='admin' ? 'videoClassList' : role==='adminstaff' ? 'asVideoContent' : role==='instructor' ? 'iVideoContent' : 'sVideoClassList';
   const containerId = role==='admin' ? 'videoRoom' : role==='adminstaff' ? 'asVideoRoom' : role==='instructor' ? 'iVideoRoom' : 'sVideoRoom';
   var listEl = document.getElementById(listId);
   if(listEl) listEl.style.display = 'none';
@@ -11890,7 +11905,7 @@ function exitVideoRoom(role) {
     container.querySelectorAll('video').forEach(function(v){ v.srcObject = null; });
   }
 
-  var listId = role==='admin' ? 'videoClassList' : role==='adminstaff' ? 'asVideoContent' : role==='instructor' ? 'iVideoClassList' : 'sVideoClassList';
+  var listId = role==='admin' ? 'videoClassList' : role==='adminstaff' ? 'asVideoContent' : role==='instructor' ? 'iVideoContent' : 'sVideoClassList';
   var listEl = document.getElementById(listId);
   if(listEl) listEl.style.display = 'block';
   if(container) container.style.display = 'none';
@@ -12120,13 +12135,36 @@ function deleteClassSession(id) {
   refreshContentDependentViews();
 }
 
-// ============================== ADMIN MEETING FUNCTIONS ==============================
+// ============================== STAFF MEETING FUNCTIONS ==============================
+// Meetings have an `access` of 'allstaff' (Teachers + Admin Staff + Administrator)
+// or 'adminonly' (Admin Staff + Administrator). Older meetings saved before this
+// field existed are treated as 'adminonly' for backward compatibility.
+function meetingAccess(m) { return (m && m.access === 'allstaff') ? 'allstaff' : 'adminonly'; }
+
+// Open the schedule-meeting modal, tailoring the Access options to the role:
+// instructors may only create All-Staff conferences, so the admin-only option is
+// hidden and locked for them.
+function openStaffMeetingModal() {
+  var sel = document.getElementById('amAccess');
+  var adminOpt = sel ? sel.querySelector('option[value="adminonly"]') : null;
+  var isInstructor = (currentRole === 'instructor');
+  if(sel) {
+    if(adminOpt) adminOpt.style.display = isInstructor ? 'none' : '';
+    sel.value = isInstructor ? 'allstaff' : sel.value || 'allstaff';
+    sel.disabled = isInstructor;
+  }
+  openModal('createAdminMeetingModal');
+}
+
 function createAdminMeeting() {
   var title = (document.getElementById('amTitle')?.value || '').trim();
   var description = (document.getElementById('amDescription')?.value || '').trim();
   var date = document.getElementById('amDate')?.value;
   var time = document.getElementById('amTime')?.value;
   var duration = parseInt(document.getElementById('amDuration')?.value) || 60;
+  var access = (document.getElementById('amAccess')?.value === 'adminonly') ? 'adminonly' : 'allstaff';
+  // Teachers can only schedule all-staff conferences.
+  if(currentRole === 'instructor') access = 'allstaff';
 
   if(!title) { showToast('Please enter a meeting title'); return; }
   if(!date) { showToast('Please select a date'); return; }
@@ -12139,17 +12177,21 @@ function createAdminMeeting() {
     date: date,
     time: time,
     duration: duration,
+    access: access,
     roomCode: generateRoomCode(),
     status: 'scheduled',
     createdBy: currentLoggedInUser ? currentLoggedInUser.name : 'Admin',
+    createdById: currentLoggedInUser ? currentLoggedInUser.id : '',
     createdAt: new Date().toISOString()
   };
 
   adminMeetings.push(meeting);
   saveState();
   closeModal('createAdminMeetingModal');
-  showToast('Admin meeting "' + title + '" scheduled successfully');
-  addNotification('Admin meeting scheduled: "' + title + '"', 'calendar', null, ['admin','adminstaff']);
+  var kindLabel = access === 'allstaff' ? 'All-staff conference' : 'Admin meeting';
+  showToast(kindLabel + ' "' + title + '" scheduled successfully');
+  var notifyRoles = access === 'allstaff' ? ['admin','adminstaff','instructor'] : ['admin','adminstaff'];
+  addNotification(kindLabel + ' scheduled: "' + title + '"', 'calendar', null, notifyRoles);
 
   document.getElementById('amTitle').value = '';
   document.getElementById('amDescription').value = '';
@@ -12160,12 +12202,18 @@ function createAdminMeeting() {
   renderAdminMeetingsList();
 }
 
+function meetingAccessBadge(m) {
+  return meetingAccess(m) === 'allstaff'
+    ? '<span class="badge badge-green"><span class="badge-dot"></span>All Staff</span>'
+    : '<span class="badge badge-purple"><span class="badge-dot"></span>Admin Only</span>';
+}
+
 function renderAdminMeetingsList() {
-  // Render to admin page container
+  // Render to admin page container — admins see and manage every meeting.
   var adminContainer = document.getElementById('adminMeetingsList');
   if(adminContainer) {
     if(adminMeetings.length === 0) {
-      adminContainer.innerHTML = '<tr><td colspan="6" style="text-align:center;color:var(--text-muted);padding:24px;">No admin meetings scheduled. Click "Schedule Admin Meeting" to create one.</td></tr>';
+      adminContainer.innerHTML = '<tr><td colspan="6" style="text-align:center;color:var(--text-muted);padding:24px;">No staff meetings scheduled. Click "Schedule Staff Meeting" to create one.</td></tr>';
     } else {
       adminContainer.innerHTML = adminMeetings.map(function(m) {
         var timeStr = m.time ? new Date('2000-01-01T'+m.time).toLocaleTimeString([],{hour:'numeric',minute:'2-digit'}) : m.time;
@@ -12175,7 +12223,7 @@ function renderAdminMeetingsList() {
           '<td>' + (m.createdBy || 'Admin') + '</td>' +
           '<td>' + m.date + ' ' + timeStr + '</td>' +
           '<td>' + m.duration + 'min</td>' +
-          '<td><span class="badge badge-purple"><span class="badge-dot"></span>Admin Only</span>' + (m.roomCode ? '<div style="font-family:monospace;font-size:10px;color:var(--accent);margin-top:2px;">Room: '+m.roomCode+'</div>' : '') + '</td>' +
+          '<td>' + meetingAccessBadge(m) + (m.roomCode ? '<div style="font-family:monospace;font-size:10px;color:var(--accent);margin-top:2px;">Room: '+m.roomCode+'</div>' : '') + '</td>' +
           '<td>' +
             '<button class="btn btn-sm btn-primary" onclick="enterVideoRoom(\'' + escapedTitle + '\',\'admin\',\'' + (m.roomCode||'') + '\')" style="margin-right:6px;">Join</button>' +
             '<button class="btn btn-sm btn-danger" onclick="deleteAdminMeeting(\'' + m.id + '\')">Delete</button>' +
@@ -12185,17 +12233,17 @@ function renderAdminMeetingsList() {
     }
   }
 
-  // Render to admin staff page container (no delete button, adminstaff role)
+  // Render to admin staff page container — admin staff see every meeting (join only).
   var asContainer = document.getElementById('asAdminMeetingsList');
   if(asContainer) {
     if(adminMeetings.length === 0) {
-      asContainer.innerHTML = '<tr><td colspan="5" style="text-align:center;color:var(--text-muted);padding:24px;">No admin meetings scheduled.</td></tr>';
+      asContainer.innerHTML = '<tr><td colspan="5" style="text-align:center;color:var(--text-muted);padding:24px;">No staff meetings scheduled.</td></tr>';
     } else {
       asContainer.innerHTML = adminMeetings.map(function(m) {
         var timeStr = m.time ? new Date('2000-01-01T'+m.time).toLocaleTimeString([],{hour:'numeric',minute:'2-digit'}) : m.time;
         var escapedTitle = m.title.replace(/'/g,"\\'");
         return '<tr>' +
-          '<td><strong>' + m.title + '</strong>' + (m.description ? '<div style="font-size:11px;color:var(--text-muted);margin-top:2px;">' + m.description.substring(0,60) + (m.description.length > 60 ? '...' : '') + '</div>' : '') + '</td>' +
+          '<td><strong>' + m.title + '</strong> ' + meetingAccessBadge(m) + (m.description ? '<div style="font-size:11px;color:var(--text-muted);margin-top:2px;">' + m.description.substring(0,60) + (m.description.length > 60 ? '...' : '') + '</div>' : '') + '</td>' +
           '<td>' + (m.createdBy || 'Admin') + '</td>' +
           '<td>' + m.date + ' ' + timeStr + '</td>' +
           '<td>' + m.duration + 'min</td>' +
@@ -12204,13 +12252,74 @@ function renderAdminMeetingsList() {
       }).join('');
     }
   }
+
+  // Render to instructor page container — teachers only see ALL-STAFF conferences,
+  // can join them, and can delete ones they created themselves.
+  var iContainer = document.getElementById('iAdminMeetingsList');
+  if(iContainer) {
+    var myId = currentLoggedInUser ? currentLoggedInUser.id : '';
+    var staffMeetings = adminMeetings.filter(function(m){ return meetingAccess(m) === 'allstaff'; });
+    if(staffMeetings.length === 0) {
+      iContainer.innerHTML = '<tr><td colspan="5" style="text-align:center;color:var(--text-muted);padding:24px;">No all-staff conferences scheduled yet. Click "Schedule Staff Meeting" to create one.</td></tr>';
+    } else {
+      iContainer.innerHTML = staffMeetings.map(function(m) {
+        var timeStr = m.time ? new Date('2000-01-01T'+m.time).toLocaleTimeString([],{hour:'numeric',minute:'2-digit'}) : m.time;
+        var escapedTitle = m.title.replace(/'/g,"\\'");
+        var canDelete = myId && m.createdById === myId;
+        return '<tr>' +
+          '<td><strong>' + m.title + '</strong>' + (m.description ? '<div style="font-size:11px;color:var(--text-muted);margin-top:2px;">' + m.description.substring(0,60) + (m.description.length > 60 ? '...' : '') + '</div>' : '') + '</td>' +
+          '<td>' + (m.createdBy || 'Admin') + '</td>' +
+          '<td>' + m.date + ' ' + timeStr + '</td>' +
+          '<td>' + m.duration + 'min</td>' +
+          '<td>' + (m.roomCode ? '<span style="font-family:monospace;font-size:10px;color:var(--accent);margin-right:6px;">'+m.roomCode+'</span>' : '') +
+            '<button class="btn btn-sm btn-primary" onclick="enterVideoRoom(\'' + escapedTitle + '\',\'instructor\',\'' + (m.roomCode||'') + '\')" style="margin-right:6px;">Join</button>' +
+            (canDelete ? '<button class="btn btn-sm btn-danger" onclick="deleteAdminMeeting(\'' + m.id + '\')">Delete</button>' : '') +
+          '</td>' +
+        '</tr>';
+      }).join('');
+    }
+  }
 }
 
 function deleteAdminMeeting(id) {
+  var m = adminMeetings.find(function(x){ return x.id === id; });
+  // Teachers may only delete all-staff conferences they created themselves.
+  if(m && currentRole === 'instructor') {
+    var myId = currentLoggedInUser ? currentLoggedInUser.id : '';
+    if(meetingAccess(m) !== 'allstaff' || m.createdById !== myId) { showToast('You can only delete conferences you created'); return; }
+  }
   adminMeetings = adminMeetings.filter(function(m){ return m.id !== id; });
   saveState();
-  showToast('Admin meeting deleted');
+  showToast('Meeting deleted');
   renderAdminMeetingsList();
+}
+
+// Instructor join-by-code for all-staff conferences (mirrors asJoinMeetingByCode).
+function iJoinMeetingByCode() {
+  var code = (document.getElementById('i-vc-join-code')?.value || '').toUpperCase().trim();
+  if(!code || code.length < 4) { showToast('Please enter a valid room code'); return; }
+  vcCurrentRole = 'instructor';
+  vcCurrentUserName = (typeof currentInstructor !== 'undefined' && currentInstructor && currentInstructor.name) ? currentInstructor.name : (currentLoggedInUser ? currentLoggedInUser.name : 'Instructor');
+  var listEl = document.getElementById('iVideoContent');
+  if(listEl) listEl.style.display = 'none';
+  var room = document.getElementById('iVideoRoom');
+  if(!room) return;
+  room.style.display = 'block';
+  room.innerHTML = '<div style="display:flex;align-items:center;gap:12px;margin-bottom:24px;">' +
+    '<button class="btn btn-secondary btn-sm" onclick="exitVideoRoom(\'instructor\')">&#8592; Back</button>' +
+    '<h3 style="font-family:\'Playfair Display\',serif;">Staff Conference</h3></div>' +
+    '<div class="vc-lobby">' +
+      '<div class="vc-lobby-preview"><video id="vc-preview" autoplay muted playsinline></video>' +
+        '<div id="vc-preview-ph" style="position:absolute;inset:0;display:flex;align-items:center;justify-content:center;"><div style="text-align:center;color:var(--text-muted);"><div style="font-size:48px;margin-bottom:8px;">&#x1F4F9;</div><div>Starting camera...</div></div></div></div>' +
+      '<div style="display:flex;gap:12px;">' +
+        '<button class="vc-btn active" id="vc-lobby-mic" onclick="toggleLobbyDevice(\'audio\')" title="Microphone">&#x1F3A4;</button>' +
+        '<button class="vc-btn active" id="vc-lobby-cam" onclick="toggleLobbyDevice(\'video\')" title="Camera">&#x1F4F9;</button></div>' +
+      '<div id="vc-status" class="vc-status">Ready to connect</div>' +
+      '<div style="text-align:center;">' +
+        '<div style="font-size:13px;color:var(--text-muted);margin-bottom:8px;">Joining room with code:</div>' +
+        '<div style="font-family:monospace;font-size:22px;letter-spacing:4px;color:var(--accent);margin-bottom:16px;">' + code + '</div></div></div>';
+  vcStartCameraPreview();
+  setTimeout(function(){ vcJoinRoom('Staff Conference','instructor', code); }, 500);
 }
 
 // ============================== ASSIGNMENT FUNCTIONS ==============================
@@ -23109,6 +23218,7 @@ function lmsChatSendMessage(prefix) {
   if(!lmsChatMessages[lmsChatActiveRoom]) lmsChatMessages[lmsChatActiveRoom] = [];
   lmsChatMessages[lmsChatActiveRoom].push(msg);
   saveLmsChatData();
+  lmsChatFlushDriveSyncNow(); // push instantly so the recipient receives it on their next fast poll
 
   // Notify DM recipient (throttled to once per 5 s per recipient)
   var activeRoom = lmsChatRooms.find(function(r){ return r.id === lmsChatActiveRoom; });
@@ -23457,6 +23567,7 @@ function lmsChatSendPoll() {
   if(!lmsChatMessages[lmsChatActiveRoom]) lmsChatMessages[lmsChatActiveRoom] = [];
   lmsChatMessages[lmsChatActiveRoom].push(msg);
   saveLmsChatData();
+  lmsChatFlushDriveSyncNow(); // push instantly so members receive the poll on their next fast poll
 
   lmsChatClosePollModal();
   var prefix = _lmsChatPollPrefix || lmsChatGetRolePrefix();
@@ -24856,6 +24967,7 @@ function lmsChatToggleVideo() {
 // INITIALIZE CHAT ON PAGE SHOW
 // ============================================
 var lmsChatCallPollInterval = null;
+var _lmsChatPollInFlight = false;
 
 function lmsChatOnPageShow(prefix) {
   initLmsChatData();
@@ -24881,17 +24993,26 @@ function lmsChatOnPageShow(prefix) {
     });
   }
 
-  // Start periodic sync to detect incoming calls (every 15 seconds)
+  // Fast realtime poll: pull new messages (and incoming calls) every few seconds
+  // so members receive each other's messages almost instantly without having to
+  // press the Cloud sync button. lmsChatSyncFromDrive only re-renders on an actual
+  // change, so this stays cheap and doesn't disturb scrolling. A guard prevents
+  // overlapping fetches if a poll is still in flight.
   if(lmsChatCallPollInterval) clearInterval(lmsChatCallPollInterval);
   lmsChatCallPollInterval = setInterval(function() {
     if(!isCloudConnected || !googleAccessToken) return;
+    if(_lmsChatPollInFlight) return;
+    _lmsChatPollInFlight = true;
     lmsChatSyncFromDrive().then(function() {
+      // ensureMembership may add a room the cloud merge didn't render (e.g. a new
+      // skill-area room with no messages yet); only re-render the list if it did.
+      var beforeRooms = lmsChatRooms.length;
       lmsChatEnsureMembership();
-      lmsChatRenderRoomList(prefix);
+      if(lmsChatRooms.length !== beforeRooms) lmsChatRenderRoomList(prefix);
       if(lmsChatActiveRoom) lmsChatRenderCallBanner(prefix);
       lmsChatCheckForActiveCalls();
-    });
-  }, 15000);
+    }).finally(function(){ _lmsChatPollInFlight = false; });
+  }, 3500);
 
   // Save status (but skip the Drive sync timer — we just fetched)
   try {
@@ -24992,6 +25113,19 @@ async function lmsChatSyncToDrive() {
   }
 }
 
+// Lightweight signature of the in-memory messages so a poll can tell whether a
+// merge actually changed anything (count + id of the last message per room).
+// This lets us skip re-rendering when nothing arrived, which is what keeps the
+// fast (few-second) poll from constantly resetting the scroll position.
+function lmsChatMsgSignature() {
+  var sig = {};
+  Object.keys(lmsChatMessages).forEach(function(rid) {
+    var arr = lmsChatMessages[rid] || [];
+    sig[rid] = arr.length + ':' + (arr.length ? arr[arr.length - 1].id : '');
+  });
+  return sig;
+}
+
 async function lmsChatSyncFromDrive() {
   if(!isCloudConnected || !googleAccessToken) return;
   try {
@@ -25000,6 +25134,7 @@ async function lmsChatSyncFromDrive() {
       console.log('No chat backup found on Drive — will create on first save');
       return;
     }
+    var _beforeSig = lmsChatMsgSignature();
     var resp = await fetch('https://www.googleapis.com/drive/v3/files/'+fileId+'?alt=media', {
       headers:{'Authorization':'Bearer '+googleAccessToken}
     });
@@ -25072,9 +25207,29 @@ async function lmsChatSyncFromDrive() {
 
     console.log('Chat data loaded from Google Drive');
 
+    // Re-render only what actually changed so a fast poll doesn't flicker the
+    // list or yank the message pane's scroll position on every tick.
+    var _afterSig = lmsChatMsgSignature();
+    var _beforeKeys = Object.keys(_beforeSig), _afterKeys = Object.keys(_afterSig);
+    var _roomsChanged = _beforeKeys.length !== _afterKeys.length ||
+      _afterKeys.some(function(k){ return _beforeSig[k] !== _afterSig[k]; });
+    var _activeChanged = lmsChatActiveRoom &&
+      _beforeSig[lmsChatActiveRoom] !== _afterSig[lmsChatActiveRoom];
+
     var prefix = lmsChatGetRolePrefix();
-    lmsChatRenderRoomList(prefix);
-    if(lmsChatActiveRoom) lmsChatRenderMessages(prefix);
+    if(_roomsChanged) lmsChatRenderRoomList(prefix);
+    if(_activeChanged) {
+      var _c = document.getElementById(prefix+'ChatMessages');
+      // If the reader is already at (or near) the bottom, keep them pinned to
+      // the newest message; otherwise preserve their position so we don't
+      // interrupt someone scrolling back through history.
+      var _atBottom = _c ? (_c.scrollHeight - _c.scrollTop - _c.clientHeight < 80) : true;
+      lmsChatRenderMessages(prefix);
+      if(_atBottom) {
+        var _c2 = document.getElementById(prefix+'ChatMessages');
+        if(_c2) _c2.scrollTop = _c2.scrollHeight;
+      }
+    }
   } catch(err) {
     console.error('Chat fetch from Drive error:', err);
   }
