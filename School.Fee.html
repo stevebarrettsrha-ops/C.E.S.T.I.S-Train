@@ -3033,8 +3033,8 @@
     <!-- Inactivity Privacy Screen (covers dashboard after 30s idle) -->
     <div id="inactivityOverlay" class="inactivity-overlay">
         <div id="dvdLogo" class="dvd-logo">
-            <img src="../uploads/CESTI_-_LOGO.png" alt="CESTIS Logo"
-                 onerror="this.replaceWith(Object.assign(document.createElement('div'),{className:'dvd-logo-fallback',textContent:'CESTIS'}));">
+            <img src="https://drive.google.com/thumbnail?id=1P-DmK6T37lr6ryEfWBMDfOoa3-pqeWIG&sz=w500" alt="CESTIS Logo"
+                 onerror="if(!this.dataset.fb){this.dataset.fb='1';this.src='../uploads/CESTI_-_LOGO.png';}else{this.replaceWith(Object.assign(document.createElement('div'),{className:'dvd-logo-fallback',textContent:'CESTIS'}));}">
         </div>
         <div class="inactivity-message">User inactive, please activate page when ready</div>
         <button id="activateWindowBtn" class="activate-window-btn" onclick="deactivateInactivityScreen()">Activate Window</button>
@@ -3119,7 +3119,7 @@
         // Logs user out after 30 seconds of inactivity.
         // Shows a 5-second warning before auto-logout.
 
-        const SESSION_TIMEOUT_MS = 30 * 1000;            // 30 seconds
+        const SESSION_TIMEOUT_MS = 5 * 60 * 1000;        // 5 minutes
         const SESSION_WARNING_MS = 5 * 1000;             // warn 5s before timeout
         let sessionInactivityTimer = null;
         let sessionWarningTimer = null;
