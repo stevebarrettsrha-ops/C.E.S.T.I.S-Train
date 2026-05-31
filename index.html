@@ -14435,17 +14435,45 @@ function openUpdateStage(idx) {
 }
 function updateStudentStage(idx) {
   const newStage = document.getElementById('newStage').value;
+  const prevStage = students[idx].stage;
   students[idx].stage = newStage;
   if(newStage==='certified'){students[idx].progress=90;students[idx].certNo=students[idx].course.substring(0,2).toUpperCase()+'-'+new Date().getFullYear()+'-'+String(Math.floor(Math.random()*9000)+1000);students[idx].certDate=new Date().toLocaleDateString('en-US',{year:'numeric',month:'long',day:'2-digit'});}
   if(newStage==='collected'){students[idx].progress=100;students[idx].certCollected=true;}
   if(newStage==='incomplete')students[idx].progress=Math.min(students[idx].progress,40);
+  // Demotion: if the student is no longer certified/collected, strip the
+  // certificate data so the Certificate Tracking and Certificate Download
+  // pages stop listing them. Without this the certNo lingers (and
+  // reconcileCertifiedFromApprovals would silently re-promote them).
+  if(newStage!=='certified' && newStage!=='collected' &&
+     (prevStage==='certified' || prevStage==='collected' || students[idx].certNo)) {
+    clearStudentCertification(students[idx]);
+  }
   students[idx].lastModified = new Date().toISOString();
   closeModal('updateStageModal');filterStudents();updatePipelineCounts();
+  refreshStudentDependentViews();
   showToast(`${students[idx].name} moved to ${stageLabels[newStage]}`);
   if(newStage==='certified') addNotification('Certificate issued: ' + students[idx].name + ' — ' + students[idx].course, 'cert', null, ['admin','student']);
   else if(newStage==='collected') addNotification('Certificate collected: ' + students[idx].name, 'cert', null, ['admin']);
   else addNotification(students[idx].name + ' moved to ' + stageLabels[newStage], 'student', null, ['admin']);
   saveState();
+}
+
+// Strip all certificate data from a student and deactivate any pending
+// download approval. Keeps the parallel certDownloadApprovals store in sync
+// with the student's stage so the Cert Download page reflects demotions and
+// reconcileCertifiedFromApprovals() does not resurrect the certification.
+function clearStudentCertification(s) {
+  if(!s) return;
+  s.certNo = null;
+  s.certDate = null;
+  s.certCollected = false;
+  if(typeof certDownloadApprovals !== 'undefined' && Array.isArray(certDownloadApprovals)) {
+    var approval = certDownloadApprovals.find(function(a){ return a && a.studentId === s.id; });
+    if(approval) {
+      approval.approved = false;
+      approval.certNo = null;
+    }
+  }
 }
 function openEditStudent(idx) {
   var s = students[idx];
@@ -14509,10 +14537,17 @@ function saveEditStudent() {
   } else {
     attendanceRecords.push({studentId:s.id, studentName:s.name, course:s.course, date:new Date().toISOString().split('T')[0], days:{Mon:'absent',Tue:'absent',Wed:'absent',Thu:'absent',Fri:'absent'}});
   }
+  // Keep the parallel certificate-download snapshot consistent with edits to
+  // the student's identity/course so the Cert Download page shows current data.
+  if(typeof certDownloadApprovals !== 'undefined' && Array.isArray(certDownloadApprovals)) {
+    var _ap = certDownloadApprovals.find(function(a){ return a && a.studentId === s.id; });
+    if(_ap) { _ap.name = s.name; _ap.course = s.course; }
+  }
   s.lastModified = new Date().toISOString();
   updateSkillAreaCounts();
   closeModal('editStudentModal');
   filterStudents();
+  refreshStudentDependentViews();
   showToast(s.name + ' updated successfully');
   saveState();
 }
@@ -14561,9 +14596,12 @@ function confirmDeleteStudent() {
 // Cert Downloads, Verify Users, Instructor views, etc.) without a reload.
 function refreshStudentDependentViews() {
   var fns = [
+    'filterStudents',
+    'updatePipelineCounts',
     'renderAttendancePage',
     'renderInstructorAttendance',
     'filterCerts',
+    'renderCertStats',
     'renderCertDownloadMgmt',
     'renderVerifyUsersPage',
     'renderUserAccountsTable',
@@ -16436,7 +16474,7 @@ function renderCerts(filter,search) {
   tbody.innerHTML = certs.map(s=>`<tr><td><strong>${s.name}</strong></td><td style="font-family:monospace;font-size:12px;">${s.certNo}</td><td>${s.course}</td><td>${(certTemplates[s.course]||{}).programmeCode||s.course}</td><td>${s.certDate}</td><td>${s.certCollected?'<span class="badge badge-green"><span class="badge-dot"></span>Collected</span>':'<span class="badge badge-amber"><span class="badge-dot"></span>Pending</span>'}</td><td>${!s.certCollected?`<button class="btn btn-sm btn-success" onclick="markCollected(${students.indexOf(s)})">Mark Collected</button>`:'<span style="font-size:12px;color:var(--text-muted);">✓ Done</span>'}</td></tr>`).join('');
 }
 function filterCerts() { renderCerts(document.getElementById('certFilter')?.value,document.getElementById('certSearch')?.value?.toLowerCase()); }
-function markCollected(idx) { students[idx].certCollected=true;students[idx].stage='collected';students[idx].progress=100;filterCerts();updatePipelineCounts();renderCertStats();showToast(`Certificate collected: ${students[idx].name}`);addNotification('Certificate collected: ' + students[idx].name + ' — ' + students[idx].course, 'cert', null, ['admin']);saveState(); }
+function markCollected(idx) { students[idx].certCollected=true;students[idx].stage='collected';students[idx].progress=100;filterCerts();updatePipelineCounts();renderCertStats();refreshStudentDependentViews();showToast(`Certificate collected: ${students[idx].name}`);addNotification('Certificate collected: ' + students[idx].name + ' — ' + students[idx].course, 'cert', null, ['admin']);saveState(); }
 
 function renderPassRates() {
   const el = document.getElementById('passRateChart');
