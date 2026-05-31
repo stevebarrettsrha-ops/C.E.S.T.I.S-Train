@@ -5986,6 +5986,18 @@ function loadState() {
   // Recover certified status for students whose stage/id was lost during a
   // dedup/merge but whose cert download approval records survived. Run this
   // BEFORE backfill so restored students are picked up by the backfill pass.
+  // Remove duplicate student records (same name+course) that accumulated via
+  // multi-device sync assigning different IDs to the same person.
+  var _dedupResult = deduplicateStudents();
+  if (_dedupResult.removed > 0) {
+    console.log('[loadState] Removed ' + _dedupResult.removed + ' duplicate student record(s)');
+    relinkDependentData(_dedupResult.idMap);
+    try { CESTISStore.setItem('voctrain_students', JSON.stringify(students)); } catch(e) {}
+    try { CESTISStore.setItem('voctrain_attendance', JSON.stringify(attendanceRecords)); } catch(e) {}
+    try { CESTISStore.setItem('voctrain_certDownloadApprovals', JSON.stringify(certDownloadApprovals)); } catch(e) {}
+    try { CESTISStore.setItem('voctrain_examResults', JSON.stringify(examResults)); } catch(e) {}
+    try { saveUserAccounts(); } catch(e) {}
+  }
   reconcileCertifiedFromApprovals();
   // Remove orphaned/duplicate attendance records left behind when students were
   // deleted or re-IDed during a dedup/merge, so the attendance register shows
@@ -5997,6 +6009,117 @@ function loadState() {
     try { CESTISStore.setItem('voctrain_students', JSON.stringify(students)); } catch(e) {}
   }
   updateSkillAreaCounts();
+}
+
+function mergeStudentRecords(a, b) {
+  var aMod = a.lastModified ? new Date(a.lastModified).getTime() : 0;
+  var bMod = b.lastModified ? new Date(b.lastModified).getTime() : 0;
+  var base = (bMod > aMod) ? Object.assign({}, b) : Object.assign({}, a);
+  var other = (bMod > aMod) ? a : b;
+  var fields = ['stage','progress','score','gpa','certNo','certDate','certCollected',
+                'attendance','assignments','instructor','email','phone','address',
+                'dob','enrollDate','completionDate','nqfLevel','notes','gender'];
+  fields.forEach(function(f){
+    if((base[f] === undefined || base[f] === null || base[f] === '') &&
+       other[f] !== undefined && other[f] !== null && other[f] !== '') {
+      base[f] = other[f];
+    }
+  });
+  return base;
+}
+
+// Returns { removed, idMap } where idMap[oldId] = keptId for every removed duplicate
+function deduplicateStudents() {
+  var seen = {};    // key -> kept record
+  var idMap = {};   // oldId -> keptId
+
+  // First pass: merge all duplicates for each name|course key
+  students.forEach(function(s) {
+    var key = (s.name || '').trim().toLowerCase() + '|' + (s.course || '').trim().toLowerCase();
+    if (!key || key === '|') return;
+    if (seen[key]) {
+      var prev = seen[key];
+      seen[key] = mergeStudentRecords(prev, s);
+      // Map whichever ID was NOT chosen as base to the winner
+      if (seen[key].id !== prev.id) idMap[prev.id] = seen[key].id;
+      if (seen[key].id !== s.id)    idMap[s.id]    = seen[key].id;
+    } else {
+      seen[key] = s;
+    }
+  });
+
+  // Second pass: build deduped list preserving first-encounter order
+  var added = {}, deduped = [];
+  students.forEach(function(s) {
+    var key = (s.name || '').trim().toLowerCase() + '|' + (s.course || '').trim().toLowerCase();
+    if (!key || key === '|') { deduped.push(s); return; }
+    if (!added[key]) {
+      added[key] = true;
+      deduped.push(seen[key]);
+      // Any ID that is not the kept ID needs mapping
+      if (s.id !== seen[key].id) idMap[s.id] = seen[key].id;
+    } else {
+      if (s.id !== seen[key].id) idMap[s.id] = seen[key].id;
+    }
+  });
+
+  var removed = students.length - deduped.length;
+  students = deduped;
+  return { removed: removed, idMap: idMap };
+}
+
+// Re-link all dependent arrays after student deduplication.
+// Any record referencing a removed student ID is updated to use the kept ID.
+function relinkDependentData(idMap) {
+  if (!idMap || Object.keys(idMap).length === 0) return;
+
+  // userAccounts: re-link studentDataId, then dedup accounts for same student
+  var keptAccountByStudentId = {};
+  userAccounts.forEach(function(u) {
+    if (u.studentDataId && idMap[u.studentDataId]) {
+      u.studentDataId = idMap[u.studentDataId];
+    }
+  });
+  // Remove duplicate accounts for the same studentDataId (keep the one with most data)
+  var seenAcct = {};
+  userAccounts = userAccounts.filter(function(u) {
+    if (!u.studentDataId) return true;
+    if (seenAcct[u.studentDataId]) {
+      // Keep the one with a non-empty password/status, discard the thinner one
+      var prev = seenAcct[u.studentDataId];
+      if ((u.password && !prev.password) || (u.status === 'active' && prev.status !== 'active')) {
+        seenAcct[u.studentDataId] = u;
+        return true; // keep this, remove prev — but we can't remove prev retroactively
+      }
+      return false; // discard this duplicate
+    }
+    seenAcct[u.studentDataId] = u;
+    return true;
+  });
+
+  // attendanceRecords: re-link studentId
+  attendanceRecords.forEach(function(r) {
+    if (r && r.studentId && idMap[r.studentId]) r.studentId = idMap[r.studentId];
+  });
+
+  // certDownloadApprovals: re-link studentId, then dedup by studentId
+  certDownloadApprovals.forEach(function(c) {
+    if (c && c.studentId && idMap[c.studentId]) c.studentId = idMap[c.studentId];
+  });
+  var seenCert = {};
+  certDownloadApprovals = certDownloadApprovals.filter(function(c) {
+    if (!c || !c.studentId) return true;
+    if (seenCert[c.studentId]) return false;
+    seenCert[c.studentId] = true;
+    return true;
+  });
+
+  // examResults: re-link studentId
+  if (Array.isArray(examResults)) {
+    examResults.forEach(function(r) {
+      if (r && r.studentId && idMap[r.studentId]) r.studentId = idMap[r.studentId];
+    });
+  }
 }
 
 function updateSkillAreaCounts() {
@@ -6040,7 +6163,22 @@ function reconcileStudentsFromAccounts() {
     // Check if a student record already exists
     if (u.studentDataId && studentIds[u.studentDataId]) return;
     var nameKey = u.name && u.programme ? (u.name + '|' + u.programme).toLowerCase() : null;
-    if (nameKey && studentNameCourse[nameKey]) return;
+    if (nameKey && studentNameCourse[nameKey]) {
+      // Re-link account to the existing student's ID if it was pointing at a removed duplicate
+      var matchedStu = students.find(function(s) {
+        return s.name && u.name && s.name.toLowerCase() === u.name.toLowerCase() &&
+               s.course && u.programme && s.course.toLowerCase() === u.programme.toLowerCase();
+      });
+      if (matchedStu && u.studentDataId !== matchedStu.id) u.studentDataId = matchedStu.id;
+      return;
+    }
+    // Also match by name alone when programme is missing to prevent ghost re-creation
+    if (u.name && !u.programme) {
+      var nameOnlyMatch = students.find(function(s) {
+        return s.name && s.name.toLowerCase().trim() === u.name.toLowerCase().trim();
+      });
+      if (nameOnlyMatch) { u.studentDataId = nameOnlyMatch.id; return; }
+    }
 
     // No matching student record — create one
     var studentId = u.studentDataId || ('STU-' + Date.now().toString(36).toUpperCase() + Math.random().toString(36).substring(2,6).toUpperCase());
@@ -14309,6 +14447,14 @@ window.addEventListener('message', function(e) {
     try { attendanceRecords = JSON.parse(CESTISStore.getItem('voctrain_attendance') || '[]'); } catch(e2) {}
     try { userAccounts = JSON.parse(CESTISStore.getItem('voctrain_userAccounts') || '[]'); } catch(e2) {}
     try { skillAreas = JSON.parse(CESTISStore.getItem('voctrain_skillAreas') || '[]'); } catch(e2) {}
+    var _dr2 = deduplicateStudents();
+    if (_dr2.removed > 0) {
+      relinkDependentData(_dr2.idMap);
+      try { CESTISStore.setItem('voctrain_students', JSON.stringify(students)); } catch(e2) {}
+      try { CESTISStore.setItem('voctrain_attendance', JSON.stringify(attendanceRecords)); } catch(e2) {}
+      try { CESTISStore.setItem('voctrain_certDownloadApprovals', JSON.stringify(certDownloadApprovals)); } catch(e2) {}
+      try { saveUserAccounts(); } catch(e2) {}
+    }
     refreshStudentDependentViews();
     updateSkillAreaCounts();
     saveState();

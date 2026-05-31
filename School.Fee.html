@@ -1901,14 +1901,14 @@
 
             <div class="chart-container">
                 <h2>Collection Rate by Skill Area</h2>
-                <div style="width: 8in; height: 8in; margin: 0 auto;">
+                <div style="position:relative;height:380px;">
                     <canvas id="collectionChart"></canvas>
                 </div>
             </div>
 
             <div class="chart-container">
                 <h2>Payment Trends</h2>
-                <div style="width: 8in; height: 8in; margin: 0 auto;">
+                <div style="position:relative;height:380px;">
                     <canvas id="trendChart"></canvas>
                 </div>
             </div>
@@ -6462,11 +6462,10 @@
                     },
                     options: {
                         responsive: true,
-                        maintainAspectRatio: true,
-                        aspectRatio: 2,
+                        maintainAspectRatio: false,
                         plugins: {
                             legend: {
-                                labels: { 
+                                labels: {
                                     color: textColor,
                                     font: { size: 14 }
                                 }
@@ -6543,11 +6542,10 @@
                     },
                     options: {
                         responsive: true,
-                        maintainAspectRatio: true,
-                        aspectRatio: 2,
+                        maintainAspectRatio: false,
                         plugins: {
                             legend: {
-                                labels: { 
+                                labels: {
                                     color: textColor,
                                     font: { size: 14 }
                                 }

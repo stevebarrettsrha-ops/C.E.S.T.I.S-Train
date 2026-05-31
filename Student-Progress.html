@@ -364,6 +364,79 @@ function loadData() {
   studentProfiles = safeJsonParse(CESTISStore.getItem('voctrain_studentProfiles'), {});
 }
 
+// Merge two student records, preferring the more complete / more recent one
+function mergeStudentRecords(a, b) {
+  var aMod = a.lastModified ? new Date(a.lastModified).getTime() : 0;
+  var bMod = b.lastModified ? new Date(b.lastModified).getTime() : 0;
+  var base = (bMod > aMod) ? Object.assign({}, b) : Object.assign({}, a);
+  var other = (bMod > aMod) ? a : b;
+  // Fill any blank fields from the other record
+  var fields = ['stage','progress','score','gpa','certNo','certDate','certCollected',
+                'attendance','assignments','instructor','email','phone','address',
+                'dob','enrollDate','completionDate','nqfLevel','notes','gender'];
+  fields.forEach(function(f){
+    if((base[f] === undefined || base[f] === null || base[f] === '') &&
+       other[f] !== undefined && other[f] !== null && other[f] !== '') {
+      base[f] = other[f];
+    }
+  });
+  return base;
+}
+
+function deduplicateStudents() {
+  var seen = {}, idMap = {};
+  students.forEach(function(s) {
+    var key = (s.name || '').trim().toLowerCase() + '|' + (s.course || '').trim().toLowerCase();
+    if (!key || key === '|') return;
+    if (seen[key]) {
+      var prev = seen[key];
+      seen[key] = mergeStudentRecords(prev, s);
+      if (seen[key].id !== prev.id) idMap[prev.id] = seen[key].id;
+      if (seen[key].id !== s.id)    idMap[s.id]    = seen[key].id;
+    } else { seen[key] = s; }
+  });
+  var added = {}, deduped = [];
+  students.forEach(function(s) {
+    var key = (s.name || '').trim().toLowerCase() + '|' + (s.course || '').trim().toLowerCase();
+    if (!key || key === '|') { deduped.push(s); return; }
+    if (!added[key]) { added[key] = true; deduped.push(seen[key]); }
+    else if (s.id !== seen[key].id) idMap[s.id] = seen[key].id;
+  });
+  var removed = students.length - deduped.length;
+  students = deduped;
+  return { removed: removed, idMap: idMap };
+}
+
+function relinkDependentData(idMap) {
+  if (!idMap || Object.keys(idMap).length === 0) return;
+  userAccounts.forEach(function(u) {
+    if (u.studentDataId && idMap[u.studentDataId]) u.studentDataId = idMap[u.studentDataId];
+  });
+  var seenAcct = {};
+  userAccounts = userAccounts.filter(function(u) {
+    if (!u.studentDataId) return true;
+    if (seenAcct[u.studentDataId]) return false;
+    seenAcct[u.studentDataId] = true; return true;
+  });
+  attendanceRecords.forEach(function(r) {
+    if (r && r.studentId && idMap[r.studentId]) r.studentId = idMap[r.studentId];
+  });
+  certDownloadApprovals.forEach(function(c) {
+    if (c && c.studentId && idMap[c.studentId]) c.studentId = idMap[c.studentId];
+  });
+  var seenCert = {};
+  certDownloadApprovals = certDownloadApprovals.filter(function(c) {
+    if (!c || !c.studentId) return true;
+    if (seenCert[c.studentId]) return false;
+    seenCert[c.studentId] = true; return true;
+  });
+  if (Array.isArray(examResults)) {
+    examResults.forEach(function(r) {
+      if (r && r.studentId && idMap[r.studentId]) r.studentId = idMap[r.studentId];
+    });
+  }
+}
+
 function saveData() {
   CESTISStore.setItem('voctrain_students', JSON.stringify(students));
   CESTISStore.setItem('voctrain_skillAreas', JSON.stringify(skillAreas));
@@ -799,6 +872,12 @@ function init() {
   // Our page is dark-only matching index.html's :root defaults
 
   loadData();
+  var _dr = deduplicateStudents();
+  if (_dr.removed > 0) {
+    console.log('[StudentProgress] Removed ' + _dr.removed + ' duplicate student record(s)');
+    relinkDependentData(_dr.idMap);
+    saveData();
+  }
   populateCourseDropdowns();
   filterStudents();
   updatePipelineCounts();
@@ -808,6 +887,8 @@ function init() {
 window.addEventListener('storage', function(e){
   if(e.key === 'voctrain_students' || e.key === 'voctrain_skillAreas'){
     loadData();
+    var _dr3 = deduplicateStudents();
+    if(_dr3.removed > 0) { relinkDependentData(_dr3.idMap); saveData(); }
     populateCourseDropdowns();
     filterStudents();
     updatePipelineCounts();
