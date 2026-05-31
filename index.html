@@ -14509,7 +14509,18 @@ function syncStudentsFromLocalFeeSystem() {
 }
 
 function filterStudents() {
-  syncStudentsFromLocalFeeSystem();
+  var _feeAdded = syncStudentsFromLocalFeeSystem();
+  // Always keep the pipeline stage cards in sync with the full student list
+  // (cheap), so totals never lag behind students added via any path.
+  try { if (typeof updatePipelineCounts === 'function') updatePipelineCounts(); } catch(e){}
+  if (_feeAdded) {
+    // New students were pulled in from School Fee: also refresh the dashboard
+    // stats and skill-area (Training Centre / chat) counts so every total
+    // reflects the new students.
+    try { if (typeof renderDashboard === 'function') renderDashboard(); } catch(e){}
+    try { if (typeof updateSkillAreaCounts === 'function') updateSkillAreaCounts(); } catch(e){}
+    try { if (typeof renderSkills === 'function') renderSkills(); } catch(e){}
+  }
   let filtered = [...students];
   const stage = document.getElementById('filterStage')?.value;
   const course = document.getElementById('filterCourse')?.value;
