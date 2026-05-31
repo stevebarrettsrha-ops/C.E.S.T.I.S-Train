@@ -220,6 +220,26 @@ test('tombstones record and detect deleted ids', function () {
   assert.strictEqual(Core.isStudentDeleted(Core.stableStudentId({ name: 'gone person', course: 'WELDING' }), mockStore), true);
 });
 
+/* ---- change bus (drives reactive view refresh) ------------------------ */
+test('bus delivers payloads to subscribers and off() unsubscribes', function () {
+  var got = [];
+  var unsub = Core.on('evt:x', function (p) { got.push(p); });
+  Core.emit('evt:x', 1);
+  Core.emit('evt:x', 2);
+  unsub();
+  Core.emit('evt:x', 3);
+  assert.deepStrictEqual(got, [1, 2], 'received before unsubscribe only');
+});
+test('a throwing listener does not break the others', function () {
+  var reached = false;
+  Core.on('evt:y', function () { throw new Error('boom'); });
+  Core.on('evt:y', function () { reached = true; });
+  Core.emit('evt:y');
+  assert.strictEqual(reached, true);
+  // emitting an event with no listeners must not throw
+  assert.doesNotThrow(function () { Core.emit('evt:nobody'); });
+});
+
 /* ---- catalogue -------------------------------------------------------- */
 test('catalogue is shared and freshSkillAreas returns an independent copy', function () {
   assert.strictEqual(Core.SKILL_AREAS.length, 20);

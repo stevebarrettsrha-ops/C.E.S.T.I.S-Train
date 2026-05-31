@@ -488,7 +488,33 @@ function saveData() {
   try {
     window.top.postMessage({type:'students-updated'}, '*');
   } catch(e) {}
+  // Reactive views: announce on the shared bus so this page re-renders too.
+  try { if (window.CESTISCore && typeof CESTISCore.emit === 'function') CESTISCore.emit('cestis:state-saved'); } catch(e) {}
 }
+
+// Single reactive subscriber: coalesce saves into one re-render of this page's
+// views, so a change never leaves the Student Progress view stale.
+var _spRefreshScheduled = false, _spRefreshing = false;
+function spReactiveRefreshNow() {
+  _spRefreshScheduled = false;
+  if (_spRefreshing) return;
+  _spRefreshing = true;
+  try { if (typeof populateCourseDropdowns === 'function') populateCourseDropdowns(); } catch(e) {}
+  try { if (typeof filterStudents === 'function') filterStudents(); } catch(e) {}
+  try { if (typeof updatePipelineCounts === 'function') updatePipelineCounts(); } catch(e) {}
+  _spRefreshing = false;
+}
+function spScheduleReactiveRefresh() {
+  if (_spRefreshScheduled || _spRefreshing) return;
+  _spRefreshScheduled = true;
+  if (typeof requestAnimationFrame === 'function') requestAnimationFrame(spReactiveRefreshNow);
+  else setTimeout(spReactiveRefreshNow, 50);
+}
+try {
+  if (window.CESTISCore && typeof CESTISCore.on === 'function') {
+    CESTISCore.on('cestis:state-saved', spScheduleReactiveRefresh);
+  }
+} catch(e) {}
 
 // ============================== UTILITIES ==============================
 

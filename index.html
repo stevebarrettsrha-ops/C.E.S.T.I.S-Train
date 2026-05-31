@@ -5864,6 +5864,11 @@ function saveState() {
   }
   // Push changes to Google Drive immediately (debounced)
   scheduleDebouncedCloudSave();
+  // Reactive views: announce the change on the shared bus so the single
+  // subscriber re-renders every dependent view. This makes freshness
+  // structural instead of relying on each mutation remembering to call
+  // refreshXView(). Coalesced on the next frame, so bursts of saves render once.
+  try { if (window.CESTISCore && typeof CESTISCore.emit === 'function') CESTISCore.emit('cestis:state-saved'); } catch(e) {}
 }
 var debouncedSaveState = debounce(saveState, 500);
 
@@ -15019,6 +15024,34 @@ function refreshContentDependentViews() {
     } catch(e) { /* one bad render shouldn't block the others */ }
   });
 }
+
+// ===================== REACTIVE VIEW REFRESH (single source) =====================
+// One subscriber drives all view freshness. saveState() emits 'cestis:state-saved'
+// on the shared cestis-core bus; this coalesces a burst of saves into a single
+// re-render on the next animation frame. The two refresh funnels above only read
+// + render (they never write state and are no-ops for pages that aren't mounted),
+// so there is no save -> refresh -> save loop. A re-entrancy guard makes that
+// invariant explicit and prevents nested renders.
+var _cestisRefreshScheduled = false, _cestisRefreshing = false;
+function cestisReactiveRefreshNow() {
+  _cestisRefreshScheduled = false;
+  if (_cestisRefreshing) return;
+  _cestisRefreshing = true;
+  try { if (typeof refreshStudentDependentViews === 'function') refreshStudentDependentViews(); } catch(e) {}
+  try { if (typeof refreshContentDependentViews === 'function') refreshContentDependentViews(); } catch(e) {}
+  _cestisRefreshing = false;
+}
+function cestisScheduleReactiveRefresh() {
+  if (_cestisRefreshScheduled || _cestisRefreshing) return;
+  _cestisRefreshScheduled = true;
+  if (typeof requestAnimationFrame === 'function') requestAnimationFrame(cestisReactiveRefreshNow);
+  else setTimeout(cestisReactiveRefreshNow, 50);
+}
+try {
+  if (window.CESTISCore && typeof CESTISCore.on === 'function') {
+    CESTISCore.on('cestis:state-saved', cestisScheduleReactiveRefresh);
+  }
+} catch(e) {}
 
 // Canonical "is this student certified?" — used for certification counts so the
 // dashboards, certificate pages and reports all agree on one definition.
