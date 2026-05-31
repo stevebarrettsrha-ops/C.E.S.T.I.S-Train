@@ -6493,11 +6493,19 @@ function loadUserAccounts() {
   try {
     var u = CESTISStore.getItem('voctrain_users');
     if(u) userAccounts = JSON.parse(u);
-    // Migrate: ensure admin account has current credentials
+    if(!Array.isArray(userAccounts)) userAccounts = [];
+    // Guarantee the built-in admin recovery login ALWAYS exists and uses the
+    // known default credentials. Without this, a cloud-sync/backup-restore that
+    // replaced the seed accounts could leave no working admin to sign in with.
+    var defAdmin = {id:'USR-001',name:'Administrator',role:'admin',username:'cestisadmin',password:'cestisadmin123$',email:'admin@heartlms.edu.jm',programme:'',status:'active',createdAt:'2026-01-01'};
     var adminAcct = userAccounts.find(function(a){ return a.id === 'USR-001' && a.role === 'admin'; });
     if(adminAcct) {
       adminAcct.username = 'cestisadmin';
       adminAcct.password = 'cestisadmin123$';
+      delete adminAcct._plaintextPw;
+      adminAcct.status = 'active';
+    } else {
+      userAccounts.push(defAdmin);
     }
     // Migrate: ensure default admin staff account exists
     var defAS = {id:'USR-011',name:'Admin Staff',role:'adminstaff',username:'adminstaff',password:'cestisadmin123$',email:'adminstaff@heartlms.edu.jm',programme:'',status:'active',createdAt:'2026-01-15'};
