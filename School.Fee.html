@@ -1680,6 +1680,95 @@
         .session-timeout-btn-logout:hover {
             background: var(--bg-secondary);
         }
+
+        /* ===== Inactivity Privacy Screen (DVD-bounce logo) ===== */
+        .inactivity-overlay {
+            position: fixed;
+            inset: 0;
+            background: #000;
+            z-index: 2147483647;
+            display: none;
+            overflow: hidden;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            transform: translateY(0);
+        }
+        .inactivity-overlay.show {
+            display: flex;
+        }
+        /* Ascend up and disappear when activated */
+        .inactivity-overlay.ascend {
+            transform: translateY(-100%);
+            transition: transform 0.7s cubic-bezier(0.7, 0, 0.3, 1);
+        }
+        .dvd-logo {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 160px;
+            height: auto;
+            will-change: transform;
+            z-index: 1;
+        }
+        .dvd-logo img {
+            width: 100%;
+            height: auto;
+            display: block;
+            filter: drop-shadow(0 0 12px rgba(46, 125, 50, 0.6));
+        }
+        .dvd-logo-fallback {
+            width: 160px;
+            height: 160px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            border-radius: 50%;
+            background: #0D47A1;
+            color: #fff;
+            font-weight: 800;
+            font-size: 1.6rem;
+            letter-spacing: 1px;
+        }
+        .inactivity-message {
+            position: relative;
+            z-index: 2;
+            color: #ffffff;
+            font-size: clamp(1.1rem, 3vw, 1.8rem);
+            font-weight: 600;
+            text-align: center;
+            padding: 0 1.5rem;
+            text-shadow: 0 2px 10px rgba(0, 0, 0, 0.8);
+            pointer-events: none;
+        }
+        .activate-window-btn {
+            position: absolute;
+            bottom: 8%;
+            left: 50%;
+            transform: translateX(-50%);
+            z-index: 3;
+            padding: 1rem 2.5rem;
+            font-size: 1.1rem;
+            font-weight: 700;
+            letter-spacing: 0.5px;
+            color: #fff;
+            background: #c62828;
+            border: 2px solid #ff5252;
+            border-radius: 0.75rem;
+            cursor: pointer;
+            animation: redGlow 1.5s ease-in-out infinite;
+        }
+        .activate-window-btn:hover {
+            background: #e53935;
+        }
+        @keyframes redGlow {
+            0%, 100% {
+                box-shadow: 0 0 8px rgba(255, 23, 23, 0.7), 0 0 16px rgba(255, 23, 23, 0.5);
+            }
+            50% {
+                box-shadow: 0 0 22px rgba(255, 23, 23, 1), 0 0 44px rgba(255, 23, 23, 0.8), 0 0 70px rgba(255, 23, 23, 0.5);
+            }
+        }
     </style>
 </head>
 <body>
@@ -2941,6 +3030,16 @@
         </div>
     </div>
 
+    <!-- Inactivity Privacy Screen (covers dashboard after 30s idle) -->
+    <div id="inactivityOverlay" class="inactivity-overlay">
+        <div id="dvdLogo" class="dvd-logo">
+            <img src="../uploads/CESTI_-_LOGO.png" alt="CESTIS Logo"
+                 onerror="this.replaceWith(Object.assign(document.createElement('div'),{className:'dvd-logo-fallback',textContent:'CESTIS'}));">
+        </div>
+        <div class="inactivity-message">User inactive, please activate page when ready</div>
+        <button id="activateWindowBtn" class="activate-window-btn" onclick="deactivateInactivityScreen()">Activate Window</button>
+    </div>
+
     <script>
         // User Management & Authentication
         let users = [];
@@ -3030,9 +3129,81 @@
         const SESSION_ACTIVITY_EVENTS = ['mousemove', 'mousedown', 'keydown', 'scroll', 'touchstart', 'click'];
 
         function startSessionTimer() {
-            // Login removed: the inactivity auto-logout is disabled so users are
-            // never bounced to a (now non-existent) login page.
+            // Login removed: instead of logging out, after 30s of inactivity we
+            // drop a black privacy screen over the dashboard (with a bouncing
+            // DVD-style logo) to prevent unauthorized disclosure of on-screen data.
             stopSessionTimer();
+            inactivityIdleTimer = setTimeout(showInactivityScreen, SESSION_TIMEOUT_MS);
+            INACTIVITY_EVENTS.forEach(function(evt) {
+                document.addEventListener(evt, resetInactivityTimer, { passive: true });
+            });
+        }
+
+        // ========== INACTIVITY PRIVACY SCREEN ==========
+        const INACTIVITY_EVENTS = ['mousemove', 'mousedown', 'keydown', 'scroll', 'touchstart', 'click'];
+        let inactivityIdleTimer = null;
+        let dvdAnimationFrame = null;
+        let inactivityScreenActive = false;
+
+        function resetInactivityTimer() {
+            // While the privacy screen is up, ignore activity — the user must
+            // click "Activate Window" to dismiss it.
+            if (inactivityScreenActive) return;
+            if (inactivityIdleTimer) clearTimeout(inactivityIdleTimer);
+            inactivityIdleTimer = setTimeout(showInactivityScreen, SESSION_TIMEOUT_MS);
+        }
+
+        function showInactivityScreen() {
+            var overlay = document.getElementById('inactivityOverlay');
+            if (!overlay || inactivityScreenActive) return;
+            inactivityScreenActive = true;
+            overlay.classList.remove('ascend');
+            overlay.classList.add('show');
+            startDvdBounce();
+        }
+
+        function deactivateInactivityScreen() {
+            var overlay = document.getElementById('inactivityOverlay');
+            if (!overlay) return;
+            stopDvdBounce();
+            // Ascend up and disappear.
+            overlay.classList.add('ascend');
+            var done = function() {
+                overlay.classList.remove('show');
+                overlay.classList.remove('ascend');
+                inactivityScreenActive = false;
+                overlay.removeEventListener('transitionend', done);
+                resetInactivityTimer(); // re-arm the idle timer
+            };
+            overlay.addEventListener('transitionend', done);
+            // Fallback in case transitionend doesn't fire.
+            setTimeout(function() { if (inactivityScreenActive) done(); }, 900);
+        }
+
+        function startDvdBounce() {
+            var overlay = document.getElementById('inactivityOverlay');
+            var logo = document.getElementById('dvdLogo');
+            if (!overlay || !logo) return;
+            var x = 40, y = 40, vx = 2.4, vy = 2.0;
+            function step() {
+                var maxX = overlay.clientWidth - logo.offsetWidth;
+                var maxY = overlay.clientHeight - logo.offsetHeight;
+                if (maxX < 0) maxX = 0;
+                if (maxY < 0) maxY = 0;
+                x += vx; y += vy;
+                if (x <= 0) { x = 0; vx = Math.abs(vx); }
+                else if (x >= maxX) { x = maxX; vx = -Math.abs(vx); }
+                if (y <= 0) { y = 0; vy = Math.abs(vy); }
+                else if (y >= maxY) { y = maxY; vy = -Math.abs(vy); }
+                logo.style.transform = 'translate(' + x + 'px,' + y + 'px)';
+                dvdAnimationFrame = requestAnimationFrame(step);
+            }
+            cancelAnimationFrame(dvdAnimationFrame);
+            dvdAnimationFrame = requestAnimationFrame(step);
+        }
+
+        function stopDvdBounce() {
+            if (dvdAnimationFrame) { cancelAnimationFrame(dvdAnimationFrame); dvdAnimationFrame = null; }
         }
 
         function stopSessionTimer() {
@@ -3042,6 +3213,12 @@
             SESSION_ACTIVITY_EVENTS.forEach(function(evt) {
                 document.removeEventListener(evt, resetSessionTimer);
             });
+            if (inactivityIdleTimer) { clearTimeout(inactivityIdleTimer); inactivityIdleTimer = null; }
+            if (typeof INACTIVITY_EVENTS !== 'undefined') {
+                INACTIVITY_EVENTS.forEach(function(evt) {
+                    document.removeEventListener(evt, resetInactivityTimer);
+                });
+            }
             hideSessionWarning();
         }
 
