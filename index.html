@@ -14491,6 +14491,35 @@ function syncStudentsFromLocalFeeSystem() {
         source: 'schoolfee'
       });
 
+      // Create a linked disabled user account carrying the student's programme
+      // so they are auto-associated with the matching Training Centre (skill
+      // area) and skill chat rooms — membership for both is derived from the
+      // account's programme (findSkillAreaForCourse / getChatRoomsForUser).
+      try {
+        if (typeof userAccounts !== 'undefined' && Array.isArray(userAccounts)) {
+          var feeUsername = name.toLowerCase().replace(/\s+/g, '.');
+          var dupAcct = userAccounts.find(function(u){
+            return u && ((u.username === feeUsername && u.role === 'student') || u.studentDataId === studentId);
+          });
+          if (!dupAcct) {
+            userAccounts.push({
+              id: 'USR-FEE-' + Date.now() + '-' + Math.floor(Math.random() * 1000),
+              name: name,
+              role: 'student',
+              username: feeUsername,
+              password: '',
+              email: norm(fee.email) || '',
+              programme: course,
+              status: 'disabled',
+              createdAt: new Date().toISOString().split('T')[0],
+              registeredVia: 'fee-system',
+              studentDataId: studentId,
+              approvedBy: 'system'
+            });
+          }
+        }
+      } catch (e) {}
+
       existingIds[studentId] = true;
       existingKeys[dupKey] = true;
       changed = true;
