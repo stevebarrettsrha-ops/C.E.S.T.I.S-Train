@@ -38584,13 +38584,20 @@ function ttRefreshOnShow(){
           '<p style="margin:0 0 18px;line-height:1.5;font-size:0.95rem;text-align:center;">' + who +
           ' has been added to <b>Student Progress</b> and to the <b>School Fee Management</b> system.<br><br>' +
           'Please open <b>School Fee Management</b> to complete the remaining information &mdash; tuition fee, contact number and personal details (ID, address, guardian, etc.).</p>' +
-          '<button id="sfReminderOk" style="display:block;width:100%;background:#0D47A1;color:#fff;border:none;padding:12px;border-radius:8px;font-size:1rem;cursor:pointer;">Got it</button>' +
+          '<button id="sfReminderGo" style="display:block;width:100%;background:#0D47A1;color:#fff;border:none;padding:12px;border-radius:8px;font-size:1rem;font-weight:600;cursor:pointer;margin-bottom:10px;">Open School Fee Management &rarr;</button>' +
+          '<button id="sfReminderOk" style="display:block;width:100%;background:transparent;color:#0D47A1;border:1px solid #0D47A1;padding:10px;border-radius:8px;font-size:0.95rem;cursor:pointer;">Not now</button>' +
         '</div>';
       document.body.appendChild(ov);
       function close(){ if (ov.parentNode) ov.parentNode.removeChild(ov); }
       ov.addEventListener('click', function(e){ if (e.target === ov) close(); });
       var ok = document.getElementById('sfReminderOk');
       if (ok) ok.addEventListener('click', close);
+      var go = document.getElementById('sfReminderGo');
+      if (go) go.addEventListener('click', function(){
+        close();
+        try { if (typeof showPage === 'function') showPage('fee-management'); }
+        catch(e){ try { window.location.hash = '#fee-management'; } catch(_){} }
+      });
     } catch(e){ try{ alert('Student added. Please add fee & personal details in School Fee Management.'); }catch(_){} }
   }
   window.showSchoolFeeReminder = showSchoolFeeReminder;

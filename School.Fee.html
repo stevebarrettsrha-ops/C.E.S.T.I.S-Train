@@ -2106,6 +2106,7 @@
                             <th>Paid</th>
                             <th>Balance</th>
                             <th>Status</th>
+                            <th>Stage</th>
                             <th>Actions</th>
                         </tr>
                     </thead>
@@ -4376,6 +4377,44 @@
             broadcastStudentsToParent();
         }
 
+        // --- Academic stage (from the LMS Student Progress dashboard) ---------
+        // The dashboard owns each student's training stage/progress; we read it
+        // from voctrain_students (and live messages) so the fee table can show it.
+        const STAGE_LABELS = { testing:'Testing', interview:'Interview', training:'In Training', certified:'Certified', collected:'Collected', incomplete:'Incomplete' };
+        const STAGE_COLORS = { testing:'#1565C0', interview:'#7B1FA2', training:'#F57C00', certified:'#2E7D32', collected:'#1B5E20', incomplete:'#C62828' };
+        let lmsStudentCache = [];
+        function refreshLmsStudentCache() {
+            try {
+                const raw = CESTISStore.getItem('voctrain_students');
+                lmsStudentCache = raw ? (JSON.parse(raw) || []) : [];
+                if (!Array.isArray(lmsStudentCache)) lmsStudentCache = [];
+            } catch (e) { lmsStudentCache = []; }
+        }
+        function getStudentStage(student) {
+            if (!student) return null;
+            if (!lmsStudentCache.length) refreshLmsStudentCache();
+            const norm = v => (v == null ? '' : String(v)).trim().toLowerCase().replace(/\s+/g, ' ');
+            const linkId = 'SF-' + student.id;
+            const m = lmsStudentCache.find(ls => ls && (
+                (student.lmsId && ls.id === student.lmsId) ||
+                ls.id === student.id ||
+                ls.id === linkId ||
+                ls.schoolFeeId === student.id ||
+                (norm(ls.name) === norm(student.name) &&
+                    (!ls.course || !student.skillArea || norm(ls.course) === norm(student.skillArea)))
+            ));
+            return m ? { stage: m.stage || 'testing', progress: (m.progress != null ? m.progress : '') } : null;
+        }
+        function renderStageBadge(student) {
+            const info = getStudentStage(student);
+            if (!info) return '<span style="color: var(--text-secondary); font-size: 0.85rem;">—</span>';
+            const label = STAGE_LABELS[info.stage] || info.stage || '—';
+            const color = STAGE_COLORS[info.stage] || '#1565C0';
+            const pct = (info.progress === '' || info.progress == null) ? '' :
+                ` <span style="color: var(--text-secondary); font-size: 0.75rem;">${info.progress}%</span>`;
+            return `<span style="display:inline-block;padding:2px 8px;border-radius:10px;font-size:0.78rem;font-weight:600;color:#fff;background:${color};">${label}</span>${pct}`;
+        }
+
         // When running inside the LMS dashboard iframe, send the current student
         // list to the parent window. The parent keeps its own CESTISStore cache,
         // so a postMessage is the reliable way to hand it fresh data live.
@@ -4709,6 +4748,7 @@
         function renderStudentsTable() {
             const tbody = document.getElementById('studentsTableBody');
             tbody.innerHTML = '';
+            refreshLmsStudentCache(); // pull latest stages from the Progress dashboard
 
             students.forEach((student, index) => {
                 const isSelected = selectedForMerge.includes(index);
@@ -4728,6 +4768,7 @@
                     <td>$${student.totalPaid.toFixed(2)}</td>
                     <td>$${student.balance.toFixed(2)}</td>
                     <td><span class="status-badge status-${getStatusClass(student.status)}">${student.status}</span></td>
+                    <td>${renderStageBadge(student)}</td>
                     <td>
                         <button class="action-btn btn-success" onclick="viewStudent(${index})">View</button>
                         <button class="action-btn" style="background: #FFA726;" onclick="editStudent(${index})">Edit</button>
