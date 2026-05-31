@@ -4369,6 +4369,94 @@
             if (savedStudents) students = JSON.parse(savedStudents);
             if (savedPayments) payments = JSON.parse(savedPayments);
             if (savedDocuments) documents = JSON.parse(savedDocuments);
+            // Make sure existing students also appear on the Progress dashboard.
+            syncStudentsToProgressDashboard();
+        }
+
+        // Cross-page sync: mirror School Fee students into the Student
+        // Progress dashboard (index.html, key 'voctrain_students') so the
+        // same people appear there with progress tracking. The fee page owns
+        // fee/identity data; the dashboard owns academic progress
+        // (stage / score / progress %), which we never overwrite.
+        function syncStudentsToProgressDashboard() {
+            try {
+                let lmsStudents = [];
+                const rawLms = CESTISStore.getItem('voctrain_students');
+                if (rawLms) { try { lmsStudents = JSON.parse(rawLms) || []; } catch (e) { lmsStudents = []; } }
+                if (!Array.isArray(lmsStudents)) lmsStudents = [];
+
+                // Respect dashboard deletions so we don't resurrect students.
+                let delIds = [];
+                try {
+                    const rawDel = CESTISStore.getItem('voctrain_deletedStudentIds');
+                    delIds = rawDel ? JSON.parse(rawDel) : [];
+                } catch (e) { delIds = []; }
+                if (!Array.isArray(delIds)) delIds = [];
+
+                const norm = v => (v == null ? '' : String(v)).trim().toLowerCase().replace(/\s+/g, ' ');
+                let changed = false;
+
+                students.forEach(sf => {
+                    if (!sf || !sf.name) return;
+
+                    const linkId = 'SF-' + sf.id;          // stable dashboard id for this fee record
+                    if (delIds.indexOf(linkId) !== -1) return; // removed on the dashboard
+
+                    // Match an existing dashboard record by link id, raw fee id,
+                    // stored back-reference, or name (+ matching course).
+                    const existing = lmsStudents.find(ls => ls && (
+                        ls.id === linkId ||
+                        ls.id === sf.id ||
+                        ls.schoolFeeId === sf.id ||
+                        (norm(ls.name) === norm(sf.name) &&
+                            (!ls.course || !sf.skillArea || norm(ls.course) === norm(sf.skillArea)))
+                    ));
+
+                    if (existing) {
+                        // Link records and backfill only EMPTY identity/contact
+                        // fields. Never touch stage / score / progress.
+                        if (existing.schoolFeeId !== sf.id) { existing.schoolFeeId = sf.id; changed = true; }
+                        if (sf.skillArea && !existing.course) { existing.course = sf.skillArea; changed = true; }
+                        if (sf.email && !existing.email) { existing.email = sf.email; changed = true; }
+                        if (sf.contact && !existing.phone) { existing.phone = sf.contact; changed = true; }
+                        if (sf.gender && !existing.gender) { existing.gender = sf.gender; changed = true; }
+                        return;
+                    }
+
+                    // No match: add a new dashboard student mirroring the fee record.
+                    lmsStudents.push({
+                        id: linkId,
+                        schoolFeeId: sf.id,
+                        name: sf.name,
+                        course: sf.skillArea || '',
+                        stage: 'testing',
+                        score: '',
+                        progress: 0,
+                        certNo: null,
+                        certDate: null,
+                        certCollected: false,
+                        attendance: 0,
+                        assignments: 0,
+                        assignmentsTotal: 8,
+                        gpa: '0.0',
+                        instructor: '',
+                        gender: sf.gender || '',
+                        email: sf.email || '',
+                        phone: sf.contact || '',
+                        createdAt: new Date().toISOString().split('T')[0],
+                        lastModified: new Date().toISOString(),
+                        source: 'schoolfee'
+                    });
+                    changed = true;
+                });
+
+                if (changed) {
+                    CESTISStore.setItem('voctrain_students', JSON.stringify(lmsStudents));
+                }
+            } catch (e) {
+                // Best-effort: a sync failure must never block fee management.
+                console.warn('syncStudentsToProgressDashboard failed:', e);
+            }
         }
 
         // Save data to localStorage
@@ -4376,6 +4464,8 @@
             CESTISStore.setItem('cestiSchoolFeeStudents', JSON.stringify(students));
             CESTISStore.setItem('cestiSchoolFeePayments', JSON.stringify(payments));
             CESTISStore.setItem('cestiSchoolFeeDocuments', JSON.stringify(documents));
+            // Mirror students into the Student Progress dashboard.
+            syncStudentsToProgressDashboard();
         }
 
         // Recalculate student totals from actual payment records
