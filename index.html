@@ -15025,10 +15025,6 @@ async function addStudent() {
   addNotification('New student enrolled: ' + name + ' — ' + selectedCourse + ' (account disabled — activate in Verify Users)', 'student', null, ['admin','instructor']);
   saveState();
 
-  // Auto-merge from cloud to pick up students added on other devices
-  if (isCloudConnected && googleAccessToken) {
-    autoSyncOnLogin();
-  }
 }
 
 function renderSkills() {
@@ -19546,7 +19542,13 @@ async function mergeFromCloud() {
       backupData.data.students.forEach(cloudStudent => {
         if (isStudentDeleted(cloudStudent.id)) return; // Honor tombstone
         if (_demoStudentIds[cloudStudent.id]) return; // Skip legacy demo data
-        var localMatch = students.find(function(s) { return s.id === cloudStudent.id; });
+        var localMatch = students.find(function(s) {
+          if (s.id === cloudStudent.id) return true;
+          return s.name && cloudStudent.name &&
+            s.name.trim().toLowerCase() === cloudStudent.name.trim().toLowerCase() &&
+            s.course && cloudStudent.course &&
+            s.course.trim().toLowerCase() === cloudStudent.course.trim().toLowerCase();
+        });
         if (localMatch) {
           // Timestamp-based merge: cloud wins if it has a newer lastModified, or if local has none
           var cloudMod = cloudStudent.lastModified ? new Date(cloudStudent.lastModified).getTime() : 0;
@@ -20273,7 +20275,13 @@ async function silentMergeFromBackup(fileId) {
       backupData.data.students.forEach(cloudStudent => {
         if (isStudentDeleted(cloudStudent.id)) return; // Honor tombstone
         if (_ds[cloudStudent.id]) return;
-        var localMatch = students.find(function(s) { return s.id === cloudStudent.id; });
+        var localMatch = students.find(function(s) {
+          if (s.id === cloudStudent.id) return true;
+          return s.name && cloudStudent.name &&
+            s.name.trim().toLowerCase() === cloudStudent.name.trim().toLowerCase() &&
+            s.course && cloudStudent.course &&
+            s.course.trim().toLowerCase() === cloudStudent.course.trim().toLowerCase();
+        });
         if (localMatch) {
           // Timestamp-based merge: cloud wins if it has a newer lastModified, or if local has none
           var cloudMod = cloudStudent.lastModified ? new Date(cloudStudent.lastModified).getTime() : 0;
