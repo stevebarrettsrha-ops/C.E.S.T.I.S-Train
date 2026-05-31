@@ -14510,14 +14510,14 @@ function syncStudentsFromLocalFeeSystem() {
 
 function filterStudents() {
   var _feeAdded = syncStudentsFromLocalFeeSystem();
-  // Always keep the pipeline stage cards in sync with the full student list
-  // (cheap), so totals never lag behind students added via any path.
+  // Always keep the pipeline stage cards and the Dashboard "Total Enrolled"
+  // figure in sync with the full student list (cheap), so they never lag behind
+  // students added via any path.
   try { if (typeof updatePipelineCounts === 'function') updatePipelineCounts(); } catch(e){}
+  try { if (typeof refreshDashboardStudentTotals === 'function') refreshDashboardStudentTotals(); } catch(e){}
   if (_feeAdded) {
-    // New students were pulled in from School Fee: also refresh the dashboard
-    // stats and skill-area (Training Centre / chat) counts so every total
-    // reflects the new students.
-    try { if (typeof renderDashboard === 'function') renderDashboard(); } catch(e){}
+    // New students were pulled in from School Fee: also refresh the skill-area
+    // (Training Centre / chat) counts and the skills list.
     try { if (typeof updateSkillAreaCounts === 'function') updateSkillAreaCounts(); } catch(e){}
     try { if (typeof renderSkills === 'function') renderSkills(); } catch(e){}
   }
@@ -14829,6 +14829,28 @@ function updatePipelineCounts() {
     const count = students.filter(st=>st.stage===s).length;
     ['','2'].forEach(sfx => { const el=document.getElementById('p'+s.charAt(0).toUpperCase()+s.slice(1)+sfx); if(el) el.textContent=count; });
   });
+}
+
+// Live-update the Dashboard stat cards that count students, so they reflect
+// students added via any path (e.g. pulled in from School Fee) without
+// rebuilding the page (the dashboard is template-literal HTML; there is no
+// updateDashboard fn). The cards have no ids, so match them by label text.
+function refreshDashboardStudentTotals() {
+  try {
+    var totalEnrolled = students.length;
+    var totalCertified = students.filter(function(s){ return s && (s.stage === 'certified' || s.stage === 'collected'); }).length;
+    var map = { 'Total Enrolled Students': totalEnrolled, 'Certified This Year': totalCertified };
+    document.querySelectorAll('#page-dashboard .stat-card').forEach(function(card){
+      var labelEl = card.querySelector('.stat-label');
+      var valEl = card.querySelector('.stat-value');
+      if (!labelEl || !valEl) return;
+      var label = (labelEl.textContent || '').trim();
+      if (Object.prototype.hasOwnProperty.call(map, label)) {
+        valEl.setAttribute('data-count', map[label]);
+        valEl.textContent = map[label];
+      }
+    });
+  } catch (e) { /* non-fatal */ }
 }
 async function addStudent() {
   const name = document.getElementById('newStudentName').value.trim();
@@ -38652,9 +38674,15 @@ function ttRefreshOnShow(){
       CESTISStore.setItem('cestiSchoolFeeStudents', JSON.stringify(d.students));
       var added = false;
       if (typeof syncStudentsFromLocalFeeSystem === 'function') added = syncStudentsFromLocalFeeSystem();
-      // Refresh the Student Progress view if it's the one on screen.
+      // Refresh the Student Progress table (filterStudents also refreshes the
+      // pipeline stage cards and the Dashboard total).
       try { if (typeof filterStudents === 'function') filterStudents(); } catch(e){}
-      try { if (added && typeof updatePipelineCounts === 'function') updatePipelineCounts(); } catch(e){}
+      if (added) {
+        // New students pulled in: refresh the skill-area (Training Centre /
+        // chat) counts and skills list too.
+        try { if (typeof updateSkillAreaCounts === 'function') updateSkillAreaCounts(); } catch(e){}
+        try { if (typeof renderSkills === 'function') renderSkills(); } catch(e){}
+      }
       // The fee iframe just announced itself (e.g. on load): reply with the
       // dashboard's students so it picks up any Student-Progress-added people.
       try { syncStudentsToSchoolFee(); } catch(e){}
