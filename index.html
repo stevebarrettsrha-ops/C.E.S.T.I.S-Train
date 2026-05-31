@@ -2,6 +2,7 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8">
+<script src="cestis-core.js"></script>
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <meta name="google-site-verification" content="h1kcrSWbOfqMdqcEuN9crbU73K84WTBd7Qy1lcbcFC4" />
 <title>VocTrain LMS — Vocational Training Management System</title>
@@ -5988,6 +5989,7 @@ function loadState() {
   // BEFORE backfill so restored students are picked up by the backfill pass.
   // Remove duplicate student records (same name+course) that accumulated via
   // multi-device sync assigning different IDs to the same person.
+  cestisStabilizeStudentIds();
   var _dedupResult = deduplicateStudents();
   if (_dedupResult.removed > 0) {
     console.log('[loadState] Removed ' + _dedupResult.removed + ' duplicate student record(s)');
@@ -6012,6 +6014,9 @@ function loadState() {
 }
 
 function mergeStudentRecords(a, b) {
+  if (window.CESTISCore && typeof CESTISCore.mergeStudentRecords === 'function') {
+    return CESTISCore.mergeStudentRecords(a, b);
+  }
   var aMod = a.lastModified ? new Date(a.lastModified).getTime() : 0;
   var bMod = b.lastModified ? new Date(b.lastModified).getTime() : 0;
   var base = (bMod > aMod) ? Object.assign({}, b) : Object.assign({}, a);
@@ -6030,6 +6035,11 @@ function mergeStudentRecords(a, b) {
 
 // Returns { removed, idMap } where idMap[oldId] = keptId for every removed duplicate
 function deduplicateStudents() {
+  if (window.CESTISCore && typeof CESTISCore.dedupeStudents === 'function') {
+    var _r = CESTISCore.dedupeStudents(students);
+    students = _r.students;
+    return { removed: _r.removed, idMap: _r.idMap };
+  }
   var seen = {};    // key -> kept record
   var idMap = {};   // oldId -> keptId
 
@@ -6072,6 +6082,16 @@ function deduplicateStudents() {
 // Any record referencing a removed student ID is updated to use the kept ID.
 function relinkDependentData(idMap) {
   if (!idMap || Object.keys(idMap).length === 0) return;
+  if (window.CESTISCore && typeof CESTISCore.relinkDependentData === 'function') {
+    var _d = { userAccounts: userAccounts, attendanceRecords: attendanceRecords,
+               certDownloadApprovals: certDownloadApprovals,
+               examResults: (typeof examResults !== 'undefined' && Array.isArray(examResults)) ? examResults : [] };
+    CESTISCore.relinkDependentData(idMap, _d);
+    userAccounts = _d.userAccounts; attendanceRecords = _d.attendanceRecords;
+    certDownloadApprovals = _d.certDownloadApprovals;
+    if (typeof examResults !== 'undefined' && Array.isArray(examResults)) examResults = _d.examResults;
+    return;
+  }
 
   // userAccounts: re-link studentDataId, then dedup accounts for same student
   var keptAccountByStudentId = {};
@@ -6120,6 +6140,36 @@ function relinkDependentData(idMap) {
       if (r && r.studentId && idMap[r.studentId]) r.studentId = idMap[r.studentId];
     });
   }
+}
+
+// Stabilise student identity: migrate every student to a deterministic id
+// derived from name+course (via the shared cestis-core), collapse cross-device
+// duplicates and re-link all dependent arrays. Idempotent — once ids are stable
+// this is a no-op, so it is safe to call on every load / sync. This is the
+// root-cause fix for the recurring "duplicate student" cascade.
+function cestisStabilizeStudentIds() {
+  if (!window.CESTISCore || typeof CESTISCore.migrateToStableIds !== 'function') return false;
+  var bundle = {
+    students: students,
+    userAccounts: userAccounts,
+    attendanceRecords: attendanceRecords,
+    certDownloadApprovals: certDownloadApprovals,
+    examResults: (typeof examResults !== 'undefined' && Array.isArray(examResults)) ? examResults : []
+  };
+  var res = CESTISCore.migrateToStableIds(bundle);
+  if (!res || !res.changed) return false;
+  students = bundle.students;
+  userAccounts = bundle.userAccounts;
+  attendanceRecords = bundle.attendanceRecords;
+  certDownloadApprovals = bundle.certDownloadApprovals;
+  if (typeof examResults !== 'undefined' && Array.isArray(examResults)) examResults = bundle.examResults;
+  try { CESTISStore.setItem('voctrain_students', JSON.stringify(students)); } catch(e) {}
+  try { CESTISStore.setItem('voctrain_attendance', JSON.stringify(attendanceRecords)); } catch(e) {}
+  try { CESTISStore.setItem('voctrain_certDownloadApprovals', JSON.stringify(certDownloadApprovals)); } catch(e) {}
+  try { if (typeof examResults !== 'undefined' && Array.isArray(examResults)) CESTISStore.setItem('voctrain_examResults', JSON.stringify(examResults)); } catch(e) {}
+  try { if (typeof saveUserAccounts === 'function') saveUserAccounts(); } catch(e) {}
+  try { console.log('[stableId] remapped ' + Object.keys(res.idMap).length + ' id(s), removed ' + res.removed + ' duplicate(s)'); } catch(e) {}
+  return true;
 }
 
 function updateSkillAreaCounts() {
@@ -7442,6 +7492,7 @@ function createStudentDataForAccount(userAccount) {
     createdAt: new Date().toISOString().split('T')[0],
     instructor: assignedInstructor
   };
+  if (window.CESTISCore) { var _sid = CESTISCore.stableStudentId(newStudent); if (_sid) newStudent.id = _sid; }
   students.push(newStudent);
   // Auto-create attendance record so the student appears in attendance pages
   attendanceRecords.push({studentId:newStudent.id, studentName:newStudent.name, course:newStudent.course, date:new Date().toISOString().split('T')[0], days:{Mon:'absent',Tue:'absent',Wed:'absent',Thu:'absent',Fri:'absent'}});
@@ -14447,6 +14498,7 @@ window.addEventListener('message', function(e) {
     try { attendanceRecords = JSON.parse(CESTISStore.getItem('voctrain_attendance') || '[]'); } catch(e2) {}
     try { userAccounts = JSON.parse(CESTISStore.getItem('voctrain_userAccounts') || '[]'); } catch(e2) {}
     try { skillAreas = JSON.parse(CESTISStore.getItem('voctrain_skillAreas') || '[]'); } catch(e2) {}
+    cestisStabilizeStudentIds();
     var _dr2 = deduplicateStudents();
     if (_dr2.removed > 0) {
       relinkDependentData(_dr2.idMap);
@@ -15098,6 +15150,7 @@ async function addStudent() {
   })||{}).name || '';
   var gender = document.getElementById('newStudentGender').value || '';
   var studentId = generateStudentId();
+  if (window.CESTISCore) { var _sid = CESTISCore.stableStudentId({name:name, course:selectedCourse}); if (_sid) studentId = _sid; }
   students.unshift({id:studentId,name,stage:document.getElementById('newStudentStage').value,course:selectedCourse,score:'',progress:10,certNo:null,certDate:null,certCollected:false,attendance:0,assignments:0,assignmentsTotal:8,gpa:'0.0',instructor:assignedInstructor,gender:gender,createdAt:new Date().toISOString().split('T')[0],lastModified:new Date().toISOString()});
   // Auto-create attendance record so the student appears in attendance pages
   var existingAtt = attendanceRecords.find(function(r){ return r.studentId === studentId; });

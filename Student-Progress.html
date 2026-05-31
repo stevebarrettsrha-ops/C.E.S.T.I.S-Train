@@ -2,6 +2,7 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8">
+<script src="cestis-core.js"></script>
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>CESTIS - Student Progress</title>
 
@@ -366,6 +367,9 @@ function loadData() {
 
 // Merge two student records, preferring the more complete / more recent one
 function mergeStudentRecords(a, b) {
+  if (window.CESTISCore && typeof CESTISCore.mergeStudentRecords === 'function') {
+    return CESTISCore.mergeStudentRecords(a, b);
+  }
   var aMod = a.lastModified ? new Date(a.lastModified).getTime() : 0;
   var bMod = b.lastModified ? new Date(b.lastModified).getTime() : 0;
   var base = (bMod > aMod) ? Object.assign({}, b) : Object.assign({}, a);
@@ -384,6 +388,11 @@ function mergeStudentRecords(a, b) {
 }
 
 function deduplicateStudents() {
+  if (window.CESTISCore && typeof CESTISCore.dedupeStudents === 'function') {
+    var _r = CESTISCore.dedupeStudents(students);
+    students = _r.students;
+    return { removed: _r.removed, idMap: _r.idMap };
+  }
   var seen = {}, idMap = {};
   students.forEach(function(s) {
     var key = (s.name || '').trim().toLowerCase() + '|' + (s.course || '').trim().toLowerCase();
@@ -409,6 +418,16 @@ function deduplicateStudents() {
 
 function relinkDependentData(idMap) {
   if (!idMap || Object.keys(idMap).length === 0) return;
+  if (window.CESTISCore && typeof CESTISCore.relinkDependentData === 'function') {
+    var _d = { userAccounts: userAccounts, attendanceRecords: attendanceRecords,
+               certDownloadApprovals: certDownloadApprovals,
+               examResults: (Array.isArray(examResults) ? examResults : []) };
+    CESTISCore.relinkDependentData(idMap, _d);
+    userAccounts = _d.userAccounts; attendanceRecords = _d.attendanceRecords;
+    certDownloadApprovals = _d.certDownloadApprovals;
+    if (Array.isArray(examResults)) examResults = _d.examResults;
+    return;
+  }
   userAccounts.forEach(function(u) {
     if (u.studentDataId && idMap[u.studentDataId]) u.studentDataId = idMap[u.studentDataId];
   });
@@ -435,6 +454,25 @@ function relinkDependentData(idMap) {
       if (r && r.studentId && idMap[r.studentId]) r.studentId = idMap[r.studentId];
     });
   }
+}
+
+// Stabilise student identity via the shared cestis-core (deterministic ids,
+// duplicate collapse, dependent relink). Idempotent; safe to call on every
+// load. Persists through saveData() only when something actually changed.
+function cestisStabilizeStudentIds() {
+  if (!window.CESTISCore || typeof CESTISCore.migrateToStableIds !== 'function') return false;
+  var bundle = {
+    students: students, userAccounts: userAccounts,
+    attendanceRecords: attendanceRecords, certDownloadApprovals: certDownloadApprovals,
+    examResults: (Array.isArray(examResults) ? examResults : [])
+  };
+  var res = CESTISCore.migrateToStableIds(bundle);
+  if (!res || !res.changed) return false;
+  students = bundle.students; userAccounts = bundle.userAccounts;
+  attendanceRecords = bundle.attendanceRecords; certDownloadApprovals = bundle.certDownloadApprovals;
+  if (Array.isArray(examResults)) examResults = bundle.examResults;
+  saveData();
+  return true;
 }
 
 function saveData() {
@@ -786,6 +824,7 @@ async function addStudent() {
   })||{}).name || '';
   var gender = document.getElementById('newStudentGender').value || '';
   var studentId = generateStudentId();
+  if (window.CESTISCore) { var _sid = CESTISCore.stableStudentId({name:name, course:selectedCourse}); if (_sid) studentId = _sid; }
   students.unshift({
     id: studentId, name: name,
     stage: document.getElementById('newStudentStage').value,
@@ -872,6 +911,7 @@ function init() {
   // Our page is dark-only matching index.html's :root defaults
 
   loadData();
+  cestisStabilizeStudentIds();
   var _dr = deduplicateStudents();
   if (_dr.removed > 0) {
     console.log('[StudentProgress] Removed ' + _dr.removed + ' duplicate student record(s)');
@@ -887,6 +927,7 @@ function init() {
 window.addEventListener('storage', function(e){
   if(e.key === 'voctrain_students' || e.key === 'voctrain_skillAreas'){
     loadData();
+    cestisStabilizeStudentIds();
     var _dr3 = deduplicateStudents();
     if(_dr3.removed > 0) { relinkDependentData(_dr3.idMap); saveData(); }
     populateCourseDropdowns();
