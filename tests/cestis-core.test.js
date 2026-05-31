@@ -240,6 +240,88 @@ test('a throwing listener does not break the others', function () {
   assert.doesNotThrow(function () { Core.emit('evt:nobody'); });
 });
 
+/* ---- master snapshot: build / verify ---------------------------------- */
+test('buildSnapshot excludes sensitive keys and is checksum-verifiable', function () {
+  var storeMap = {
+    voctrain_students: JSON.stringify([{ id: 'STU-A', name: 'A', course: 'C' }]),
+    cestisGoogleAccessToken: 'secret-token',
+    voctrain_sessionUserId: 'USR-1',
+    schoolFeeCloudFileId: 'file123',
+    darkMode: 'true',
+    cestiSchoolFeeStudents: JSON.stringify([{ id: 'SF-1', name: 'A' }])
+  };
+  var snap = Core.buildSnapshot(storeMap, { event: 'logout', savedBy: 'admin' });
+  assert.ok(!('cestisGoogleAccessToken' in snap.store), 'token excluded');
+  assert.ok(!('voctrain_sessionUserId' in snap.store), 'session excluded');
+  assert.ok(!('schoolFeeCloudFileId' in snap.store), 'cloud file id excluded');
+  assert.ok(!('darkMode' in snap.store), 'volatile ui flag excluded');
+  assert.ok('voctrain_students' in snap.store && 'cestiSchoolFeeStudents' in snap.store, 'data kept');
+  assert.strictEqual(snap.event, 'logout');
+  assert.strictEqual(snap.counts.voctrain_students, 1);
+  assert.strictEqual(Core.verifySnapshot(snap).ok, true, 'checksum verifies');
+});
+test('verifySnapshot detects tampering / corruption', function () {
+  var snap = Core.buildSnapshot({ voctrain_students: JSON.stringify([{ id: 'X', name: 'n', course: 'c' }]) }, {});
+  snap.store.voctrain_students = JSON.stringify([{ id: 'X', name: 'n', course: 'c' }, { id: 'Y', name: 'm', course: 'c' }]);
+  assert.strictEqual(Core.verifySnapshot(snap).ok, false, 'mutated store fails checksum');
+});
+test('checksum is independent of key insertion order', function () {
+  var a = Core.buildSnapshot({ voctrain_students: '[]', cestiSchoolFeeStudents: '[]' }, {});
+  var b = Core.buildSnapshot({ cestiSchoolFeeStudents: '[]', voctrain_students: '[]' }, {});
+  assert.strictEqual(a.checksum, b.checksum);
+});
+
+/* ---- master snapshot: data-loss report -------------------------------- */
+test('dataLossReport finds records the snapshot has but local lost', function () {
+  var snap = Core.buildSnapshot({
+    voctrain_students: JSON.stringify([
+      { id: 'STU-A', name: 'A', course: 'C' },
+      { id: 'STU-B', name: 'B', course: 'C' },
+      { id: 'STU-GONE', name: 'Deleted Person', course: 'C' }
+    ])
+  }, {});
+  var local = {
+    voctrain_students: JSON.stringify([{ id: 'STU-A', name: 'A', course: 'C' }]),
+    voctrain_deletedStudentIds: JSON.stringify(['STU-GONE']) // intentionally deleted
+  };
+  var rep = Core.dataLossReport(snap, local);
+  assert.strictEqual(rep.collections.voctrain_students.missingFromLocal, 1, 'only STU-B counts as lost');
+  assert.deepStrictEqual(rep.missingLocally.voctrain_students, ['STU-B']);
+  assert.strictEqual(rep.totalMissing, 1);
+});
+
+/* ---- master snapshot: reconcile (merge & repair) ---------------------- */
+test('reconcileSnapshot restores missing records without resurrecting deletes', function () {
+  var snap = Core.buildSnapshot({
+    voctrain_students: JSON.stringify([
+      { id: 'STU-A', name: 'A', course: 'C', progress: 10 },
+      { id: 'STU-B', name: 'B', course: 'C' },
+      { id: 'STU-GONE', name: 'Gone', course: 'C' }
+    ]),
+    voctrain_systemSettings: JSON.stringify({ theme: 'x' })
+  }, {});
+  var local = {
+    voctrain_students: JSON.stringify([{ id: 'STU-A', name: 'A', course: 'C', progress: 99 }]),
+    voctrain_deletedStudentIds: JSON.stringify(['STU-GONE']),
+    voctrain_systemSettings: '' // empty locally -> should be restored
+  };
+  var res = Core.reconcileSnapshot(snap, local);
+  assert.ok(res.changed);
+  var students = JSON.parse(res.store.voctrain_students);
+  var ids = students.map(function (s) { return s.id; }).sort();
+  assert.deepStrictEqual(ids, ['STU-A', 'STU-B'], 'B restored, GONE not resurrected');
+  var a = students.filter(function (s) { return s.id === 'STU-A'; })[0];
+  assert.strictEqual(a.progress, 99, 'newer local edit preserved, not overwritten by snapshot');
+  assert.strictEqual(res.recoveredStudents, 1);
+  assert.strictEqual(res.store.voctrain_systemSettings, JSON.stringify({ theme: 'x' }), 'empty config restored');
+});
+test('reconcileSnapshot is a no-op when local already has everything', function () {
+  var data = { voctrain_students: JSON.stringify([{ id: 'STU-A', name: 'A', course: 'C' }]) };
+  var snap = Core.buildSnapshot(data, {});
+  var res = Core.reconcileSnapshot(snap, data);
+  assert.strictEqual(res.changed, false);
+});
+
 /* ---- catalogue -------------------------------------------------------- */
 test('catalogue is shared and freshSkillAreas returns an independent copy', function () {
   assert.strictEqual(Core.SKILL_AREAS.length, 20);

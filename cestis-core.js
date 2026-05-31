@@ -389,6 +389,182 @@
     });
   };
 
+  /* ==========================================================================
+     MASTER SNAPSHOT — one self-describing JSON of the entire data store.
+     Saved to Drive on logout / tab-close / periodically; read on login to
+     reconcile (merge & repair) and to let an algorithm detect data loss.
+     All logic here is pure: it takes a plain { key: value } map of the store
+     and returns data out, so it is fully unit-testable without a browser.
+     ========================================================================== */
+  Core.SNAPSHOT_SCHEMA_VERSION = 1;
+
+  // Collections we report counts / missing-id deltas for (the loss-detection
+  // signal). Arrays or id-keyed; everything else is still snapshotted, just not
+  // diffed at id granularity.
+  Core.SNAPSHOT_COUNT_KEYS = [
+    'voctrain_students', 'voctrain_users', 'voctrain_attendance', 'voctrain_examResults',
+    'voctrain_certDownloadApprovals', 'voctrain_instructorData',
+    'cestiSchoolFeeStudents', 'cestiSchoolFeePayments'
+  ];
+
+  // Keys that must NEVER leave the device inside a shared snapshot: auth tokens,
+  // session pointers, per-device Drive metadata and volatile UI flags. Excluding
+  // these prevents session/token bleed across devices and keeps the file clean.
+  Core.isSnapshotableKey = function (key) {
+    if (!key) return false;
+    key = String(key);
+    if (/token/i.test(key)) return false;            // cestisGoogleAccessToken, *Token
+    if (/session/i.test(key)) return false;          // voctrain_session*
+    if (/cloudfileid/i.test(key)) return false;      // *CloudFileId
+    if (/lastsync/i.test(key)) return false;         // *LastSyncTime
+    if (key === 'darkMode') return false;
+    if (/examInProgress/i.test(key)) return false;   // volatile exam state
+    return true;
+  };
+
+  Core._parseArr = function (raw) {
+    try { var v = JSON.parse(raw || 'null'); return Array.isArray(v) ? v : []; }
+    catch (e) { return []; }
+  };
+
+  // Deterministic serialisation of the store map (sorted keys) so the checksum
+  // is stable regardless of key insertion order across devices.
+  Core.stableStringify = function (storeObj) {
+    storeObj = storeObj || {};
+    return Object.keys(storeObj).sort().map(function (k) {
+      return k + ' ' + String(storeObj[k]);
+    }).join('');
+  };
+
+  Core.snapshotCounts = function (store) {
+    store = store || {};
+    var c = {};
+    Core.SNAPSHOT_COUNT_KEYS.forEach(function (k) {
+      var n = 0;
+      try {
+        var v = JSON.parse(store[k] == null ? 'null' : store[k]);
+        if (Array.isArray(v)) n = v.length;
+        else if (v && typeof v === 'object') n = Object.keys(v).length;
+      } catch (e) {}
+      c[k] = n;
+    });
+    return c;
+  };
+
+  // Build the self-describing snapshot object from a { key: value } store map.
+  Core.buildSnapshot = function (storeMap, meta) {
+    meta = meta || {};
+    var store = {};
+    Object.keys(storeMap || {}).forEach(function (k) {
+      if (!Core.isSnapshotableKey(k)) return;
+      var v = storeMap[k];
+      if (v == null) return;
+      store[k] = (typeof v === 'string') ? v : JSON.stringify(v);
+    });
+    return {
+      schemaVersion: Core.SNAPSHOT_SCHEMA_VERSION,
+      app: 'CESTIS-LMS',
+      savedAt: meta.savedAt || new Date().toISOString(),
+      savedBy: meta.savedBy || 'unknown',
+      savedByRole: meta.savedByRole || 'unknown',
+      event: meta.event || 'manual',
+      keyCount: Object.keys(store).length,
+      counts: Core.snapshotCounts(store),
+      checksum: Core.hashString(Core.stableStringify(store)),
+      store: store
+    };
+  };
+
+  // Re-derive the checksum and confirm the snapshot's store is intact.
+  Core.verifySnapshot = function (snapshot) {
+    if (!snapshot || !snapshot.store) return { ok: false, reason: 'no-store' };
+    var actual = Core.hashString(Core.stableStringify(snapshot.store));
+    return { ok: actual === snapshot.checksum, expected: snapshot.checksum, actual: actual };
+  };
+
+  // THE DATA-LOSS ALGORITHM. Compares a snapshot to the current local store map
+  // and reports, per collection, how many records the snapshot has that local is
+  // missing (i.e. that would be lost without recovery). Tombstoned (deliberately
+  // deleted) students are not counted as "lost".
+  Core.dataLossReport = function (snapshot, localStoreMap) {
+    localStoreMap = localStoreMap || {};
+    var rep = { checksumOk: Core.verifySnapshot(snapshot).ok, collections: {}, missingLocally: {}, totalMissing: 0 };
+    var snapStore = (snapshot && snapshot.store) || {};
+    var deleted = {};
+    Core._parseArr(localStoreMap['voctrain_deletedStudentIds']).forEach(function (id) { if (id) deleted[id] = true; });
+    Core.SNAPSHOT_COUNT_KEYS.forEach(function (k) {
+      var snapArr = Core._parseArr(snapStore[k]);
+      var locArr = Core._parseArr(localStoreMap[k]);
+      var locIds = {};
+      locArr.forEach(function (r) { if (r && r.id != null) locIds[r.id] = true; });
+      var isStudents = (k === 'voctrain_students');
+      var missing = snapArr.filter(function (r) {
+        if (!r || r.id == null) return false;
+        if (locIds[r.id]) return false;
+        if (isStudents && deleted[r.id]) return false; // intentionally deleted, not lost
+        return true;
+      });
+      rep.collections[k] = { snapshot: snapArr.length, local: locArr.length, missingFromLocal: missing.length };
+      if (missing.length) { rep.missingLocally[k] = missing.map(function (r) { return r.id; }); rep.totalMissing += missing.length; }
+    });
+    return rep;
+  };
+
+  // MERGE & REPAIR. Returns a new store map that unions the snapshot into local
+  // without losing data: missing records are restored, newer local edits are
+  // preserved, tombstoned students are never resurrected, and students are kept
+  // duplicate-free via the stable-id dedupe. Non-array keys are restored only
+  // when local is missing/empty (never overwrites populated local config).
+  Core.reconcileSnapshot = function (snapshot, localStoreMap) {
+    localStoreMap = localStoreMap || {};
+    var out = {}; var k;
+    for (k in localStoreMap) { if (Object.prototype.hasOwnProperty.call(localStoreMap, k)) out[k] = localStoreMap[k]; }
+    var snapStore = (snapshot && snapshot.store) || {};
+    var result = { store: out, changed: false, restored: {}, recoveredStudents: 0, restoredKeys: [] };
+
+    var deleted = {};
+    Core._parseArr(localStoreMap['voctrain_deletedStudentIds']).forEach(function (id) { if (id) deleted[id] = true; });
+
+    // id-keyed array collections: union, add-missing, keep local on id clash.
+    Core.SNAPSHOT_COUNT_KEYS.forEach(function (key) {
+      if (!(key in snapStore)) return;
+      var snapArr = Core._parseArr(snapStore[key]);
+      var locArr = Core._parseArr(localStoreMap[key]);
+      var byId = {}; var order = [];
+      locArr.forEach(function (r) { if (r && r.id != null) { byId[r.id] = r; order.push(r.id); } });
+      var added = 0;
+      snapArr.forEach(function (r) {
+        if (!r || r.id == null) return;
+        if (key === 'voctrain_students' && deleted[r.id]) return; // honor tombstone
+        if (!(r.id in byId)) { byId[r.id] = r; order.push(r.id); added++; }
+      });
+      if (added > 0) {
+        var merged = order.map(function (id) { return byId[id]; });
+        if (key === 'voctrain_students') {
+          var dr = Core.dedupeStudents(merged); merged = dr.students;
+          result.recoveredStudents += added;
+        }
+        out[key] = JSON.stringify(merged);
+        result.restored[key] = added;
+        result.changed = true;
+      }
+    });
+
+    // Any other snapshot key absent or empty locally: restore (fill-only).
+    Object.keys(snapStore).forEach(function (key) {
+      if (Core.SNAPSHOT_COUNT_KEYS.indexOf(key) !== -1) return;
+      var local = localStoreMap[key];
+      var localEmpty = (local == null || local === '' || local === '[]' || local === '{}');
+      if (localEmpty && snapStore[key] != null && snapStore[key] !== '') {
+        out[key] = snapStore[key];
+        result.restoredKeys.push(key);
+        result.changed = true;
+      }
+    });
+
+    return result;
+  };
+
   root.CESTISCore = Core;
 
   if (typeof module !== 'undefined' && module.exports) {
