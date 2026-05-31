@@ -321,8 +321,6 @@
 
     // Compose: any id previously mapped to a survivor whose id then changed
     // must now point at the survivor's new stable id.
-    var survivorOldToNew = {};
-    survivors.forEach(function (s) {}); // (kept for clarity; composition handled below)
     for (k in idMap) {
       if (!Object.prototype.hasOwnProperty.call(idMap, k)) continue;
       var target = idMap[k];
