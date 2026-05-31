@@ -21816,10 +21816,12 @@ async function studentLightSync(uname, pw) {
 
     // Step 4: Merge ONLY student-relevant data (user accounts, students, cert approvals)
     // Do NOT overwrite admin data or give access to backup folders
-    var cloudAccounts = backupData.userAccounts || [];
-    var cloudStudents = backupData.students || [];
-    var cloudCertApprovals = backupData.certDownloadApprovals || [];
-    var cloudCertTemplates = backupData.certTemplates || {};
+    // Backup structure wraps all data under .data; fall back to top-level for legacy backups
+    var _bd = (backupData.data && typeof backupData.data === 'object') ? backupData.data : backupData;
+    var cloudAccounts = _bd.userAccounts || [];
+    var cloudStudents = _bd.students || [];
+    var cloudCertApprovals = _bd.certDownloadApprovals || [];
+    var cloudCertTemplates = _bd.certTemplates || {};
 
     // Merge user accounts (add cloud accounts not already local)
     cloudAccounts.forEach(function(ca) {
@@ -21865,7 +21867,7 @@ async function studentLightSync(uname, pw) {
     });
 
     // Merge skill areas (training centres)
-    var cloudSkillAreas = backupData.skillAreas || [];
+    var cloudSkillAreas = _bd.skillAreas || [];
     cloudSkillAreas.forEach(function(sa) {
       if (sa && sa.id && !skillAreas.some(function(l) { return l.id === sa.id; })) {
         skillAreas.push(sa);
@@ -22356,7 +22358,7 @@ function lmsChatRenderRoomList(prefix) {
 
     if(room.type === 'dm') {
       // Show other participant's avatar
-      var otherId = (room.dmBetween||room.members).find(function(id){ return id !== currentUser.id; });
+      var otherId = (room.dmBetween||room.members||[]).find(function(id){ return id !== currentUser.id; });
       var otherUser = otherId ? userAccounts.find(function(u){ return u.id === otherId; }) : null;
       var otherProf = otherId ? lmsChatGetProfile(otherId) : {};
       var otherName = otherUser ? otherUser.name : 'Direct Message';
@@ -22461,7 +22463,7 @@ function lmsChatOpenRoom(roomId, prefix) {
   var headerStatus = document.getElementById(prefix+'ChatHeaderStatus');
   if(room.type === 'dm') {
     var dmCurrentUser = lmsChatGetCurrentUser();
-    var dmOtherId = (room.dmBetween||room.members).find(function(id){ return id !== dmCurrentUser.id; });
+    var dmOtherId = (room.dmBetween||room.members||[]).find(function(id){ return id !== dmCurrentUser.id; });
     var dmOtherUser = dmOtherId ? userAccounts.find(function(u){ return u.id === dmOtherId; }) : null;
     var dmOtherProf = dmOtherId ? lmsChatGetProfile(dmOtherId) : {};
     var dmOtherName = dmOtherUser ? dmOtherUser.name : 'Direct Message';
@@ -24042,7 +24044,7 @@ function lmsChatNotifyCallMembers(room, caller, callType) {
 
   // For DM rooms, also show an incoming call notification popup
   if(room.type === 'dm') {
-    var dmOtherId = (room.dmBetween || room.members).find(function(id){ return id !== caller.id; });
+    var dmOtherId = (room.dmBetween || room.members || []).find(function(id){ return id !== caller.id; });
     if(dmOtherId) {
       lmsChatShowIncomingCallNotif(room, caller, callType, dmOtherId);
     }
