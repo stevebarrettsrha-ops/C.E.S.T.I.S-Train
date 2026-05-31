@@ -1,0 +1,835 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>CESTIS - Student Progress</title>
+
+  <!-- CESTISStore — shared localStorage/IndexedDB API -->
+  <script>
+(function(){
+  if (window.CESTISStore) return;
+  var DB_NAME='CESTIS_KV', STORE='kv', LS=null;
+  try { LS = window.localStorage; } catch(e) { LS = null; }
+  var cache = {};
+  try { if(LS){ for(var i=0;i<LS.length;i++){ var k=LS.key(i); cache[k]=LS.getItem(k); } } } catch(e){}
+  var db=null, ready=false, wq=[];
+  function drainQueue(){ var q=wq; wq=[]; for(var i=0;i<q.length;i++){ writeIDB(q[i].k,q[i].v,q[i].del); } }
+  function writeIDB(k,v,del){
+    if(!db){ if(!ready){ wq.push({k:k,v:v,del:del}); } return; }
+    try { var os=db.transaction(STORE,'readwrite').objectStore(STORE); if(del){ os.delete(k); } else { os.put(v,k); } } catch(e){}
+  }
+  try {
+    var req = indexedDB.open(DB_NAME,1);
+    req.onupgradeneeded = function(e){ var d=e.target.result; if(!d.objectStoreNames.contains(STORE)){ d.createObjectStore(STORE); } };
+    req.onsuccess = function(e){
+      db = e.target.result;
+      try {
+        var idbKeys = {};
+        var cur = db.transaction(STORE,'readonly').objectStore(STORE).openCursor();
+        cur.onsuccess = function(ev){ var c=ev.target.result;
+          if(c){ idbKeys[c.key]=1; if(!(c.key in cache)){ cache[c.key]=c.value; } c.continue(); }
+          else {
+            try { var ws=db.transaction(STORE,'readwrite').objectStore(STORE);
+                  for(var kk in cache){ if(Object.prototype.hasOwnProperty.call(cache,kk) && !idbKeys[kk]){ ws.put(cache[kk], kk); } } } catch(_){}
+            ready=true; drainQueue(); try{ window.dispatchEvent(new Event('cestis-store-ready')); }catch(_){}
+          }
+        };
+        cur.onerror = function(){ ready=true; drainQueue(); };
+      } catch(e){ ready=true; drainQueue(); }
+    };
+    req.onerror = function(){ db=null; ready=true; };
+  } catch(e){ db=null; ready=true; }
+  var Store = {
+    _cache: cache,
+    getItem: function(k){ k=String(k); return (k in cache) ? cache[k] : null; },
+    setItem: function(k,v){ k=String(k); v=String(v); cache[k]=v; try{ if(LS) LS.setItem(k,v); }catch(e){} writeIDB(k,v,false); },
+    removeItem: function(k){ k=String(k); delete cache[k]; try{ if(LS) LS.removeItem(k); }catch(e){} writeIDB(k,null,true); },
+    clear: function(){ for(var k in cache){ if(Object.prototype.hasOwnProperty.call(cache,k)) delete cache[k]; }
+                       try{ if(LS) LS.clear(); }catch(e){}
+                       if(db){ try{ db.transaction(STORE,'readwrite').objectStore(STORE).clear(); }catch(e){} } },
+    key: function(i){ return Object.keys(cache)[i]; },
+    keys: function(){ return Object.keys(cache); },
+    hasOwnProperty: function(k){ return Object.prototype.hasOwnProperty.call(cache, String(k)); },
+    whenReady: function(cb){ if(ready){ cb(); } else { window.addEventListener('cestis-store-ready', cb, {once:true}); } },
+    get length(){ return Object.keys(cache).length; }
+  };
+  window.CESTISStore = Store;
+})();
+  </script>
+
+  <style>
+    * { margin:0; padding:0; box-sizing:border-box; }
+
+    :root {
+      --bg-primary: #0c1117;
+      --bg-secondary: #141b24;
+      --bg-card: #1a2332;
+      --bg-card-hover: #1f2b3d;
+      --bg-input: #0f1820;
+      --accent: #f0a500;
+      --accent-dim: rgba(240,165,0,0.15);
+      --accent-glow: rgba(240,165,0,0.3);
+      --green: #2ecc71;
+      --green-dim: rgba(46,204,113,0.15);
+      --red: #e74c3c;
+      --red-dim: rgba(231,76,60,0.15);
+      --blue: #3498db;
+      --blue-dim: rgba(52,152,219,0.15);
+      --purple: #9b59b6;
+      --purple-dim: rgba(155,89,182,0.15);
+      --teal: #1abc9c;
+      --teal-dim: rgba(26,188,156,0.15);
+      --text-primary: #e8edf3;
+      --text-secondary: #8899aa;
+      --text-muted: #556677;
+      --border: rgba(255,255,255,0.06);
+      --border-light: rgba(255,255,255,0.1);
+      --radius: 12px;
+      --radius-sm: 8px;
+      --radius-lg: 16px;
+      --transition: 0.2s ease;
+    }
+
+    body {
+      font-family: 'DM Sans', 'Segoe UI', sans-serif;
+      background: var(--bg-primary);
+      color: var(--text-primary);
+      min-height: 100vh;
+      padding: 20px;
+    }
+
+    /* ---- Card ---- */
+    .card { background:var(--bg-card); border:1px solid var(--border); border-radius:var(--radius); padding:22px; margin-bottom:18px; }
+    .card-header { display:flex; align-items:center; justify-content:space-between; margin-bottom:18px; }
+    .card-header h3 { font-size:16px; }
+
+    /* ---- Table ---- */
+    table { width:100%; border-collapse:collapse; }
+    .table-wrapper { overflow-x:auto; -webkit-overflow-scrolling:touch; }
+    thead th { text-align:left; font-size:11px; font-weight:700; text-transform:uppercase; letter-spacing:1px; color:var(--text-muted); padding:12px 14px; border-bottom:1px solid var(--border); white-space:nowrap; }
+    tbody td { padding:12px 14px; font-size:13.5px; border-bottom:1px solid var(--border); color:var(--text-secondary); }
+    tbody tr:hover { background:rgba(255,255,255,0.02); }
+
+    /* ---- Badges ---- */
+    .badge { display:inline-flex; align-items:center; gap:5px; padding:4px 10px; border-radius:20px; font-size:11.5px; font-weight:600; }
+    .badge-green { background:var(--green-dim); color:var(--green); }
+    .badge-red { background:var(--red-dim); color:var(--red); }
+    .badge-blue { background:var(--blue-dim); color:var(--blue); }
+    .badge-purple { background:var(--purple-dim); color:var(--purple); }
+    .badge-amber { background:var(--accent-dim); color:var(--accent); }
+    .badge-dot { width:6px; height:6px; border-radius:50%; background:currentColor; }
+
+    /* ---- Buttons ---- */
+    .btn {
+      display:inline-flex; align-items:center; gap:8px;
+      padding:9px 18px; border-radius:var(--radius-sm);
+      font-size:13px; font-weight:600; font-family:'DM Sans',sans-serif;
+      cursor:pointer; border:none; transition:all var(--transition);
+    }
+    .btn-primary { background:linear-gradient(135deg,var(--accent),#d4900a); color:#000; }
+    .btn-primary:hover { transform:translateY(-1px); box-shadow:0 4px 16px var(--accent-glow); }
+    .btn-secondary { background:rgba(255,255,255,0.06); color:var(--text-primary); border:1px solid var(--border-light); }
+    .btn-secondary:hover { background:rgba(255,255,255,0.1); }
+    .btn-sm { padding:6px 12px; font-size:12px; }
+    .btn-export {
+      display:inline-flex; align-items:center; gap:8px;
+      padding:9px 18px; border-radius:var(--radius-sm);
+      font-size:13px; font-weight:600; font-family:'DM Sans',sans-serif;
+      cursor:pointer; border:1px solid var(--border-light);
+      background:rgba(255,255,255,0.04); color:var(--text-primary);
+      transition:all var(--transition);
+    }
+    .btn-export:hover { background:rgba(255,255,255,0.1); border-color:var(--accent); color:var(--accent); }
+
+    /* ---- Form Controls ---- */
+    .form-group { margin-bottom:16px; }
+    .form-group label { display:block; font-size:12px; font-weight:600; color:var(--text-secondary); margin-bottom:6px; text-transform:uppercase; letter-spacing:0.5px; }
+    .form-control {
+      width:100%; background:var(--bg-input); border:1px solid var(--border-light);
+      color:var(--text-primary); padding:10px 14px; border-radius:var(--radius-sm);
+      font-size:13.5px; font-family:'DM Sans',sans-serif; outline:none;
+    }
+    .form-control:focus { border-color:var(--accent); }
+    select.form-control { cursor:pointer; }
+    textarea.form-control { resize:vertical; min-height:80px; }
+
+    /* ---- Progress Bar ---- */
+    .progress-bar { width:100%; height:6px; background:rgba(255,255,255,0.06); border-radius:3px; overflow:hidden; }
+    .progress-bar .fill { height:100%; border-radius:3px; transition:width 0.6s ease; }
+
+    /* ---- Modal ---- */
+    .modal-overlay {
+      display:none; position:fixed; inset:0; background:rgba(0,0,0,0.6);
+      backdrop-filter:blur(8px); z-index:200; align-items:center; justify-content:center;
+    }
+    .modal-overlay.active { display:flex; }
+    .modal {
+      background:var(--bg-secondary); border:1px solid var(--border-light);
+      border-radius:var(--radius-lg); padding:28px; width:90%; max-width:560px;
+      max-height:85vh; overflow-y:auto; animation:modalIn 0.3s ease;
+    }
+    @keyframes modalIn { from{opacity:0;transform:scale(0.95) translateY(10px);} to{opacity:1;transform:scale(1) translateY(0);} }
+    .modal-header { display:flex; align-items:center; justify-content:space-between; margin-bottom:20px; }
+    .modal-close {
+      background:none; border:none; color:var(--text-muted); cursor:pointer;
+      font-size:20px; width:32px; height:32px; display:flex; align-items:center;
+      justify-content:center; border-radius:var(--radius-sm);
+    }
+    .modal-close:hover { background:rgba(255,255,255,0.06); color:var(--text-primary); }
+
+    /* ---- Pipeline ---- */
+    .pipeline { display:flex; gap:2px; margin:20px 0; }
+    .pipeline-stage {
+      flex:1; text-align:center; padding:14px 8px;
+      background:var(--bg-input); position:relative; font-size:12px; font-weight:600;
+    }
+    .pipeline-stage:first-child { border-radius:var(--radius-sm) 0 0 var(--radius-sm); }
+    .pipeline-stage:last-child { border-radius:0 var(--radius-sm) var(--radius-sm) 0; }
+    .pipeline-stage .count { font-size:22px; font-family:'Playfair Display',serif; display:block; margin-bottom:4px; }
+    .pipeline-stage.s-test { background:rgba(52,152,219,0.12); color:var(--blue); }
+    .pipeline-stage.s-interview { background:rgba(155,89,182,0.12); color:var(--purple); }
+    .pipeline-stage.s-training { background:rgba(240,165,0,0.12); color:var(--accent); }
+    .pipeline-stage.s-certified { background:rgba(46,204,113,0.12); color:var(--green); }
+    .pipeline-stage.s-collected { background:rgba(46,204,113,0.2); color:#27ae60; }
+    .pipeline-stage.s-incomplete { background:rgba(231,76,60,0.12); color:var(--red); }
+
+    /* ---- Toast ---- */
+    #toastContainer { position:fixed; bottom:28px; right:28px; z-index:100000; display:flex; flex-direction:column; gap:8px; }
+    .toast {
+      background:var(--bg-card); border:1px solid var(--green);
+      border-radius:var(--radius); padding:14px 20px; font-size:13px; color:var(--green);
+      display:flex; align-items:center; gap:10px;
+      animation:slideUp 0.3s ease, fadeOut 0.3s ease 3.2s;
+      box-shadow:0 8px 30px rgba(0,0,0,0.4);
+    }
+    .toast-error { border-color:var(--red) !important; color:var(--red) !important; }
+    .toast-warning { border-color:var(--accent) !important; color:var(--accent) !important; }
+    @keyframes slideUp { from{transform:translateY(20px);opacity:0;} to{transform:translateY(0);opacity:1;} }
+    @keyframes fadeOut { to{opacity:0;} }
+
+    /* ---- Filter row ---- */
+    .filter-row { display:flex; gap:12px; margin-bottom:20px; flex-wrap:wrap; align-items:center; }
+    .filter-row .form-control { width:auto; flex:0 0 auto; }
+    .filter-row input.form-control { width:220px; }
+    .filter-row select.form-control { width:200px; }
+  </style>
+</head>
+<body>
+
+<!-- Page content -->
+<div style="display:flex;gap:12px;margin-bottom:20px;flex-wrap:wrap;align-items:center;" class="filter-row">
+  <button class="btn btn-primary" onclick="openModal('addStudentModal')">+ Add Student</button>
+  <select class="form-control" style="width:200px;" id="filterStage" onchange="filterStudents()">
+    <option value="all">All Stages</option>
+    <option value="testing">Testing</option>
+    <option value="interview">Interview</option>
+    <option value="training">In Training</option>
+    <option value="certified">Certified</option>
+    <option value="collected">Cert. Collected</option>
+    <option value="incomplete">Incomplete</option>
+  </select>
+  <select class="form-control" style="width:200px;" id="filterCourse" onchange="filterStudents()">
+    <option value="all">All Courses</option>
+  </select>
+  <input type="text" class="form-control" style="width:220px;" placeholder="Search by name, ID, or course..." id="studentSearch" onkeyup="filterStudents()">
+</div>
+
+<div class="pipeline" style="margin-bottom:20px;">
+  <div class="pipeline-stage s-test"><span class="count" id="pTest2">0</span>Testing</div>
+  <div class="pipeline-stage s-interview"><span class="count" id="pInterview2">0</span>Interview</div>
+  <div class="pipeline-stage s-training"><span class="count" id="pTraining2">0</span>In Training</div>
+  <div class="pipeline-stage s-certified"><span class="count" id="pCertified2">0</span>Certified</div>
+  <div class="pipeline-stage s-collected"><span class="count" id="pCollected2">0</span>Collected</div>
+  <div class="pipeline-stage s-incomplete"><span class="count" id="pIncomplete2">0</span>Incomplete</div>
+</div>
+
+<div class="card">
+  <div class="card-header">
+    <h3>Student Records</h3>
+    <div style="display:flex;gap:8px;align-items:center;">
+      <span style="font-size:13px;color:var(--text-muted);" id="studentCount"></span>
+      <button class="btn-export" onclick="exportStudentsCSV()">&#128196; Export</button>
+    </div>
+  </div>
+  <div class="table-wrapper">
+    <table>
+      <thead>
+        <tr>
+          <th>Student</th>
+          <th>ID</th>
+          <th>Course</th>
+          <th>Stage</th>
+          <th>Test Score</th>
+          <th>Progress</th>
+          <th>Actions</th>
+        </tr>
+      </thead>
+      <tbody id="studentTableBody"></tbody>
+    </table>
+  </div>
+</div>
+
+<!-- ===== MODALS ===== -->
+
+<!-- Add Student Modal -->
+<div class="modal-overlay" id="addStudentModal">
+  <div class="modal">
+    <div class="modal-header"><h3>Add New Student</h3><button class="modal-close" onclick="closeModal('addStudentModal')">&#x2715;</button></div>
+    <div class="form-group"><label>Full Name</label><input type="text" class="form-control" id="newStudentName" placeholder="e.g. John Smith"></div>
+    <div class="form-group"><label>Email</label><input type="email" class="form-control" id="newStudentEmail" placeholder="e.g. john@email.com"></div>
+    <div class="form-group"><label>Programme</label><select class="form-control" id="newStudentCourse"></select></div>
+    <div class="form-group"><label>Gender</label><select class="form-control" id="newStudentGender"><option value="">— Select —</option><option value="Male">Male</option><option value="Female">Female</option></select></div>
+    <div class="form-group"><label>Starting Stage</label><select class="form-control" id="newStudentStage"><option value="testing">Testing</option><option value="interview">Interview</option><option value="training">In Training</option></select></div>
+    <div style="display:flex;gap:10px;justify-content:flex-end;margin-top:20px;">
+      <button class="btn btn-secondary" onclick="closeModal('addStudentModal')">Cancel</button>
+      <button class="btn btn-primary" onclick="addStudent()">Add Student</button>
+    </div>
+  </div>
+</div>
+
+<!-- Edit Student Modal -->
+<div class="modal-overlay" id="editStudentModal">
+  <div class="modal">
+    <div class="modal-header"><h3>Edit Student</h3><button class="modal-close" onclick="closeModal('editStudentModal')">&#x2715;</button></div>
+    <input type="hidden" id="editStudentIdx">
+    <div class="form-group"><label>Student ID</label><div style="display:flex;gap:8px;align-items:center;"><input type="text" class="form-control" id="editStudentId" readonly style="flex:1;background:var(--bg-secondary);cursor:default;"><button class="btn btn-sm btn-secondary" id="regenerateIdBtn" onclick="regenerateStudentId()" style="white-space:nowrap;">&#x21BB; Regenerate</button></div></div>
+    <div class="form-group"><label>Full Name</label><input type="text" class="form-control" id="editStudentName"></div>
+    <div class="form-group"><label>Email</label><input type="email" class="form-control" id="editStudentEmail" placeholder="e.g. john@email.com"></div>
+    <div class="form-group"><label>Programme</label><select class="form-control" id="editStudentCourse"></select></div>
+    <div class="form-group"><label>Gender</label><select class="form-control" id="editStudentGender"><option value="">— Select —</option><option value="Male">Male</option><option value="Female">Female</option></select></div>
+    <div class="form-group"><label>Instructor</label><input type="text" class="form-control" id="editStudentInstructor"></div>
+    <div class="form-group"><label>Attendance (%)</label><input type="number" class="form-control" id="editStudentAttendance" min="0" max="100"></div>
+    <div class="form-group"><label>GPA</label><input type="text" class="form-control" id="editStudentGPA"></div>
+    <div style="display:flex;gap:10px;justify-content:flex-end;margin-top:20px;">
+      <button class="btn btn-secondary" onclick="closeModal('editStudentModal')">Cancel</button>
+      <button class="btn btn-primary" onclick="saveEditStudent()">Save Changes</button>
+    </div>
+  </div>
+</div>
+
+<!-- Update Stage Modal -->
+<div class="modal-overlay" id="updateStageModal">
+  <div class="modal">
+    <div class="modal-header"><h3>Update Student Stage</h3><button class="modal-close" onclick="closeModal('updateStageModal')">&#x2715;</button></div>
+    <div id="updateStageContent"></div>
+  </div>
+</div>
+
+<!-- Delete Student Modal -->
+<div class="modal-overlay" id="deleteStudentModal">
+  <div class="modal" style="max-width:420px;">
+    <div class="modal-header"><h3>Delete Student</h3><button class="modal-close" onclick="closeModal('deleteStudentModal')">&#x2715;</button></div>
+    <input type="hidden" id="deleteStudentIdx">
+    <p style="margin-bottom:16px;">Are you sure you want to delete <strong id="deleteStudentName"></strong>?</p>
+    <p style="font-size:13px;color:var(--text-muted);margin-bottom:20px;">This action cannot be undone. All student records will be permanently removed.</p>
+    <div style="display:flex;gap:10px;justify-content:flex-end;">
+      <button class="btn btn-secondary" onclick="closeModal('deleteStudentModal')">Cancel</button>
+      <button class="btn" style="background:#e74c3c;color:#fff;" onclick="confirmDeleteStudent()">Delete</button>
+    </div>
+  </div>
+</div>
+
+<!-- Toast container -->
+<div id="toastContainer"></div>
+
+<script>
+// ============================== DATA ==============================
+var students = [];
+var skillAreas = [];
+var instructorData = [];
+var attendanceRecords = [];
+var examResults = [];
+var certDownloadApprovals = [];
+var userAccounts = [];
+var studentProfiles = {};
+
+var stages = ['testing','interview','training','certified','collected','incomplete'];
+var stageLabels = {testing:'Testing',interview:'Interview',training:'In Training',certified:'Certified',collected:'Collected',incomplete:'Incomplete'};
+var stageBadge = {testing:'badge-blue',interview:'badge-purple',training:'badge-amber',certified:'badge-green',collected:'badge-green',incomplete:'badge-red'};
+
+function safeJsonParse(v, fallback) {
+  if(!v) return fallback;
+  try { return JSON.parse(v); } catch(e) { return fallback; }
+}
+
+function loadData() {
+  students = safeJsonParse(CESTISStore.getItem('voctrain_students'), []);
+  skillAreas = safeJsonParse(CESTISStore.getItem('voctrain_skillAreas'), []);
+  instructorData = safeJsonParse(CESTISStore.getItem('voctrain_instructorData'), []);
+  attendanceRecords = safeJsonParse(CESTISStore.getItem('voctrain_attendance'), []);
+  examResults = safeJsonParse(CESTISStore.getItem('voctrain_examResults'), []);
+  certDownloadApprovals = safeJsonParse(CESTISStore.getItem('voctrain_certDownloadApprovals'), []);
+  userAccounts = safeJsonParse(CESTISStore.getItem('voctrain_userAccounts'), []);
+  studentProfiles = safeJsonParse(CESTISStore.getItem('voctrain_studentProfiles'), {});
+}
+
+function saveData() {
+  CESTISStore.setItem('voctrain_students', JSON.stringify(students));
+  CESTISStore.setItem('voctrain_skillAreas', JSON.stringify(skillAreas));
+  CESTISStore.setItem('voctrain_instructorData', JSON.stringify(instructorData));
+  CESTISStore.setItem('voctrain_attendance', JSON.stringify(attendanceRecords));
+  CESTISStore.setItem('voctrain_examResults', JSON.stringify(examResults));
+  CESTISStore.setItem('voctrain_certDownloadApprovals', JSON.stringify(certDownloadApprovals));
+  CESTISStore.setItem('voctrain_userAccounts', JSON.stringify(userAccounts));
+  CESTISStore.setItem('voctrain_studentProfiles', JSON.stringify(studentProfiles));
+  // Notify parent window that student data changed
+  try {
+    window.top.postMessage({type:'students-updated'}, '*');
+  } catch(e) {}
+}
+
+// ============================== UTILITIES ==============================
+
+function getCourseList() {
+  var courseSet = {};
+  if(skillAreas) skillAreas.forEach(function(s){ courseSet[s.name] = true; });
+  if(students) students.forEach(function(s){ if(s.course && !courseSet[s.course]) courseSet[s.course] = true; });
+  if(userAccounts) userAccounts.forEach(function(u){ if(u.programme && !courseSet[u.programme]) courseSet[u.programme] = true; });
+  return Object.keys(courseSet).sort();
+}
+
+function findSkillAreaForCourse(courseName) {
+  if(!courseName) return skillAreas[0];
+  var cn = courseName.toLowerCase().trim();
+  var exact = skillAreas.find(function(sk){ return sk.name.toLowerCase().trim() === cn; });
+  if(exact) return exact;
+  var contains = skillAreas.find(function(sk){
+    var sn = sk.name.toLowerCase().trim();
+    return cn.indexOf(sn) !== -1 || sn.indexOf(cn) !== -1;
+  });
+  if(contains) return contains;
+  var firstWord = skillAreas.find(function(sk){
+    var fw = sk.name.split(' ')[0].toLowerCase();
+    return fw.length > 2 && cn.indexOf(fw) !== -1;
+  });
+  if(firstWord) return firstWord;
+  var cnWords = cn.split(/[\s&,\-]+/).filter(function(w){ return w.length > 3; });
+  var overlap = skillAreas.find(function(sk){
+    var skWords = sk.name.toLowerCase().split(/[\s&,\-]+/).filter(function(w){ return w.length > 3; });
+    return cnWords.some(function(w){ return skWords.indexOf(w) !== -1; });
+  });
+  return overlap || null;
+}
+
+function updateSkillAreaCounts() {
+  skillAreas.forEach(function(sk){
+    var skNameLower = sk.name.toLowerCase().trim();
+    sk.students = students.filter(function(s){
+      if(!s.course) return false;
+      if(s.course.toLowerCase().trim() === skNameLower) return true;
+      var stuSk = findSkillAreaForCourse(s.course);
+      return stuSk && stuSk.id && stuSk.id === sk.id;
+    }).length;
+  });
+}
+
+function openModal(id) { var el = document.getElementById(id); if(el) el.classList.add('active'); }
+function closeModal(id) { var el = document.getElementById(id); if(el) el.classList.remove('active'); }
+
+function showToast(message, type) {
+  var c = document.getElementById('toastContainer');
+  if(!c) return;
+  var t = document.createElement('div');
+  t.className = 'toast' + (type ? ' toast-'+type : '');
+  var icon = type === 'error' ? '✗' : type === 'warning' ? '⚠' : '✓';
+  t.textContent = icon + ' ' + message;
+  c.appendChild(t);
+  setTimeout(function(){ t.remove(); }, 3500);
+}
+
+function sanitizeInput(s) {
+  if(!s) return '';
+  return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+
+// ============================== TOMBSTONE ==============================
+function _getDeletedStudentIds() {
+  try {
+    var raw = CESTISStore.getItem('voctrain_deletedStudentIds');
+    if(!raw) return {};
+    var arr = JSON.parse(raw);
+    if(!Array.isArray(arr)) return {};
+    var map = {};
+    arr.forEach(function(id){ if(id) map[id] = true; });
+    return map;
+  } catch(e) { return {}; }
+}
+
+function isStudentDeleted(id) {
+  if(!id) return false;
+  return _getDeletedStudentIds()[id] === true;
+}
+
+function recordDeletedStudent(id) {
+  if(!id) return;
+  try {
+    var existing = _getDeletedStudentIds();
+    existing[id] = true;
+    CESTISStore.setItem('voctrain_deletedStudentIds', JSON.stringify(Object.keys(existing)));
+  } catch(e) {}
+}
+
+// ============================== COURSE DROPDOWNS ==============================
+function populateCourseDropdowns() {
+  var courses = getCourseList();
+  ['newStudentCourse','editStudentCourse'].forEach(function(id){
+    var sel = document.getElementById(id);
+    if(!sel) return;
+    var prev = sel.value;
+    sel.innerHTML = courses.map(function(c){ return '<option>' + c + '</option>'; }).join('');
+    if(prev && sel.querySelector('option[value="'+prev+'"]')) sel.value = prev;
+  });
+  // Refresh filterCourse dropdown
+  var filt = document.getElementById('filterCourse');
+  if(filt){
+    var prev = filt.value;
+    filt.innerHTML = '<option value="all">All Courses</option>' + courses.map(function(c){ return '<option value="'+c+'">'+c+'</option>'; }).join('');
+    if(prev) filt.value = prev;
+  }
+}
+
+// ============================== RENDER ==============================
+function renderStudents(data) {
+  var tbody = document.getElementById('studentTableBody');
+  if(!tbody) return;
+  if(!data || !Array.isArray(data)) { data = []; }
+  tbody.innerHTML = data.map(function(s){
+    var idx = students.indexOf(s);
+    var prog = s.progress || 0;
+    return '<tr>' +
+      '<td><strong>' + sanitizeInput(s.name||'Unknown') + '</strong></td>' +
+      '<td style="font-family:monospace;font-size:12px;color:var(--text-muted);">' + sanitizeInput(s.id||'—') + '</td>' +
+      '<td>' + sanitizeInput(s.course||'—') + '</td>' +
+      '<td><span class="badge ' + (stageBadge[s.stage]||'badge-blue') + '"><span class="badge-dot"></span>' + sanitizeInput(stageLabels[s.stage]||s.stage||'—') + '</span></td>' +
+      '<td>' + sanitizeInput(s.score||'—') + '</td>' +
+      '<td><div style="display:flex;align-items:center;gap:8px;"><div class="progress-bar" style="width:80px;"><div class="fill" style="width:' + prog + '%;background:' + (prog>=80?'var(--green)':prog>=40?'var(--accent)':'var(--red)') + ';"></div></div><span style="font-size:12px;color:var(--text-muted);">' + prog + '%</span></div></td>' +
+      '<td><div style="display:flex;gap:6px;">' +
+        '<button class="btn btn-sm btn-secondary" onclick="openUpdateStage(' + idx + ')">Update</button>' +
+        '<button class="btn btn-sm btn-secondary" onclick="openEditStudent(' + idx + ')" style="font-size:11px;">&#x270E; Edit</button>' +
+        '<button class="btn btn-sm" style="background:#e74c3c;color:#fff;font-size:11px;border:none;border-radius:var(--radius-sm);cursor:pointer;" onclick="openDeleteStudent(' + idx + ')">&#x2715; Delete</button>' +
+      '</div></td>' +
+    '</tr>';
+  }).join('');
+  var sc = document.getElementById('studentCount');
+  if(sc) sc.textContent = 'Showing ' + data.length + ' student' + (data.length !== 1 ? 's' : '');
+}
+
+function filterStudents() {
+  var filtered = students.slice();
+  var stage = document.getElementById('filterStage') ? document.getElementById('filterStage').value : 'all';
+  var course = document.getElementById('filterCourse') ? document.getElementById('filterCourse').value : 'all';
+  var search = ((document.getElementById('studentSearch') ? document.getElementById('studentSearch').value : '') || '').toLowerCase().trim();
+  if(stage && stage !== 'all') filtered = filtered.filter(function(s){ return s.stage === stage; });
+  if(course && course !== 'all') filtered = filtered.filter(function(s){
+    if(!s.course) return false;
+    if(s.course === course) return true;
+    if(s.course.toLowerCase().trim() === course.toLowerCase().trim()) return true;
+    var studentSkill = findSkillAreaForCourse(s.course);
+    var filterSkill = findSkillAreaForCourse(course);
+    if(studentSkill && filterSkill && studentSkill.id && filterSkill.id && studentSkill.id === filterSkill.id) return true;
+    return false;
+  });
+  if(search) filtered = filtered.filter(function(s){
+    var name = (s.name||'').toLowerCase();
+    var id = (s.id||'').toLowerCase();
+    var sCourse = (s.course||'').toLowerCase();
+    return name.includes(search) || id.includes(search) || sCourse.includes(search);
+  });
+  renderStudents(filtered);
+}
+
+function updatePipelineCounts() {
+  var stagePipelineIds = {
+    testing:'pTest2', interview:'pInterview2', training:'pTraining2',
+    certified:'pCertified2', collected:'pCollected2', incomplete:'pIncomplete2'
+  };
+  stages.forEach(function(s){
+    var count = students.filter(function(st){ return st.stage === s; }).length;
+    var el = document.getElementById(stagePipelineIds[s]);
+    if(el) el.textContent = count;
+  });
+}
+
+// ============================== STAGE OPERATIONS ==============================
+function openUpdateStage(idx) {
+  var s = students[idx];
+  document.getElementById('updateStageContent').innerHTML =
+    '<p style="margin-bottom:16px;font-size:14px;">Student: <strong>' + sanitizeInput(s.name) + '</strong> (' + sanitizeInput(s.id) + ')<br>Course: ' + sanitizeInput(s.course) + '<br>Current: <span class="badge ' + (stageBadge[s.stage]||'badge-blue') + '">' + (stageLabels[s.stage]||s.stage) + '</span></p>' +
+    '<div class="form-group"><label>Move to Stage</label><select class="form-control" id="newStage">' +
+      stages.map(function(st){ return '<option value="' + st + '"' + (st===s.stage?' selected':'') + '>' + stageLabels[st] + '</option>'; }).join('') +
+    '</select></div>' +
+    '<div class="form-group"><label>Notes</label><textarea class="form-control" placeholder="Add notes..."></textarea></div>' +
+    '<div style="display:flex;gap:10px;justify-content:flex-end;margin-top:20px;">' +
+      '<button class="btn btn-secondary" onclick="closeModal(\'updateStageModal\')">Cancel</button>' +
+      '<button class="btn btn-primary" onclick="updateStudentStage(' + idx + ')">Update</button>' +
+    '</div>';
+  openModal('updateStageModal');
+}
+
+function updateStudentStage(idx) {
+  var newStage = document.getElementById('newStage').value;
+  students[idx].stage = newStage;
+  if(newStage === 'certified'){
+    students[idx].progress = 90;
+    students[idx].certNo = students[idx].course.substring(0,2).toUpperCase()+'-'+new Date().getFullYear()+'-'+String(Math.floor(Math.random()*9000)+1000);
+    students[idx].certDate = new Date().toLocaleDateString('en-US',{year:'numeric',month:'long',day:'2-digit'});
+  }
+  if(newStage === 'collected'){ students[idx].progress=100; students[idx].certCollected=true; }
+  if(newStage === 'incomplete') students[idx].progress = Math.min(students[idx].progress,40);
+  students[idx].lastModified = new Date().toISOString();
+  closeModal('updateStageModal');
+  filterStudents();
+  updatePipelineCounts();
+  showToast(students[idx].name + ' moved to ' + stageLabels[newStage]);
+  saveData();
+}
+
+// ============================== EDIT STUDENT ==============================
+function openEditStudent(idx) {
+  var s = students[idx];
+  document.getElementById('editStudentIdx').value = idx;
+  document.getElementById('editStudentId').value = s.id;
+  document.getElementById('editStudentName').value = s.name;
+  var profile = studentProfiles[s.id] || {};
+  document.getElementById('editStudentEmail').value = profile.email || '';
+  document.getElementById('editStudentGender').value = s.gender || '';
+  document.getElementById('editStudentInstructor').value = s.instructor || '';
+  document.getElementById('editStudentAttendance').value = s.attendance || 0;
+  document.getElementById('editStudentGPA').value = s.gpa || '0.0';
+  populateCourseDropdowns();
+  var courseSel = document.getElementById('editStudentCourse');
+  if(courseSel) courseSel.value = s.course;
+  openModal('editStudentModal');
+}
+
+function generateStudentId() {
+  return 'STU-'+Date.now().toString(36).toUpperCase()+Math.random().toString(36).substring(2,6).toUpperCase();
+}
+
+function regenerateStudentId() {
+  var newId = generateStudentId();
+  document.getElementById('editStudentId').value = newId;
+  showToast('New ID generated — save to apply');
+}
+
+function saveEditStudent() {
+  var idx = parseInt(document.getElementById('editStudentIdx').value);
+  var name = document.getElementById('editStudentName').value.trim();
+  if(!name){ alert('Please enter a name'); return; }
+  var s = students[idx];
+  var newId = document.getElementById('editStudentId').value;
+  if(newId && newId !== s.id){
+    var oldId = s.id;
+    if(studentProfiles[oldId]){
+      studentProfiles[newId] = studentProfiles[oldId];
+      delete studentProfiles[oldId];
+    }
+    s.id = newId;
+  }
+  s.name = name;
+  s.gender = document.getElementById('editStudentGender').value || '';
+  s.course = document.getElementById('editStudentCourse').value;
+  s.instructor = document.getElementById('editStudentInstructor').value.trim();
+  s.attendance = parseInt(document.getElementById('editStudentAttendance').value) || 0;
+  s.gpa = document.getElementById('editStudentGPA').value.trim() || '0.0';
+  var email = document.getElementById('editStudentEmail').value.trim();
+  if(email){
+    if(!studentProfiles[s.id]) studentProfiles[s.id] = {};
+    studentProfiles[s.id].email = email;
+    studentProfiles[s.id].updatedAt = new Date().toISOString();
+  }
+  // Update attendance record
+  var attRec = attendanceRecords.find(function(r){ return r.studentId === s.id; });
+  if(attRec){
+    attRec.studentName = s.name;
+    attRec.course = s.course;
+  } else {
+    attendanceRecords.push({studentId:s.id, studentName:s.name, course:s.course, date:new Date().toISOString().split('T')[0], days:{Mon:'absent',Tue:'absent',Wed:'absent',Thu:'absent',Fri:'absent'}});
+  }
+  s.lastModified = new Date().toISOString();
+  updateSkillAreaCounts();
+  closeModal('editStudentModal');
+  filterStudents();
+  showToast(s.name + ' updated successfully');
+  saveData();
+}
+
+// ============================== DELETE STUDENT ==============================
+function openDeleteStudent(idx) {
+  var s = students[idx];
+  document.getElementById('deleteStudentIdx').value = idx;
+  document.getElementById('deleteStudentName').textContent = s.name + ' (' + s.id + ')';
+  openModal('deleteStudentModal');
+}
+
+function confirmDeleteStudent() {
+  var idx = parseInt(document.getElementById('deleteStudentIdx').value);
+  var s = students[idx];
+  var name = s.name;
+  var sid = s.id;
+  students.splice(idx, 1);
+  if(studentProfiles[sid]) delete studentProfiles[sid];
+  if(Array.isArray(attendanceRecords)){
+    attendanceRecords = attendanceRecords.filter(function(r){ return r.studentId !== sid; });
+  }
+  if(Array.isArray(examResults)){
+    examResults = examResults.filter(function(r){ return r.studentId !== sid; });
+  }
+  if(Array.isArray(certDownloadApprovals)){
+    certDownloadApprovals = certDownloadApprovals.filter(function(a){ return a.studentId !== sid; });
+  }
+  if(Array.isArray(userAccounts)){
+    userAccounts = userAccounts.filter(function(u){ return u.studentDataId !== sid; });
+  }
+  recordDeletedStudent(sid);
+  closeModal('deleteStudentModal');
+  filterStudents();
+  updatePipelineCounts();
+  showToast(name + ' has been deleted');
+  saveData();
+}
+
+// ============================== ADD STUDENT ==============================
+async function hashPassword(password) {
+  var encoder = new TextEncoder();
+  var data = encoder.encode(password + '__CESTIS_SALT_2026__');
+  var hashBuffer = await crypto.subtle.digest('SHA-256', data);
+  var hashArray = Array.from(new Uint8Array(hashBuffer));
+  return hashArray.map(function(b){ return b.toString(16).padStart(2,'0'); }).join('');
+}
+
+async function addStudent() {
+  var name = document.getElementById('newStudentName').value.trim();
+  if(!name){ alert('Please enter a name'); return; }
+  var email = (document.getElementById('newStudentEmail').value || '').trim();
+  var selectedCourse = document.getElementById('newStudentCourse').value;
+  var assignedInstructor = (instructorData.find(function(ins){
+    if(!ins.course) return false;
+    if(ins.course.toLowerCase().trim() === selectedCourse.toLowerCase().trim()) return true;
+    var insSk = findSkillAreaForCourse(ins.course);
+    var stuSk = findSkillAreaForCourse(selectedCourse);
+    return insSk && stuSk && insSk.id && stuSk.id && insSk.id === stuSk.id;
+  })||{}).name || '';
+  var gender = document.getElementById('newStudentGender').value || '';
+  var studentId = generateStudentId();
+  students.unshift({
+    id: studentId, name: name,
+    stage: document.getElementById('newStudentStage').value,
+    course: selectedCourse, score:'', progress:10,
+    certNo:null, certDate:null, certCollected:false,
+    attendance:0, assignments:0, assignmentsTotal:8,
+    gpa:'0.0', instructor:assignedInstructor, gender:gender,
+    createdAt:new Date().toISOString().split('T')[0],
+    lastModified:new Date().toISOString()
+  });
+  // Auto-create attendance record
+  var existingAtt = attendanceRecords.find(function(r){ return r.studentId === studentId; });
+  if(!existingAtt){
+    attendanceRecords.push({studentId:studentId, studentName:name, course:selectedCourse, date:new Date().toISOString().split('T')[0], days:{Mon:'absent',Tue:'absent',Wed:'absent',Thu:'absent',Fri:'absent'}});
+  }
+  updateSkillAreaCounts();
+  // Create linked disabled user account
+  var username = email ? email.split('@')[0] : name.toLowerCase().replace(/\s+/g,'.');
+  var dupAccount = userAccounts.find(function(u){
+    if(email && u.email === email) return true;
+    if(u.username === username && u.role === 'student') return true;
+    return false;
+  });
+  if(!dupAccount){
+    var defaultPw = await hashPassword(name.split(' ')[0].toLowerCase() + '123');
+    userAccounts.push({
+      id:'USR-'+Date.now(), name:name, role:'student',
+      username:username, password:defaultPw, email:email||'',
+      programme:selectedCourse, status:'disabled',
+      createdAt:new Date().toISOString().split('T')[0],
+      registeredVia:'admin-created', studentDataId:studentId, approvedBy:'admin'
+    });
+  } else {
+    dupAccount.studentDataId = studentId;
+  }
+  closeModal('addStudentModal');
+  filterStudents();
+  updatePipelineCounts();
+  showToast(name + ' added (account disabled until activated)!');
+  document.getElementById('newStudentName').value = '';
+  document.getElementById('newStudentGender').value = '';
+  document.getElementById('newStudentEmail').value = '';
+  saveData();
+  // Auto cloud sync if parent supports it
+  try { if(window.top.autoSyncOnLogin) window.top.autoSyncOnLogin(); } catch(e){}
+}
+
+// ============================== EXPORT ==============================
+function exportCSV(data, headers, filename) {
+  var csvRows = [headers.join(',')];
+  data.forEach(function(row){
+    csvRows.push(headers.map(function(h){
+      var val = row[h] !== undefined && row[h] !== null ? String(row[h]) : '';
+      if(val.includes(',') || val.includes('"') || val.includes('\n')) val = '"' + val.replace(/"/g,'""') + '"';
+      return val;
+    }).join(','));
+  });
+  var blob = new Blob([csvRows.join('\n')], {type:'text/csv;charset=utf-8;'});
+  var url = URL.createObjectURL(blob);
+  var a = document.createElement('a');
+  a.href = url; a.download = filename; a.style.display = 'none';
+  document.body.appendChild(a); a.click(); document.body.removeChild(a);
+  URL.revokeObjectURL(url);
+}
+
+function exportStudentsCSV() {
+  var headers = ['name','id','course','stage','score','progress','attendance','gpa','instructor'];
+  exportCSV(students, headers, 'students_export.csv');
+  showToast('Students CSV exported!');
+}
+
+// ============================== INIT ==============================
+function init() {
+  // Apply dark mode from parent or stored preference
+  try {
+    if(window.top && window.top.document && window.top.document.body) {
+      if(window.top.document.body.classList.contains('dark-mode') ||
+         !window.top.document.body.classList.contains('light-mode')) {
+        // index.html is dark by default — nothing to do (our CSS already dark)
+      }
+    }
+  } catch(e){}
+  var isDark = CESTISStore.getItem('darkMode') === 'true';
+  // Our page is dark-only matching index.html's :root defaults
+
+  loadData();
+  populateCourseDropdowns();
+  filterStudents();
+  updatePipelineCounts();
+}
+
+// Listen for storage events (another tab mutated students)
+window.addEventListener('storage', function(e){
+  if(e.key === 'voctrain_students' || e.key === 'voctrain_skillAreas'){
+    loadData();
+    populateCourseDropdowns();
+    filterStudents();
+    updatePipelineCounts();
+  }
+});
+
+// Listen for parent-initiated refresh
+window.addEventListener('message', function(e){
+  if(e.data && e.data.type === 'refresh-students'){
+    loadData();
+    populateCourseDropdowns();
+    filterStudents();
+    updatePipelineCounts();
+  }
+});
+
+// Run init when DOM is ready
+if(document.readyState === 'loading'){
+  document.addEventListener('DOMContentLoaded', init);
+} else {
+  init();
+}
+</script>
+</body>
+</html>

@@ -4104,17 +4104,7 @@ body.vc-fullscreen-mode.vc-host-only-mode .video-grid .video-tile:not(.vc-hoston
   </div>
 </div>
 
-<div class="modal-overlay" id="addStudentModal">
-  <div class="modal">
-    <div class="modal-header"><h3>Add New Student</h3><button class="modal-close" onclick="closeModal('addStudentModal')">✕</button></div>
-    <div class="form-group"><label>Full Name</label><input type="text" class="form-control" id="newStudentName" placeholder="e.g. John Smith"></div>
-    <div class="form-group"><label>Email</label><input type="email" class="form-control" id="newStudentEmail" placeholder="e.g. john@email.com"></div>
-    <div class="form-group"><label>Programme</label><select class="form-control" id="newStudentCourse"></select></div>
-    <div class="form-group"><label>Gender</label><select class="form-control" id="newStudentGender"><option value="">— Select —</option><option value="Male">Male</option><option value="Female">Female</option></select></div>
-    <div class="form-group"><label>Starting Stage</label><select class="form-control" id="newStudentStage"><option value="testing">Testing</option><option value="interview">Interview</option><option value="training">In Training</option></select></div>
-    <div style="display:flex;gap:10px;justify-content:flex-end;margin-top:20px;"><button class="btn btn-secondary" onclick="closeModal('addStudentModal')">Cancel</button><button class="btn btn-primary" onclick="addStudent()">Add Student</button></div>
-  </div>
-</div>
+<!-- addStudentModal moved to Student-Progress.html -->
 <div class="modal-overlay" id="createExamModal">
   <div class="modal" style="max-width:780px;">
     <div class="modal-header"><h3>Create Online Exam</h3><button class="modal-close" onclick="closeModal('createExamModal');examBuilderQuestions=[];">✕</button></div>
@@ -4158,36 +4148,7 @@ body.vc-fullscreen-mode.vc-host-only-mode .video-grid .video-tile:not(.vc-hoston
     </div>
   </div>
 </div>
-<div class="modal-overlay" id="updateStageModal">
-  <div class="modal">
-    <div class="modal-header"><h3>Update Student Stage</h3><button class="modal-close" onclick="closeModal('updateStageModal')">✕</button></div>
-    <div id="updateStageContent"></div>
-  </div>
-</div>
-<div class="modal-overlay" id="editStudentModal">
-  <div class="modal">
-    <div class="modal-header"><h3>Edit Student</h3><button class="modal-close" onclick="closeModal('editStudentModal')">✕</button></div>
-    <input type="hidden" id="editStudentIdx">
-    <div class="form-group"><label>Student ID</label><div style="display:flex;gap:8px;align-items:center;"><input type="text" class="form-control" id="editStudentId" readonly style="flex:1;background:var(--bg-secondary);cursor:default;"><button class="btn btn-sm btn-secondary" id="regenerateIdBtn" onclick="regenerateStudentId()" style="white-space:nowrap;">↻ Regenerate</button></div></div>
-    <div class="form-group"><label>Full Name</label><input type="text" class="form-control" id="editStudentName"></div>
-    <div class="form-group"><label>Email</label><input type="email" class="form-control" id="editStudentEmail" placeholder="e.g. john@email.com"></div>
-    <div class="form-group"><label>Programme</label><select class="form-control" id="editStudentCourse"></select></div>
-    <div class="form-group"><label>Gender</label><select class="form-control" id="editStudentGender"><option value="">— Select —</option><option value="Male">Male</option><option value="Female">Female</option></select></div>
-    <div class="form-group"><label>Instructor</label><input type="text" class="form-control" id="editStudentInstructor"></div>
-    <div class="form-group"><label>Attendance (%)</label><input type="number" class="form-control" id="editStudentAttendance" min="0" max="100"></div>
-    <div class="form-group"><label>GPA</label><input type="text" class="form-control" id="editStudentGPA"></div>
-    <div style="display:flex;gap:10px;justify-content:flex-end;margin-top:20px;"><button class="btn btn-secondary" onclick="closeModal('editStudentModal')">Cancel</button><button class="btn btn-primary" onclick="saveEditStudent()">Save Changes</button></div>
-  </div>
-</div>
-<div class="modal-overlay" id="deleteStudentModal">
-  <div class="modal" style="max-width:420px;">
-    <div class="modal-header"><h3>Delete Student</h3><button class="modal-close" onclick="closeModal('deleteStudentModal')">✕</button></div>
-    <input type="hidden" id="deleteStudentIdx">
-    <p style="margin-bottom:16px;">Are you sure you want to delete <strong id="deleteStudentName"></strong>?</p>
-    <p style="font-size:13px;color:var(--text-muted);margin-bottom:20px;">This action cannot be undone. All student records will be permanently removed.</p>
-    <div style="display:flex;gap:10px;justify-content:flex-end;"><button class="btn btn-secondary" onclick="closeModal('deleteStudentModal')">Cancel</button><button class="btn" style="background:#e74c3c;color:#fff;" onclick="confirmDeleteStudent()">Delete</button></div>
-  </div>
-</div>
+<!-- updateStageModal, editStudentModal, deleteStudentModal moved to Student-Progress.html -->
 <!-- CREATE USER MODAL -->
 <div class="modal-overlay" id="createUserModal">
   <div class="modal">
@@ -8090,12 +8051,14 @@ function showPage(pageId) {
   // This avoids stale cached error states that appear when iframes are destroyed
   // on logout and recreated on the next login with the same src URL.
   var iframePageMap = {
-    'fee-management':    {id:'feeManagementFrame',   src:'School.Fee.html'},
-    'cashbook':          {id:'cashbookFrame',        src:'CESTIS.Cashbook.html'},
-    'as-fee-management': {id:'asFeeManagementFrame', src:'School.Fee.html'},
-    'pdf-workshop':      {id:'pdfWorkshopFrame',     src:'PDF.Workshop.html'},
-    'as-pdf-workshop':   {id:'asPdfWorkshopFrame',   src:'PDF.Workshop.html'},
-    'i-pdf-workshop':    {id:'iPdfWorkshopFrame',    src:'PDF.Workshop.html'}
+    'fee-management':    {id:'feeManagementFrame',       src:'School.Fee.html'},
+    'cashbook':          {id:'cashbookFrame',            src:'CESTIS.Cashbook.html'},
+    'as-fee-management': {id:'asFeeManagementFrame',     src:'School.Fee.html'},
+    'pdf-workshop':      {id:'pdfWorkshopFrame',         src:'PDF.Workshop.html'},
+    'as-pdf-workshop':   {id:'asPdfWorkshopFrame',       src:'PDF.Workshop.html'},
+    'i-pdf-workshop':    {id:'iPdfWorkshopFrame',        src:'PDF.Workshop.html'},
+    'students':          {id:'studentProgressFrame',     src:'Student-Progress.html'},
+    'as-students':       {id:'asStudentProgressFrame',   src:'Student-Progress.html'}
   };
   if(iframePageMap[pageId]) {
     var iframeInfo = iframePageMap[pageId];
@@ -8161,7 +8124,7 @@ function buildAdminPages() {
       <div class="stat-card"><div class="stat-icon" style="background:var(--purple-dim);color:var(--purple);">\uD83D\uDCF9</div><div class="stat-value" data-count="${classSessions.length}">0</div><div class="stat-label">Class Sessions</div><div class="stat-change" style="color:var(--text-muted);">Total scheduled</div></div>
     </div>
     <div class="quick-actions">
-      <div class="quick-action-btn" onclick="showPage('students');openModal('addStudentModal')"><div class="qa-icon">\uD83D\uDC64</div><div class="qa-label">Add Student</div></div>
+      <div class="quick-action-btn" onclick="showPage('students')"><div class="qa-icon">&#128100;</div><div class="qa-label">Add Student</div></div>
       <div class="quick-action-btn" onclick="openModal('createExamModal')"><div class="qa-icon">\uD83D\uDCDD</div><div class="qa-label">Create Exam</div></div>
       <div class="quick-action-btn" onclick="showPage('announcements')"><div class="qa-icon">\uD83D\uDCE2</div><div class="qa-label">New Announcement</div></div>
       <div class="quick-action-btn" onclick="exportReportCSV()"><div class="qa-icon">\uD83D\uDCC4</div><div class="qa-label">Export Report</div></div>
@@ -8241,15 +8204,7 @@ function buildAdminPages() {
 
   <!-- STUDENTS -->
   <section class="page" id="page-students">
-    <div style="display:flex;gap:12px;margin-bottom:20px;flex-wrap:wrap;">
-      <button class="btn btn-primary" onclick="openModal('addStudentModal')">+ Add Student</button>
-      <button class="btn btn-secondary" onclick="recoverAllCourseData()" title="Recover students and instructors from cloud backups">🔄 Recover from Cloud</button>
-      <select class="form-control" style="width:200px;" id="filterStage" onchange="filterStudents()"><option value="all">All Stages</option><option value="testing">Testing</option><option value="interview">Interview</option><option value="training">In Training</option><option value="certified">Certified</option><option value="collected">Cert. Collected</option><option value="incomplete">Incomplete</option></select>
-      <select class="form-control" style="width:200px;" id="filterCourse" onchange="filterStudents()"><option value="all">All Courses</option>${courses.map(c=>'<option>'+c+'</option>').join('')}</select>
-      <input type="text" class="form-control" style="width:220px;" placeholder="Search by name, ID, or course..." id="studentSearch" onkeyup="filterStudents()">
-    </div>
-    <div class="pipeline" style="margin-bottom:20px;"><div class="pipeline-stage s-test"><span class="count" id="pTest2">0</span>Testing</div><div class="pipeline-stage s-interview"><span class="count" id="pInterview2">0</span>Interview</div><div class="pipeline-stage s-training"><span class="count" id="pTraining2">0</span>In Training</div><div class="pipeline-stage s-certified"><span class="count" id="pCertified2">0</span>Certified</div><div class="pipeline-stage s-collected"><span class="count" id="pCollected2">0</span>Collected</div><div class="pipeline-stage s-incomplete"><span class="count" id="pIncomplete2">0</span>Incomplete</div></div>
-    <div class="card"><div class="card-header"><h3>Student Records</h3><span style="font-size:13px;color:var(--text-muted);" id="studentCount">Showing ${students.length} students</span></div><div class="table-wrapper"><table><thead><tr><th>Student</th><th>ID</th><th>Course</th><th>Stage</th><th>Test Score</th><th>Progress</th><th>Actions</th></tr></thead><tbody id="studentTableBody"></tbody></table></div></div>
+    <iframe id="studentProgressFrame" style="width:100%;height:calc(100vh - var(--topbar-h) - 56px);border:none;border-radius:12px;"></iframe>
   </section>
 
   <!-- TRAINING -->
@@ -14343,6 +14298,20 @@ window.addEventListener('storage', function(e) {
         setTimeout(function() { logout(); applyMaintenanceOverlay(); }, 2000);
       }
     }
+  }
+});
+
+// ============================== STUDENT IFRAME MESSAGE HANDLER ==============================
+window.addEventListener('message', function(e) {
+  if(e.data && e.data.type === 'students-updated') {
+    try { students = JSON.parse(CESTISStore.getItem('voctrain_students') || '[]'); } catch(e2) {}
+    try { studentProfiles = JSON.parse(CESTISStore.getItem('voctrain_studentProfiles') || '{}'); } catch(e2) {}
+    try { attendanceRecords = JSON.parse(CESTISStore.getItem('voctrain_attendance') || '[]'); } catch(e2) {}
+    try { userAccounts = JSON.parse(CESTISStore.getItem('voctrain_userAccounts') || '[]'); } catch(e2) {}
+    try { skillAreas = JSON.parse(CESTISStore.getItem('voctrain_skillAreas') || '[]'); } catch(e2) {}
+    refreshStudentDependentViews();
+    updateSkillAreaCounts();
+    saveState();
   }
 });
 
@@ -25800,14 +25769,7 @@ function buildAdminStaffPages() {
 
   // Student Progress
   html += '<section class="page" id="page-as-students">' +
-    '<div class="card-header" style="margin-bottom:16px;"><h3 style="font-family:\'Playfair Display\',serif;">Student Progress</h3></div>' +
-    '<div style="display:flex;gap:12px;margin-bottom:16px;flex-wrap:wrap;">' +
-      '<input type="text" class="form-control" id="asStudentSearch" placeholder="Search students..." oninput="asFilterStudents()" style="width:260px;">' +
-      '<select class="form-control" id="asStudentCourse" onchange="asFilterStudents()" style="width:200px;"><option value="all">All Courses</option>' + courses.map(function(c){ return '<option value="'+c+'">'+c+'</option>'; }).join('') + '</select>' +
-    '</div>' +
-    '<div class="table-wrapper"><table><thead><tr><th>ID</th><th>Name</th><th>Course</th><th>Status</th><th>Score</th><th>Progress</th></tr></thead><tbody id="asStudentTableBody">' +
-      students.map(function(st){ return '<tr data-course="'+st.course+'" data-name="'+st.name.toLowerCase()+'"><td>'+st.id+'</td><td>'+st.name+'</td><td>'+st.course+'</td><td><span class="badge '+(stageBadge[st.stage]||'badge-blue')+'">'+(stageLabels[st.stage]||st.stage)+'</span></td><td>'+(st.score||'N/A')+'</td><td><div class="progress-bar" style="width:100px;"><div class="fill" style="width:'+st.progress+'%;"></div></div></td></tr>'; }).join('') +
-    '</tbody></table></div>' +
+    '<iframe id="asStudentProgressFrame" style="width:100%;height:calc(100vh - var(--topbar-h) - 56px);border:none;border-radius:12px;"></iframe>' +
   '</section>';
 
   // Training Centres
