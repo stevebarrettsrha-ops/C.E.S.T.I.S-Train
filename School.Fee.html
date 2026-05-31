@@ -4371,6 +4371,23 @@
             if (savedDocuments) documents = JSON.parse(savedDocuments);
             // Make sure existing students also appear on the Progress dashboard.
             syncStudentsToProgressDashboard();
+            // If embedded in the LMS dashboard, push the live list to the parent
+            // so it can refresh the Student Progress page immediately.
+            broadcastStudentsToParent();
+        }
+
+        // When running inside the LMS dashboard iframe, send the current student
+        // list to the parent window. The parent keeps its own CESTISStore cache,
+        // so a postMessage is the reliable way to hand it fresh data live.
+        function broadcastStudentsToParent() {
+            try {
+                if (window.parent && window.parent !== window) {
+                    window.parent.postMessage({
+                        type: 'cestis-fee-students',
+                        students: students
+                    }, '*');
+                }
+            } catch (e) { /* cross-origin or no parent: ignore */ }
         }
 
         // Cross-page sync: mirror School Fee students into the Student
@@ -4469,6 +4486,8 @@
             CESTISStore.setItem('cestiSchoolFeeDocuments', JSON.stringify(documents));
             // Mirror students into the Student Progress dashboard.
             syncStudentsToProgressDashboard();
+            // Push the live list to the parent LMS dashboard (if embedded).
+            broadcastStudentsToParent();
         }
 
         // Recalculate student totals from actual payment records

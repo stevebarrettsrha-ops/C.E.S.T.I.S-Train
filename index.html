@@ -8684,6 +8684,7 @@ function buildAdminPages() {
   `;
 
   populateCourseDropdowns();
+  if(typeof syncStudentsFromLocalFeeSystem === 'function') syncStudentsFromLocalFeeSystem();
   renderStudents(students);
   renderSkills();
   renderExams('upcoming');
@@ -14417,7 +14418,98 @@ function renderStudents(data) {
   if(sc) sc.textContent = `Showing ${data.length} student${data.length!==1?'s':''}`;
 }
 
+// Pull students from the LOCAL School Fee Management store (cestiSchoolFeeStudents)
+// into the Student Progress list. The fee page runs in an iframe, so its own
+// push may not have fired; this guarantees fee students appear on the dashboard
+// whether or not the fee page has been opened, and without needing cloud sync.
+function syncStudentsFromLocalFeeSystem() {
+  try {
+    if (!Array.isArray(students)) return false;
+    var raw = CESTISStore.getItem('cestiSchoolFeeStudents');
+    if (!raw) return false;
+    var feeStudents = [];
+    try { feeStudents = JSON.parse(raw) || []; } catch(e) { return false; }
+    if (!Array.isArray(feeStudents) || feeStudents.length === 0) return false;
+
+    // Respect dashboard deletions so we don't resurrect removed students.
+    var deleted = {};
+    try {
+      var dr = CESTISStore.getItem('voctrain_deletedStudentIds');
+      var da = dr ? JSON.parse(dr) : [];
+      if (Array.isArray(da)) da.forEach(function(id){ if(id) deleted[id] = true; });
+    } catch(e) {}
+
+    var existingIds = {};
+    students.forEach(function(s){ if(s) existingIds[s.id] = true; });
+    var existingKeys = {};
+    students.forEach(function(s){ if(s) existingKeys[((s.name||'') + '|' + (s.course||'')).toLowerCase()] = true; });
+
+    var norm = function(v){ return (v==null?'':String(v)).trim(); };
+    var changed = false;
+
+    feeStudents.forEach(function(fee) {
+      if (!fee) return;
+      var name = norm(fee.name || fee.Name || fee.studentName || fee.student_name);
+      if (!name) return;
+      var course = norm(fee.skillArea || fee.Course || fee['Skill Area'] || fee.course || fee.programme);
+
+      // Use the fee record's own id as the dashboard id so the two systems link
+      // 1:1 and the School Fee->dashboard mirror (which matches f.lmsId === vs.id)
+      // recognises it. Skip records the fee page already mirrored as 'SF-' ids
+      // (those are handled by its own push path) only if they already exist.
+      var studentId = norm(fee.id) || ('STU-FEE-' + Date.now() + '-' + Math.floor(Math.random()*1000));
+
+      if (deleted[studentId]) return;                 // removed on the dashboard
+      if (existingIds[studentId]) return;             // already present by id
+      var dupKey = (name + '|' + course).toLowerCase();
+      if (existingKeys[dupKey]) return;               // already present by name+course
+
+      var assignedInstructor = '';
+      var matchedInstructor = (typeof instructorData !== 'undefined' && Array.isArray(instructorData))
+        ? instructorData.find(function(ins){ return ins.course === course; }) : null;
+      if (matchedInstructor) assignedInstructor = matchedInstructor.name;
+
+      students.push({
+        id: studentId,
+        schoolFeeId: norm(fee.id),
+        name: name,
+        stage: 'testing',
+        course: course,
+        score: '',
+        progress: 0,
+        certNo: null,
+        certDate: null,
+        certCollected: false,
+        attendance: 0,
+        assignments: 0,
+        assignmentsTotal: 10,
+        gpa: '0.0',
+        gender: norm(fee.gender),
+        email: norm(fee.email),
+        createdAt: new Date().toISOString().split('T')[0],
+        instructor: assignedInstructor,
+        source: 'schoolfee'
+      });
+
+      existingIds[studentId] = true;
+      existingKeys[dupKey] = true;
+      changed = true;
+    });
+
+    if (changed) {
+      try { if (typeof updateSkillAreaCounts === 'function') updateSkillAreaCounts(); } catch(e){}
+      saveState();
+      console.log('[FeeSync] Pulled new students from local School Fee store into Student Progress');
+    }
+    return changed;
+  } catch(e) {
+    console.warn('syncStudentsFromLocalFeeSystem failed:', e);
+    return false;
+  }
+}
+
 function filterStudents() {
+  syncStudentsFromLocalFeeSystem();
   let filtered = [...students];
   const stage = document.getElementById('filterStage')?.value;
   const course = document.getElementById('filterCourse')?.value;
@@ -38512,6 +38604,23 @@ function ttRefreshOnShow(){
       window.addStudent.__feeWrapped = true;
     }
   }
+
+  // Listen for the School Fee iframe broadcasting its live student list. The
+  // iframe and this page keep separate CESTISStore in-memory caches, so when
+  // the fee page reports its data we write it into THIS document's store and
+  // re-pull/re-render the Student Progress page immediately (no reload needed).
+  window.addEventListener('message', function(ev){
+    try {
+      var d = ev && ev.data;
+      if (!d || d.type !== 'cestis-fee-students' || !Array.isArray(d.students)) return;
+      CESTISStore.setItem('cestiSchoolFeeStudents', JSON.stringify(d.students));
+      var added = false;
+      if (typeof syncStudentsFromLocalFeeSystem === 'function') added = syncStudentsFromLocalFeeSystem();
+      // Refresh the Student Progress view if it's the one on screen.
+      try { if (typeof filterStudents === 'function') filterStudents(); } catch(e){}
+      try { if (added && typeof updatePipelineCounts === 'function') updatePipelineCounts(); } catch(e){}
+    } catch(e){ console.warn('fee-students message handler failed:', e); }
+  });
 
   // Install at parse time (main app script has already run), again after the
   // app's own init, then run an initial mirror.
