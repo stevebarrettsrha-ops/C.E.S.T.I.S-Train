@@ -4400,7 +4400,10 @@
                     if (!sf || !sf.name) return;
 
                     const linkId = 'SF-' + sf.id;          // stable dashboard id for this fee record
-                    if (delIds.indexOf(linkId) !== -1) return; // removed on the dashboard
+                    // Skip if removed on the dashboard (twin id, raw fee id, or linked lms id).
+                    if (delIds.indexOf(linkId) !== -1 ||
+                        delIds.indexOf(sf.id) !== -1 ||
+                        (sf.lmsId && delIds.indexOf(sf.lmsId) !== -1)) return;
 
                     // Match an existing dashboard record by link id, raw fee id,
                     // stored back-reference, or name (+ matching course).
@@ -5110,7 +5113,17 @@
         function deleteStudent(index) {
             if (confirm('Are you sure you want to delete this student? All payment records and documents will also be deleted.')) {
                 const studentId = students[index].id;
+                const _delLmsId = students[index].lmsId || students[index].id;
                 students.splice(index, 1);
+                // Tombstone the link so the Student Progress dashboard does not
+                // recreate this student's fee record on its next sync.
+                try {
+                    let _tomb = [];
+                    const _raw = CESTISStore.getItem('cestiSchoolFeeDeletedLmsIds');
+                    if (_raw) { try { _tomb = JSON.parse(_raw) || []; } catch (e) { _tomb = []; } }
+                    if (!Array.isArray(_tomb)) _tomb = [];
+                    if (_delLmsId && _tomb.indexOf(_delLmsId) === -1) { _tomb.push(_delLmsId); CESTISStore.setItem('cestiSchoolFeeDeletedLmsIds', JSON.stringify(_tomb)); }
+                } catch (e) {}
                 payments = payments.filter(p => p.studentId !== studentId);
                 documents = documents.filter(d => d.studentId !== studentId);
                 
