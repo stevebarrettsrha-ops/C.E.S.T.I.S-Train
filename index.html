@@ -4599,6 +4599,57 @@ function getCourseList() {
 function findSkillAreaForCourse(courseName) {
   if (!courseName) return skillAreas[0];
   var cn = courseName.toLowerCase().trim();
+
+  // 0. Explicit aliases: map School Fee skill-area names (and common variants)
+  //    to the canonical Training Centre / skill-area name, so e.g.
+  //    "WELDING L2" -> "Welding & Fabrication", "COMMI CHEF L2" -> "Commercial
+  //    Cooking". Level suffixes (L2/L3/Level 2) are stripped first so every
+  //    level maps to the same centre. Resolution is by substring, so a target
+  //    matches whether the skill area is named "Welding" or "Welding & Fabrication".
+  var COURSE_ALIASES = {
+    'welding': 'Welding & Fabrication',
+    'welding & fabrication': 'Welding & Fabrication',
+    'electrical': 'Electrical Installation',
+    'electrical installation': 'Electrical Installation',
+    'hospitality': 'Hospitality & Tourism',
+    'hospitality services': 'Hospitality & Tourism',
+    'hospitality & tourism': 'Hospitality & Tourism',
+    'commi chef': 'Commercial Cooking',
+    'commis chef': 'Commercial Cooking',
+    'chef': 'Commercial Cooking',
+    'commercial cooking': 'Commercial Cooking',
+    'culinary': 'Commercial Cooking',
+    'business admin': 'Business Administration',
+    'business administration': 'Business Administration',
+    'beauty therapy': 'Beauty Therapy',
+    'beauty': 'Beauty Therapy',
+    'cosmetology': 'Cosmetology',
+    'auto mechanics': 'Auto Mechanics',
+    'plumbing': 'Plumbing',
+    'carpentry': 'Carpentry',
+    'information technology': 'Information Technology',
+    'garment construction': 'Garment Construction',
+    'refrigeration & ac': 'Refrigeration & AC',
+    'refrigeration': 'Refrigeration & AC',
+    'heavy equipment ops': 'Heavy Equipment Ops',
+    'heavy equipment': 'Heavy Equipment Ops',
+    'solar energy tech': 'Solar Energy Tech',
+    'solar energy': 'Solar Energy Tech',
+    'photovoltaic': 'Solar Energy Tech',
+    'photovoltaic installer': 'Solar Energy Tech'
+  };
+  // Strip trailing level markers like " l2", " l3", " level 2", " (l2)".
+  var aliasKey = cn.replace(/[\s\-]*\(?\b(l|level)\s*-?\s*[0-9]+\)?\s*$/i, '').trim();
+  var aliasTarget = COURSE_ALIASES[aliasKey] || COURSE_ALIASES[cn] || null;
+  if (aliasTarget) {
+    var tn = aliasTarget.toLowerCase().trim();
+    var aliasMatch = skillAreas.find(function(sk) {
+      var sn = sk.name.toLowerCase().trim();
+      return sn === tn || sn.indexOf(tn) !== -1 || tn.indexOf(sn) !== -1;
+    });
+    if (aliasMatch) return aliasMatch;
+  }
+
   // 1. Exact match
   var exact = skillAreas.find(function(sk) { return sk.name.toLowerCase().trim() === cn; });
   if (exact) return exact;
@@ -14491,6 +14542,35 @@ function syncStudentsFromLocalFeeSystem() {
         source: 'schoolfee'
       });
 
+      // Create a linked disabled user account carrying the student's programme
+      // so they are auto-associated with the matching Training Centre (skill
+      // area) and skill chat rooms — membership for both is derived from the
+      // account's programme (findSkillAreaForCourse / getChatRoomsForUser).
+      try {
+        if (typeof userAccounts !== 'undefined' && Array.isArray(userAccounts)) {
+          var feeUsername = name.toLowerCase().replace(/\s+/g, '.');
+          var dupAcct = userAccounts.find(function(u){
+            return u && ((u.username === feeUsername && u.role === 'student') || u.studentDataId === studentId);
+          });
+          if (!dupAcct) {
+            userAccounts.push({
+              id: 'USR-FEE-' + Date.now() + '-' + Math.floor(Math.random() * 1000),
+              name: name,
+              role: 'student',
+              username: feeUsername,
+              password: '',
+              email: norm(fee.email) || '',
+              programme: course,
+              status: 'disabled',
+              createdAt: new Date().toISOString().split('T')[0],
+              registeredVia: 'fee-system',
+              studentDataId: studentId,
+              approvedBy: 'system'
+            });
+          }
+        }
+      } catch (e) {}
+
       existingIds[studentId] = true;
       existingKeys[dupKey] = true;
       changed = true;
@@ -14509,7 +14589,18 @@ function syncStudentsFromLocalFeeSystem() {
 }
 
 function filterStudents() {
-  syncStudentsFromLocalFeeSystem();
+  var _feeAdded = syncStudentsFromLocalFeeSystem();
+  // Always keep the pipeline stage cards and the Dashboard "Total Enrolled"
+  // figure in sync with the full student list (cheap), so they never lag behind
+  // students added via any path.
+  try { if (typeof updatePipelineCounts === 'function') updatePipelineCounts(); } catch(e){}
+  try { if (typeof refreshDashboardStudentTotals === 'function') refreshDashboardStudentTotals(); } catch(e){}
+  if (_feeAdded) {
+    // New students were pulled in from School Fee: also refresh the skill-area
+    // (Training Centre / chat) counts and the skills list.
+    try { if (typeof updateSkillAreaCounts === 'function') updateSkillAreaCounts(); } catch(e){}
+    try { if (typeof renderSkills === 'function') renderSkills(); } catch(e){}
+  }
   let filtered = [...students];
   const stage = document.getElementById('filterStage')?.value;
   const course = document.getElementById('filterCourse')?.value;
@@ -14818,6 +14909,28 @@ function updatePipelineCounts() {
     const count = students.filter(st=>st.stage===s).length;
     ['','2'].forEach(sfx => { const el=document.getElementById('p'+s.charAt(0).toUpperCase()+s.slice(1)+sfx); if(el) el.textContent=count; });
   });
+}
+
+// Live-update the Dashboard stat cards that count students, so they reflect
+// students added via any path (e.g. pulled in from School Fee) without
+// rebuilding the page (the dashboard is template-literal HTML; there is no
+// updateDashboard fn). The cards have no ids, so match them by label text.
+function refreshDashboardStudentTotals() {
+  try {
+    var totalEnrolled = students.length;
+    var totalCertified = students.filter(function(s){ return s && (s.stage === 'certified' || s.stage === 'collected'); }).length;
+    var map = { 'Total Enrolled Students': totalEnrolled, 'Certified This Year': totalCertified };
+    document.querySelectorAll('#page-dashboard .stat-card').forEach(function(card){
+      var labelEl = card.querySelector('.stat-label');
+      var valEl = card.querySelector('.stat-value');
+      if (!labelEl || !valEl) return;
+      var label = (labelEl.textContent || '').trim();
+      if (Object.prototype.hasOwnProperty.call(map, label)) {
+        valEl.setAttribute('data-count', map[label]);
+        valEl.textContent = map[label];
+      }
+    });
+  } catch (e) { /* non-fatal */ }
 }
 async function addStudent() {
   const name = document.getElementById('newStudentName').value.trim();
@@ -38641,9 +38754,15 @@ function ttRefreshOnShow(){
       CESTISStore.setItem('cestiSchoolFeeStudents', JSON.stringify(d.students));
       var added = false;
       if (typeof syncStudentsFromLocalFeeSystem === 'function') added = syncStudentsFromLocalFeeSystem();
-      // Refresh the Student Progress view if it's the one on screen.
+      // Refresh the Student Progress table (filterStudents also refreshes the
+      // pipeline stage cards and the Dashboard total).
       try { if (typeof filterStudents === 'function') filterStudents(); } catch(e){}
-      try { if (added && typeof updatePipelineCounts === 'function') updatePipelineCounts(); } catch(e){}
+      if (added) {
+        // New students pulled in: refresh the skill-area (Training Centre /
+        // chat) counts and skills list too.
+        try { if (typeof updateSkillAreaCounts === 'function') updateSkillAreaCounts(); } catch(e){}
+        try { if (typeof renderSkills === 'function') renderSkills(); } catch(e){}
+      }
       // The fee iframe just announced itself (e.g. on load): reply with the
       // dashboard's students so it picks up any Student-Progress-added people.
       try { syncStudentsToSchoolFee(); } catch(e){}
