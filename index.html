@@ -38330,5 +38330,158 @@ function ttRefreshOnShow(){
 </script>
 <!-- ================= END INLINED STAFF TIME TRACKING ================= -->
 
+<script>
+/* ========================================================================
+   Cross-system student sync:  Student Progress (voctrain_students)  <->
+   School Fee Management (cestiSchoolFeeStudents).
+   - Mirrors every Student Progress student into School Fee Management so the
+     same people exist in both systems (School Fee already mirrors the other
+     direction into voctrain_students).
+   - When a student is added from the Student Progress page, a popup prompts
+     the user to complete the extra details (fees, contact, personal info)
+     in School Fee Management.
+   Implemented as a non-invasive wrapper so the existing app code is untouched.
+   ======================================================================== */
+(function(){
+  if (window.__cestisProgressFeeSyncInstalled) return;
+  window.__cestisProgressFeeSyncInstalled = true;
+
+  function readArr(key){
+    try { var r = CESTISStore.getItem(key); var a = r ? JSON.parse(r) : []; return Array.isArray(a) ? a : []; }
+    catch(e){ return []; }
+  }
+  function norm(v){ return (v==null?'':String(v)).trim().toLowerCase().replace(/\s+/g,' '); }
+
+  // Mirror Student Progress students into School Fee Management.
+  function syncStudentsToSchoolFee(){
+    try {
+      if (typeof students === 'undefined' || !Array.isArray(students)) return;
+      var fee = readArr('cestiSchoolFeeStudents');
+      var profiles = (typeof studentProfiles !== 'undefined' && studentProfiles) ? studentProfiles : {};
+      var tombstones = readArr('cestiSchoolFeeDeletedLmsIds'); // lms ids whose fee twin was deleted in School Fee
+      var changed = false;
+
+      students.forEach(function(vs){
+        if (!vs || !vs.name) return;
+        if (tombstones.indexOf(vs.id) !== -1) return; // deleted in School Fee; don't resurrect
+
+        var prof = profiles[vs.id] || {};
+        var existing = fee.find(function(f){ return f && (
+          f.lmsId === vs.id ||
+          f.id === vs.id ||
+          (norm(f.name) === norm(vs.name) &&
+            (!f.skillArea || !vs.course || norm(f.skillArea) === norm(vs.course)))
+        ); });
+
+        if (existing){
+          // Link records and backfill only EMPTY fields; never overwrite fee data.
+          if (existing.lmsId !== vs.id){ existing.lmsId = vs.id; changed = true; }
+          if (vs.course && !existing.skillArea){ existing.skillArea = vs.course; changed = true; }
+          var em = vs.email || prof.email || '';
+          if (em && !existing.email){ existing.email = em; changed = true; }
+          var ph = prof.phone || vs.phone || '';
+          if (ph && !existing.contact){ existing.contact = ph; changed = true; }
+          if (vs.gender && !existing.gender){ existing.gender = vs.gender; changed = true; }
+          return;
+        }
+
+        // No match: create a School Fee record mirroring the dashboard student.
+        // Fee/personal fields are left blank for the user to complete there.
+        fee.push({
+          id: vs.id,
+          lmsId: vs.id,
+          name: vs.name,
+          skillArea: vs.course || '',
+          tuitionFee: 0,
+          contact: prof.phone || vs.phone || '',
+          email: vs.email || prof.email || '',
+          enrollmentDate: vs.createdAt || new Date().toISOString().split('T')[0],
+          dateOfBirth: '',
+          gender: vs.gender || '',
+          nationalId: '',
+          address: '',
+          city: '',
+          parentName: '',
+          parentContact: '',
+          emergencyContact: '',
+          totalPaid: 0,
+          balance: 0,
+          status: 'Outstanding',
+          createdAt: new Date().toISOString(),
+          source: 'lms',
+          needsFeeDetails: true
+        });
+        changed = true;
+      });
+
+      if (changed) CESTISStore.setItem('cestiSchoolFeeStudents', JSON.stringify(fee));
+    } catch(e){ console.warn('syncStudentsToSchoolFee failed:', e); }
+  }
+  window.syncStudentsToSchoolFee = syncStudentsToSchoolFee;
+
+  // Popup reminding the user to complete fee/personal details in School Fee Mgmt.
+  function showSchoolFeeReminder(studentName){
+    try {
+      var prev = document.getElementById('sfReminderOverlay');
+      if (prev && prev.parentNode) prev.parentNode.removeChild(prev);
+      var ov = document.createElement('div');
+      ov.id = 'sfReminderOverlay';
+      ov.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,0.55);z-index:99999;display:flex;align-items:center;justify-content:center;padding:20px;';
+      var who = studentName ? ('"' + studentName + '"') : 'This student';
+      ov.innerHTML =
+        '<div style="background:#fff;color:#2C3E50;max-width:440px;width:100%;border-radius:14px;padding:26px 24px;box-shadow:0 20px 60px rgba(0,0,0,0.4);font-family:Segoe UI,Tahoma,sans-serif;">' +
+          '<div style="font-size:40px;text-align:center;margin-bottom:8px;">&#127891;&#128179;</div>' +
+          '<h3 style="margin:0 0 10px;color:#0D47A1;text-align:center;font-size:1.25rem;">Add Fee &amp; Personal Details</h3>' +
+          '<p style="margin:0 0 18px;line-height:1.5;font-size:0.95rem;text-align:center;">' + who +
+          ' has been added to <b>Student Progress</b> and to the <b>School Fee Management</b> system.<br><br>' +
+          'Please open <b>School Fee Management</b> to complete the remaining information &mdash; tuition fee, contact number and personal details (ID, address, guardian, etc.).</p>' +
+          '<button id="sfReminderOk" style="display:block;width:100%;background:#0D47A1;color:#fff;border:none;padding:12px;border-radius:8px;font-size:1rem;cursor:pointer;">Got it</button>' +
+        '</div>';
+      document.body.appendChild(ov);
+      function close(){ if (ov.parentNode) ov.parentNode.removeChild(ov); }
+      ov.addEventListener('click', function(e){ if (e.target === ov) close(); });
+      var ok = document.getElementById('sfReminderOk');
+      if (ok) ok.addEventListener('click', close);
+    } catch(e){ try{ alert('Student added. Please add fee & personal details in School Fee Management.'); }catch(_){} }
+  }
+  window.showSchoolFeeReminder = showSchoolFeeReminder;
+
+  function install(){
+    // Hook saveState so any change to the student list mirrors to School Fee.
+    if (typeof window.saveState === 'function' && !window.saveState.__feeWrapped){
+      var _origSave = window.saveState;
+      window.saveState = function(){
+        var r = _origSave.apply(this, arguments);
+        try { syncStudentsToSchoolFee(); } catch(e){}
+        return r;
+      };
+      window.saveState.__feeWrapped = true;
+    }
+    // Hook the Student Progress add-student flow to show the reminder popup.
+    if (typeof window.addStudent === 'function' && !window.addStudent.__feeWrapped){
+      var _origAdd = window.addStudent;
+      window.addStudent = function(){
+        // Capture the name before the original clears the form.
+        var nm = '';
+        try { var el = document.getElementById('newStudentName'); nm = el ? (el.value||'').trim() : ''; } catch(e){}
+        var done = function(){ try { syncStudentsToSchoolFee(); if (nm) showSchoolFeeReminder(nm); } catch(e){} };
+        var r;
+        try { r = _origAdd.apply(this, arguments); } catch(e){ done(); throw e; }
+        if (r && typeof r.then === 'function'){ r.then(done, function(){}); } else { done(); }
+        return r;
+      };
+      window.addStudent.__feeWrapped = true;
+    }
+  }
+
+  // Install at parse time (main app script has already run), again after the
+  // app's own init, then run an initial mirror.
+  install();
+  window.addEventListener('DOMContentLoaded', function(){
+    setTimeout(function(){ install(); try { syncStudentsToSchoolFee(); } catch(e){} }, 0);
+  });
+})();
+</script>
+
 </body>
 </html>
