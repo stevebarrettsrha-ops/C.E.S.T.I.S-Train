@@ -14603,6 +14603,7 @@ function filterStudents() {
     // Join the new students into their matching LMS Chat skill-area rooms and
     // refresh the chat room list/directory if chat is open.
     try {
+      if (typeof backfillAccountProgrammes === 'function' && backfillAccountProgrammes()) { try { saveState(); } catch(e){} }
       if (typeof lmsChatEnsureMembership === 'function') lmsChatEnsureMembership();
       if (typeof lmsChatRenderRoomList === 'function' && typeof lmsChatGetRolePrefix === 'function') lmsChatRenderRoomList(lmsChatGetRolePrefix());
     } catch(e){}
@@ -14911,10 +14912,40 @@ function recordDeletedStudent(id) {
   } catch(e) { /* ignore */ }
 }
 function updatePipelineCounts() {
+  // Explicit stage -> element-id-base map. NOTE: 'testing' uses id base 'pTest'
+  // (not 'pTesting'), so deriving the id from the stage name silently failed for
+  // Testing — leaving that count stuck at 0 while the table showed the students.
+  var STAGE_ID_BASE = { testing:'pTest', interview:'pInterview', training:'pTraining', certified:'pCertified', collected:'pCollected', incomplete:'pIncomplete' };
   stages.forEach(s => {
     const count = students.filter(st=>st.stage===s).length;
-    ['','2'].forEach(sfx => { const el=document.getElementById('p'+s.charAt(0).toUpperCase()+s.slice(1)+sfx); if(el) el.textContent=count; });
+    var base = STAGE_ID_BASE[s] || ('p'+s.charAt(0).toUpperCase()+s.slice(1));
+    ['','2'].forEach(sfx => { const el=document.getElementById(base+sfx); if(el) el.textContent=count; });
   });
+}
+
+// Backfill: ensure every student-role account carries a `programme`, copying it
+// from the linked student record's `course` (matched by studentDataId, then by
+// name). Accounts created before fee-sync set the programme had it blank, which
+// stopped LMS Chat membership (it skips accounts with no programme) and broke
+// Training Centre matching. Returns true if anything changed.
+function backfillAccountProgrammes() {
+  try {
+    if (typeof userAccounts === 'undefined' || !Array.isArray(userAccounts)) return false;
+    if (typeof students === 'undefined' || !Array.isArray(students)) return false;
+    var byId = {}, byName = {};
+    students.forEach(function(s){
+      if (!s) return;
+      if (s.id) byId[s.id] = s;
+      if (s.name) byName[String(s.name).toLowerCase().trim()] = s;
+    });
+    var changed = false;
+    userAccounts.forEach(function(u){
+      if (!u || u.role !== 'student' || u.programme) return;
+      var s = (u.studentDataId && byId[u.studentDataId]) || byName[String(u.name||'').toLowerCase().trim()];
+      if (s && s.course) { u.programme = s.course; changed = true; }
+    });
+    return changed;
+  } catch (e) { return false; }
 }
 
 // Live-update the Dashboard stat cards that count students, so they reflect
@@ -24204,6 +24235,9 @@ var lmsChatCallPollInterval = null;
 
 function lmsChatOnPageShow(prefix) {
   initLmsChatData();
+  // Ensure existing student accounts have a programme so they match skill-area
+  // rooms (covers accounts created before fee-sync set the programme).
+  try { if (typeof backfillAccountProgrammes === 'function' && backfillAccountProgrammes()) { try { saveState(); } catch(e){} } } catch(e){}
   lmsChatEnsureMembership();
   lmsChatActiveRoom = null;
   lmsChatRenderRoomList(prefix);
@@ -38770,6 +38804,7 @@ function ttRefreshOnShow(){
         try { if (typeof renderSkills === 'function') renderSkills(); } catch(e){}
         // Join them into their matching LMS Chat skill-area rooms.
         try {
+          if (typeof backfillAccountProgrammes === 'function' && backfillAccountProgrammes()) { try { saveState(); } catch(e){} }
           if (typeof lmsChatEnsureMembership === 'function') lmsChatEnsureMembership();
           if (typeof lmsChatRenderRoomList === 'function' && typeof lmsChatGetRolePrefix === 'function') lmsChatRenderRoomList(lmsChatGetRolePrefix());
         } catch(e){}
