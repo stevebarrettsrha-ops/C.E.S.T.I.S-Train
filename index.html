@@ -4513,6 +4513,16 @@ var FEE_SYSTEM_DRIVE_CONFIG = {
   FOLDER_ID: '11vWe_Nc40TtJ1Hi7PoE7EZ3JrpR-K0Vj',
   FILE_NAME: 'school_fee_management_system.json'
 };
+// Master snapshot: ONE self-describing JSON of the entire data store, kept in a
+// dedicated Drive folder. Written on logout / tab-close / periodically, read on
+// login to reconcile (merge & repair) and to detect data loss. See the
+// cestis-core master-snapshot helpers for the pure build/verify/reconcile logic.
+var MASTER_SNAPSHOT_CONFIG = {
+  FOLDER_ID: '1-BVqRHL3bh0UB30pvlXt0AWAsKWsueec',
+  FILE_NAME: 'cestis-master-snapshot.json'
+};
+var _masterSnapshotFileId = null;     // cached Drive file id for the master file
+var _lastMasterSnapshotHash = null;   // dirty-check so we don't re-upload identical data
 var ALL_DRIVE_FOLDERS = [
   { id: GOOGLE_DRIVE_CONFIG.FOLDER_ID, label: 'Main Backup' },
   { id: '18ACBw0kRi0BssLEoZLWoeXNa1EiANeBu', label: 'Online Exams' },
@@ -7712,9 +7722,13 @@ function logout() {
   closeMobileSidebar();
   // Release all camera/mic permissions and cleanup WebRTC
   vcCleanupMediaIfNeeded();
-  // Final cloud save before logout to ensure latest data (including new accounts) reaches the cloud
+  // Final cloud save before logout to ensure latest data (including new accounts) reaches the cloud.
+  // logout() does not navigate/reload the page (it only hides the app shell), so these in-flight
+  // requests complete normally. The master snapshot is built synchronously here (before session
+  // state is cleared below) so it captures correct savedBy metadata.
   if(isCloudConnected && googleAccessToken) {
     try { autoSaveToAllFolders(); } catch(e) { console.warn('[Logout] Final cloud save failed:', e); }
+    try { saveMasterSnapshot('logout', true); } catch(e) { console.warn('[Logout] Master snapshot failed:', e); }
   }
   // Stop auto-save, debounced cloud save, and session expiry checks
   stopAutoSave();
@@ -20285,6 +20299,119 @@ async function findBackupFileInFolder(folderId) {
   return null;
 }
 
+// ===================== MASTER SNAPSHOT (single full-store Drive file) =====================
+// Collect every CESTISStore key into a plain { key: value } map. This captures
+// the ENTIRE data store — all dashboard data plus the School Fee / financial
+// pages (same-origin IndexedDB) — so the master file is complete and stays
+// complete as future features add keys. cestis-core decides what is snapshotable
+// (it strips tokens / session / device-local Drive metadata).
+function cestisCollectStoreMap() {
+  var map = {};
+  try {
+    var keys = (CESTISStore.keys ? CESTISStore.keys() : []);
+    for (var i = 0; i < keys.length; i++) {
+      var k = keys[i];
+      try { map[k] = CESTISStore.getItem(k); } catch (e) {}
+    }
+  } catch (e) {}
+  return map;
+}
+
+async function findMasterSnapshotFile() {
+  if (_masterSnapshotFileId) return _masterSnapshotFileId;
+  try {
+    var query = "name='" + MASTER_SNAPSHOT_CONFIG.FILE_NAME + "' and '" + MASTER_SNAPSHOT_CONFIG.FOLDER_ID + "' in parents and trashed=false";
+    var resp = await fetch('https://www.googleapis.com/drive/v3/files?q=' + encodeURIComponent(query) + '&fields=files(id,name)',
+      { headers: { 'Authorization': 'Bearer ' + googleAccessToken } });
+    if (resp.ok) { var d = await resp.json(); if (d.files && d.files.length) { _masterSnapshotFileId = d.files[0].id; return d.files[0].id; } }
+  } catch (e) { console.warn('[MasterSnapshot] find failed:', e); }
+  return null;
+}
+
+// Build + upload the single master snapshot. Never throws. Skips the upload when
+// the data is byte-identical to the last successful one (checksum dirty-check)
+// unless force=true. Note: the snapshot is BUILT synchronously before the first
+// await, so calling this at the top of logout() captures correct session
+// metadata even though session state is cleared immediately afterwards.
+async function saveMasterSnapshot(eventName, force) {
+  if (!isCloudConnected || !googleAccessToken) return { ok: false, reason: 'offline' };
+  if (!window.CESTISCore || typeof CESTISCore.buildSnapshot !== 'function') return { ok: false, reason: 'no-core' };
+  try {
+    try { saveState(); } catch (e) {}
+    var cloudUser = getCurrentCloudUser() || {};
+    var snapshot = CESTISCore.buildSnapshot(cestisCollectStoreMap(), {
+      event: eventName || 'manual',
+      savedBy: cloudUser.username || currentRole || 'unknown',
+      savedByRole: currentRole || 'unknown'
+    });
+    if (!force && snapshot.checksum === _lastMasterSnapshotHash) return { ok: true, skipped: true };
+    var blob = new Blob([JSON.stringify(snapshot)], { type: 'application/json' });
+    var fileId = _masterSnapshotFileId || await findMasterSnapshotFile();
+    var resp;
+    if (fileId) {
+      resp = await fetch('https://www.googleapis.com/upload/drive/v3/files/' + fileId + '?uploadType=media',
+        { method: 'PATCH', headers: { 'Authorization': 'Bearer ' + googleAccessToken, 'Content-Type': 'application/json' }, body: blob });
+    } else {
+      var metadata = { name: MASTER_SNAPSHOT_CONFIG.FILE_NAME, parents: [MASTER_SNAPSHOT_CONFIG.FOLDER_ID], mimeType: 'application/json' };
+      var fd = new FormData();
+      fd.append('metadata', new Blob([JSON.stringify(metadata)], { type: 'application/json' }));
+      fd.append('file', blob);
+      resp = await fetch('https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart&fields=id,name',
+        { method: 'POST', headers: { 'Authorization': 'Bearer ' + googleAccessToken }, body: fd });
+      if (resp.ok) { try { var r = await resp.json(); _masterSnapshotFileId = r.id; } catch (e) {} }
+    }
+    if (resp && resp.ok) { _lastMasterSnapshotHash = snapshot.checksum; return { ok: true, snapshot: snapshot }; }
+    return { ok: false, reason: 'http-' + (resp ? resp.status : '?') };
+  } catch (e) {
+    console.warn('[MasterSnapshot] save failed:', e);
+    return { ok: false, reason: 'exception' };
+  }
+}
+
+async function fetchMasterSnapshot() {
+  if (!googleAccessToken) return null;
+  try {
+    var fileId = await findMasterSnapshotFile();
+    if (!fileId) return null;
+    var resp = await fetch('https://www.googleapis.com/drive/v3/files/' + fileId + '?alt=media',
+      { headers: { 'Authorization': 'Bearer ' + googleAccessToken } });
+    if (!resp.ok) return null;
+    return await resp.json();
+  } catch (e) { console.warn('[MasterSnapshot] fetch failed:', e); return null; }
+}
+
+// On login: reconcile local data against the master snapshot (merge & repair)
+// and report any data loss it recovered. Safe by construction (cestis-core):
+// never overwrites newer local edits, never resurrects deleted students.
+async function reconcileWithMasterSnapshot() {
+  if (!isCloudConnected || !googleAccessToken) return;
+  if (!window.CESTISCore || typeof CESTISCore.reconcileSnapshot !== 'function') return;
+  try {
+    var snapshot = await fetchMasterSnapshot();
+    if (!snapshot || !snapshot.store) return;
+    var ver = CESTISCore.verifySnapshot(snapshot);
+    if (!ver.ok) console.warn('[MasterSnapshot] checksum mismatch — snapshot may be partial; merging cautiously.');
+    var local = cestisCollectStoreMap();
+    var report = CESTISCore.dataLossReport(snapshot, local);
+    var res = CESTISCore.reconcileSnapshot(snapshot, local);
+    if (res.changed) {
+      Object.keys(res.store).forEach(function (k) {
+        if (res.store[k] !== local[k]) { try { CESTISStore.setItem(k, res.store[k]); } catch (e) {} }
+      });
+      try { loadState(); } catch (e) {}
+      try { cestisStabilizeStudentIds(); } catch (e) {}
+      try { refreshStudentDependentViews(); refreshContentDependentViews(); } catch (e) {}
+      if (report.totalMissing > 0) {
+        try { showToast('Recovered ' + report.totalMissing + ' record(s) from the master backup', 'success'); } catch (e) {}
+      }
+      console.log('[MasterSnapshot] reconcile restored', res.restored, 'config keys:', res.restoredKeys, 'checksumOk:', ver.ok);
+      _lastMasterSnapshotHash = null; // force a fresh save so the master reflects the merged state
+    } else {
+      console.log('[MasterSnapshot] local data consistent with master backup (checksumOk:' + ver.ok + ')');
+    }
+  } catch (e) { console.warn('[MasterSnapshot] reconcile failed:', e); }
+}
+
 // ---- Per-User Backup Helpers ----
 function getPerUserBackupFileName() {
   var userId = currentLoggedInUser ? currentLoggedInUser.id : null;
@@ -21196,6 +21323,11 @@ async function autoSyncOnLogin() {
     var reconciled = reconcileStudentsFromAccounts();
     if (reconciled) { anyChanged = true; saveState(); }
 
+    // 3b. Reconcile against the master snapshot: merge & repair anything that
+    // was lost locally, and run the data-loss check. Self-contained (re-hydrates
+    // and refreshes views), so it does not need anyChanged plumbing.
+    try { await reconcileWithMasterSnapshot(); } catch (e) { console.warn('[AutoSync] Master reconcile error:', e); }
+
     // 4. Update sync timestamp
     lastSyncTime = new Date();
     CESTISStore.setItem('schoolDashboardLastSyncTime', lastSyncTime.toISOString());
@@ -21400,6 +21532,14 @@ async function autoSaveToAllFolders() {
       await saveAssignmentsToDrive();
     } catch (e) {
       console.warn('[AutoSave] Assignments Drive sync error:', e);
+    }
+
+    // Refresh the single master snapshot (whole-store reference file). Its own
+    // checksum dirty-check skips the upload when nothing has actually changed.
+    try {
+      await saveMasterSnapshot('autosave');
+    } catch (e) {
+      console.warn('[AutoSave] Master snapshot error:', e);
     }
 
     const successCount = results.filter(r => r.status === 'fulfilled' && r.value === true).length;
@@ -21834,6 +21974,10 @@ window.addEventListener('pageshow', function(event) {
 document.addEventListener('visibilitychange', function() {
   if (document.visibilityState === 'visible') {
     revalidateCloudSync();
+  } else if (document.visibilityState === 'hidden') {
+    // Best-effort master-snapshot save when the tab is hidden/closed, so data is
+    // preserved even if the user closes the browser without clicking Log out.
+    try { saveMasterSnapshot('tab-hidden'); } catch (e) {}
   }
 });
 
