@@ -1980,7 +1980,10 @@
             <!-- History Module -->
             <div id="history" class="module">
                 <h2 style="color: var(--primary-blue); margin-bottom: 1.5rem;">📊 My Work History</h2>
-                
+
+                <div id="historyQuarterBar"></div>
+                <div id="historyQuarterLabel" style="font-size:13px;color:var(--text-secondary,#5b6b80);margin:0 0 12px;font-weight:600;"></div>
+
                 <div class="form-section">
                     <div class="form-grid">
                         <div class="form-group">
@@ -6221,11 +6224,27 @@
         }
 
         // Render History
+        // A record belongs to the app-wide active financial quarter (by its date).
+        function recordInActiveQuarter(r) {
+            if (typeof CESTISCore === 'undefined' || !CESTISCore.getActiveQuarter) return true;
+            // Undated/unparseable records stay visible in every quarter.
+            if (!r || !CESTISCore.deriveQuarter(r.date)) return true;
+            const cur = CESTISCore.getActiveQuarter();
+            return CESTISCore.recordInQuarter(r, cur.fy, cur.q, 'date');
+        }
+
         function renderHistory() {
-            const userRecords = timeRecords.filter(r => 
-                r.staffId === currentUser.id && 
-                r.status === 'completed'
+            const userRecords = timeRecords.filter(r =>
+                r.staffId === currentUser.id &&
+                r.status === 'completed' &&
+                recordInActiveQuarter(r)
             ).sort((a, b) => new Date(b.date) - new Date(a.date));
+
+            const qLbl = document.getElementById('historyQuarterLabel');
+            if (qLbl && typeof CESTISCore !== 'undefined' && CESTISCore.getActiveQuarter) {
+                const cur = CESTISCore.getActiveQuarter();
+                qLbl.textContent = 'Showing ' + CESTISCore.quarterPeriodLabel(cur.fy, cur.q);
+            }
 
             const tbody = document.getElementById('historyTable');
             tbody.innerHTML = '';
@@ -8318,6 +8337,7 @@
                     renderTodayLog();
                 }
                 renderHistory();
+                mountClockInQuarterBar();
             }
 
             // Check if first-time sync prompt should be shown
@@ -8364,6 +8384,20 @@
         // Filter History
         function filterHistory() {
             renderHistory();
+        }
+
+        // Mount the shared FY/quarter selector above My Work History. Switching the
+        // quarter here (or on any other CESTIS page/tab) re-renders the history for
+        // that quarter.
+        let _clockInQuarterBar = null;
+        function mountClockInQuarterBar() {
+            if (typeof CESTISCore === 'undefined' || !CESTISCore.mountQuarterBar) return;
+            if (_clockInQuarterBar || !document.getElementById('historyQuarterBar')) return;
+            _clockInQuarterBar = CESTISCore.mountQuarterBar('historyQuarterBar', {
+                onChange: function () {
+                    if (typeof renderHistory === 'function') renderHistory();
+                }
+            });
         }
     </script>
 </body>

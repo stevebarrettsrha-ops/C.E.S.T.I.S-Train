@@ -621,6 +621,271 @@
     return result;
   };
 
+  /* ==========================================================================
+     QUARTER ENGINE — shared financial-year / quarter state for the whole app.
+
+     WHY THIS EXISTS
+     ---------------
+     Several pages (Cashbook, Virement, and now School Fee, Staff Clock-In and
+     Attendance) present their data one financial quarter at a time. Before this
+     engine each page rolled its own FY/quarter maths and persisted the active
+     selection differently, so "switch quarter here" did not switch it there.
+
+     This block is the ONE source of truth:
+       • the canonical Apr–Jun / Jul–Sep / Oct–Dec / Jan–Mar definition,
+       • deriveQuarter(date)  — bucket any dated record into its FY+quarter,
+       • getActiveQuarter()/setActiveQuarter() — read & write the single shared
+         selection, persisted under 'cestis_active_quarter' (the key Cashbook &
+         Virement already use, so they line up automatically),
+       • setActiveQuarter() fires a 'cestis-quarter-changed' DOM event and the
+         browser 'storage' event propagates the change to every other open tab,
+         giving true "switch everywhere" behaviour.
+
+     The pure helpers (deriveQuarter / quarterKey / labels) are Node-safe so they
+     can be unit-tested without a browser.
+     ========================================================================== */
+  var ACTIVE_QUARTER_KEY = 'cestis_active_quarter';
+
+  // The Sierra-Leone / CESTIS financial year starts in April. Q1 = Apr–Jun.
+  Core.QUARTER_META = [
+    { q: 1, label: 'Q1', months: 'Apr–Jun', startMonth: 4 },
+    { q: 2, label: 'Q2', months: 'Jul–Sep', startMonth: 7 },
+    { q: 3, label: 'Q3', months: 'Oct–Dec', startMonth: 10 },
+    { q: 4, label: 'Q4', months: 'Jan–Mar', startMonth: 1 }
+  ];
+
+  // FY string for a (calendar year, 1-based month): months Apr..Dec belong to
+  // FY <year>/<year+1>; Jan..Mar belong to FY <year-1>/<year>.
+  function fyStringFor(year, month) {
+    var startYear = (month >= 4) ? year : (year - 1);
+    return startYear + '/' + (startYear + 1);
+  }
+
+  // Quarter number (1..4) for a 1-based calendar month.
+  function quarterForMonth(month) {
+    if (month >= 4 && month <= 6) return 1;
+    if (month >= 7 && month <= 9) return 2;
+    if (month >= 10 && month <= 12) return 3;
+    return 4; // Jan, Feb, Mar
+  }
+
+  /* deriveQuarter(dateInput) -> { fy:'2026/2027', q:1 } | null
+     Accepts a 'YYYY-MM-DD' string, an ISO timestamp, a Date, or anything Date
+     can parse. Returns null for missing/unparseable input so callers can decide
+     how to treat undated records. */
+  Core.deriveQuarter = function (dateInput) {
+    if (dateInput == null || dateInput === '') return null;
+    var d;
+    if (dateInput instanceof Date) {
+      d = dateInput;
+    } else {
+      var s = String(dateInput);
+      // Fast path for plain 'YYYY-MM-DD' to avoid timezone shifts.
+      var m = /^(\d{4})-(\d{2})-(\d{2})/.exec(s);
+      if (m) {
+        var yr = parseInt(m[1], 10), mo = parseInt(m[2], 10);
+        return { fy: fyStringFor(yr, mo), q: quarterForMonth(mo) };
+      }
+      d = new Date(s);
+    }
+    if (isNaN(d.getTime())) return null;
+    var month = d.getMonth() + 1, year = d.getFullYear();
+    return { fy: fyStringFor(year, month), q: quarterForMonth(month) };
+  };
+
+  // The FY+quarter that "today" falls in — the sensible default selection.
+  Core.currentQuarter = function (now) {
+    return Core.deriveQuarter(now || new Date());
+  };
+
+  Core.getQuarterMeta = function (q) {
+    for (var i = 0; i < Core.QUARTER_META.length; i++) {
+      if (Core.QUARTER_META[i].q === q) return Core.QUARTER_META[i];
+    }
+    return null;
+  };
+
+  // Calendar year that a given FY+quarter actually lands in (Q4 = Jan–Mar of the
+  // second year of the FY span; Q1–Q3 are the first year).
+  Core.quarterCalendarYear = function (fy, q) {
+    var startYear = parseInt(String(fy).split('/')[0], 10);
+    return (q === 4) ? startYear + 1 : startYear;
+  };
+
+  Core.fyLabel = function (fy) { return 'FY ' + fy; };
+  Core.quarterShortLabel = function (fy, q) {
+    var meta = Core.getQuarterMeta(q);
+    return meta ? (meta.label + ' · ' + meta.months) : ('Q' + q);
+  };
+  Core.quarterPeriodLabel = function (fy, q) {
+    var meta = Core.getQuarterMeta(q);
+    var yr = Core.quarterCalendarYear(fy, q);
+    return meta ? (meta.months + ' ' + yr) : ('Q' + q + ' ' + yr);
+  };
+
+  /* quarterKey(baseKey, fy, q) — namespace a storage key by quarter so a page can
+     keep one bucket per quarter when it wants physical separation. Format mirrors
+     the Cashbook convention ('<base>::<fy>_Q<n>'). */
+  Core.quarterKey = function (baseKey, fy, q) {
+    return baseKey + '::' + fy + '_Q' + q;
+  };
+
+  // True when two FY+quarter pairs are the same (null-safe).
+  Core.sameQuarter = function (a, b) {
+    return !!a && !!b && a.fy === b.fy && a.q === b.q;
+  };
+
+  /* recordInQuarter(record, fy, q, dateField) — does a dated record belong to the
+     given quarter? Reads record[dateField] (default 'date'). Records that already
+     carry explicit fy/quarter fields (e.g. Cashbook/Virement) honour those. */
+  Core.recordInQuarter = function (record, fy, q, dateField) {
+    if (!record) return false;
+    if (record.fy != null && record.quarter != null) {
+      return record.fy === fy && record.quarter === q;
+    }
+    var dq = Core.deriveQuarter(record[dateField || 'date']);
+    return !!dq && dq.fy === fy && dq.q === q;
+  };
+
+  /* --- Active-quarter persistence + cross-page propagation (browser only) --- */
+  Core.ACTIVE_QUARTER_KEY = ACTIVE_QUARTER_KEY;
+
+  Core.getActiveQuarter = function () {
+    try {
+      var raw = root.CESTISStore ? root.CESTISStore.getItem(ACTIVE_QUARTER_KEY) : null;
+      if (raw) {
+        var parsed = JSON.parse(raw);
+        if (parsed && parsed.fy && parsed.q) {
+          return { fy: parsed.fy, q: parseInt(parsed.q, 10) };
+        }
+      }
+    } catch (e) {}
+    return Core.currentQuarter();
+  };
+
+  Core.setActiveQuarter = function (fy, q) {
+    q = parseInt(q, 10);
+    var val = { fy: fy, q: q };
+    try {
+      if (root.CESTISStore) root.CESTISStore.setItem(ACTIVE_QUARTER_KEY, JSON.stringify(val));
+    } catch (e) {}
+    // Notify this page's listeners immediately…
+    try {
+      if (root.dispatchEvent && typeof CustomEvent === 'function') {
+        root.dispatchEvent(new CustomEvent('cestis-quarter-changed', { detail: val }));
+      }
+    } catch (e) {}
+    return val;
+  };
+
+  /* onQuarterChange(cb) — subscribe to quarter switches from THIS page (custom
+     event) AND from OTHER tabs (the native localStorage 'storage' event). Returns
+     an unsubscribe function. cb receives { fy, q }. */
+  Core.onQuarterChange = function (cb) {
+    if (typeof cb !== 'function' || !root.addEventListener) return function () {};
+    var localHandler = function (e) { cb((e && e.detail) || Core.getActiveQuarter()); };
+    var storageHandler = function (e) {
+      if (e && e.key === ACTIVE_QUARTER_KEY) cb(Core.getActiveQuarter());
+    };
+    root.addEventListener('cestis-quarter-changed', localHandler);
+    root.addEventListener('storage', storageHandler);
+    return function () {
+      root.removeEventListener('cestis-quarter-changed', localHandler);
+      root.removeEventListener('storage', storageHandler);
+    };
+  };
+
+  /* mountQuarterBar(target, opts) — render the shared FY/quarter selector bar
+     (the "FY 2026/2027  ◀ ▶  | Q1·Apr–Jun … | ◀ Prev Qtr  Next Qtr ▶" strip) into
+     `target` (an element or element id) and keep it in sync with the shared
+     active-quarter state. Clicking any control calls setActiveQuarter, which
+     propagates to every other bar/page. opts.onChange({fy,q}) fires whenever the
+     active quarter changes (from this bar OR another page/tab) so the host can
+     re-render its data. Returns { destroy(), refresh() }. Browser-only. */
+  Core.mountQuarterBar = function (target, opts) {
+    opts = opts || {};
+    if (typeof document === 'undefined') return { destroy: function () {}, refresh: function () {} };
+    var el = (typeof target === 'string') ? document.getElementById(target) : target;
+    if (!el) return { destroy: function () {}, refresh: function () {} };
+
+    if (!document.getElementById('cestis-qbar-styles')) {
+      var st = document.createElement('style');
+      st.id = 'cestis-qbar-styles';
+      st.textContent =
+        '.cestis-qbar{display:flex;flex-direction:column;gap:8px;align-items:center;padding:12px 14px;border-radius:12px;' +
+        'background:linear-gradient(180deg,rgba(13,71,161,.06),rgba(13,71,161,.02));border:1px solid rgba(13,71,161,.18);margin:0 0 16px;}' +
+        '.cestis-qbar-fy{display:flex;align-items:center;gap:14px;}' +
+        '.cestis-qbar-fy .cestis-qbar-fylabel{font-weight:700;font-size:15px;letter-spacing:.5px;color:var(--text,#0D47A1);min-width:150px;text-align:center;}' +
+        '.cestis-qbar-tabs{display:flex;flex-wrap:wrap;gap:8px;align-items:center;justify-content:center;}' +
+        '.cestis-qbar-tab{cursor:pointer;border:1px solid rgba(13,71,161,.25);background:transparent;color:var(--text-muted,#5b6b80);' +
+        'padding:6px 14px;border-radius:8px;font-size:13px;font-weight:600;transition:all .15s;}' +
+        '.cestis-qbar-tab:hover{background:rgba(13,71,161,.08);}' +
+        '.cestis-qbar-tab.active{background:#0D47A1;color:#fff;border-color:#0D47A1;box-shadow:0 0 0 3px rgba(13,71,161,.18);}' +
+        '.cestis-qbar-btn{cursor:pointer;border:1px solid rgba(13,71,161,.25);background:transparent;color:var(--text,#0D47A1);' +
+        'padding:6px 12px;border-radius:8px;font-size:13px;font-weight:600;transition:all .15s;}' +
+        '.cestis-qbar-btn:hover{background:rgba(13,71,161,.08);}';
+      document.head.appendChild(st);
+    }
+
+    el.classList.add('cestis-qbar');
+    el.innerHTML =
+      '<div class="cestis-qbar-fy">' +
+        '<button class="cestis-qbar-btn" data-act="fy-1" title="Previous financial year">◀</button>' +
+        '<span class="cestis-qbar-fylabel"></span>' +
+        '<button class="cestis-qbar-btn" data-act="fy+1" title="Next financial year">▶</button>' +
+      '</div>' +
+      '<div class="cestis-qbar-tabs">' +
+        Core.QUARTER_META.map(function (m) {
+          return '<button class="cestis-qbar-tab" data-q="' + m.q + '">' + m.label + ' · ' + m.months + '</button>';
+        }).join('') +
+        '<button class="cestis-qbar-btn" data-act="q-1" style="margin-left:8px;">◀ Prev Qtr</button>' +
+        '<button class="cestis-qbar-btn" data-act="q+1">Next Qtr ▶</button>' +
+      '</div>';
+
+    function shiftFY(fy, dir) {
+      var start = parseInt(String(fy).split('/')[0], 10) + dir;
+      return start + '/' + (start + 1);
+    }
+    function paint() {
+      var cur = Core.getActiveQuarter();
+      var lbl = el.querySelector('.cestis-qbar-fylabel');
+      if (lbl) lbl.textContent = Core.fyLabel(cur.fy);
+      var tabs = el.querySelectorAll('.cestis-qbar-tab');
+      for (var i = 0; i < tabs.length; i++) {
+        tabs[i].classList.toggle('active', parseInt(tabs[i].getAttribute('data-q'), 10) === cur.q);
+      }
+    }
+    function go(fy, q) {
+      // clamp quarter into 1..4, rolling the FY across year boundaries
+      while (q < 1) { q += 4; fy = shiftFY(fy, -1); }
+      while (q > 4) { q -= 4; fy = shiftFY(fy, 1); }
+      Core.setActiveQuarter(fy, q);
+    }
+    el.addEventListener('click', function (e) {
+      var t = e.target.closest('[data-q],[data-act]');
+      if (!t || !el.contains(t)) return;
+      var cur = Core.getActiveQuarter();
+      if (t.hasAttribute('data-q')) { go(cur.fy, parseInt(t.getAttribute('data-q'), 10)); return; }
+      switch (t.getAttribute('data-act')) {
+        case 'fy-1': go(shiftFY(cur.fy, -1), cur.q); break;
+        case 'fy+1': go(shiftFY(cur.fy, 1), cur.q); break;
+        case 'q-1': go(cur.fy, cur.q - 1); break;
+        case 'q+1': go(cur.fy, cur.q + 1); break;
+      }
+    });
+
+    var unsub = Core.onQuarterChange(function (cur) {
+      paint();
+      if (typeof opts.onChange === 'function') opts.onChange(cur);
+    });
+    paint();
+
+    return {
+      refresh: paint,
+      destroy: function () { unsub(); el.innerHTML = ''; el.classList.remove('cestis-qbar'); }
+    };
+  };
+
   root.CESTISCore = Core;
 
   if (typeof module !== 'undefined' && module.exports) {

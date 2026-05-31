@@ -2125,6 +2125,9 @@
                 <button class="btn" onclick="recordPayment()">Record Payment</button>
             </div>
 
+            <div id="paymentsQuarterBar"></div>
+            <div id="paymentsQuarterLabel" style="font-size:13px;color:var(--text-muted,#5b6b80);margin:0 0 10px;font-weight:600;"></div>
+
             <div class="search-filter">
                 <input type="text" id="searchPayment" placeholder="🔍 Search payments..." oninput="filterPayments()">
                 <input type="date" id="filterDateFrom" onchange="filterPayments()">
@@ -4282,6 +4285,7 @@
             updateDashboard();
             renderStudentsTable();
             renderPaymentsTable();
+            mountSchoolFeeQuarterBar();
             renderDocumentsTable();
             renderUsersTable();
             populatePaymentStudentSelect();
@@ -5676,13 +5680,47 @@
             alert('Payment recorded successfully! Receipt has been generated and downloaded.');
         }
 
+        // True when a payment's date falls in the app-wide active financial quarter.
+        // Outstanding-balance maths stays cumulative (all-time) elsewhere; only the
+        // payment register & reports are scoped to the selected quarter.
+        function paymentInActiveQuarter(p) {
+            if (typeof CESTISCore === 'undefined' || !CESTISCore.getActiveQuarter) return true;
+            // Undated/unparseable payments stay visible in every quarter so they are
+            // never silently hidden by the quarter filter.
+            if (!p || !CESTISCore.deriveQuarter(p.date)) return true;
+            const cur = CESTISCore.getActiveQuarter();
+            return CESTISCore.recordInQuarter(p, cur.fy, cur.q, 'date');
+        }
+
+        // Mount the shared FY/quarter selector above the payments register. The
+        // active quarter is shared across every CESTIS page, so switching it here
+        // (or on another page/tab) re-renders the register for that quarter.
+        let _schoolFeeQuarterBar = null;
+        function mountSchoolFeeQuarterBar() {
+            if (typeof CESTISCore === 'undefined' || !CESTISCore.mountQuarterBar) return;
+            if (_schoolFeeQuarterBar || !document.getElementById('paymentsQuarterBar')) return;
+            _schoolFeeQuarterBar = CESTISCore.mountQuarterBar('paymentsQuarterBar', {
+                onChange: function () {
+                    if (typeof renderPaymentsTable === 'function') renderPaymentsTable();
+                }
+            });
+        }
+
         // Render payments table
         function renderPaymentsTable() {
             const tbody = document.getElementById('paymentsTableBody');
             tbody.innerHTML = '';
-            
-            const sortedPayments = [...payments].sort((a, b) => new Date(b.date) - new Date(a.date));
-            
+
+            const sortedPayments = [...payments]
+                .filter(paymentInActiveQuarter)
+                .sort((a, b) => new Date(b.date) - new Date(a.date));
+            const qLbl = document.getElementById('paymentsQuarterLabel');
+            if (qLbl && typeof CESTISCore !== 'undefined' && CESTISCore.getActiveQuarter) {
+                const cur = CESTISCore.getActiveQuarter();
+                qLbl.textContent = 'Showing ' + CESTISCore.quarterPeriodLabel(cur.fy, cur.q) +
+                    ' — ' + sortedPayments.length + ' payment' + (sortedPayments.length === 1 ? '' : 's');
+            }
+
             sortedPayments.forEach((payment) => {
                 const row = tbody.insertRow();
                 row.innerHTML = `
