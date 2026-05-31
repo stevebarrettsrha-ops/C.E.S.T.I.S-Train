@@ -4599,6 +4599,57 @@ function getCourseList() {
 function findSkillAreaForCourse(courseName) {
   if (!courseName) return skillAreas[0];
   var cn = courseName.toLowerCase().trim();
+
+  // 0. Explicit aliases: map School Fee skill-area names (and common variants)
+  //    to the canonical Training Centre / skill-area name, so e.g.
+  //    "WELDING L2" -> "Welding & Fabrication", "COMMI CHEF L2" -> "Commercial
+  //    Cooking". Level suffixes (L2/L3/Level 2) are stripped first so every
+  //    level maps to the same centre. Resolution is by substring, so a target
+  //    matches whether the skill area is named "Welding" or "Welding & Fabrication".
+  var COURSE_ALIASES = {
+    'welding': 'Welding & Fabrication',
+    'welding & fabrication': 'Welding & Fabrication',
+    'electrical': 'Electrical Installation',
+    'electrical installation': 'Electrical Installation',
+    'hospitality': 'Hospitality & Tourism',
+    'hospitality services': 'Hospitality & Tourism',
+    'hospitality & tourism': 'Hospitality & Tourism',
+    'commi chef': 'Commercial Cooking',
+    'commis chef': 'Commercial Cooking',
+    'chef': 'Commercial Cooking',
+    'commercial cooking': 'Commercial Cooking',
+    'culinary': 'Commercial Cooking',
+    'business admin': 'Business Administration',
+    'business administration': 'Business Administration',
+    'beauty therapy': 'Beauty Therapy',
+    'beauty': 'Beauty Therapy',
+    'cosmetology': 'Cosmetology',
+    'auto mechanics': 'Auto Mechanics',
+    'plumbing': 'Plumbing',
+    'carpentry': 'Carpentry',
+    'information technology': 'Information Technology',
+    'garment construction': 'Garment Construction',
+    'refrigeration & ac': 'Refrigeration & AC',
+    'refrigeration': 'Refrigeration & AC',
+    'heavy equipment ops': 'Heavy Equipment Ops',
+    'heavy equipment': 'Heavy Equipment Ops',
+    'solar energy tech': 'Solar Energy Tech',
+    'solar energy': 'Solar Energy Tech',
+    'photovoltaic': 'Solar Energy Tech',
+    'photovoltaic installer': 'Solar Energy Tech'
+  };
+  // Strip trailing level markers like " l2", " l3", " level 2", " (l2)".
+  var aliasKey = cn.replace(/[\s\-]*\(?\b(l|level)\s*-?\s*[0-9]+\)?\s*$/i, '').trim();
+  var aliasTarget = COURSE_ALIASES[aliasKey] || COURSE_ALIASES[cn] || null;
+  if (aliasTarget) {
+    var tn = aliasTarget.toLowerCase().trim();
+    var aliasMatch = skillAreas.find(function(sk) {
+      var sn = sk.name.toLowerCase().trim();
+      return sn === tn || sn.indexOf(tn) !== -1 || tn.indexOf(sn) !== -1;
+    });
+    if (aliasMatch) return aliasMatch;
+  }
+
   // 1. Exact match
   var exact = skillAreas.find(function(sk) { return sk.name.toLowerCase().trim() === cn; });
   if (exact) return exact;
