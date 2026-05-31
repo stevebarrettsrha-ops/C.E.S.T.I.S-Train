@@ -5986,6 +5986,13 @@ function loadState() {
   // Recover certified status for students whose stage/id was lost during a
   // dedup/merge but whose cert download approval records survived. Run this
   // BEFORE backfill so restored students are picked up by the backfill pass.
+  // Remove duplicate student records (same name+course) that accumulated via
+  // multi-device sync assigning different IDs to the same person.
+  var _dupsRemoved = deduplicateStudents();
+  if (_dupsRemoved > 0) {
+    console.log('[loadState] Removed ' + _dupsRemoved + ' duplicate student record(s)');
+    try { CESTISStore.setItem('voctrain_students', JSON.stringify(students)); } catch(e) {}
+  }
   reconcileCertifiedFromApprovals();
   // Remove orphaned/duplicate attendance records left behind when students were
   // deleted or re-IDed during a dedup/merge, so the attendance register shows
@@ -5997,6 +6004,41 @@ function loadState() {
     try { CESTISStore.setItem('voctrain_students', JSON.stringify(students)); } catch(e) {}
   }
   updateSkillAreaCounts();
+}
+
+function mergeStudentRecords(a, b) {
+  var aMod = a.lastModified ? new Date(a.lastModified).getTime() : 0;
+  var bMod = b.lastModified ? new Date(b.lastModified).getTime() : 0;
+  var base = (bMod > aMod) ? Object.assign({}, b) : Object.assign({}, a);
+  var other = (bMod > aMod) ? a : b;
+  var fields = ['stage','progress','score','gpa','certNo','certDate','certCollected',
+                'attendance','assignments','instructor','email','phone','address',
+                'dob','enrollDate','completionDate','nqfLevel','notes','gender'];
+  fields.forEach(function(f){
+    if((base[f] === undefined || base[f] === null || base[f] === '') &&
+       other[f] !== undefined && other[f] !== null && other[f] !== '') {
+      base[f] = other[f];
+    }
+  });
+  return base;
+}
+
+function deduplicateStudents() {
+  var seen = {};
+  students.forEach(function(s) {
+    var key = (s.name || '').trim().toLowerCase() + '|' + (s.course || '').trim().toLowerCase();
+    if (!key || key === '|') return;
+    if (seen[key]) { seen[key] = mergeStudentRecords(seen[key], s); } else { seen[key] = s; }
+  });
+  var added = {}, deduped = [];
+  students.forEach(function(s) {
+    var key = (s.name || '').trim().toLowerCase() + '|' + (s.course || '').trim().toLowerCase();
+    if (!key || key === '|') { deduped.push(s); return; }
+    if (!added[key]) { added[key] = true; deduped.push(seen[key]); }
+  });
+  var removed = students.length - deduped.length;
+  students = deduped;
+  return removed;
 }
 
 function updateSkillAreaCounts() {
@@ -14309,6 +14351,8 @@ window.addEventListener('message', function(e) {
     try { attendanceRecords = JSON.parse(CESTISStore.getItem('voctrain_attendance') || '[]'); } catch(e2) {}
     try { userAccounts = JSON.parse(CESTISStore.getItem('voctrain_userAccounts') || '[]'); } catch(e2) {}
     try { skillAreas = JSON.parse(CESTISStore.getItem('voctrain_skillAreas') || '[]'); } catch(e2) {}
+    var _dr = deduplicateStudents();
+    if (_dr > 0) { try { CESTISStore.setItem('voctrain_students', JSON.stringify(students)); } catch(e2) {} }
     refreshStudentDependentViews();
     updateSkillAreaCounts();
     saveState();
