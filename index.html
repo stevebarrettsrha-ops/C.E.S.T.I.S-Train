@@ -7418,6 +7418,7 @@ function approveUser(userId) {
   }
   saveState();
   renderVerifyUsersPage();
+  refreshStudentDependentViews();
   showToast('Account approved: ' + user.name + ' (' + user.role + ')');
   addNotification('Account approved: ' + user.name + ' (' + user.role + ')', 'success', null, ['admin']);
 }
@@ -7462,6 +7463,7 @@ function approveAllPending() {
   });
   saveState();
   renderVerifyUsersPage();
+  refreshStudentDependentViews();
   showToast(pending.length + ' account(s) approved!');
   addNotification(pending.length + ' user account(s) approved', 'success', null, ['admin']);
 }
@@ -9239,8 +9241,10 @@ function buildInstructorPages() {
           });
         } else if (myAssignments.length > 0) {
           grades = myAssignments.slice(0,7).map(function(a) {
-            var sub = (assignmentSubmissions||[]).find(function(s){ return s.assignmentId === a.id && s.studentId === st.id && s.grade != null; });
-            return sub ? parseInt(sub.grade)||null : null;
+            // Grades are stored on the assignment (a.grades[studentId]), not on
+            // the submission record — read from there so the gradebook fills in.
+            var g = (a.grades && a.grades[st.id] != null) ? a.grades[st.id] : null;
+            return g != null ? parseInt(g)||null : null;
           });
         } else {
           grades = [parseInt(st.score)||null];
@@ -9272,9 +9276,13 @@ function buildInstructorPages() {
         {label:'F (<50%)',color:'var(--red)',pct:Math.round(distF/distTotal*100)}
       ];
 
-      // Real assignment counts
-      var totalGraded = (assignmentSubmissions||[]).filter(function(s){ return s.grade != null && myStudents.some(function(st){return st.id===s.studentId;}); }).length + (examResults||[]).filter(function(r){ return myStudents.some(function(st){return st.id===r.studentId;}); }).length;
-      var totalPending = (assignmentSubmissions||[]).filter(function(s){ return s.grade == null && s.submitted && myStudents.some(function(st){return st.id===s.studentId;}); }).length;
+      // Real assignment counts — a submission is "graded" when the assignment
+      // carries a grade for that student (a.grades[studentId]); otherwise it is
+      // a pending submission awaiting grading.
+      var _isMine = function(sid){ return myStudents.some(function(st){return st.id===sid;}); };
+      var _assignGrade = function(sub){ var a=(instructorAssignments||[]).find(function(x){return x.id===sub.assignmentId;}); return (a && a.grades && a.grades[sub.studentId] != null) ? a.grades[sub.studentId] : null; };
+      var totalGraded = (assignmentSubmissions||[]).filter(function(s){ return _isMine(s.studentId) && _assignGrade(s) != null; }).length + (examResults||[]).filter(function(r){ return _isMine(r.studentId); }).length;
+      var totalPending = (assignmentSubmissions||[]).filter(function(s){ return _isMine(s.studentId) && _assignGrade(s) == null; }).length;
       var highScore = allScores.length > 0 ? Math.max.apply(null, allScores) : 0;
       var lowScore = allScores.length > 0 ? Math.min.apply(null, allScores) : 0;
 
@@ -9552,6 +9560,8 @@ function saveInstructorAttendance() {
   showToast('Attendance saved!');
   addNotification('Attendance records updated', 'attendance', null, ['instructor','admin']);
   renderInstructorAttendance();
+  // Propagate the updated attendance % to admin/student dashboards and reports.
+  refreshStudentDependentViews();
 }
 
 var iAnnouncementFormVisible = false;
@@ -9579,6 +9589,7 @@ function createInstructorAnnouncement() {
   document.getElementById('iAnnBody').value = '';
   toggleInstructorAnnouncementForm();
   renderInstructorAnnouncements();
+  refreshContentDependentViews();
   saveState();
   showToast('Announcement published!');
   addNotification('New announcement: "' + title + '"' + (priority==='urgent' ? ' (URGENT)' : ''), priority==='urgent' ? 'warning' : 'announce', null, targetRoles);
@@ -11528,7 +11539,9 @@ function createClassSession() {
   saveState();
   closeModal('createClassSessionModal');
   showToast('Class session "' + name + '" created successfully');
-  addNotification('New class session: "' + name + '"', 'calendar', null, ['admin','instructor']);
+  // Notify students too — they have a class-sessions view and should hear about
+  // a new scheduled session for their course.
+  addNotification('New class session: "' + name + '"', 'calendar', null, ['admin','instructor','student']);
 
   // Reset form fields
   document.getElementById('csSessionName').value = '';
@@ -11537,9 +11550,10 @@ function createClassSession() {
   document.getElementById('csDuration').value = '90';
   document.getElementById('csLocation').value = '';
 
-  // Refresh the class sessions display
+  // Refresh the class sessions display across roles
   if(currentRole === 'instructor') renderInstructorClassSessions();
   if(currentRole === 'admin') renderAdminClassSessions();
+  refreshContentDependentViews();
 }
 
 function renderInstructorClassSessions() {
@@ -11705,6 +11719,7 @@ function deleteClassSession(id) {
   showToast('Class session deleted');
   if(currentRole === 'instructor') renderInstructorClassSessions();
   if(currentRole === 'admin') renderAdminClassSessions();
+  refreshContentDependentViews();
 }
 
 // ============================== ADMIN MEETING FUNCTIONS ==============================
@@ -12052,6 +12067,7 @@ function gradeSubmission(assignmentId, studentId) {
   showToast('Graded ' + (st ? st.name : studentId) + ': ' + score + '/' + a.maxPoints);
   addNotification((st ? st.name : 'Student') + ' graded ' + score + '/' + a.maxPoints + ' on "' + a.title + '"', 'grade', null, ['admin','instructor','student']);
   renderInstructorGradebook();
+  refreshContentDependentViews();
 }
 
 function deleteAssignment(id) {
@@ -12063,6 +12079,7 @@ function deleteAssignment(id) {
   showToast('Assignment deleted');
   if (a) addNotification('Assignment "' + a.title + '" was deleted', 'exam', null, ['admin','instructor','student']);
   renderInstructorGradebook();
+  refreshContentDependentViews();
 }
 
 // ============================== ADMIN ASSIGNMENTS VIEW ==============================
@@ -12381,6 +12398,7 @@ function submitStudentAssignment() {
     addNotification(s.name + ' submitted work for "' + a.title + '"', 'exam', null, ['admin','instructor','student']);
     renderStudentAssignments();
     renderStudentAssignmentsPage();
+    refreshContentDependentViews();
   });
 }
 
@@ -12811,6 +12829,7 @@ function uploadResource() {
   document.getElementById('resDesc').value = '';
 
   renderInstructorCustomResources();
+  refreshContentDependentViews();
 }
 
 function createResourceFolder() {
@@ -12980,6 +12999,7 @@ function deleteResource(id) {
   saveState();
   showToast('Resource deleted');
   renderInstructorCustomResources();
+  refreshContentDependentViews();
 }
 
 // ============================== ADMIN RESOURCE MANAGER (GOOGLE DRIVE) ==============================
@@ -13495,6 +13515,7 @@ async function uploadResourceToDrive() {
       var selEl = document.getElementById('driveFileSelected');
       if (selEl) { selEl.style.display = 'none'; selEl.textContent = ''; }
       renderAdminResources();
+      refreshContentDependentViews();
     }, 800);
   } catch(err) {
     console.error('Drive upload error:', err);
@@ -13659,6 +13680,7 @@ function deleteDriveResource(id) {
   saveState();
   showToast('Resource removed');
   renderAdminResources();
+  refreshContentDependentViews();
 }
 
 // Lookup resource by ID for student access
@@ -13716,7 +13738,7 @@ function renderStudentDriveResources() {
   var myDriveResources = driveResources.filter(function(r) {
     if (!courseMatches(r.course, s.course)) return false;
     if (_sResFilter !== 'all' && r.category !== _sResFilter) return false;
-    if (searchTerm && r.name.toLowerCase().indexOf(searchTerm) === -1 && r.resourceId.toLowerCase().indexOf(searchTerm) === -1) return false;
+    if (searchTerm && (r.name||'').toLowerCase().indexOf(searchTerm) === -1 && (r.resourceId||'').toLowerCase().indexOf(searchTerm) === -1) return false;
     return true;
   });
 
@@ -14618,6 +14640,61 @@ function refreshStudentDependentViews() {
   });
 }
 
+// Re-render content/config views that may be open for OTHER roles or on other
+// pages, so a change made in one place is reflected everywhere without a reload.
+// Every listed render function guards on its own missing DOM (or is wrapped in
+// try/catch here), so calling one whose page isn't mounted is a safe no-op.
+function refreshContentDependentViews() {
+  var fns = [
+    'renderInstructorExams','renderStudentExams',
+    'renderAdminAssignments','renderInstructorGradebook','renderStudentAssignments','renderStudentAssignmentsPage',
+    'renderAdminResources','renderInstructorCustomResources','renderStudentDriveResources','renderStudentResourcesPage',
+    'renderAnnouncements','renderInstructorAnnouncements','renderAsAnnouncements',
+    'renderCalendar','renderInstructorCalendar','renderStudentCalendar','renderAsCalendar',
+    'renderAdminClassSessions','renderInstructorClassSessions','renderStudentClassSessions',
+    'renderSkills','updateCentreCount','renderCentreTable',
+    'filterCerts','renderCertStats','renderCertDownloadMgmt'
+  ];
+  fns.forEach(function(name){
+    try {
+      var fn = window[name];
+      if(typeof fn === 'function') fn();
+    } catch(e) { /* one bad render shouldn't block the others */ }
+  });
+}
+
+// Canonical "is this student certified?" — used for certification counts so the
+// dashboards, certificate pages and reports all agree on one definition.
+function isStudentCertified(s) {
+  return !!s && (s.stage === 'certified' || s.stage === 'collected');
+}
+// Canonical "has this student passed?" — used for academic pass-rate widgets.
+// Per product decision this counts certified/collected OR a GPA of 2.0+.
+function isStudentPassed(s) {
+  if(!s) return false;
+  if(isStudentCertified(s)) return true;
+  return parseFloat(s.gpa) >= 2.0;
+}
+
+// Recompute a single student's stored attendance % from the authoritative
+// per-day attendance records. Called whenever attendance is marked so every
+// dashboard / progress bar / report that reads students[].attendance stays in
+// sync with what was actually recorded. Present + Late both count as attended,
+// matching the live computation used by the CMC report.
+function recomputeStudentAttendance(studentId) {
+  if(!Array.isArray(attendanceRecords) || !Array.isArray(students)) return;
+  var s = students.find(function(st){ return st.id === studentId; });
+  if(!s) return;
+  var total = 0, present = 0;
+  attendanceRecords.forEach(function(r){
+    if(r.studentId !== studentId || !r.days) return;
+    ['Mon','Tue','Wed','Thu','Fri'].forEach(function(d){
+      if(r.days[d]) { total++; if(r.days[d] === 'present' || r.days[d] === 'late') present++; }
+    });
+  });
+  if(total > 0) s.attendance = Math.round(present / total * 100);
+}
+
 // Persistent tombstone list for deleted students.
 // Loaded lazily so it survives reloads, and consulted by every cloud merge
 // path that might otherwise push a deleted student back into the local list.
@@ -14702,7 +14779,7 @@ async function addStudent() {
     dupAccount.studentDataId = studentId;
   }
 
-  closeModal('addStudentModal');filterStudents();updatePipelineCounts();showToast(`${name} added (account disabled until activated)!`);document.getElementById('newStudentName').value='';document.getElementById('newStudentGender').value='';document.getElementById('newStudentEmail').value='';
+  closeModal('addStudentModal');filterStudents();updatePipelineCounts();refreshStudentDependentViews();showToast(`${name} added (account disabled until activated)!`);document.getElementById('newStudentName').value='';document.getElementById('newStudentGender').value='';document.getElementById('newStudentEmail').value='';
   addNotification('New student enrolled: ' + name + ' — ' + selectedCourse + ' (account disabled — activate in Verify Users)', 'student', null, ['admin','instructor']);
   saveState();
 
@@ -14750,7 +14827,7 @@ function showSkillDetail(id) {
       skill.name.toLowerCase().indexOf(s.course.toLowerCase().split(' ')[0]) !== -1);
   });
   var passRate = courseStudents.length > 0
-    ? Math.round(courseStudents.filter(function(s) { return s.stage === 'certified' || s.stage === 'collected' || parseFloat(s.gpa) >= 2.0; }).length / courseStudents.length * 100)
+    ? Math.round(courseStudents.filter(isStudentPassed).length / courseStudents.length * 100)
     : 0;
 
   var materialsHtml = '';
@@ -15165,6 +15242,13 @@ function confirmDeleteCentre() {
   var centre = skillAreas.find(function(c) { return c.id === id; });
   var name = centre ? centre.name : 'Centre';
   skillAreas = skillAreas.filter(function(c) { return c.id !== id; });
+  // Remove the matching class chat room so a deleted Training Centre does not
+  // leave an orphaned room lingering in everyone's LMS Chat list.
+  if(typeof lmsChatRooms !== 'undefined' && Array.isArray(lmsChatRooms)) {
+    var _roomId = 'chat-class-' + id;
+    lmsChatRooms = lmsChatRooms.filter(function(r){ return r.id !== _roomId && r.skillAreaId !== id; });
+    if(typeof saveLmsChatData === 'function') saveLmsChatData();
+  }
   closeModal('deleteCentreModal');
   renderSkills();
   updateCentreCount();
@@ -15511,6 +15595,7 @@ function createExam() {
   examBuilderQuestions = [];
   closeModal('createExamModal');
   renderExams('upcoming');
+  refreshContentDependentViews();
   document.getElementById('examTitle').value='';
   document.getElementById('examStep1').style.display='block';
   document.getElementById('examStep2').style.display='none';
@@ -15535,6 +15620,7 @@ function activateExam(idx) {
   if(!confirm('Activate "'+e.title+'"? Students will be able to take this exam immediately.')) return;
   exams[idx].status = 'active';
   renderExams('upcoming');
+  refreshContentDependentViews();
   showToast('Exam "'+e.title+'" is now ACTIVE!');
   addNotification('Exam activated: "' + e.title + '" — students can now take this exam', 'exam', null, ['admin','instructor','student']);
   saveState();
@@ -15555,6 +15641,7 @@ function completeExam(idx) {
     exams[idx].passRate = Math.round(passed/results.length*100)+'%';
   }
   renderExams('active');
+  refreshContentDependentViews();
   showToast('Exam "'+e.title+'" marked as completed');
   addNotification('Exam completed: "' + e.title + '"' + (exams[idx].passRate ? ' — pass rate: ' + exams[idx].passRate : ''), 'exam', null, ['admin','instructor']);
   saveState();
@@ -15575,6 +15662,7 @@ function deleteExam(idx) {
   examResults = examResults.filter(function(r) { return r.examId !== examId; });
   saveState();
   renderExams('upcoming');
+  refreshContentDependentViews();
   showToast('Exam "' + e.title + '" deleted');
 }
 
@@ -16465,13 +16553,16 @@ function backToStudentExamList() {
 }
 
 function renderCerts(filter,search) {
+  // Backfill cert numbers for certified students so the list matches the
+  // stage-based certified count shown elsewhere.
+  if(typeof backfillCertificateNumbers === 'function') backfillCertificateNumbers();
   let certs = students.filter(s=>s.certNo);
   if(filter==='collected') certs=certs.filter(c=>c.certCollected);
   if(filter==='pending') certs=certs.filter(c=>!c.certCollected);
   if(search) certs=certs.filter(c=>c.name.toLowerCase().includes(search)||(c.certNo||'').toLowerCase().includes(search));
   const tbody = document.getElementById('certTableBody');
   if(!tbody) return;
-  tbody.innerHTML = certs.map(s=>`<tr><td><strong>${s.name}</strong></td><td style="font-family:monospace;font-size:12px;">${s.certNo}</td><td>${s.course}</td><td>${(certTemplates[s.course]||{}).programmeCode||s.course}</td><td>${s.certDate}</td><td>${s.certCollected?'<span class="badge badge-green"><span class="badge-dot"></span>Collected</span>':'<span class="badge badge-amber"><span class="badge-dot"></span>Pending</span>'}</td><td>${!s.certCollected?`<button class="btn btn-sm btn-success" onclick="markCollected(${students.indexOf(s)})">Mark Collected</button>`:'<span style="font-size:12px;color:var(--text-muted);">✓ Done</span>'}</td></tr>`).join('');
+  tbody.innerHTML = certs.map(s=>`<tr><td><strong>${s.name}</strong></td><td style="font-family:monospace;font-size:12px;">${s.certNo}</td><td>${s.course}</td><td>${(certTemplates[getCertTemplateKey(s.course)]||{}).programmeCode||s.course}</td><td>${s.certDate}</td><td>${s.certCollected?'<span class="badge badge-green"><span class="badge-dot"></span>Collected</span>':'<span class="badge badge-amber"><span class="badge-dot"></span>Pending</span>'}</td><td>${!s.certCollected?`<button class="btn btn-sm btn-success" onclick="markCollected(${students.indexOf(s)})">Mark Collected</button>`:'<span style="font-size:12px;color:var(--text-muted);">✓ Done</span>'}</td></tr>`).join('');
 }
 function filterCerts() { renderCerts(document.getElementById('certFilter')?.value,document.getElementById('certSearch')?.value?.toLowerCase()); }
 function markCollected(idx) { students[idx].certCollected=true;students[idx].stage='collected';students[idx].progress=100;filterCerts();updatePipelineCounts();renderCertStats();refreshStudentDependentViews();showToast(`Certificate collected: ${students[idx].name}`);addNotification('Certificate collected: ' + students[idx].name + ' — ' + students[idx].course, 'cert', null, ['admin']);saveState(); }
@@ -16488,7 +16579,7 @@ function renderPassRates() {
         s.course.toLowerCase().indexOf(sk.name.split(' ')[0].toLowerCase()) !== -1);
     });
     if (courseStudents.length === 0) return;
-    var passed = courseStudents.filter(function(s) { return s.stage === 'certified' || s.stage === 'collected' || parseFloat(s.gpa) >= 2.0; }).length;
+    var passed = courseStudents.filter(isStudentPassed).length;
     var rate = Math.round(passed / courseStudents.length * 100);
     // Truncate long names for display
     var displayName = sk.name.length > 15 ? sk.name.substring(0, 13) + '...' : sk.name;
@@ -16504,6 +16595,9 @@ function renderPassRates() {
 function renderCertStats() {
   const el = document.getElementById('certStats');
   if(!el) return;
+  // Ensure every certified/collected student has a cert number so this count
+  // (certNo-based) agrees with the stage-based "Certified" count on dashboards.
+  if(typeof backfillCertificateNumbers === 'function') backfillCertificateNumbers();
   const totalCert = students.filter(s=>s.certNo).length;
   const collected = students.filter(s=>s.certCollected).length;
   const pending = totalCert - collected;
@@ -16520,7 +16614,7 @@ function renderReportStats() {
   const el = document.getElementById('reportStats');
   if(!el) return;
   // Compute overall pass rate from student data
-  const passedStudents = students.filter(function(s) { return s.stage === 'certified' || s.stage === 'collected' || parseFloat(s.gpa) >= 2.0; });
+  const passedStudents = students.filter(isStudentPassed);
   const overallPassRate = students.length ? Math.round(passedStudents.length / students.length * 100) : 0;
   // Compute average months to certification from students who have certDate
   var totalMonths = 0; var certCount = 0;
@@ -16784,6 +16878,9 @@ function updateAttendanceCell(sel) {
   const day = sel.getAttribute('data-day');
   const rec = attendanceRecords.find(r=>r.studentId===sid);
   if(rec) rec.days[day] = sel.value;
+  // Keep the student's stored attendance % in step with the marking so every
+  // page that reads students[].attendance reflects it.
+  recomputeStudentAttendance(sid);
 }
 
 function saveAttendance() {
@@ -16794,6 +16891,8 @@ function saveAttendance() {
   let records = courseFilter==='all' ? attendanceRecords : attendanceRecords.filter(r=>r.course===courseFilter);
   renderAttendanceSummary(records);
   renderWeeklyAttChart(records);
+  // Propagate the updated attendance % to dashboards, progress bars and reports.
+  refreshStudentDependentViews();
 }
 
 function toggleAnnouncementForm() {
@@ -16821,6 +16920,7 @@ function createAnnouncement() {
   document.getElementById('annBody').value = '';
   toggleAnnouncementForm();
   renderAnnouncements();
+  refreshContentDependentViews();
   saveState();
   showToast('Announcement published!');
   addNotification('New announcement: "' + title + '"' + (priority==='urgent' ? ' (URGENT)' : ''), priority==='urgent' ? 'warning' : 'announce', null, targetRoles);
@@ -16829,6 +16929,7 @@ function createAnnouncement() {
 function deleteAnnouncement(id) {
   announcements = announcements.filter(a => a.id !== id);
   renderAnnouncements();
+  refreshContentDependentViews();
   saveState();
   showToast('Announcement deleted');
 }
@@ -17107,12 +17208,13 @@ function promptAddEvent() {
   if(!date) return;
   const time = prompt('Time:', '09:00 AM') || '09:00 AM';
   const type = prompt('Type (class/exam/deadline/meeting):', 'meeting') || 'meeting';
-  const audienceInput = prompt('Target audience (comma-separated: admin, instructor, student):', 'admin, instructor, student');
-  var targetRoles = (audienceInput || 'admin, instructor, student').split(',').map(function(r){return r.trim().toLowerCase();}).filter(function(r){return ['admin','instructor','student'].indexOf(r)!==-1;});
-  if(targetRoles.length === 0) targetRoles = ['admin','instructor','student'];
+  const audienceInput = prompt('Target audience (comma-separated: admin, adminstaff, instructor, student):', 'admin, instructor, student');
+  var targetRoles = (audienceInput || 'admin, instructor, student').split(',').map(function(r){return r.trim().toLowerCase();}).filter(function(r){return ['admin','adminstaff','instructor','student'].indexOf(r)!==-1;});
+  if(targetRoles.length === 0) targetRoles = ['admin','adminstaff','instructor','student'];
   const colors = {class:'var(--blue)',exam:'var(--red)',deadline:'var(--accent)',meeting:'var(--purple)'};
   calendarEvents.push({title, date, time, type, color: colors[type] || 'var(--blue)', forRoles: targetRoles});
   renderCalendar();
+  refreshContentDependentViews();
   saveState();
   showToast('Event added!');
   addNotification('New ' + type + ' event: "' + title + '" on ' + date, 'calendar', null, targetRoles);
@@ -17137,6 +17239,7 @@ function editCalendarEvent(idx) {
   var colors = {class:'var(--blue)',exam:'var(--red)',deadline:'var(--accent)',meeting:'var(--purple)'};
   calendarEvents[idx] = {title:title.trim(), date:date, time:time, type:type, color:colors[type]||'var(--blue)', forRoles:targetRoles};
   renderCalendar();
+  refreshContentDependentViews();
   saveState();
   showToast('Event updated!');
 }
@@ -17147,6 +17250,7 @@ function deleteCalendarEvent(idx) {
   if(!confirm('Delete event "' + e.title + '" on ' + e.date + '?')) return;
   calendarEvents.splice(idx, 1);
   renderCalendar();
+  refreshContentDependentViews();
   saveState();
   showToast('Event deleted');
 }
@@ -19207,7 +19311,7 @@ async function mergeFromCloud() {
           var localMod = localMatch.lastModified ? new Date(localMatch.lastModified).getTime() : 0;
           var cloudIsNewer = cloudMod > localMod;
           // Update fields: cloud wins if newer OR if local field is empty/undefined
-          var fieldsToMerge = ['stage','progress','name','course','instructor','certCollected','certNumber','certDate','email','phone','status','address','dob','enrollDate','completionDate','nqfLevel','notes'];
+          var fieldsToMerge = ['stage','progress','name','course','instructor','certCollected','certNo','certDate','score','gpa','attendance','email','phone','status','address','dob','enrollDate','completionDate','nqfLevel','notes'];
           fieldsToMerge.forEach(function(field) {
             if (cloudStudent[field] !== undefined && cloudStudent[field] !== null && cloudStudent[field] !== '') {
               if (cloudIsNewer || !localMatch[field] || localMatch[field] === '') {
@@ -19933,7 +20037,7 @@ async function silentMergeFromBackup(fileId) {
           var cloudMod = cloudStudent.lastModified ? new Date(cloudStudent.lastModified).getTime() : 0;
           var localMod = localMatch.lastModified ? new Date(localMatch.lastModified).getTime() : 0;
           var cloudIsNewer = cloudMod > localMod;
-          var fieldsToMerge = ['stage','progress','name','course','instructor','certCollected','certNumber','certDate','email','phone','status','address','dob','enrollDate','completionDate','nqfLevel','notes'];
+          var fieldsToMerge = ['stage','progress','name','course','instructor','certCollected','certNo','certDate','score','gpa','attendance','email','phone','status','address','dob','enrollDate','completionDate','nqfLevel','notes'];
           fieldsToMerge.forEach(function(field) {
             if (cloudStudent[field] !== undefined && cloudStudent[field] !== null && cloudStudent[field] !== '') {
               if (cloudIsNewer || !localMatch[field] || localMatch[field] === '') {
@@ -27042,7 +27146,10 @@ function buildCmcPages() {
   html += '<div class="cmc-table-card"><h4>Instructor Roster</h4>';
   html += '<table class="cmc-table"><thead><tr><th>#</th><th>Name</th><th>Course</th><th>Students</th><th>Avg Attendance</th></tr></thead><tbody>';
   (instructorData||[]).forEach(function(ins, i) {
-    var insStudents = students.filter(function(s){return s.instructor===ins.name;});
+    // Match students the same way the instructor's own views do (by assigned
+    // instructor name OR by course/skill-area) so the admin roster count agrees
+    // with what the instructor sees as "My Students".
+    var insStudents = students.filter(function(s){ return s.instructor===ins.name || (typeof instructorCourseMatch==='function' && instructorCourseMatch(s.course, ins.course)); });
     var insAtt = 0;
     if(attendanceRecords && attendanceRecords.length > 0 && insStudents.length > 0) {
       var insStudentIds = insStudents.map(function(s){return s.id;});
@@ -27497,7 +27604,7 @@ function cmcRenderCharts() {
   if(studInstrEl && instructorData && instructorData.length > 0) {
     var instrLabels = []; var instrStudCounts = [];
     instructorData.forEach(function(ins) {
-      var cnt = students.filter(function(s){return s.instructor===ins.name;}).length;
+      var cnt = students.filter(function(s){ return s.instructor===ins.name || (typeof instructorCourseMatch==='function' && instructorCourseMatch(s.course, ins.course)); }).length;
       instrLabels.push(ins.name.split(' ')[0]);
       instrStudCounts.push(cnt);
     });
@@ -29890,6 +29997,10 @@ function saveCertTemplate() {
   closeModal('certTemplateEditorModal');
   populateCertTemplateSkillSelect();
   loadCertTemplateForEdit();
+  // Refresh certificate views so the new programme code/version shows on the
+  // Certificates table and Download Management page without a reload.
+  try { if(typeof filterCerts === 'function') filterCerts(); } catch(e) {}
+  try { if(typeof renderCertDownloadMgmt === 'function') renderCertDownloadMgmt(); } catch(e) {}
   showToast('Certificate template saved for ' + _certTplEditingCourse);
 }
 
