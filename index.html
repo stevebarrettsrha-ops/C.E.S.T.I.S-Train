@@ -18439,6 +18439,7 @@ var _autoSaveFileIds = {}; // { folderId: fileId } for tracking backup files per
 var AUTO_SAVE_INTERVAL_MS = 5000; // 5 seconds
 var _debouncedCloudSaveTimer = null;
 var _lastAutoSaveHash = null; // hash of last data successfully pushed to the cloud (dirty-check)
+var _consecutiveCloudSaveFailures = 0;
 
 // Fast, non-cryptographic 53-bit string hash (cyrb53) used to detect whether the
 // backup payload actually changed since the last cloud save, so an idle app does
@@ -21319,7 +21320,15 @@ async function autoSaveToAllFolders() {
 
     // Remember this payload only when the canonical folders actually saved, so a
     // failed upload is retried on the next tick instead of being skipped.
-    if (successCount >= 1) _lastAutoSaveHash = _curHash;
+    if (successCount >= 1) {
+      _lastAutoSaveHash = _curHash;
+      _consecutiveCloudSaveFailures = 0;
+    } else {
+      _consecutiveCloudSaveFailures = (_consecutiveCloudSaveFailures || 0) + 1;
+      if (_consecutiveCloudSaveFailures === 3) {
+        showToast('Cloud save failed. Check your Google Drive connection.', 'warning');
+      }
+    }
 
     // Update sync metadata
     lastSyncTime = new Date();
@@ -21544,7 +21553,11 @@ async function loginPageSync() {
     }
 
     // Step 3c: Reconcile student user accounts with student records
-    if (reconcileStudentsFromAccounts()) { totalMerged++; saveState(); }
+    try {
+      if (reconcileStudentsFromAccounts()) { totalMerged++; saveState(); }
+    } catch (e) {
+      console.warn('[LoginSync] Reconcile error:', e);
+    }
 
     // Step 4: Ensure main cloudFileId is set
     if (!cloudFileId) {
@@ -21585,6 +21598,14 @@ async function loginPageSync() {
       CESTISStore.removeItem('schoolDashboardGoogleTokenExpiry');
     } else {
       updateLoginSyncStatus(isAdmin ? 'Sync failed: ' + err.message : 'Sync failed. Try again.', 'error');
+    }
+    // Still allow login if local accounts exist — don't trap users on a failed sync
+    var hasLocalData = userAccounts.length > 3 || userAccounts.some(function(u) {
+      return u.id !== 'USR-001' && u.id !== 'USR-011' && u.id !== 'USR-021';
+    });
+    if (hasLocalData) {
+      loginSyncCompleted = true;
+      enableLoginButtons();
     }
   } finally {
     setLoginSyncBtnState(false);
