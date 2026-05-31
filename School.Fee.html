@@ -1683,152 +1683,14 @@
     </style>
 </head>
 <body>
-    <!-- Login Page -->
-    <div id="loginPage" class="login-container">
-        <div class="login-box">
-            <div class="login-header">
-                <img src="../uploads/CESTI_-_LOGO.png" alt="CESTIS Logo" style="max-width: 120px; margin: 0 auto 1rem; display: block;" onerror="this.style.display='none'">
-                <h1 class="login-title">CESTIS Login</h1>
-                <p class="login-subtitle">Community Educational and Skills Training Institute</p>
-                <p class="login-subtitle">and Services Limited</p>
-            </div>
-
-            <div class="login-error" id="loginError"></div>
-
-            <!-- First-Time User Sync Prompt -->
-            <div class="first-time-sync-prompt" id="firstTimeSyncPrompt">
-                <div class="sync-prompt-icon">☁️</div>
-                <h3>First Time Here?</h3>
-                <p>If you're logging in for the first time or on a new device, please sync with Google Cloud first to get your account data.</p>
-                <button type="button" class="sync-prompt-btn" onclick="initiateLoginPageSync()">
-                    <span>🔄</span> Connect & Sync with Google
-                </button>
-                <div class="sync-prompt-dismiss">
-                    <a onclick="dismissFirstTimePrompt()">I already have local data - skip this</a>
-                </div>
-                <div class="sync-status-message" id="loginSyncStatus" style="display: none;">
-                    <span class="sync-status-icon">⏳</span>
-                    <span class="sync-status-text" id="loginSyncStatusText">Connecting...</span>
-                </div>
-            </div>
-
-            <!-- Step 1: Username & Password -->
-            <div id="loginStep1">
-                <form onsubmit="handleLogin(event)">
-                    <div class="input-group">
-                        <label>Username</label>
-                        <input type="text" id="loginUsername" class="login-input" required autocomplete="username">
-                    </div>
-
-                    <div class="input-group">
-                        <label>Password</label>
-                        <input type="password" id="loginPassword" class="login-input" required autocomplete="current-password">
-                    </div>
-
-                    <button type="submit" class="login-btn">Login</button>
-
-                    <div class="forgot-password-link" style="margin-top: 1rem; text-align: center;">
-                        <a onclick="showForgotPassword()" style="cursor: pointer; color: var(--primary-blue); font-size: 0.9rem;">Forgot Password?</a>
-                    </div>
-                </form>
-            </div>
-
-            <!-- Step 2: 2FA Verification -->
-            <div id="loginStep2FA" style="display: none;" class="twofa-login-step">
-                <p class="login-subtitle">Enter the 6-digit code from your authenticator app</p>
-
-                <div class="input-group">
-                    <input type="text" id="login2FACode" class="twofa-single-input" maxlength="6" pattern="[0-9]*" inputmode="numeric" placeholder="000000" autocomplete="one-time-code">
-                </div>
-
-                <button type="button" class="login-btn" onclick="verify2FALogin()">Verify Code</button>
-
-                <div class="twofa-use-backup">
-                    <a onclick="showBackupCodeInput()">Use a backup code instead</a>
-                </div>
-
-                <div id="backupCodeSection" style="display: none; margin-top: 1rem;">
-                    <div class="input-group">
-                        <label>Backup Code</label>
-                        <input type="text" id="loginBackupCode" class="login-input" placeholder="Enter backup code" style="text-transform: uppercase; letter-spacing: 2px;">
-                    </div>
-                    <button type="button" class="login-btn" onclick="verifyBackupCodeLogin()" style="background: #f59e0b;">Use Backup Code</button>
-                </div>
-
-                <button type="button" class="login-btn" onclick="cancelTwoFALogin()" style="background: transparent; color: #666; border: 1px solid #e0e0e0; margin-top: 0.75rem;">Cancel</button>
-            </div>
-
-            <!-- Step: Forgot Password - Email Entry -->
-            <div id="loginStepForgotPassword" style="display: none;">
-                <p class="login-subtitle" style="margin-bottom: 1rem;">Enter your email address to receive a password reset code</p>
-
-                <div class="input-group">
-                    <label>Email Address</label>
-                    <input type="email" id="forgotPasswordEmail" class="login-input" placeholder="Enter your registered email" autocomplete="email">
-                </div>
-
-                <div class="forgot-password-error" id="forgotPasswordError" style="display: none;"></div>
-
-                <button type="button" class="login-btn" onclick="sendOTPEmail()">Send Reset Code</button>
-                <button type="button" class="login-btn" onclick="cancelForgotPassword()" style="background: transparent; color: #666; border: 1px solid #e0e0e0; margin-top: 0.75rem;">Back to Login</button>
-            </div>
-
-            <!-- Step: OTP Verification -->
-            <div id="loginStepOTP" style="display: none;">
-                <p class="login-subtitle" style="margin-bottom: 1rem;">Enter the 6-digit code sent to your email</p>
-
-                <div class="input-group">
-                    <input type="text" id="otpCode" class="twofa-single-input" maxlength="6" pattern="[0-9]*" inputmode="numeric" placeholder="000000" autocomplete="one-time-code">
-                </div>
-
-                <div class="otp-error" id="otpError" style="display: none;"></div>
-
-                <button type="button" class="login-btn" onclick="verifyOTP()">Verify Code</button>
-
-                <div class="otp-resend" style="margin-top: 1rem; text-align: center;">
-                    <p style="font-size: 0.85rem; color: #666;">Didn't receive the code?</p>
-                    <a onclick="resendOTP()" style="cursor: pointer; color: var(--primary-blue); font-weight: 500;">Resend Code</a>
-                </div>
-
-                <button type="button" class="login-btn" onclick="cancelForgotPassword()" style="background: transparent; color: #666; border: 1px solid #e0e0e0; margin-top: 0.75rem;">Cancel</button>
-            </div>
-
-            <!-- Step: New Password Entry -->
-            <div id="loginStepNewPassword" style="display: none;">
-                <p class="login-subtitle" style="margin-bottom: 1rem;">Enter your new password</p>
-
-                <div class="input-group">
-                    <label>New Password</label>
-                    <input type="password" id="newPasswordInput" class="login-input" placeholder="Enter new password (min 8 characters)" autocomplete="new-password">
-                </div>
-
-                <div class="input-group">
-                    <label>Confirm Password</label>
-                    <input type="password" id="confirmPasswordInput" class="login-input" placeholder="Confirm your new password" autocomplete="new-password">
-                </div>
-
-                <div class="new-password-error" id="newPasswordError" style="display: none;"></div>
-
-                <button type="button" class="login-btn" onclick="resetPassword()">Reset Password</button>
-                <button type="button" class="login-btn" onclick="cancelForgotPassword()" style="background: transparent; color: #666; border: 1px solid #e0e0e0; margin-top: 0.75rem;">Cancel</button>
-            </div>
-
-            <div class="login-footer">
-                <p>Secure Access Only</p>
-                <p style="margin-top: 0.5rem; font-size: 0.75rem;">Contact administrator for access issues</p>
-            </div>
-        </div>
-    </div>
+    <!-- Login page removed: page runs embedded in the authenticated LMS dashboard -->
 
     <!-- Main Dashboard (Hidden until login) -->
     <div id="mainDashboard" style="display: none;">
     <div class="container">
         <div class="header">
             <div style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 1.5rem;">
-                <button class="logout-btn" onclick="handleLogout()">
-                    <span>🚪</span>
-                    <span>Logout</span>
-                </button>
+                <span></span>
                 <div style="display: flex; align-items: center; gap: 1rem;">
                     <span id="currentUserDisplay" style="font-size: 0.9rem; color: #ffffff; font-weight: 600;"></span>
 
@@ -2106,6 +1968,7 @@
                             <th>Paid</th>
                             <th>Balance</th>
                             <th>Status</th>
+                            <th>Stage</th>
                             <th>Actions</th>
                         </tr>
                     </thead>
@@ -3143,19 +3006,14 @@
 
         // Handle logout
         function handleLogout() {
-            if (confirm('Are you sure you want to logout?')) {
-                stopAutoSync();
-                stopSessionTimer();
-                currentUser = null;
-                sessionStorage.removeItem('cestiCurrentUser');
-
-                document.getElementById('loginPage').style.display = 'flex';
-                document.getElementById('mainDashboard').style.display = 'none';
-
-                // Clear login form
-                document.getElementById('loginUsername').value = '';
-                document.getElementById('loginPassword').value = '';
-            }
+            // Login removed: this page is embedded in the authenticated LMS
+            // dashboard, so "logout" here just returns to the parent dashboard
+            // (when embedded) rather than showing a login page.
+            try {
+                if (window.parent && window.parent !== window) {
+                    window.parent.postMessage({ type: 'cestis-fee-logout' }, '*');
+                }
+            } catch (e) {}
         }
 
         // ========== SESSION INACTIVITY TIMEOUT ==========
@@ -3172,13 +3030,9 @@
         const SESSION_ACTIVITY_EVENTS = ['mousemove', 'mousedown', 'keydown', 'scroll', 'touchstart', 'click'];
 
         function startSessionTimer() {
-            stopSessionTimer(); // clear any existing timers
-            // Set a timer to show the warning 60s before expiry
-            sessionInactivityTimer = setTimeout(showSessionWarning, SESSION_TIMEOUT_MS - SESSION_WARNING_MS);
-            // Listen for user activity
-            SESSION_ACTIVITY_EVENTS.forEach(function(evt) {
-                document.addEventListener(evt, resetSessionTimer, { passive: true });
-            });
+            // Login removed: the inactivity auto-logout is disabled so users are
+            // never bounced to a (now non-existent) login page.
+            stopSessionTimer();
         }
 
         function stopSessionTimer() {
@@ -3242,15 +3096,11 @@
 
         // User clicked "Logout Now" or timer expired
         function sessionTimeoutLogout() {
-            stopAutoSync();
-            stopSessionTimer();
-            currentUser = null;
-            sessionStorage.removeItem('cestiCurrentUser');
-
-            document.getElementById('loginPage').style.display = 'flex';
-            document.getElementById('mainDashboard').style.display = 'none';
-
-            // Clear login form
+            // Login removed: never bounce to a login page. Just dismiss any warning.
+            hideSessionWarning();
+            return;
+            // (legacy code below is unreachable)
+            // eslint-disable-next-line no-unreachable
             document.getElementById('loginUsername').value = '';
             document.getElementById('loginPassword').value = '';
         }
@@ -4225,26 +4075,29 @@
             // Load fee structure from storage
             loadFeeStructure();
             
-            // Check for existing session
+            // Login removed: this page runs embedded in the authenticated LMS
+            // dashboard, so go straight into the app with an Admin session.
             const savedSession = sessionStorage.getItem('cestiCurrentUser');
             if (savedSession) {
-                currentUser = JSON.parse(savedSession);
-                document.getElementById('loginPage').style.display = 'none';
-                document.getElementById('mainDashboard').style.display = 'block';
-                document.getElementById('currentUserDisplay').textContent = `👤 ${currentUser.fullName} (${currentUser.role})`;
-                updateUIForUserRole();
-                // Render 2FA status and initialize cloud sync for restored session
-                render2FAStatus();
-                initializeCloudSync();
-                // Start session inactivity timer for restored session
-                startSessionTimer();
-            } else {
-                // Show login page
-                document.getElementById('loginPage').style.display = 'flex';
-                document.getElementById('mainDashboard').style.display = 'none';
-                // Check if we should show first-time sync prompt
-                checkFirstTimeSyncPrompt();
+                try { currentUser = JSON.parse(savedSession); } catch (e) { currentUser = null; }
             }
+            if (!currentUser) {
+                // Use the stored admin account, or fall back to a built-in Admin.
+                currentUser = (Array.isArray(users) && users.find(u => u && u.role === 'Admin'))
+                    || (Array.isArray(users) && users[0])
+                    || { id: 'ADMIN001', fullName: 'CESTIS Administrator', username: 'Cestisadmin', role: 'Admin', email: 'admin@cestis.edu', department: 'Administration' };
+                try { sessionStorage.setItem('cestiCurrentUser', JSON.stringify(currentUser)); } catch (e) {}
+            }
+            const loginPageEl = document.getElementById('loginPage');
+            if (loginPageEl) loginPageEl.style.display = 'none';
+            const mainDashEl = document.getElementById('mainDashboard');
+            if (mainDashEl) mainDashEl.style.display = 'block';
+            const userDisp = document.getElementById('currentUserDisplay');
+            if (userDisp) userDisp.textContent = `👤 ${currentUser.fullName} (${currentUser.role})`;
+            updateUIForUserRole();
+            render2FAStatus();
+            initializeCloudSync();
+            startSessionTimer();
 
             loadData();
             renderFeeStructure();
@@ -4376,6 +4229,44 @@
             broadcastStudentsToParent();
         }
 
+        // --- Academic stage (from the LMS Student Progress dashboard) ---------
+        // The dashboard owns each student's training stage/progress; we read it
+        // from voctrain_students (and live messages) so the fee table can show it.
+        const STAGE_LABELS = { testing:'Testing', interview:'Interview', training:'In Training', certified:'Certified', collected:'Collected', incomplete:'Incomplete' };
+        const STAGE_COLORS = { testing:'#1565C0', interview:'#7B1FA2', training:'#F57C00', certified:'#2E7D32', collected:'#1B5E20', incomplete:'#C62828' };
+        let lmsStudentCache = [];
+        function refreshLmsStudentCache() {
+            try {
+                const raw = CESTISStore.getItem('voctrain_students');
+                lmsStudentCache = raw ? (JSON.parse(raw) || []) : [];
+                if (!Array.isArray(lmsStudentCache)) lmsStudentCache = [];
+            } catch (e) { lmsStudentCache = []; }
+        }
+        function getStudentStage(student) {
+            if (!student) return null;
+            if (!lmsStudentCache.length) refreshLmsStudentCache();
+            const norm = v => (v == null ? '' : String(v)).trim().toLowerCase().replace(/\s+/g, ' ');
+            const linkId = 'SF-' + student.id;
+            const m = lmsStudentCache.find(ls => ls && (
+                (student.lmsId && ls.id === student.lmsId) ||
+                ls.id === student.id ||
+                ls.id === linkId ||
+                ls.schoolFeeId === student.id ||
+                (norm(ls.name) === norm(student.name) &&
+                    (!ls.course || !student.skillArea || norm(ls.course) === norm(student.skillArea)))
+            ));
+            return m ? { stage: m.stage || 'testing', progress: (m.progress != null ? m.progress : '') } : null;
+        }
+        function renderStageBadge(student) {
+            const info = getStudentStage(student);
+            if (!info) return '<span style="color: var(--text-secondary); font-size: 0.85rem;">—</span>';
+            const label = STAGE_LABELS[info.stage] || info.stage || '—';
+            const color = STAGE_COLORS[info.stage] || '#1565C0';
+            const pct = (info.progress === '' || info.progress == null) ? '' :
+                ` <span style="color: var(--text-secondary); font-size: 0.75rem;">${info.progress}%</span>`;
+            return `<span style="display:inline-block;padding:2px 8px;border-radius:10px;font-size:0.78rem;font-weight:600;color:#fff;background:${color};">${label}</span>${pct}`;
+        }
+
         // When running inside the LMS dashboard iframe, send the current student
         // list to the parent window. The parent keeps its own CESTISStore cache,
         // so a postMessage is the reliable way to hand it fresh data live.
@@ -4389,6 +4280,87 @@
                 }
             } catch (e) { /* cross-origin or no parent: ignore */ }
         }
+
+        // Receive students from the parent LMS dashboard (added on the Student
+        // Progress page) and merge any new ones into the fee system. The fee page
+        // owns fee/personal data, so we only ADD missing students and backfill
+        // empty fields -- never overwrite existing fee records.
+        function applyStudentsFromParent(incoming) {
+            try {
+                if (!Array.isArray(incoming) || incoming.length === 0) return;
+                if (!Array.isArray(students)) students = [];
+                const norm = v => (v == null ? '' : String(v)).trim().toLowerCase().replace(/\s+/g, ' ');
+                let changed = false;
+
+                incoming.forEach(p => {
+                    if (!p || !p.name) return;
+                    // Map dashboard fields -> fee fields.
+                    const pId = p.id || '';
+                    const pSkill = p.skillArea || p.course || '';
+                    const existing = students.find(s => s && (
+                        (pId && (s.id === pId || s.lmsId === pId)) ||
+                        (s.lmsId && s.lmsId === p.lmsId) ||
+                        (norm(s.name) === norm(p.name) &&
+                            (!s.skillArea || !pSkill || norm(s.skillArea) === norm(pSkill)))
+                    ));
+
+                    if (existing) {
+                        if (pId && existing.lmsId !== pId) { existing.lmsId = pId; changed = true; }
+                        if (pSkill && !existing.skillArea) { existing.skillArea = pSkill; changed = true; }
+                        if (p.email && !existing.email) { existing.email = p.email; changed = true; }
+                        if ((p.contact || p.phone) && !existing.contact) { existing.contact = p.contact || p.phone; changed = true; }
+                        if (p.gender && !existing.gender) { existing.gender = p.gender; changed = true; }
+                        return;
+                    }
+
+                    // New dashboard student: add a fee record with blank fee/personal
+                    // fields for the user to complete here.
+                    students.push({
+                        id: pId || ('STU' + Date.now()),
+                        lmsId: pId,
+                        name: p.name,
+                        skillArea: pSkill,
+                        tuitionFee: 0,
+                        contact: p.contact || p.phone || '',
+                        email: p.email || '',
+                        enrollmentDate: (p.createdAt ? String(p.createdAt).split('T')[0] : new Date().toISOString().split('T')[0]),
+                        dateOfBirth: '',
+                        gender: p.gender || '',
+                        nationalId: '',
+                        address: '',
+                        city: '',
+                        parentName: '',
+                        parentContact: '',
+                        emergencyContact: '',
+                        totalPaid: 0,
+                        balance: 0,
+                        status: 'Outstanding',
+                        createdAt: new Date().toISOString(),
+                        source: 'lms',
+                        needsFeeDetails: true
+                    });
+                    changed = true;
+                });
+
+                if (changed) {
+                    // Persist (saveData re-broadcasts to parent, keeping both in sync)
+                    // and refresh the visible fee views.
+                    saveData();
+                    try { if (typeof renderStudentsTable === 'function') renderStudentsTable(); } catch (e) {}
+                    try { if (typeof populatePaymentStudentSelect === 'function') populatePaymentStudentSelect(); } catch (e) {}
+                    try { if (typeof populateDocumentStudentSelect === 'function') populateDocumentStudentSelect(); } catch (e) {}
+                    try { if (typeof updateDashboard === 'function') updateDashboard(); } catch (e) {}
+                }
+            } catch (e) { console.warn('applyStudentsFromParent failed:', e); }
+        }
+
+        window.addEventListener('message', function (ev) {
+            try {
+                const d = ev && ev.data;
+                if (!d || d.type !== 'cestis-lms-students' || !Array.isArray(d.students)) return;
+                applyStudentsFromParent(d.students);
+            } catch (e) { /* ignore */ }
+        });
 
         // Cross-page sync: mirror School Fee students into the Student
         // Progress dashboard (index.html, key 'voctrain_students') so the
@@ -4628,6 +4600,7 @@
         function renderStudentsTable() {
             const tbody = document.getElementById('studentsTableBody');
             tbody.innerHTML = '';
+            refreshLmsStudentCache(); // pull latest stages from the Progress dashboard
 
             students.forEach((student, index) => {
                 const isSelected = selectedForMerge.includes(index);
@@ -4647,6 +4620,7 @@
                     <td>$${student.totalPaid.toFixed(2)}</td>
                     <td>$${student.balance.toFixed(2)}</td>
                     <td><span class="status-badge status-${getStatusClass(student.status)}">${student.status}</span></td>
+                    <td>${renderStageBadge(student)}</td>
                     <td>
                         <button class="action-btn btn-success" onclick="viewStudent(${index})">View</button>
                         <button class="action-btn" style="background: #FFA726;" onclick="editStudent(${index})">Edit</button>
