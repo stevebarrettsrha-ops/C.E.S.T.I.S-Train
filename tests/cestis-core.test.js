@@ -408,4 +408,50 @@ test('catalogue is shared and freshSkillAreas returns an independent copy', func
   assert.strictEqual(Core.SKILL_AREAS[0].students, 0, 'mutating a copy must not corrupt the source');
 });
 
+/* ---- quarter engine --------------------------------------------------- */
+test('deriveQuarter buckets dates into the correct FY and quarter', function () {
+  assert.deepStrictEqual(Core.deriveQuarter('2026-04-01'), { fy: '2026/2027', q: 1 }, 'Apr -> Q1 of new FY');
+  assert.deepStrictEqual(Core.deriveQuarter('2026-06-30'), { fy: '2026/2027', q: 1 }, 'Jun -> Q1');
+  assert.deepStrictEqual(Core.deriveQuarter('2026-07-01'), { fy: '2026/2027', q: 2 }, 'Jul -> Q2');
+  assert.deepStrictEqual(Core.deriveQuarter('2026-12-31'), { fy: '2026/2027', q: 3 }, 'Dec -> Q3');
+  assert.deepStrictEqual(Core.deriveQuarter('2027-01-15'), { fy: '2026/2027', q: 4 }, 'Jan -> Q4 of SAME FY span');
+  assert.deepStrictEqual(Core.deriveQuarter('2027-03-31'), { fy: '2026/2027', q: 4 }, 'Mar -> Q4');
+  assert.deepStrictEqual(Core.deriveQuarter('2027-04-01'), { fy: '2027/2028', q: 1 }, 'next Apr rolls the FY');
+});
+
+test('deriveQuarter handles ISO timestamps, Date objects and bad input', function () {
+  assert.deepStrictEqual(Core.deriveQuarter('2026-10-05T08:30:00.000Z'), { fy: '2026/2027', q: 3 }, 'ISO timestamp');
+  assert.deepStrictEqual(Core.deriveQuarter(new Date(2026, 3, 10)), { fy: '2026/2027', q: 1 }, 'Date object (April)');
+  assert.strictEqual(Core.deriveQuarter(''), null, 'empty -> null');
+  assert.strictEqual(Core.deriveQuarter(null), null, 'null -> null');
+  assert.strictEqual(Core.deriveQuarter('not-a-date'), null, 'garbage -> null');
+});
+
+test('quarter labels and calendar year are correct', function () {
+  assert.strictEqual(Core.quarterCalendarYear('2026/2027', 1), 2026, 'Q1 is in the first year');
+  assert.strictEqual(Core.quarterCalendarYear('2026/2027', 4), 2027, 'Q4 (Jan-Mar) is in the second year');
+  assert.strictEqual(Core.quarterShortLabel('2026/2027', 1), 'Q1 · Apr–Jun');
+  assert.strictEqual(Core.quarterPeriodLabel('2026/2027', 4), 'Jan–Mar 2027');
+  assert.strictEqual(Core.fyLabel('2026/2027'), 'FY 2026/2027');
+});
+
+test('quarterKey namespaces a base storage key per quarter', function () {
+  assert.strictEqual(Core.quarterKey('voctrain_attendance', '2026/2027', 1), 'voctrain_attendance::2026/2027_Q1');
+});
+
+test('recordInQuarter filters by date, and honours explicit fy/quarter fields', function () {
+  assert.strictEqual(Core.recordInQuarter({ date: '2026-05-10' }, '2026/2027', 1), true, 'May date in Q1');
+  assert.strictEqual(Core.recordInQuarter({ date: '2026-08-10' }, '2026/2027', 1), false, 'Aug date not in Q1');
+  // explicit fields win over the derived date
+  assert.strictEqual(Core.recordInQuarter({ date: '2026-08-10', fy: '2026/2027', quarter: 1 }, '2026/2027', 1), true, 'explicit fy/quarter override');
+  // custom date field name
+  assert.strictEqual(Core.recordInQuarter({ clockIn: '2026-11-02T09:00:00Z' }, '2026/2027', 3, 'clockIn'), true, 'custom date field');
+});
+
+test('sameQuarter compares FY+quarter pairs null-safely', function () {
+  assert.strictEqual(Core.sameQuarter({ fy: '2026/2027', q: 2 }, { fy: '2026/2027', q: 2 }), true);
+  assert.strictEqual(Core.sameQuarter({ fy: '2026/2027', q: 2 }, { fy: '2026/2027', q: 3 }), false);
+  assert.strictEqual(Core.sameQuarter(null, { fy: '2026/2027', q: 2 }), false);
+});
+
 console.log('\nAll ' + passed + ' tests passed.');

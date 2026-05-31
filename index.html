@@ -5083,6 +5083,12 @@ function exportDataBackup() {
     'voctrain_adrStaffMeta','voctrain_adminStaffAccess','voctrain_instructorData','voctrain_certDownloadApprovals',
     'voctrain_skillAreas','voctrain_certTemplates','voctrain_chatRooms','voctrain_chatMessages',
     'voctrain_chatProfiles','voctrain_chatFollows'];
+  // Include every per-quarter attendance bucket so all quarters are backed up.
+  try {
+    (CESTISStore.keys ? CESTISStore.keys() : Object.keys(CESTISStore._cache || {})).forEach(function(k) {
+      if (k && k.indexOf('voctrain_attendance::') === 0 && keys.indexOf(k) === -1) keys.push(k);
+    });
+  } catch(e) {}
   keys.forEach(function(k) {
     var val = CESTISStore.getItem(k);
     if(val) backup.data[k] = safeJsonParse(val, null);
@@ -5838,6 +5844,7 @@ function saveState() {
     CESTISStore.setItem('voctrain_exams', JSON.stringify(exams));
     CESTISStore.setItem('voctrain_announcements', JSON.stringify(announcements));
     CESTISStore.setItem('voctrain_attendance', JSON.stringify(attendanceRecords));
+    if (typeof mirrorActiveAttendance === 'function') mirrorActiveAttendance();
     CESTISStore.setItem('voctrain_users', JSON.stringify(userAccounts));
     CESTISStore.setItem('voctrain_classSessions', JSON.stringify(classSessions));
     CESTISStore.setItem('voctrain_adminMeetings', JSON.stringify(adminMeetings));
@@ -6015,6 +6022,7 @@ function loadState() {
     relinkDependentData(_dedupResult.idMap);
     try { CESTISStore.setItem('voctrain_students', JSON.stringify(students)); } catch(e) {}
     try { CESTISStore.setItem('voctrain_attendance', JSON.stringify(attendanceRecords)); } catch(e) {}
+    try { if (typeof mirrorActiveAttendance === 'function') mirrorActiveAttendance(); } catch(e) {}
     try { CESTISStore.setItem('voctrain_certDownloadApprovals', JSON.stringify(certDownloadApprovals)); } catch(e) {}
     try { CESTISStore.setItem('voctrain_examResults', JSON.stringify(examResults)); } catch(e) {}
     try { saveUserAccounts(); } catch(e) {}
@@ -6207,6 +6215,7 @@ function cestisStabilizeStudentIds() {
   if (!_changed) return false;
   try { CESTISStore.setItem('voctrain_students', JSON.stringify(students)); } catch(e) {}
   try { CESTISStore.setItem('voctrain_attendance', JSON.stringify(attendanceRecords)); } catch(e) {}
+  try { if (typeof mirrorActiveAttendance === 'function') mirrorActiveAttendance(); } catch(e) {}
   try { CESTISStore.setItem('voctrain_certDownloadApprovals', JSON.stringify(certDownloadApprovals)); } catch(e) {}
   try { if (typeof examResults !== 'undefined' && Array.isArray(examResults)) CESTISStore.setItem('voctrain_examResults', JSON.stringify(examResults)); } catch(e) {}
   try { if (typeof saveUserAccounts === 'function') saveUserAccounts(); } catch(e) {}
@@ -6362,7 +6371,88 @@ function reconcileStudentsFromAccounts() {
   return changed;
 }
 
+/* ============================== ATTENDANCE — PER-QUARTER SEPARATION ==========
+   The attendance register is a per-student weekly roster (one record per
+   student), so each financial quarter keeps its OWN roster. We mirror the active
+   quarter into the legacy 'voctrain_attendance' key (so all existing save / load
+   / cloud-sync code keeps working unchanged) AND into a per-quarter bucket key
+   ('voctrain_attendance::<FY>_Q<n>'). Switching quarter (from any page/tab, via
+   the shared quarter bar) swaps the in-memory roster for that quarter's bucket.
+   ----------------------------------------------------------------------------- */
+var ATTENDANCE_BASE_KEY = 'voctrain_attendance';
+var attnLoadedQuarter = null; // {fy,q} currently materialised in attendanceRecords
+
+function attendanceBucketKey(fy, q) { return CESTISCore.quarterKey(ATTENDANCE_BASE_KEY, fy, q); }
+
+// Mirror the in-memory roster into the active quarter's bucket. Called right
+// after every write to the legacy key so the bucket never drifts behind it.
+function mirrorActiveAttendance() {
+  try {
+    var fq = attnLoadedQuarter || CESTISCore.getActiveQuarter();
+    CESTISStore.setItem(attendanceBucketKey(fq.fy, fq.q), JSON.stringify(attendanceRecords));
+  } catch (e) {}
+}
+
+// One-time migration: fold the pre-existing single roster into the current
+// quarter's bucket so today's data lands in the quarter you're in now.
+function migrateAttendanceToQuarters() {
+  if (CESTISStore.getItem('voctrain_attendance_quartered')) return;
+  var cur = CESTISCore.getActiveQuarter();
+  var legacy = CESTISStore.getItem(ATTENDANCE_BASE_KEY);
+  var bucket = CESTISStore.getItem(attendanceBucketKey(cur.fy, cur.q));
+  if (legacy && !bucket) { try { CESTISStore.setItem(attendanceBucketKey(cur.fy, cur.q), legacy); } catch (e) {} }
+  try { CESTISStore.setItem('voctrain_attendance_quartered', '1'); } catch (e) {}
+}
+
+// Materialise a given quarter's roster into attendanceRecords + the legacy key.
+function loadAttendanceForQuarter(fq) {
+  var raw = CESTISStore.getItem(attendanceBucketKey(fq.fy, fq.q));
+  var arr = [];
+  if (raw) { try { arr = JSON.parse(raw) || []; } catch (e) { arr = []; } }
+  attendanceRecords = arr;
+  try { CESTISStore.setItem(ATTENDANCE_BASE_KEY, JSON.stringify(arr)); } catch (e) {}
+  attnLoadedQuarter = { fy: fq.fy, q: fq.q };
+}
+
+// Ensure every current student has a row in the active quarter's roster
+// (default: absent all week). Lets a freshly-selected empty quarter still list
+// everyone. Returns true if any record was added.
+function backfillAttendanceRoster() {
+  if (typeof students === 'undefined' || !Array.isArray(students)) return false;
+  var seen = {};
+  attendanceRecords.forEach(function (r) { if (r) seen[r.studentId] = true; });
+  var added = false;
+  students.forEach(function (s) {
+    if (!seen[s.id]) {
+      attendanceRecords.push({
+        studentId: s.id, studentName: s.name, course: s.course,
+        date: new Date().toISOString().split('T')[0],
+        days: { Mon: 'absent', Tue: 'absent', Wed: 'absent', Thu: 'absent', Fri: 'absent' }
+      });
+      added = true;
+    }
+  });
+  return added;
+}
+
+function initAttendanceQuarters() {
+  migrateAttendanceToQuarters();
+  loadAttendanceForQuarter(CESTISCore.getActiveQuarter());
+  CESTISCore.onQuarterChange(function (next) {
+    // Persist the roster we were showing, then swap in the newly-selected quarter.
+    mirrorActiveAttendance();
+    loadAttendanceForQuarter(next);
+    backfillAttendanceRoster();
+    if (typeof dedupeAttendanceRecords === 'function') { try { dedupeAttendanceRecords(); } catch (e) {} }
+    try { CESTISStore.setItem(ATTENDANCE_BASE_KEY, JSON.stringify(attendanceRecords)); } catch (e) {}
+    mirrorActiveAttendance();
+    if (typeof renderAttendancePage === 'function') { try { renderAttendancePage(); } catch (e) {} }
+    if (typeof renderInstructorAttendance === 'function' && document.getElementById('iAttendanceTableBody')) { try { renderInstructorAttendance(); } catch (e) {} }
+  });
+}
+
 loadState();
+initAttendanceQuarters();
 applyGoogleVerificationMeta();
 // Check and apply maintenance mode on page load
 checkMaintenanceOnLoad();
@@ -8040,6 +8130,7 @@ var cestisFeatureConfig = {
     onMount: function() {
       cestisSetAttDate();
       cestisSafe('populateCourseDropdowns');
+      cestisMountAttQuarterBar('attendanceQuarterBar', 'renderAttendancePage');
       cestisSafe('renderAttendancePage');
     }
   },
@@ -8117,6 +8208,7 @@ var cestisFeatureConfig = {
   'i-attendance': {
     file: 'Pages/Instructor-Attendance.html',
     onMount: function() {
+      cestisMountAttQuarterBar('iAttendanceQuarterBar', 'renderInstructorAttendance');
       cestisInitIAttendance();
     }
   },
@@ -8147,6 +8239,7 @@ var cestisFeatureConfig = {
   'as-attendance': {
     file: 'Pages/AdminStaff-Attendance.html',
     onMount: function() {
+      cestisMountAttQuarterBar('asAttendanceQuarterBar', 'renderAsAttendance');
       cestisSafe('renderAsAttendance');
     }
   },
@@ -8202,6 +8295,22 @@ var cestisFeatureConfig = {
 
 // ---- Helpers for externally hosted admin feature pages (run from onMount) ----
 function cestisSetAttDate(){ var el=document.getElementById('attendanceDate'); if(el && !el.value){ el.value=new Date().toISOString().split('T')[0]; } }
+// Mount the shared FY/quarter selector bar above an attendance view. The global
+// onQuarterChange handler (initAttendanceQuarters) swaps the roster data; the
+// bar's onChange just re-renders this particular view once the swap has run.
+var _cestisQuarterBars = {};
+function cestisMountAttQuarterBar(barId, renderFn){
+  try {
+    if(typeof CESTISCore==='undefined' || !CESTISCore.mountQuarterBar) return;
+    if(!document.getElementById(barId)) return;
+    // The fragment is re-injected on every visit, so tear down any previous bar
+    // (and its quarter-change subscription) before mounting a fresh one.
+    if(_cestisQuarterBars[barId] && typeof _cestisQuarterBars[barId].destroy === 'function'){
+      try { _cestisQuarterBars[barId].destroy(); } catch(e) {}
+    }
+    _cestisQuarterBars[barId] = CESTISCore.mountQuarterBar(barId, { onChange: function(){ cestisSafe(renderFn); } });
+  } catch(e) { console.warn('[QuarterBar] mount error', e); }
+}
 function renderExamsUpcoming(){ if(typeof renderExams==='function'){ try{ renderExams('upcoming'); }catch(e){} } }
 function cestisCertsAll(){ if(typeof renderCerts==='function'){ try{ renderCerts('all',''); }catch(e){} } }
 function cestisInitIAttendance(){ var d=document.getElementById('iAttendanceDate'); if(d && !d.value){ d.value=new Date().toISOString().split('T')[0]; } var lbl=document.getElementById('iAttCourseLabel'); if(lbl && typeof currentInstructor!=='undefined' && currentInstructor){ lbl.textContent='— '+currentInstructor.course; } if(typeof renderInstructorAttendance==='function'){ try{ renderInstructorAttendance(); }catch(e){} } }
@@ -14568,6 +14677,7 @@ window.addEventListener('message', function(e) {
       relinkDependentData(_dr2.idMap);
       try { CESTISStore.setItem('voctrain_students', JSON.stringify(students)); } catch(e2) {}
       try { CESTISStore.setItem('voctrain_attendance', JSON.stringify(attendanceRecords)); } catch(e2) {}
+      try { if (typeof mirrorActiveAttendance === 'function') mirrorActiveAttendance(); } catch(e2) {}
       try { CESTISStore.setItem('voctrain_certDownloadApprovals', JSON.stringify(certDownloadApprovals)); } catch(e2) {}
       try { saveUserAccounts(); } catch(e2) {}
     }
