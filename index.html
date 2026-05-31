@@ -6176,18 +6176,41 @@ function cestisStabilizeStudentIds() {
     examResults: (typeof examResults !== 'undefined' && Array.isArray(examResults)) ? examResults : []
   };
   var res = CESTISCore.migrateToStableIds(bundle);
-  if (!res || !res.changed) return false;
   students = bundle.students;
   userAccounts = bundle.userAccounts;
   attendanceRecords = bundle.attendanceRecords;
   certDownloadApprovals = bundle.certDownloadApprovals;
   if (typeof examResults !== 'undefined' && Array.isArray(examResults)) examResults = bundle.examResults;
+
+  // Tombstone enforcement: drop any student that was deleted (matched on id OR
+  // stable id) and purge their dependent records. Runs every time, so a deleted
+  // student re-added by ANY path is removed again here. This closes the
+  // account/cloud/fee resurrection vectors at a single chokepoint.
+  var _droppedTomb = 0;
+  if (typeof CESTISCore.dropTombstonedStudents === 'function') {
+    var _del = (typeof _getDeletedStudentIds === 'function') ? _getDeletedStudentIds() : {};
+    if (_del && Object.keys(_del).length) {
+      var _dt = CESTISCore.dropTombstonedStudents(students, _del);
+      if (_dt.removed > 0) {
+        students = _dt.students;
+        var _gone = {}; _dt.droppedIds.forEach(function(id){ _gone[id] = true; });
+        if (Array.isArray(attendanceRecords)) attendanceRecords = attendanceRecords.filter(function(r){ return !(r && _gone[r.studentId]); });
+        if (typeof examResults !== 'undefined' && Array.isArray(examResults)) examResults = examResults.filter(function(r){ return !(r && _gone[r.studentId]); });
+        if (Array.isArray(certDownloadApprovals)) certDownloadApprovals = certDownloadApprovals.filter(function(c){ return !(c && _gone[c.studentId]); });
+        if (Array.isArray(userAccounts)) userAccounts = userAccounts.filter(function(u){ return !(u && _gone[u.studentDataId]); });
+        _droppedTomb = _dt.removed;
+      }
+    }
+  }
+
+  var _changed = (res && res.changed) || _droppedTomb > 0;
+  if (!_changed) return false;
   try { CESTISStore.setItem('voctrain_students', JSON.stringify(students)); } catch(e) {}
   try { CESTISStore.setItem('voctrain_attendance', JSON.stringify(attendanceRecords)); } catch(e) {}
   try { CESTISStore.setItem('voctrain_certDownloadApprovals', JSON.stringify(certDownloadApprovals)); } catch(e) {}
   try { if (typeof examResults !== 'undefined' && Array.isArray(examResults)) CESTISStore.setItem('voctrain_examResults', JSON.stringify(examResults)); } catch(e) {}
   try { if (typeof saveUserAccounts === 'function') saveUserAccounts(); } catch(e) {}
-  try { console.log('[stableId] remapped ' + Object.keys(res.idMap).length + ' id(s), removed ' + res.removed + ' duplicate(s)'); } catch(e) {}
+  try { console.log('[stableId] remapped ' + Object.keys((res&&res.idMap)||{}).length + ' id(s), removed ' + ((res&&res.removed)||0) + ' duplicate(s), ' + _droppedTomb + ' tombstoned'); } catch(e) {}
   return true;
 }
 
@@ -6228,6 +6251,18 @@ function reconcileStudentsFromAccounts() {
   userAccounts.forEach(function(u) {
     if (u.role !== 'student') return;
     if (u.status === 'pending') return; // Don't create records for unapproved accounts
+
+    // Honor the deletion tombstone: never recreate a student that was deleted,
+    // whether the account still points at its (stable) id or resolves to it by
+    // name+programme. This closes the "deleted student resurrected via its
+    // re-synced account" hole.
+    if (typeof isStudentDeleted === 'function') {
+      if (u.studentDataId && isStudentDeleted(u.studentDataId)) return;
+      if (window.CESTISCore && u.name) {
+        var _delSid = CESTISCore.stableStudentId({ name: u.name, course: u.programme || '' });
+        if (_delSid && isStudentDeleted(_delSid)) return;
+      }
+    }
 
     // Check if a student record already exists
     if (u.studentDataId && studentIds[u.studentDataId]) return;
@@ -13547,7 +13582,7 @@ async function recoverCourseDataFromCloud(courseName) {
     // Recover students from cloud that match this course
     if (Array.isArray(backupData.data.students)) {
       backupData.data.students.forEach(function(cloudStudent) {
-        if (isStudentDeleted(cloudStudent && cloudStudent.id)) return;
+        if (cestisIsStudentTombstoned(cloudStudent)) return;
         if (!cloudStudent.course || cloudStudent.course.toLowerCase().trim() !== courseNameLower) return;
         // Skip if already exists locally (by ID or by name+course)
         var exists = students.some(function(s) {
@@ -14982,8 +15017,10 @@ function confirmDeleteStudent() {
     userAccounts = userAccounts.filter(function(u){ return u.studentDataId !== sid; });
     if(typeof saveUserAccounts === 'function') saveUserAccounts();
   }
-  // Tombstone the ID so cloud-merge skips it instead of resurrecting it.
+  // Tombstone the ID (and its stable id) so cloud-merge / account-reconcile skip
+  // it instead of resurrecting it — even if a copy returns under a different id.
   recordDeletedStudent(sid);
+  if (window.CESTISCore) { var _stableSid = CESTISCore.stableStudentId(s); if (_stableSid && _stableSid !== sid) recordDeletedStudent(_stableSid); }
   closeModal('deleteStudentModal');
   filterStudents();
   updatePipelineCounts();
@@ -15120,6 +15157,15 @@ function _getDeletedStudentIds() {
 function isStudentDeleted(id) {
   if(!id) return false;
   return _getDeletedStudentIds()[id] === true;
+}
+// True if this student record is tombstoned, matching on BOTH its current id and
+// its deterministic stable id — so a deleted student carrying a legacy/fee id is
+// still recognised as deleted at every cloud-merge / recovery add site.
+function cestisIsStudentTombstoned(stu) {
+  if (!stu) return false;
+  if (isStudentDeleted(stu.id)) return true;
+  if (window.CESTISCore) { var sid = CESTISCore.stableStudentId(stu); if (sid && isStudentDeleted(sid)) return true; }
+  return false;
 }
 function recordDeletedStudent(id) {
   if(!id) return;
@@ -19760,7 +19806,7 @@ async function mergeFromCloud() {
     // Uses lastModified timestamp when available for conflict resolution
     if (backupData.data.students) {
       backupData.data.students.forEach(cloudStudent => {
-        if (isStudentDeleted(cloudStudent.id)) return; // Honor tombstone
+        if (cestisIsStudentTombstoned(cloudStudent)) return; // Honor tombstone (id + stable id)
         if (_demoStudentIds[cloudStudent.id]) return; // Skip legacy demo data
         var localMatch = students.find(function(s) {
           if (s.id === cloudStudent.id) return true;
@@ -20659,7 +20705,7 @@ async function silentMergeFromBackup(fileId) {
     // Merge students — timestamp-based update for existing, add new ones
     if (backupData.data.students) {
       backupData.data.students.forEach(cloudStudent => {
-        if (isStudentDeleted(cloudStudent.id)) return; // Honor tombstone
+        if (cestisIsStudentTombstoned(cloudStudent)) return; // Honor tombstone (id + stable id)
         if (_ds[cloudStudent.id]) return;
         var localMatch = students.find(function(s) {
           if (s.id === cloudStudent.id) return true;
@@ -21319,7 +21365,7 @@ async function autoSyncOnLogin() {
           // Recover students
           if (Array.isArray(_backupData.data.students)) {
             _backupData.data.students.forEach(function(cs) {
-              if (isStudentDeleted(cs && cs.id)) return;
+              if (cestisIsStudentTombstoned(cs)) return;
               if (!cs.course || cs.course.toLowerCase().trim() !== _courseNameLower) return;
               var exists = students.some(function(s) {
                 return s.id === cs.id || (s.name === cs.name && s.course && s.course.toLowerCase().trim() === _courseNameLower);
@@ -22119,7 +22165,7 @@ async function studentLightSync(uname, pw) {
 
     // Merge student records
     cloudStudents.forEach(function(cs) {
-      if (isStudentDeleted(cs && cs.id)) return;
+      if (cestisIsStudentTombstoned(cs)) return;
       if (!students.find(function(ls) { return ls.id === cs.id; })) {
         students.push(cs);
       } else {
@@ -29370,7 +29416,7 @@ async function fetchCertDataFromDrive() {
     if (backupData.data.students && Array.isArray(backupData.data.students)) {
       backupData.data.students.forEach(function(cloudStudent) {
         if (!cloudStudent || !cloudStudent.id) return;
-        if (isStudentDeleted(cloudStudent.id)) return; // Honor tombstone
+        if (cestisIsStudentTombstoned(cloudStudent)) return; // Honor tombstone (id + stable id)
         var existing = students.find(function(s) { return s.id === cloudStudent.id; });
         if (existing) {
           // Update cert-relevant fields from cloud

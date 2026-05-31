@@ -467,10 +467,30 @@ function cestisStabilizeStudentIds() {
     examResults: (Array.isArray(examResults) ? examResults : [])
   };
   var res = CESTISCore.migrateToStableIds(bundle);
-  if (!res || !res.changed) return false;
   students = bundle.students; userAccounts = bundle.userAccounts;
   attendanceRecords = bundle.attendanceRecords; certDownloadApprovals = bundle.certDownloadApprovals;
   if (Array.isArray(examResults)) examResults = bundle.examResults;
+
+  // Tombstone enforcement: remove any deleted student that re-appeared (by id or
+  // stable id) and purge their dependent records — same chokepoint as the dashboard.
+  var droppedTomb = 0;
+  if (typeof CESTISCore.dropTombstonedStudents === 'function') {
+    var del = CESTISCore.readDeletedIds(CESTISStore);
+    if (del && Object.keys(del).length) {
+      var dt = CESTISCore.dropTombstonedStudents(students, del);
+      if (dt.removed > 0) {
+        students = dt.students;
+        var gone = {}; dt.droppedIds.forEach(function(id){ gone[id] = true; });
+        if (Array.isArray(attendanceRecords)) attendanceRecords = attendanceRecords.filter(function(r){ return !(r && gone[r.studentId]); });
+        if (Array.isArray(examResults)) examResults = examResults.filter(function(r){ return !(r && gone[r.studentId]); });
+        if (Array.isArray(certDownloadApprovals)) certDownloadApprovals = certDownloadApprovals.filter(function(c){ return !(c && gone[c.studentId]); });
+        if (Array.isArray(userAccounts)) userAccounts = userAccounts.filter(function(u){ return !(u && gone[u.studentDataId]); });
+        droppedTomb = dt.removed;
+      }
+    }
+  }
+
+  if (!((res && res.changed) || droppedTomb > 0)) return false;
   saveData();
   return true;
 }

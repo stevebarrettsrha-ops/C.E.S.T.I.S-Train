@@ -315,11 +315,78 @@ test('reconcileSnapshot restores missing records without resurrecting deletes', 
   assert.strictEqual(res.recoveredStudents, 1);
   assert.strictEqual(res.store.voctrain_systemSettings, JSON.stringify({ theme: 'x' }), 'empty config restored');
 });
+test('reconcileSnapshot unions tombstones and drops a now-tombstoned local student', function () {
+  // Device A deleted Mary -> the snapshot carries the tombstone but not Mary.
+  // Device B still has Mary locally and no tombstone. After reconcile, B must
+  // gain the tombstone AND drop Mary (deleted data cannot re-emerge anywhere).
+  var maryId = 'STU-MARY';
+  var snap = Core.buildSnapshot({
+    voctrain_students: JSON.stringify([{ id: 'STU-keep', name: 'Sam', course: 'Welding' }]),
+    voctrain_deletedStudentIds: JSON.stringify([maryId])
+  }, {});
+  var local = {
+    voctrain_students: JSON.stringify([
+      { id: maryId, name: 'Mary', course: 'Cosmetology' },
+      { id: 'STU-keep', name: 'Sam', course: 'Welding' }
+    ]),
+    voctrain_deletedStudentIds: JSON.stringify([])
+  };
+  var res = Core.reconcileSnapshot(snap, local);
+  assert.ok(res.changed);
+  var ids = JSON.parse(res.store.voctrain_students).map(function (s) { return s.id; });
+  assert.strictEqual(ids.indexOf(maryId), -1, 'tombstoned Mary dropped on device B');
+  assert.ok(ids.indexOf('STU-keep') !== -1, 'Sam kept');
+  assert.ok(JSON.parse(res.store.voctrain_deletedStudentIds).indexOf(maryId) !== -1, 'tombstone propagated to device B');
+  assert.ok(res.droppedTombstoned >= 1);
+});
 test('reconcileSnapshot is a no-op when local already has everything', function () {
   var data = { voctrain_students: JSON.stringify([{ id: 'STU-A', name: 'A', course: 'C' }]) };
   var snap = Core.buildSnapshot(data, {});
   var res = Core.reconcileSnapshot(snap, data);
   assert.strictEqual(res.changed, false);
+});
+
+/* ---- tombstone resurrection prevention -------------------------------- */
+test('dropTombstonedStudents removes a student matched by its current id', function () {
+  var students = [{ id: 'STU-A', name: 'A', course: 'C' }, { id: 'STU-B', name: 'B', course: 'C' }];
+  var del = { 'STU-A': true };
+  var r = Core.dropTombstonedStudents(students, del);
+  assert.strictEqual(r.removed, 1);
+  assert.deepStrictEqual(r.students.map(function (s) { return s.id; }), ['STU-B']);
+  assert.deepStrictEqual(r.droppedIds, ['STU-A']);
+});
+test('dropTombstonedStudents catches a resurrected copy carrying a DIFFERENT id', function () {
+  // Student was deleted; its stable id was tombstoned. A cloud/fee copy returns
+  // under a legacy id but the same name+course -> must still be dropped.
+  var person = { name: 'Mary Jane', course: 'Cosmetology' };
+  var stable = Core.stableStudentId(person);
+  var resurrected = { id: 'SF-legacy-999', name: 'mary  jane', course: 'COSMETOLOGY' };
+  var r = Core.dropTombstonedStudents([resurrected, { id: 'STU-keep', name: 'Sam', course: 'Welding' }], (function () { var m = {}; m[stable] = true; return m; })());
+  assert.strictEqual(r.removed, 1, 'resurrected copy dropped via stable-id match');
+  assert.deepStrictEqual(r.students.map(function (s) { return s.id; }), ['STU-keep']);
+});
+test('dropTombstonedStudents keeps everything when nothing is tombstoned', function () {
+  var students = [{ id: 'STU-A', name: 'A', course: 'C' }];
+  var r = Core.dropTombstonedStudents(students, {});
+  assert.strictEqual(r.removed, 0);
+  assert.strictEqual(r.students.length, 1);
+});
+test('end-to-end: tombstoned student survives neither migration nor a re-add', function () {
+  // Simulate: delete Mary (tombstone her stable id), then a sync re-adds her
+  // under a fresh unstable id. After stabilize + drop she must be gone.
+  var mary = { name: 'Mary Jane', course: 'Cosmetology' };
+  var stable = Core.stableStudentId(mary);
+  var del = {}; del[stable] = true;
+  var students = [
+    { id: 'STU-1700000000001', name: 'Mary Jane', course: 'Cosmetology' }, // re-added copy
+    { id: 'STU-keep', name: 'Sam Okafor', course: 'Welding & Fabrication' }
+  ];
+  // migrate first (as the app does, which restabilises every id), then drop tombstoned
+  var bundle = { students: students };
+  Core.migrateToStableIds(bundle);
+  var r = Core.dropTombstonedStudents(bundle.students, del);
+  assert.strictEqual(r.students.length, 1, 'only one student remains');
+  assert.strictEqual(Core.normName(r.students[0].name), 'sam okafor', 'Mary stays deleted, Sam remains');
 });
 
 /* ---- catalogue -------------------------------------------------------- */

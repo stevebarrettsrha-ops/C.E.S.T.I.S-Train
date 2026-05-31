@@ -368,6 +368,28 @@
     } catch (e) {}
   };
 
+  // Drop any student that has been tombstoned (deleted), matching on BOTH the
+  // record's current id and its deterministic stable id. This is the single
+  // chokepoint that prevents a deleted student from re-emerging no matter which
+  // path re-added them (cloud merge under a legacy/fee id, account reconcile,
+  // recovery, etc.) — because even a copy carrying a different id resolves to
+  // the same tombstoned stable id. Returns the kept list + the dropped ids so
+  // callers can purge dependent records.
+  Core.dropTombstonedStudents = function (students, deletedMap) {
+    deletedMap = deletedMap || {};
+    var dropped = {};
+    var kept = (students || []).filter(function (s) {
+      if (!s) return false;
+      var sid = Core.stableStudentId(s);
+      if (deletedMap[s.id] === true || (sid && deletedMap[sid] === true)) {
+        if (s.id != null) dropped[s.id] = true;
+        return false;
+      }
+      return true;
+    });
+    return { students: kept, droppedIds: Object.keys(dropped), removed: (students ? students.length : 0) - kept.length };
+  };
+
   /* --- Lightweight change bus -------------------------------------------
      A single in-page pub/sub plus an optional cross-document (postMessage)
      bridge so any page can announce "students changed" and every listener —
@@ -406,6 +428,11 @@
     'voctrain_certDownloadApprovals', 'voctrain_instructorData',
     'cestiSchoolFeeStudents', 'cestiSchoolFeePayments'
   ];
+
+  // Deletion-tombstone keys. These are UNIONED (never overwritten) during
+  // reconcile because tombstones only ever grow — that is how a delete on one
+  // device propagates to all others so deleted data cannot re-emerge anywhere.
+  Core.TOMBSTONE_UNION_KEYS = ['voctrain_deletedStudentIds', 'cestiSchoolFeeDeletedLmsIds'];
 
   // Keys that must NEVER leave the device inside a shared snapshot: auth tokens,
   // session pointers, per-device Drive metadata and volatile UI flags. Excluding
@@ -520,14 +547,26 @@
     var out = {}; var k;
     for (k in localStoreMap) { if (Object.prototype.hasOwnProperty.call(localStoreMap, k)) out[k] = localStoreMap[k]; }
     var snapStore = (snapshot && snapshot.store) || {};
-    var result = { store: out, changed: false, restored: {}, recoveredStudents: 0, restoredKeys: [] };
+    var result = { store: out, changed: false, restored: {}, recoveredStudents: 0, restoredKeys: [], droppedTombstoned: 0 };
 
-    var deleted = {};
-    Core._parseArr(localStoreMap['voctrain_deletedStudentIds']).forEach(function (id) { if (id) deleted[id] = true; });
+    // 1) Union deletion tombstones (local + snapshot). Tombstones only grow, so
+    //    unioning is always safe — this propagates a delete made on one device to
+    //    every other device so deleted data cannot re-emerge anywhere.
+    Core.TOMBSTONE_UNION_KEYS.forEach(function (tk) {
+      var snapIds = Core._parseArr(snapStore[tk]);
+      if (!snapIds.length) return;
+      var set = {}; Core._parseArr(localStoreMap[tk]).forEach(function (id) { if (id) set[id] = true; });
+      var addedAny = false;
+      snapIds.forEach(function (id) { if (id && !set[id]) { set[id] = true; addedAny = true; } });
+      if (addedAny) { out[tk] = JSON.stringify(Object.keys(set)); result.changed = true; if (result.restoredKeys.indexOf(tk) === -1) result.restoredKeys.push(tk); }
+    });
+    var deletedStudents = {};
+    Core._parseArr(localStoreMap['voctrain_deletedStudentIds']).forEach(function (id) { if (id) deletedStudents[id] = true; });
+    Core._parseArr(snapStore['voctrain_deletedStudentIds']).forEach(function (id) { if (id) deletedStudents[id] = true; });
 
-    // id-keyed array collections: union, add-missing, keep local on id clash.
+    // 2) id-keyed array collections: union (add-missing), keep local on id clash.
     Core.SNAPSHOT_COUNT_KEYS.forEach(function (key) {
-      if (!(key in snapStore)) return;
+      var isStudents = (key === 'voctrain_students');
       var snapArr = Core._parseArr(snapStore[key]);
       var locArr = Core._parseArr(localStoreMap[key]);
       var byId = {}; var order = [];
@@ -535,24 +574,32 @@
       var added = 0;
       snapArr.forEach(function (r) {
         if (!r || r.id == null) return;
-        if (key === 'voctrain_students' && deleted[r.id]) return; // honor tombstone
+        if (isStudents && deletedStudents[r.id]) return; // honor tombstone on add
         if (!(r.id in byId)) { byId[r.id] = r; order.push(r.id); added++; }
       });
-      if (added > 0) {
-        var merged = order.map(function (id) { return byId[id]; });
-        if (key === 'voctrain_students') {
-          var dr = Core.dedupeStudents(merged); merged = dr.students;
-          result.recoveredStudents += added;
-        }
+      var merged = order.map(function (id) { return byId[id]; });
+      var changedHere = (added > 0);
+      if (isStudents) {
+        // Drop any student (local OR added) that is now tombstoned, then dedupe.
+        var dropRes = Core.dropTombstonedStudents(merged, deletedStudents);
+        if (dropRes.removed > 0) { merged = dropRes.students; result.droppedTombstoned += dropRes.removed; changedHere = true; }
+        var dr = Core.dedupeStudents(merged);
+        if (dr.removed > 0) changedHere = true;
+        merged = dr.students;
+        result.recoveredStudents += added;
+      }
+      if (changedHere) {
         out[key] = JSON.stringify(merged);
-        result.restored[key] = added;
+        if (added > 0) result.restored[key] = added;
         result.changed = true;
       }
     });
 
-    // Any other snapshot key absent or empty locally: restore (fill-only).
+    // 3) Any other snapshot key absent or empty locally: restore (fill-only),
+    //    excluding the count keys and tombstone keys already handled above.
     Object.keys(snapStore).forEach(function (key) {
       if (Core.SNAPSHOT_COUNT_KEYS.indexOf(key) !== -1) return;
+      if (Core.TOMBSTONE_UNION_KEYS.indexOf(key) !== -1) return;
       var local = localStoreMap[key];
       var localEmpty = (local == null || local === '' || local === '[]' || local === '{}');
       if (localEmpty && snapStore[key] != null && snapStore[key] !== '') {
