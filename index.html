@@ -4026,9 +4026,13 @@ body.vc-fullscreen-mode.vc-host-only-mode .video-grid .video-tile:not(.vc-hoston
             <div class="cloud-dropdown-item" onclick="browseBackupFiles()">
               <span>📁</span><span>Browse All Backups</span>
             </div>
+            <div class="cloud-dropdown-item" onclick="restoreFromMasterBackup()">
+              <span>🛟</span><span>Restore from Master Backup</span>
+            </div>
             <div class="cloud-dropdown-divider"></div>
             <div class="last-sync-info" id="lastSyncInfo">Last sync: Never</div>
             <div class="last-sync-info" id="lastSavedByInfo" style="color:var(--text-muted);font-size:0.7rem;">Last saved by: --</div>
+            <div class="last-sync-info" id="masterBackupInfo" style="color:var(--text-muted);font-size:0.7rem;">Master backup: --</div>
             <div class="cloud-dropdown-divider"></div>
             <div class="cloud-dropdown-item danger" onclick="disconnectFromGoogleDrive()">
               <span>🔌</span><span>Disconnect</span>
@@ -20360,7 +20364,7 @@ async function saveMasterSnapshot(eventName, force) {
         { method: 'POST', headers: { 'Authorization': 'Bearer ' + googleAccessToken }, body: fd });
       if (resp.ok) { try { var r = await resp.json(); _masterSnapshotFileId = r.id; } catch (e) {} }
     }
-    if (resp && resp.ok) { _lastMasterSnapshotHash = snapshot.checksum; return { ok: true, snapshot: snapshot }; }
+    if (resp && resp.ok) { _lastMasterSnapshotHash = snapshot.checksum; try { updateMasterBackupInfo(snapshot); } catch (e) {} return { ok: true, snapshot: snapshot }; }
     return { ok: false, reason: 'http-' + (resp ? resp.status : '?') };
   } catch (e) {
     console.warn('[MasterSnapshot] save failed:', e);
@@ -20391,6 +20395,7 @@ async function reconcileWithMasterSnapshot() {
     if (!snapshot || !snapshot.store) return;
     var ver = CESTISCore.verifySnapshot(snapshot);
     if (!ver.ok) console.warn('[MasterSnapshot] checksum mismatch — snapshot may be partial; merging cautiously.');
+    try { updateMasterBackupInfo(snapshot); } catch (e) {}
     var local = cestisCollectStoreMap();
     var report = CESTISCore.dataLossReport(snapshot, local);
     var res = CESTISCore.reconcileSnapshot(snapshot, local);
@@ -20410,6 +20415,58 @@ async function reconcileWithMasterSnapshot() {
       console.log('[MasterSnapshot] local data consistent with master backup (checksumOk:' + ver.ok + ')');
     }
   } catch (e) { console.warn('[MasterSnapshot] reconcile failed:', e); }
+}
+
+// Update the header indicator that shows when/who/how-much for the master file.
+function updateMasterBackupInfo(snapshot) {
+  var el = document.getElementById('masterBackupInfo');
+  if (!el) return;
+  if (!snapshot || !snapshot.counts) { el.textContent = 'Master backup: --'; el.removeAttribute('title'); return; }
+  var when = snapshot.savedAt ? new Date(snapshot.savedAt).toLocaleString() : '?';
+  var who = snapshot.savedBy || '?';
+  var students = (snapshot.counts.voctrain_students != null) ? snapshot.counts.voctrain_students : '?';
+  var total = 0;
+  Object.keys(snapshot.counts).forEach(function (k) { total += (snapshot.counts[k] || 0); });
+  el.textContent = 'Master backup: ' + when + ' · by ' + who + ' · ' + students + ' students / ' + total + ' records';
+  // Hover shows the full per-collection counts so loss is auditable at a glance.
+  var lines = Object.keys(snapshot.counts).map(function (k) { return k + ': ' + snapshot.counts[k]; });
+  el.title = 'Saved ' + when + ' by ' + who + ' (event: ' + (snapshot.event || '?') + ')\n' + lines.join('\n');
+}
+
+// Manual one-click recovery from the master backup. Same safe merge & repair as
+// the automatic login path (never overwrites newer local edits, never resurrects
+// deleted students), but user-initiated with a confirmation and explicit result.
+async function restoreFromMasterBackup() {
+  try { if (typeof closeCloudMenu === 'function') closeCloudMenu(); } catch (e) {}
+  if (!isCloudConnected || !googleAccessToken) { showToast('Connect to Google Drive first.', 'warning'); return; }
+  if (!window.CESTISCore || typeof CESTISCore.reconcileSnapshot !== 'function') { showToast('Data core unavailable.', 'warning'); return; }
+  if (!confirm('Restore from the master backup?\n\nThis merges back any records missing on this device. It will NOT overwrite newer local edits and will NOT bring back deleted students.')) return;
+  showToast('Restoring from master backup…');
+  try {
+    var snapshot = await fetchMasterSnapshot();
+    if (!snapshot || !snapshot.store) { showToast('No master backup found in Drive.', 'warning'); return; }
+    var ver = CESTISCore.verifySnapshot(snapshot);
+    var local = cestisCollectStoreMap();
+    var report = CESTISCore.dataLossReport(snapshot, local);
+    var res = CESTISCore.reconcileSnapshot(snapshot, local);
+    if (res.changed) {
+      Object.keys(res.store).forEach(function (k) {
+        if (res.store[k] !== local[k]) { try { CESTISStore.setItem(k, res.store[k]); } catch (e) {} }
+      });
+      try { loadState(); } catch (e) {}
+      try { cestisStabilizeStudentIds(); } catch (e) {}
+      try { refreshStudentDependentViews(); refreshContentDependentViews(); } catch (e) {}
+      _lastMasterSnapshotHash = null; // re-save so the master reflects the merged state
+      var settings = res.restoredKeys ? res.restoredKeys.length : 0;
+      showToast('Restored ' + report.totalMissing + ' record(s)' + (settings ? ' + ' + settings + ' setting(s)' : '') + ' from master backup.', 'success');
+    } else {
+      showToast('Already up to date — nothing to restore.' + (ver.ok ? '' : ' (Note: backup checksum mismatch.)'), 'success');
+    }
+    updateMasterBackupInfo(snapshot);
+  } catch (e) {
+    console.warn('[MasterSnapshot] manual restore failed:', e);
+    showToast('Restore failed — see console for details.', 'warning');
+  }
 }
 
 // ---- Per-User Backup Helpers ----
