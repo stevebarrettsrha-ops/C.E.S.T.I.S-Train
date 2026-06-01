@@ -4756,7 +4756,7 @@ function shakeNotificationBell() {
 function addNotification(text, type, icon, forRoles) {
   type = type || 'info';
   var icons = {success:'\u2705',warning:'\u26A0\uFE0F',info:'\uD83D\uDD14',exam:'\uD83D\uDCDD',student:'\uD83D\uDC64',cert:'\uD83C\uDF93',announce:'\uD83D\uDCE2',calendar:'\uD83D\uDCC5',attendance:'\uD83D\uDCCB',resource:'\uD83D\uDCC1',grade:'\uD83C\uDF1F'};
-  notifications.unshift({
+  var notif = {
     id: Date.now() + Math.random(),
     text: text,
     timestamp: Date.now(),
@@ -4765,12 +4765,17 @@ function addNotification(text, type, icon, forRoles) {
     icon: icon || icons[type] || icons.info,
     type: type === 'warning' ? 'warning' : type === 'success' || type === 'grade' || type === 'cert' ? 'success' : 'info',
     forRoles: forRoles || ['admin','instructor','student']
-  });
+  };
+  notifications.unshift(notif);
   if(notifications.length > 50) notifications = notifications.slice(0, 50);
   updateNotificationDot();
   shakeNotificationBell();
   playNotificationSound();
   saveNotifications();
+  // Realtime fan-out: instant bell for other online users + a nudge so their
+  // announcement/assignment/task lists refresh, and an immediate cloud push so
+  // that nudge-pull finds the new data.
+  try { cestisRTBroadcastNotification(notif, true); cestisFlushCloudNow(); } catch(e) {}
 }
 
 function getFilteredNotifications() {
@@ -4791,7 +4796,7 @@ function getFilteredNotifications() {
 function addNotificationForUser(text, type, icon, userId, role) {
   type = type || 'info';
   var icons = {success:'\u2705',warning:'\u26A0\uFE0F',info:'\uD83D\uDD14',dm:'\uD83D\uDCAC',follow:'\uD83D\uDC65'};
-  notifications.unshift({
+  var notif = {
     id: Date.now() + Math.random(),
     text: text,
     timestamp: Date.now(),
@@ -4801,12 +4806,24 @@ function addNotificationForUser(text, type, icon, userId, role) {
     type: 'info',
     forUsers: [userId],
     forRoles: role ? [role] : []
-  });
+  };
+  notifications.unshift(notif);
   if(notifications.length > 50) notifications = notifications.slice(0, 50);
   updateNotificationDot();
   shakeNotificationBell();
   playNotificationSound();
   saveNotifications();
+  // Realtime fan-out to the single target user. Chat-related notices (DM/follow)
+  // are skipped entirely here — the chat data channel already delivers the
+  // message AND raises its own DM notification, so broadcasting again would
+  // double-notify. Everything else (e.g. a task assigned to one person) goes out
+  // with a cloud nudge so the target's lists refresh.
+  try {
+    if(type !== 'dm' && type !== 'follow') {
+      cestisRTBroadcast([userId], { type: 'notify', notif: notif, nudge: true });
+      cestisFlushCloudNow();
+    }
+  } catch(e) {}
 }
 
 function getRelativeTime(ts) {
@@ -5788,6 +5805,7 @@ function clearSensitiveStudentData() {
 
 // Full data wipe for session expiry (when we can't identify the student)
 function clearSensitiveDataOnExpiry() {
+  try { if(typeof lmsChatRTStop === 'function') lmsChatRTStop(); } catch(e) {}
   var sessionRole = CESTISStore.getItem('voctrain_sessionRole');
   if(sessionRole === 'student') {
     clearSensitiveStudentData();
@@ -7438,6 +7456,11 @@ function enterApp(role) {
     // Load per-user local data (chat, profiles) for this specific user
     loadPerUserLocalData();
 
+    // Bring up the realtime data-channel peer for the whole session so live
+    // notifications, announcements, assignments and assigned tasks arrive
+    // instantly on ANY page — not only while the chat page is open.
+    try { if(typeof lmsChatRTStart === 'function') lmsChatRTStart(); } catch(e) {}
+
     // Auto-sync from all Google Drive folders on login, then start 5s auto-save
     setTimeout(function() {
       autoSyncOnLogin().then(function() {
@@ -7906,6 +7929,8 @@ function logout() {
   stopAutoSave();
   if(_debouncedCloudSaveTimer) { clearTimeout(_debouncedCloudSaveTimer); _debouncedCloudSaveTimer = null; }
   stopSessionExpiryCheck();
+  // Tear down the realtime chat data-channel peer
+  try { if(typeof lmsChatRTStop === 'function') lmsChatRTStop(); } catch(e) {}
   // Clear sensitive data from localStorage based on role
   clearSensitiveStudentData();
   // Clear in-memory session state
@@ -23218,7 +23243,8 @@ function lmsChatSendMessage(prefix) {
   if(!lmsChatMessages[lmsChatActiveRoom]) lmsChatMessages[lmsChatActiveRoom] = [];
   lmsChatMessages[lmsChatActiveRoom].push(msg);
   saveLmsChatData();
-  lmsChatFlushDriveSyncNow(); // push instantly so the recipient receives it on their next fast poll
+  lmsChatRTSend(lmsChatActiveRoom, msg); // instant P2P delivery to online members
+  lmsChatFlushDriveSyncNow(); // durable fallback + offline/other-device delivery
 
   // Notify DM recipient (throttled to once per 5 s per recipient)
   var activeRoom = lmsChatRooms.find(function(r){ return r.id === lmsChatActiveRoom; });
@@ -23567,7 +23593,8 @@ function lmsChatSendPoll() {
   if(!lmsChatMessages[lmsChatActiveRoom]) lmsChatMessages[lmsChatActiveRoom] = [];
   lmsChatMessages[lmsChatActiveRoom].push(msg);
   saveLmsChatData();
-  lmsChatFlushDriveSyncNow(); // push instantly so members receive the poll on their next fast poll
+  lmsChatRTSend(lmsChatActiveRoom, msg); // instant P2P delivery to online members
+  lmsChatFlushDriveSyncNow(); // durable fallback + offline/other-device delivery
 
   lmsChatClosePollModal();
   var prefix = _lmsChatPollPrefix || lmsChatGetRolePrefix();
@@ -24481,6 +24508,348 @@ function lmsChatResolvePeerName(peerId) {
   return 'Participant';
 }
 
+// ============================================================================
+// REALTIME CHAT over PeerJS data channels  (sub-second delivery)
+// ----------------------------------------------------------------------------
+// This is a peer-to-peer fast lane layered ON TOP of the Google Drive sync.
+// The Drive file remains the durable source of truth and the offline/cross-
+// device fallback (the 3.5s poll still reconciles anything missed). When the
+// sender and a recipient are both online, a sent text/poll message is pushed
+// straight over a WebRTC data channel so it appears on the other screen in
+// well under a second — no waiting for a Drive round-trip.
+//
+// Each logged-in user holds a persistent PeerJS peer with a DETERMINISTIC id
+// ('lmsrt-<userId>') so anyone can reach them by id alone (discovery via the
+// same public PeerJS broker the calls already use). Connections are opened
+// lazily: when you send to a room we connect to that room's members and push;
+// the channel then stays open for their replies. A light periodic sweep also
+// pre-warms channels to members currently flagged online.
+// ============================================================================
+var lmsChatRTPeer = null;        // persistent PeerJS peer for data channels
+var lmsChatRTConns = {};         // userId -> open DataConnection
+var lmsChatRTReady = false;      // broker assigned our id and we're connectable
+var lmsChatRTSweepTimer = null;  // periodic proactive-connect timer
+var _lmsChatRTUsedFallbackId = false;
+
+function lmsChatRTPeerId(userId) { return 'lmsrt-' + String(userId).replace(/[^a-zA-Z0-9]/g, ''); }
+
+// Map an incoming peer id (lmsrt-<sanitizedId>[-<rand>]) back to a real account id.
+function lmsChatRTUidFromPeerId(peerId) {
+  var s = String(peerId).replace(/^lmsrt-/, '').replace(/-.*$/, ''); // strip prefix + any random fallback suffix
+  for (var i = 0; i < userAccounts.length; i++) {
+    if (String(userAccounts[i].id).replace(/[^a-zA-Z0-9]/g, '') === s) return userAccounts[i].id;
+  }
+  return s;
+}
+
+// The set of user ids it's worth proactively connecting to: members of the
+// rooms I belong to who are currently flagged online (keeps attempts bounded).
+function lmsChatRTTargets() {
+  var me = lmsChatGetCurrentUser();
+  if (!me) return [];
+  var set = {};
+  lmsChatRooms.forEach(function (r) {
+    if (!r || !r.members || r.members.indexOf(me.id) === -1) return;
+    r.members.forEach(function (uid) {
+      if (uid === me.id) return;
+      var prof = lmsChatProfiles[uid];
+      if (prof && prof.status === 'online') set[uid] = true;
+    });
+  });
+  return Object.keys(set);
+}
+
+function lmsChatRTStart() {
+  if (typeof Peer === 'undefined') return;          // PeerJS library unavailable
+  var me = lmsChatGetCurrentUser();
+  if (!me || !me.id) return;
+  if (lmsChatRTPeer && !lmsChatRTPeer.destroyed) { lmsChatRTConnectPeers(); return; }
+  _lmsChatRTUsedFallbackId = false;
+  try {
+    lmsChatRTPeer = new Peer(lmsChatRTPeerId(me.id), { config: { iceServers: LMS_CHAT_ICE_SERVERS } });
+  } catch (e) { lmsChatRTPeer = null; return; }
+  lmsChatRTBindPeerEvents(me);
+
+  if (lmsChatRTSweepTimer) clearInterval(lmsChatRTSweepTimer);
+  lmsChatRTSweepTimer = setInterval(lmsChatRTConnectPeers, 20000);
+}
+
+function lmsChatRTBindPeerEvents(me) {
+  lmsChatRTPeer.on('open', function () { lmsChatRTReady = true; lmsChatRTConnectPeers(); });
+  lmsChatRTPeer.on('connection', function (conn) { lmsChatRTBindConn(conn); });
+  lmsChatRTPeer.on('disconnected', function () { try { lmsChatRTPeer.reconnect(); } catch (e) {} });
+  lmsChatRTPeer.on('error', function (err) {
+    var type = err && err.type;
+    // 'peer-unavailable' just means a target is offline — expected, ignore quietly.
+    if (type === 'peer-unavailable') return;
+    // Our deterministic id is already held (another tab/device, or a stale broker
+    // entry). Fall back ONCE to a random-suffixed id so we can still send/receive
+    // on connections we initiate; discovery by our stable id is covered by the
+    // other session. Anything missed still arrives via the Drive poll.
+    if (type === 'unavailable-id' && !_lmsChatRTUsedFallbackId) {
+      _lmsChatRTUsedFallbackId = true;
+      try {
+        lmsChatRTPeer = new Peer(lmsChatRTPeerId(me.id) + '-' + Math.random().toString(36).substr(2, 4), { config: { iceServers: LMS_CHAT_ICE_SERVERS } });
+        lmsChatRTBindPeerEvents(me);
+      } catch (e) {}
+      return;
+    }
+    if (type !== 'unavailable-id') console.warn('LMS Chat realtime peer error:', type, err);
+  });
+}
+
+function lmsChatRTBindConn(conn, knownUid) {
+  if (!conn) return;
+  conn.on('open', function () {
+    var uid = knownUid || lmsChatRTUidFromPeerId(conn.peer);
+    if (uid) lmsChatRTConns[uid] = conn;
+  });
+  conn.on('data', function (data) { lmsChatRTHandleData(data); });
+  conn.on('close', function () {
+    var uid = knownUid || lmsChatRTUidFromPeerId(conn.peer);
+    if (uid && lmsChatRTConns[uid] === conn) delete lmsChatRTConns[uid];
+  });
+  conn.on('error', function () {});
+}
+
+// Proactively open channels to online room members we aren't connected to yet.
+function lmsChatRTConnectPeers() {
+  if (!lmsChatRTPeer || !lmsChatRTReady) return;
+  lmsChatRTTargets().forEach(function (uid) {
+    if (lmsChatRTConns[uid] && lmsChatRTConns[uid].open) return;
+    try {
+      var conn = lmsChatRTPeer.connect(lmsChatRTPeerId(uid), { reliable: true });
+      if (conn) lmsChatRTBindConn(conn, uid);
+    } catch (e) {}
+  });
+}
+
+// Push a freshly-sent message to every other member of its room over the data
+// channels, opening a connection on demand for members we aren't linked to yet.
+function lmsChatRTSend(roomId, msg) {
+  if (!lmsChatRTPeer || !lmsChatRTReady || !roomId || !msg) return;
+  var room = lmsChatRooms.find(function (r) { return r.id === roomId; });
+  if (!room) return;
+  var members = room.members || room.dmBetween || [];
+  var me = lmsChatGetCurrentUser();
+  // Include a lightweight room descriptor so a recipient who doesn't have this
+  // room yet (e.g. a brand-new DM) can materialise it instantly instead of
+  // waiting for the Drive sync to deliver the room object.
+  var payload = {
+    type: 'chat-msg',
+    msg: msg,
+    room: { id: room.id, name: room.name, type: room.type, members: room.members, dmBetween: room.dmBetween, icon: room.icon, color: room.color }
+  };
+  members.forEach(function (uid) {
+    if (!me || uid === me.id) return;
+    var conn = lmsChatRTConns[uid];
+    if (conn && conn.open) {
+      try { conn.send(payload); } catch (e) {}
+    } else {
+      try {
+        var c = lmsChatRTPeer.connect(lmsChatRTPeerId(uid), { reliable: true });
+        if (c) {
+          lmsChatRTBindConn(c, uid);
+          c.on('open', function () { try { c.send(payload); } catch (e) {} });
+        }
+      } catch (e) {}
+    }
+  });
+}
+
+// A message arrived over a data channel: validate, dedupe, persist and render.
+function lmsChatRTHandleData(data) {
+  if (!data || !data.type) return;
+  // App-wide live events (notifications + data nudges) ride the same channel.
+  if (data.type === 'notify') { try { cestisRTHandleNotify(data); } catch (e) {} return; }
+  if (data.type === 'data-nudge') { try { cestisRTHandleNudge(); } catch (e) {} return; }
+  if (data.type !== 'chat-msg' || !data.msg || !data.msg.roomId) return;
+  var msg = data.msg;
+  var roomId = msg.roomId;
+  var me = lmsChatGetCurrentUser();
+  if (!me) return;
+
+  var room = lmsChatRooms.find(function (r) { return r.id === roomId; });
+  // Materialise an unknown room from the payload only if it's addressed to me.
+  if (!room && data.room && data.room.members && data.room.members.indexOf(me.id) !== -1) {
+    room = data.room;
+    lmsChatRooms.push(room);
+  }
+  if (!room) return;                                   // not a room I know / belong to
+  if (room.members && room.members.indexOf(me.id) === -1) return; // not a member — ignore
+
+  if (!lmsChatMessages[roomId]) lmsChatMessages[roomId] = [];
+  if (lmsChatMessages[roomId].some(function (m) { return m.id === msg.id; })) return; // duplicate
+
+  lmsChatMessages[roomId].push(msg);
+  lmsChatMessages[roomId].sort(function (a, b) { return new Date(a.timestamp) - new Date(b.timestamp); });
+  // Persist locally and schedule a debounced Drive sync so offline/other-device
+  // members still receive it (the receiver re-broadcasting to the cloud).
+  saveLmsChatData();
+
+  // DM notification when the message isn't for the room I'm currently viewing.
+  if (room.type === 'dm' && lmsChatActiveRoom !== roomId && msg.senderId !== me.id) {
+    try {
+      var meAcc = userAccounts.find(function (u) { return u.id === me.id; });
+      if (meAcc && !lmsChatDMNotifThrottle[msg.senderId]) {
+        addNotificationForUser('💬 ' + (msg.senderName || 'Someone') + ' sent you a direct message', 'dm', '💬', me.id, meAcc.role);
+        lmsChatDMNotifThrottle[msg.senderId] = true;
+        setTimeout(function () { delete lmsChatDMNotifThrottle[msg.senderId]; }, 5000);
+      }
+    } catch (e) {}
+  }
+
+  var prefix = lmsChatGetRolePrefix();
+  lmsChatRenderRoomList(prefix);
+  if (lmsChatActiveRoom === roomId) {
+    var c = document.getElementById(prefix + 'ChatMessages');
+    var atBottom = c ? (c.scrollHeight - c.scrollTop - c.clientHeight < 80) : true;
+    lmsChatRenderMessages(prefix);
+    if (atBottom) { var c2 = document.getElementById(prefix + 'ChatMessages'); if (c2) c2.scrollTop = c2.scrollHeight; }
+  }
+}
+
+// Tear down the realtime peer (logout / session end).
+function lmsChatRTStop() {
+  if (lmsChatRTSweepTimer) { clearInterval(lmsChatRTSweepTimer); lmsChatRTSweepTimer = null; }
+  Object.keys(lmsChatRTConns).forEach(function (uid) { try { lmsChatRTConns[uid].close(); } catch (e) {} });
+  lmsChatRTConns = {};
+  if (lmsChatRTPeer) { try { lmsChatRTPeer.destroy(); } catch (e) {} lmsChatRTPeer = null; }
+  lmsChatRTReady = false;
+}
+
+// ============================================================================
+// APP-WIDE REALTIME EVENTS over the same PeerJS data channels
+// ----------------------------------------------------------------------------
+// The chat fast-lane above carries chat messages; this extends the SAME peer to
+// carry every other live event — notifications, new announcements, assignments,
+// assigned tasks (duty register) and anything else that fires a notification.
+//
+// Model: the originator broadcasts the small notification object (instant bell)
+// plus a lightweight "nudge". On the nudge a recipient pulls the latest cloud
+// backup with the existing additive merge and re-renders the affected views, so
+// the new announcement / assignment / task appears within ~1s — no manual Sync
+// from Cloud. The Drive backup stays the durable source of truth and the
+// offline / other-device fallback (anyone offline still gets it on next login).
+// ============================================================================
+
+// Send a payload to an explicit list of user ids, opening a channel on demand.
+function cestisRTBroadcast(userIds, payload) {
+  if (!lmsChatRTPeer || !lmsChatRTReady || !userIds || !userIds.length) return;
+  var me = lmsChatGetCurrentUser();
+  var sent = {};
+  userIds.forEach(function (uid) {
+    if (!uid || (me && uid === me.id) || sent[uid]) return;
+    sent[uid] = true;
+    var conn = lmsChatRTConns[uid];
+    if (conn && conn.open) {
+      try { conn.send(payload); } catch (e) {}
+    } else {
+      try {
+        var c = lmsChatRTPeer.connect(lmsChatRTPeerId(uid), { reliable: true });
+        if (c) { lmsChatRTBindConn(c, uid); c.on('open', function () { try { c.send(payload); } catch (e) {} }); }
+      } catch (e) {}
+    }
+  });
+}
+
+// Resolve the user ids a role-targeted notification should reach, mirroring the
+// display rule in getFilteredNotifications (admin-staff also see admin notices).
+function cestisUsersForRoles(forRoles) {
+  var roles = (forRoles && forRoles.length) ? forRoles : ['admin', 'instructor', 'student'];
+  var ids = [];
+  (userAccounts || []).forEach(function (u) {
+    if (!u || !u.id) return;
+    var r = u.role;
+    var match = roles.indexOf(r) !== -1 || (r === 'adminstaff' && roles.indexOf('admin') !== -1);
+    if (match) ids.push(u.id);
+  });
+  return ids;
+}
+
+// Does a notification object target the current viewer? (same logic as the bell)
+function cestisNotifTargetsMe(n) {
+  if (!n) return false;
+  var me = lmsChatGetCurrentUser();
+  var myId = me ? me.id : null;
+  if (n.forUsers && n.forUsers.length) return !!myId && n.forUsers.indexOf(myId) !== -1;
+  if (!currentRole) return false;
+  if (!n.forRoles || !n.forRoles.length) return true;
+  if (currentRole === 'adminstaff') return n.forRoles.indexOf('adminstaff') !== -1 || n.forRoles.indexOf('admin') !== -1;
+  return n.forRoles.indexOf(currentRole) !== -1;
+}
+
+// Broadcast a freshly-created notification (+ optional data nudge) to its targets.
+function cestisRTBroadcastNotification(notif, nudge) {
+  if (!notif) return;
+  var targets = (notif.forUsers && notif.forUsers.length) ? notif.forUsers : cestisUsersForRoles(notif.forRoles);
+  cestisRTBroadcast(targets, { type: 'notify', notif: notif, nudge: nudge !== false });
+}
+
+// Push the local data to the cloud right now so a recipient's nudge-pull finds
+// it (instead of waiting up to the 2s debounce / 5s auto-save).
+function cestisFlushCloudNow() {
+  try { if (!isCloudConnected || !googleAccessToken) return; } catch (e) { return; }
+  if (_debouncedCloudSaveTimer) { clearTimeout(_debouncedCloudSaveTimer); _debouncedCloudSaveTimer = null; }
+  try { autoSaveToAllFolders(); } catch (e) {}
+}
+
+// A peer told us data changed: pull + merge + re-render. Debounced so a burst of
+// events (e.g. one announcement notifying 30 students) is one pull per window.
+var _cestisNudgeTimer = null;
+function cestisRTHandleNudge() {
+  if (_cestisNudgeTimer) return;
+  _cestisNudgeTimer = setTimeout(function () {
+    _cestisNudgeTimer = null;
+    cestisPullAndRefresh();
+  }, 1200);
+}
+
+async function cestisPullAndRefresh() {
+  try {
+    if (!isCloudConnected || !googleAccessToken) return;
+    if (!cloudFileId) { try { await findExistingBackupFile(); } catch (e) {} }
+    if (!cloudFileId) return;
+    var changed = await silentMergeFromBackup(cloudFileId);
+    if (!changed) return;
+    try { refreshContentDependentViews(); } catch (e) {}
+    try { if (typeof adrUpdateBadge === 'function') adrUpdateBadge(); } catch (e) {}
+    try { updateNotificationDot(); } catch (e) {}
+    // Re-render the duty register if the viewer is currently on it.
+    try {
+      var dutyPage = document.querySelector('#page-admin-duty-register.active, #page-i-duties.active, #page-as-duties.active');
+      if (dutyPage) {
+        if (dutyPage.id === 'page-admin-duty-register' && typeof adrOnPageShow === 'function') adrOnPageShow();
+        else if (dutyPage.id === 'page-i-duties' && typeof iOnDutiesPageShow === 'function') iOnDutiesPageShow();
+        else if (dutyPage.id === 'page-as-duties' && typeof asOnDutiesPageShow === 'function') asOnDutiesPageShow();
+      }
+    } catch (e) {}
+  } catch (e) { console.warn('cestis realtime pull error', e); }
+}
+
+// Rebuild the notification dropdown in place if it's currently open.
+function cestisRefreshNotifDropdownIfOpen() {
+  var btn = document.querySelector('.topbar-btn[title="Notifications"]');
+  var dd = btn ? btn.querySelector('.notification-dropdown.active') : null;
+  if (dd) { dd.classList.remove('active'); try { toggleNotifications(); } catch (e) {} }
+}
+
+// A notification arrived over a data channel.
+function cestisRTHandleNotify(data) {
+  var n = data && data.notif;
+  if (n && cestisNotifTargetsMe(n) && !notifications.some(function (x) { return x.id === n.id; })) {
+    n.time = 'Just now';
+    notifications.unshift(n);
+    if (notifications.length > 50) notifications = notifications.slice(0, 50);
+    updateNotificationDot();
+    try { shakeNotificationBell(); } catch (e) {}
+    try { playNotificationSound(); } catch (e) {}
+    saveNotifications();
+    cestisRefreshNotifDropdownIfOpen();
+  }
+  if (data && data.nudge) cestisRTHandleNudge();
+}
+
 // ── Unified call initiation (voice or video) ──
 async function lmsChatInitiateCall(callType) {
   if(!lmsChatActiveRoom) return;
@@ -25018,6 +25387,10 @@ function lmsChatOnPageShow(prefix) {
   try {
     CESTISStore.setItem('voctrain_chatProfiles', JSON.stringify(lmsChatProfiles));
   } catch(e) {}
+
+  // Bring up the realtime data-channel peer for sub-second message delivery.
+  // Idempotent: reuses the existing peer if one is already open.
+  try { lmsChatRTStart(); } catch(e) { console.warn('lmsChat realtime start error', e); }
 }
 
 // Check if any rooms have active calls and show notification
