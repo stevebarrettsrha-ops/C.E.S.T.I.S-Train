@@ -883,6 +883,15 @@ textarea.form-control { resize:vertical; min-height:80px; }
   justify-content:center; position:relative; overflow:hidden;
 }
 .video-tile .participant-info { position:absolute; bottom:12px; left:12px; background:rgba(0,0,0,0.7); padding:4px 10px; border-radius:6px; font-size:12px; }
+.video-tile .vc-cam-off-overlay {
+  position:absolute; inset:0; display:flex; align-items:center; justify-content:center;
+  background:var(--bg-input); z-index:1;
+}
+.video-tile .vc-cam-off-overlay .vc-cam-off-avatar {
+  width:72px; height:72px; border-radius:50%; background:var(--accent);
+  display:flex; align-items:center; justify-content:center;
+  font-size:30px; font-weight:700; color:#000;
+}
 .video-tile .avatar-lg {
   width:64px; height:64px; border-radius:50%;
   display:flex; align-items:center; justify-content:center;
@@ -1012,13 +1021,13 @@ body.vc-fullscreen-mode .sidebar { transform:translateX(-100%) !important; }
 body.vc-fullscreen-mode .topbar { display:none !important; }
 body.vc-fullscreen-mode .main-content {
   left:0 !important; top:0 !important; padding:0 !important;
-  position:fixed; right:0; bottom:0;
+  position:fixed; right:0; bottom:0; height:100dvh; overflow:hidden;
 }
 body.vc-fullscreen-mode .page.active {
-  height:100vh; display:flex; flex-direction:column;
+  height:100%; min-height:0; display:flex; flex-direction:column; overflow:hidden;
 }
 body.vc-fullscreen-mode .vc-conference-wrapper {
-  flex:1; display:flex; flex-direction:column; height:100vh;
+  flex:1; min-height:0; display:flex; flex-direction:column; overflow:hidden;
 }
 body.vc-fullscreen-mode .vc-conference-header {
   padding:8px 16px; background:rgba(12,17,23,0.95); border-bottom:1px solid var(--border);
@@ -1029,10 +1038,19 @@ body.vc-fullscreen-mode .vc-conference-body {
   flex:1; display:flex; overflow:hidden; min-height:0;
 }
 body.vc-fullscreen-mode .vc-conference-body .vc-main-video-area {
-  flex:1; display:flex; flex-direction:column; min-width:0;
+  flex:1; display:flex; flex-direction:column; min-width:0; min-height:0;
 }
 body.vc-fullscreen-mode .vc-conference-body .video-grid {
-  flex:1; padding:8px; margin-bottom:0; align-content:center;
+  flex:1; min-height:0; padding:8px; margin-bottom:0; align-content:center;
+  overflow:auto;
+}
+/* In fullscreen the grid is height-constrained; don't let the host tile force
+   the grid taller than the viewport (which pushes the controls off-screen). */
+body.vc-fullscreen-mode .vc-conference-body .video-grid .video-tile.host-tile {
+  min-height:0;
+}
+body.vc-fullscreen-mode .vc-conference-body .video-grid .video-tile {
+  max-height:100%;
 }
 body.vc-fullscreen-mode .vc-conference-body .video-controls {
   margin-top:0; border-radius:0; border-left:0; border-right:0; border-bottom:0;
@@ -5295,6 +5313,7 @@ var peerRoles = {}; // track roles: {peerId: 'student'|'instructor'|'admin'}
 var mutedPeers = {}; // track muted peers: {peerId: true}
 var vcCoHosts = {}; // track co-hosts: {peerId: true}
 var vcScreenSharingPeerId = null; // peerId currently sharing screen, or null
+var vcScreenAudioCtx = null; // AudioContext used to mix mic + shared tab audio while screen sharing
 var vcHostPermissions = { screenShare: false, recording: false }; // host-granted permissions for participants
 var calendarMonth = new Date().getMonth();
 var calendarYear = new Date().getFullYear();
@@ -10658,6 +10677,11 @@ function vcOnData(raw, fromId) {
       delete mutedPeers[msg.peerId];
       vcUpdateParticipants();
       break;
+    case 'cam-state':
+      // A peer turned their camera on/off — show or hide a "camera off" overlay
+      // on their tile so it doesn't appear frozen on the last frame.
+      vcSetRemoteCamState(msg.peerId, !!msg.on);
+      break;
     case 'screen-share-started':
       // Highlight the sharing tile for the host; hide all other tiles for participants.
       if(isRoomHost) {
@@ -10851,6 +10875,9 @@ function vcShowConference(title, role) {
 
   // Initialize participant list
   vcUpdateParticipants();
+
+  // Restore any chat history saved from a previous visit to this room
+  vcRestoreChatHistory();
 
   videoSeconds = 0;
   if(videoTimerInterval) clearInterval(videoTimerInterval);
@@ -11057,6 +11084,31 @@ function vcUpdateVideoLabel(peerId, name) {
   if(label) label.textContent = name;
 }
 
+// Show/hide a "camera off" overlay on a remote peer's tile. When the camera is
+// off the video element would otherwise display a frozen last frame, so we hide
+// the video and show an avatar/placeholder instead.
+function vcSetRemoteCamState(peerId, on) {
+  var safeId = sanitizePeerId(peerId);
+  var tile = document.getElementById('vc-tile-'+safeId);
+  if(!tile) return;
+  var vid = document.getElementById('vc-vid-'+safeId);
+  var overlay = tile.querySelector('.vc-cam-off-overlay');
+  if(on) {
+    if(vid) vid.style.visibility = '';
+    if(overlay) overlay.remove();
+  } else {
+    if(vid) vid.style.visibility = 'hidden';
+    if(!overlay) {
+      overlay = document.createElement('div');
+      overlay.className = 'vc-cam-off-overlay';
+      var name = peerNames[peerId] || 'Participant';
+      var initial = (name.trim()[0] || '?').toUpperCase();
+      overlay.innerHTML = '<div class="vc-cam-off-avatar">'+initial+'</div>';
+      tile.appendChild(overlay);
+    }
+  }
+}
+
 function vcUpdateParticipants() {
   var list = document.getElementById('vc-part-list');
   var title = document.getElementById('vc-part-title');
@@ -11170,6 +11222,12 @@ function vcToggleCam() {
   if(hasLiveVideo) {
     // Camera is on — fully stop the track to release hardware (turn off camera light)
     tracks.forEach(function(t) { t.stop(); localStream.removeTrack(t); });
+    // Clear the outgoing video on every peer so they show a blank tile instead
+    // of a frozen last frame, and tell them to render the "camera off" overlay.
+    if(!screenStream) {
+      vcReplaceVideoTrackForAll(null);
+      vcBroadcastData({type:'cam-state', peerId: rtcPeer ? rtcPeer.id : '', on:false});
+    }
     if(btn) btn.classList.remove('active');
     if(lv) lv.style.opacity = '0.15';
     showToast('Camera off');
@@ -11178,7 +11236,10 @@ function vcToggleCam() {
     navigator.mediaDevices.getUserMedia({video:{width:{ideal:1280},height:{ideal:720},facingMode:'user'}}).then(function(vidStream) {
       var newTrack = vidStream.getVideoTracks()[0];
       localStream.addTrack(newTrack);
-      vcReplaceVideoTrackForAll(newTrack);
+      if(!screenStream) {
+        vcReplaceVideoTrackForAll(newTrack);
+        vcBroadcastData({type:'cam-state', peerId: rtcPeer ? rtcPeer.id : '', on:true});
+      }
       if(lv) { lv.srcObject = localStream; lv.style.opacity = '1'; lv.play().catch(function(){}); }
       if(btn) btn.classList.add('active');
       showToast('Camera on');
@@ -11199,14 +11260,23 @@ async function vcToggleScreen() {
     screenStream.getTracks().forEach(function(t){t.stop();});
     screenStream = null;
     btn.classList.remove('active');
-    // Restore camera track for all peers
-    if(localStream && localStream.getVideoTracks().length > 0) {
+    // Tear down the screen-share audio mix and restore the plain microphone track.
+    vcTeardownScreenAudioMix();
+    var hasCamera = localStream && localStream.getVideoTracks().length > 0 &&
+      localStream.getVideoTracks()[0].readyState === 'live';
+    if(hasCamera) {
+      // Restore camera track for all peers
       var camTrack = localStream.getVideoTracks()[0];
       camTrack.enabled = true;
       vcReplaceVideoTrackForAll(camTrack);
+    } else {
+      // Camera is off — clear the outgoing video so peers don't freeze on the
+      // last frame of the shared screen, and show the camera-off overlay.
+      vcReplaceVideoTrackForAll(null);
+      vcBroadcastData({type:'cam-state', peerId: rtcPeer ? rtcPeer.id : '', on:false});
     }
     var lv = document.getElementById('vc-local-video');
-    if(lv && localStream) { lv.srcObject = localStream; lv.parentElement.classList.add('local'); }
+    if(lv) { lv.srcObject = (hasCamera && localStream) ? localStream : null; lv.parentElement.classList.add('local'); }
     // Notify peers that screen share stopped
     vcBroadcastData({type:'screen-share-stopped', peerId: rtcPeer ? rtcPeer.id : '', name: vcCurrentUserName});
     return;
@@ -11216,45 +11286,108 @@ async function vcToggleScreen() {
     btn.classList.add('active');
     var sTrack = screenStream.getVideoTracks()[0];
     vcReplaceVideoTrackForAll(sTrack);
+    // If the shared surface carries audio (e.g. a video tab), mix it with the
+    // microphone and send the combined track so remote participants hear it.
+    vcSetupScreenAudioMix();
     var lv = document.getElementById('vc-local-video');
-    if(lv) { lv.srcObject = screenStream; lv.parentElement.classList.remove('local'); }
+    if(lv) { lv.srcObject = screenStream; lv.muted = true; lv.parentElement.classList.remove('local'); }
     // Notify peers FIRST so they switch to screen-share layout before track arrives
     vcBroadcastData({type:'screen-share-started', peerId: rtcPeer ? rtcPeer.id : '', name: vcCurrentUserName});
+    // The local camera-off overlay no longer applies while sharing.
+    vcBroadcastData({type:'cam-state', peerId: rtcPeer ? rtcPeer.id : '', on:true});
     sTrack.onended = function() { vcToggleScreen(); };
   } catch(err) { console.warn('Screen share cancelled or failed:', err); }
 }
 
-// Helper: Replace video track in all peer media connections
-function vcReplaceVideoTrackForAll(newTrack) {
-  Object.keys(peerConnections).forEach(function(pid) {
-    var mc = peerConnections[pid].media;
-    if(!mc) return;
-    // PeerJS exposes the underlying RTCPeerConnection via multiple possible paths
-    var pc = mc.peerConnection || mc._peerConnection || mc._pc || (mc.provider && mc.provider.peerConnection) || null;
-    if(!pc && mc.open !== undefined) {
-      // Try accessing through PeerJS internals
-      var keys = Object.keys(mc);
-      for(var k = 0; k < keys.length; k++) {
-        var val = mc[keys[k]];
-        if(val && val instanceof RTCPeerConnection) { pc = val; break; }
+// Mix the microphone with any audio captured from the shared screen/tab and push
+// the combined track to all peers, so participants can hear shared video sound.
+function vcSetupScreenAudioMix() {
+  if(!screenStream) return;
+  var screenAudio = screenStream.getAudioTracks();
+  if(screenAudio.length === 0) return; // user didn't share any audio — nothing to mix
+  try {
+    vcScreenAudioCtx = new (window.AudioContext || window.webkitAudioContext)();
+    var dest = vcScreenAudioCtx.createMediaStreamDestination();
+    // Shared tab/screen audio
+    vcScreenAudioCtx.createMediaStreamSource(new MediaStream(screenAudio)).connect(dest);
+    // Microphone audio (if available and enabled)
+    if(localStream) {
+      var mic = localStream.getAudioTracks();
+      if(mic.length > 0) {
+        vcScreenAudioCtx.createMediaStreamSource(new MediaStream([mic[0]])).connect(dest);
       }
     }
-    if(pc && pc.getSenders) {
+    var mixedTrack = dest.stream.getAudioTracks()[0];
+    if(mixedTrack) vcReplaceAudioTrackForAll(mixedTrack);
+  } catch(err) {
+    console.warn('Could not mix screen-share audio:', err);
+    vcTeardownScreenAudioMix();
+  }
+}
+
+// Restore the plain microphone audio track and close the mixing context.
+function vcTeardownScreenAudioMix() {
+  if(vcScreenAudioCtx) {
+    try { vcScreenAudioCtx.close(); } catch(e) {}
+    vcScreenAudioCtx = null;
+    // Restore the raw microphone track for all peers
+    if(localStream) {
+      var mic = localStream.getAudioTracks();
+      if(mic.length > 0) vcReplaceAudioTrackForAll(mic[0]);
+    }
+  }
+}
+
+// Helper: locate the underlying RTCPeerConnection PeerJS wraps for a media call
+function vcGetPeerConnection(mc) {
+  if(!mc) return null;
+  var pc = mc.peerConnection || mc._peerConnection || mc._pc || (mc.provider && mc.provider.peerConnection) || null;
+  if(!pc) {
+    var keys = Object.keys(mc);
+    for(var k = 0; k < keys.length; k++) {
+      var val = mc[keys[k]];
+      if(val && val instanceof RTCPeerConnection) { pc = val; break; }
+    }
+  }
+  return (pc && pc.getSenders) ? pc : null;
+}
+
+// Helper: Replace video track in all peer media connections.
+// Passing null clears the outgoing video (peers see a blank tile instead of a
+// frozen last frame) without tearing down the connection.
+function vcReplaceVideoTrackForAll(newTrack) {
+  Object.keys(peerConnections).forEach(function(pid) {
+    var pc = vcGetPeerConnection(peerConnections[pid].media);
+    if(pc) {
       var sender = pc.getSenders().find(function(s){return s.track && s.track.kind==='video';});
       if(sender) {
         sender.replaceTrack(newTrack).catch(function(err) {
-          console.warn('Failed to replace track for', pid, err);
-          // Fallback: close and re-call with new stream
-          vcReCallPeerWithScreen(pid, newTrack);
+          console.warn('Failed to replace video track for', pid, err);
+          if(newTrack) vcReCallPeerWithScreen(pid, newTrack);
         });
-      } else {
-        // No video sender exists (connection was made without video) — need to renegotiate
-        console.warn('No video sender for', pid, '— re-calling with screen track');
-        vcReCallPeerWithScreen(pid, newTrack);
+        return;
       }
-    } else {
-      console.warn('No RTCPeerConnection found for', pid, '— re-calling');
+    }
+    // No usable video sender. Only re-call when we actually have a track to send;
+    // there is nothing to renegotiate when clearing video.
+    if(newTrack) {
+      console.warn('No video sender for', pid, '— re-calling with new track');
       vcReCallPeerWithScreen(pid, newTrack);
+    }
+  });
+}
+
+// Helper: Replace the outgoing audio track in all peer media connections
+// (used when mixing screen-share/tab audio with the microphone).
+function vcReplaceAudioTrackForAll(newTrack) {
+  Object.keys(peerConnections).forEach(function(pid) {
+    var pc = vcGetPeerConnection(peerConnections[pid].media);
+    if(!pc) return;
+    var sender = pc.getSenders().find(function(s){return s.track && s.track.kind==='audio';});
+    if(sender) {
+      sender.replaceTrack(newTrack).catch(function(err) {
+        console.warn('Failed to replace audio track for', pid, err);
+      });
     }
   });
 }
@@ -11331,7 +11464,6 @@ function vcEnterScreenShareView(sharingPeerId) {
 
 // Restore the normal multi-tile grid when screen sharing ends.
 function vcExitScreenShareView() {
-  var prevSharingPeerId = vcScreenSharingPeerId;
   vcScreenSharingPeerId = null;
   var grid = document.getElementById('vc-video-grid');
   if (!grid) return;
@@ -11353,19 +11485,16 @@ function vcExitScreenShareView() {
     grid.classList.add('vc-host-focus-mode');
   }
 
-  // If the sharer's video tile exists, force a refresh on its video element
-  // to avoid showing a frozen last-frame of the screen share
-  if (prevSharingPeerId) {
-    var safeId = sanitizePeerId(prevSharingPeerId);
-    var vid = document.getElementById('vc-vid-' + safeId);
-    if (vid && vid.srcObject) {
-      // Re-assign the stream to force the video element to pick up the replaced track
-      var stream = vid.srcObject;
-      vid.srcObject = null;
-      vid.srcObject = stream;
-      vid.play().catch(function(){});
-    }
-  }
+  // Force a refresh on every remote video element so none of them are left
+  // showing a frozen last-frame of the screen share (this also covers the case
+  // where multiple participants shared and stopped).
+  grid.querySelectorAll('.video-tile video').forEach(function(vid) {
+    if (vid.id === 'vc-local-video' || !vid.srcObject) return;
+    var stream = vid.srcObject;
+    vid.srcObject = null;
+    vid.srcObject = stream;
+    vid.play().catch(function(){});
+  });
 
   // Re-apply current view mode to restore correct layout
   if (vcCurrentViewMode === 'host-only') {
@@ -11630,7 +11759,36 @@ async function vcUploadRecordingToDrive() {
 }
 
 // ── Chat ──
-function vcDisplayChat(sender, text, isLocal) {
+// ── Chat history persistence (survives leaving/rejoining a room) ──
+function vcChatStorageKey() {
+  return currentRoomCode ? 'vcChatHistory_' + currentRoomCode : null;
+}
+
+function vcLoadChatHistory() {
+  var key = vcChatStorageKey();
+  if(!key) return [];
+  try { return JSON.parse(localStorage.getItem(key) || '[]'); } catch(e) { return []; }
+}
+
+function vcSaveChatMessage(sender, text, isLocal) {
+  var key = vcChatStorageKey();
+  if(!key) return;
+  try {
+    var history = vcLoadChatHistory();
+    history.push({sender:sender, text:text, isLocal:isLocal, ts:Date.now()});
+    // Cap stored history to avoid unbounded growth
+    if(history.length > 500) history = history.slice(history.length - 500);
+    localStorage.setItem(key, JSON.stringify(history));
+  } catch(e) { /* storage full or unavailable — ignore */ }
+}
+
+// Render any previously-saved messages for this room into the chat panel.
+function vcRestoreChatHistory() {
+  var history = vcLoadChatHistory();
+  history.forEach(function(m) { vcDisplayChat(m.sender, m.text, m.isLocal, true); });
+}
+
+function vcDisplayChat(sender, text, isLocal, skipPersist) {
   var msgs = document.getElementById('chatMsgs-'+vcCurrentRole);
   if(!msgs) return;
   var safeText = text.replace(/</g,'&lt;').replace(/>/g,'&gt;');
@@ -11638,6 +11796,7 @@ function vcDisplayChat(sender, text, isLocal) {
   var color = isLocal ? 'var(--teal)' : 'var(--accent)';
   msgs.innerHTML += '<div class="chat-msg"><div class="sender" style="color:'+color+';">'+safeSender+'</div><div class="text">'+safeText+'</div></div>';
   msgs.scrollTop = msgs.scrollHeight;
+  if(!skipPersist) vcSaveChatMessage(sender, text, isLocal);
 }
 
 function sendChatMsg(role, sender) {
@@ -11955,6 +12114,7 @@ function exitVideoRoom(role) {
   }
   vcIsRecording = false;
   if(vcRecordingAudioCtx) { try { vcRecordingAudioCtx.close(); } catch(e){} vcRecordingAudioCtx = null; }
+  if(vcScreenAudioCtx) { try { vcScreenAudioCtx.close(); } catch(e){} vcScreenAudioCtx = null; }
   if(videoTimerInterval) clearInterval(videoTimerInterval);
   vcStopHostReconnect();
 
