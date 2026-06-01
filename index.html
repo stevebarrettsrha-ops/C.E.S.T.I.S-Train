@@ -10,11 +10,15 @@
 <script>
 /* ============================================================================
    CESTISStore — localStorage-compatible API backed by IndexedDB.
-   IndexedDB has a far larger quota than localStorage (~5MB), so large data
-   (e.g. staff records with embedded document blobs) no longer overflows.
-   A synchronous in-memory cache preserves the existing synchronous
-   getItem/setItem/removeItem call sites; writes persist to IndexedDB
-   (durable) and mirror to localStorage when they still fit.
+   IndexedDB is the durable primary store. Its quota is bounded only by the
+   browser/device (typically hundreds of MB to many GB), NOT the old ~5MB
+   localStorage cap, so large data (e.g. staff records with embedded document
+   blobs) no longer overflows. A synchronous in-memory cache preserves the
+   existing synchronous getItem/setItem/removeItem call sites; every write
+   persists to IndexedDB (durable) and is also mirrored to localStorage as a
+   best-effort fast-load seed when it still fits under the 5MB cap — when it
+   doesn't, the localStorage write fails silently and IndexedDB remains the
+   source of truth (re-hydrated on the next load via whenReady).
    ============================================================================ */
 (function(){
   if (window.CESTISStore) return;
@@ -4995,25 +4999,62 @@ function safeJsonParse(str, fallback) {
 }
 
 // ---------- ERROR HANDLING: Storage Quota Monitoring ----------
+// App data is stored durably in IndexedDB (via CESTISStore), which is bounded
+// only by the browser/device storage quota — typically hundreds of MB to many
+// GB — NOT the old ~5MB localStorage limit. getStorageUsage() reports the size
+// of the app's own data; getStorageEstimate() reports real device-level usage
+// and quota via the Storage API when the browser supports it.
+function formatBytes(bytes) {
+  if(!bytes || bytes < 0) return '0 B';
+  var units = ['B','KB','MB','GB','TB'];
+  var i = Math.floor(Math.log(bytes) / Math.log(1024));
+  if(i >= units.length) i = units.length - 1;
+  return (bytes / Math.pow(1024, i)).toFixed(i <= 0 ? 0 : (i >= 3 ? 2 : 1)) + ' ' + units[i];
+}
+
 function getStorageUsage() {
   var total = 0;
   try {
     for(var key in CESTISStore._cache) {
       if(CESTISStore.hasOwnProperty(key) && key.startsWith('voctrain_')) {
-        total += CESTISStore.getItem(key).length * 2; // UTF-16 chars = 2 bytes each
+        var val = CESTISStore.getItem(key);
+        if(val) total += val.length * 2; // UTF-16 chars = 2 bytes each
       }
     }
   } catch(e) {}
-  return { bytes: total, mb: (total / 1024 / 1024).toFixed(2), percent: Math.min(100, (total / (5 * 1024 * 1024) * 100)).toFixed(1) };
+  return { bytes: total, mb: (total / 1024 / 1024).toFixed(2) };
+}
+
+// Resolve to real device-level storage usage/quota for the IndexedDB-backed
+// store. Falls back to app-data size when the Storage API is unavailable.
+function getStorageEstimate() {
+  var appBytes = getStorageUsage().bytes;
+  try {
+    if(navigator.storage && typeof navigator.storage.estimate === 'function') {
+      return navigator.storage.estimate().then(function(est){
+        var used = (typeof est.usage === 'number') ? est.usage : appBytes;
+        var quota = (typeof est.quota === 'number') ? est.quota : 0;
+        return { appBytes: appBytes, usedBytes: used, quotaBytes: quota,
+                 percent: quota ? Math.min(100, used / quota * 100) : 0 };
+      }).catch(function(){
+        return { appBytes: appBytes, usedBytes: appBytes, quotaBytes: 0, percent: 0 };
+      });
+    }
+  } catch(e) {}
+  return Promise.resolve({ appBytes: appBytes, usedBytes: appBytes, quotaBytes: 0, percent: 0 });
 }
 
 function checkStorageQuota() {
-  var usage = getStorageUsage();
-  if(parseFloat(usage.percent) > 80) {
-    console.warn('[Storage] Usage at ' + usage.percent + '% (' + usage.mb + ' MB). Consider cleaning up old data.');
-    showToast('Storage usage is at ' + usage.percent + '%. Consider exporting and cleaning old data.');
-  }
-  return usage;
+  try {
+    getStorageEstimate().then(function(est){
+      // Warn only when the real device quota is genuinely close to full —
+      // never against the obsolete 5MB localStorage cap.
+      if(est.quotaBytes && est.percent > 90) {
+        console.warn('[Storage] Device storage at ' + est.percent.toFixed(1) + '% of quota (' + formatBytes(est.usedBytes) + ' / ' + formatBytes(est.quotaBytes) + ').');
+        showToast('Device storage is nearly full (' + est.percent.toFixed(1) + '%). Consider exporting and removing old data.', 'warning');
+      }
+    });
+  } catch(e) {}
 }
 
 // ---------- UX: Styled Alert Replacement ----------
@@ -6495,6 +6536,20 @@ function initAttendanceQuarters() {
 }
 
 loadState();
+// IndexedDB hydrates the store asynchronously and may hold far more data than
+// the synchronous localStorage seed (which is capped at ~5MB). Once the durable
+// IndexedDB store has finished loading into the cache, re-run loadState so any
+// dataset exceeding the old 5MB localStorage limit is fully pulled into memory,
+// then announce the refresh so dependent views re-render.
+try {
+  CESTISStore.whenReady(function(){
+    try {
+      loadState();
+      if(window.CESTISCore && typeof CESTISCore.emit === 'function') CESTISCore.emit('cestis:state-saved');
+      if(typeof refreshStorageUsage === 'function' && document.getElementById('storageUsageInfo')) refreshStorageUsage();
+    } catch(e) { console.warn('[loadState] post-IndexedDB reload failed:', e && e.message); }
+  });
+} catch(e) {}
 applyGoogleVerificationMeta();
 // Check and apply maintenance mode on page load
 checkMaintenanceOnLoad();
@@ -31615,16 +31670,25 @@ function bulkApproveCertDownloads() {
 // ============================== DATA MANAGEMENT HELPERS ==============================
 
 function refreshStorageUsage() {
-  var usage = getStorageUsage();
+  var app = getStorageUsage();
   var infoEl = document.getElementById('storageUsageInfo');
   var barEl = document.getElementById('storageBarFill');
-  if(infoEl) {
-    infoEl.innerHTML = 'Using <strong>' + usage.mb + ' MB</strong> of approximately 5 MB available (' + usage.percent + '%)';
-  }
-  if(barEl) {
-    barEl.style.width = usage.percent + '%';
-    barEl.className = 'storage-bar-fill ' + (parseFloat(usage.percent) > 80 ? 'high' : parseFloat(usage.percent) > 50 ? 'medium' : 'low');
-  }
+  if(infoEl) infoEl.innerHTML = 'Calculating&hellip;';
+  getStorageEstimate().then(function(est){
+    if(infoEl) {
+      if(est.quotaBytes) {
+        infoEl.innerHTML = 'App data: <strong>' + app.mb + ' MB</strong> &middot; stored durably in IndexedDB (no 5&nbsp;MB limit).<br>' +
+          'Device storage: using <strong>' + formatBytes(est.usedBytes) + '</strong> of <strong>' + formatBytes(est.quotaBytes) + '</strong> available (' + est.percent.toFixed(1) + '%).';
+      } else {
+        infoEl.innerHTML = 'App data: <strong>' + app.mb + ' MB</strong> &middot; stored durably in IndexedDB (no 5&nbsp;MB limit).';
+      }
+    }
+    if(barEl) {
+      var pct = est.quotaBytes ? est.percent : 0;
+      barEl.style.width = pct + '%';
+      barEl.className = 'storage-bar-fill ' + (pct > 90 ? 'high' : pct > 70 ? 'medium' : 'low');
+    }
+  });
 }
 
 function runAndDisplayIntegrityCheck() {
