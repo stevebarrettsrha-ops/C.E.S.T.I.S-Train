@@ -17,18 +17,35 @@
      but <script> tags will NOT run. Put any JS changes in index.html.
   ============================================================================
 -->
-<div style="display:flex;gap:12px;margin-bottom:18px;">
-  <button class="btn btn-primary" onclick="openModal('createClassSessionModal')">+ New Class Session</button>
-  <button class="btn btn-secondary" onclick="openModal('createClassSessionModal')">Schedule Session</button>
-</div>
-<div class="card" id="iVideoClassList">
-  <div class="card-header"><h3>My Class Sessions</h3></div>
-  <div id="iClassSessionsList"></div>
-</div>
-<div class="card" style="margin-top:18px;">
-  <div class="card-header"><h3>Past Recordings</h3></div>
-  <div id="iPastRecordingsList">
-    <p style="color:var(--text-muted);padding:16px;text-align:center;">No past recordings yet. Completed class sessions will appear here.</p>
+<div id="iVideoContent">
+  <div style="display:flex;gap:12px;margin-bottom:18px;flex-wrap:wrap;">
+    <button class="btn btn-primary" onclick="openModal('createClassSessionModal')">+ New Class Session</button>
+    <button class="btn btn-secondary" onclick="openModal('createClassSessionModal')">Schedule Session</button>
+    <button class="btn btn-primary" style="background:var(--purple);" onclick="openStaffMeetingModal()">+ Schedule Staff Meeting</button>
+  </div>
+  <div class="card" id="iVideoClassList">
+    <div class="card-header"><h3>My Class Sessions</h3></div>
+    <div id="iClassSessionsList"></div>
+  </div>
+  <div class="card" style="margin-top:18px;border-color:var(--purple);">
+    <div class="card-header"><h3 style="color:var(--purple);">Staff Meetings</h3><span style="font-size:12px;color:var(--text-muted);">All-Staff conferences you can create &amp; join</span></div>
+    <div class="table-wrapper"><table>
+      <thead><tr><th>Meeting</th><th>Created By</th><th>Date &amp; Time</th><th>Duration</th><th>Action</th></tr></thead>
+      <tbody id="iAdminMeetingsList"></tbody>
+    </table></div>
+    <div style="padding:16px;border-top:1px solid var(--border);text-align:center;">
+      <p style="color:var(--text-muted);font-size:13px;margin-bottom:10px;">Have a room code? Enter it to join a staff conference</p>
+      <div style="display:flex;gap:8px;align-items:center;justify-content:center;">
+        <input type="text" class="form-control" id="i-vc-join-code" placeholder="ABC123" maxlength="6" style="font-family:monospace;font-size:20px;letter-spacing:4px;text-align:center;text-transform:uppercase;width:200px;" onkeyup="this.value=this.value.toUpperCase();if(event.key==='Enter')iJoinMeetingByCode()">
+        <button class="btn btn-primary" onclick="iJoinMeetingByCode()">Join</button>
+      </div>
+    </div>
+  </div>
+  <div class="card" style="margin-top:18px;">
+    <div class="card-header"><h3>Past Recordings</h3></div>
+    <div id="iPastRecordingsList">
+      <p style="color:var(--text-muted);padding:16px;text-align:center;">No past recordings yet. Completed class sessions will appear here.</p>
+    </div>
   </div>
 </div>
 <div id="iVideoRoom" style="display:none;"></div>

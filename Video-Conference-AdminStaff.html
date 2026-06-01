@@ -19,8 +19,11 @@
   ============================================================================
 -->
 <div id="asVideoContent">
+  <div style="display:flex;gap:12px;margin-bottom:18px;flex-wrap:wrap;">
+    <button class="btn btn-primary" style="background:var(--purple);" onclick="openStaffMeetingModal()">+ Schedule Staff Meeting</button>
+  </div>
   <div class="card" style="margin-bottom:18px;border-color:var(--purple);">
-    <div class="card-header"><h3 style="color:var(--purple);">Admin Meetings</h3><span style="font-size:12px;color:var(--text-muted);">Meetings for Administrator &amp; Admin Staff</span></div>
+    <div class="card-header"><h3 style="color:var(--purple);">Staff Meetings</h3><span style="font-size:12px;color:var(--text-muted);">All-Staff conferences &amp; Admin meetings you can join</span></div>
     <div class="table-wrapper"><table>
       <thead><tr><th>Meeting</th><th>Scheduled By</th><th>Date &amp; Time</th><th>Duration</th><th>Action</th></tr></thead>
       <tbody id="asAdminMeetingsList"></tbody>
