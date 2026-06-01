@@ -4756,7 +4756,7 @@ function shakeNotificationBell() {
 function addNotification(text, type, icon, forRoles) {
   type = type || 'info';
   var icons = {success:'\u2705',warning:'\u26A0\uFE0F',info:'\uD83D\uDD14',exam:'\uD83D\uDCDD',student:'\uD83D\uDC64',cert:'\uD83C\uDF93',announce:'\uD83D\uDCE2',calendar:'\uD83D\uDCC5',attendance:'\uD83D\uDCCB',resource:'\uD83D\uDCC1',grade:'\uD83C\uDF1F'};
-  notifications.unshift({
+  var notif = {
     id: Date.now() + Math.random(),
     text: text,
     timestamp: Date.now(),
@@ -4765,12 +4765,17 @@ function addNotification(text, type, icon, forRoles) {
     icon: icon || icons[type] || icons.info,
     type: type === 'warning' ? 'warning' : type === 'success' || type === 'grade' || type === 'cert' ? 'success' : 'info',
     forRoles: forRoles || ['admin','instructor','student']
-  });
+  };
+  notifications.unshift(notif);
   if(notifications.length > 50) notifications = notifications.slice(0, 50);
   updateNotificationDot();
   shakeNotificationBell();
   playNotificationSound();
   saveNotifications();
+  // Realtime fan-out: instant bell for other online users + a nudge so their
+  // announcement/assignment/task lists refresh, and an immediate cloud push so
+  // that nudge-pull finds the new data.
+  try { cestisRTBroadcastNotification(notif, true); cestisFlushCloudNow(); } catch(e) {}
 }
 
 function getFilteredNotifications() {
@@ -4791,7 +4796,7 @@ function getFilteredNotifications() {
 function addNotificationForUser(text, type, icon, userId, role) {
   type = type || 'info';
   var icons = {success:'\u2705',warning:'\u26A0\uFE0F',info:'\uD83D\uDD14',dm:'\uD83D\uDCAC',follow:'\uD83D\uDC65'};
-  notifications.unshift({
+  var notif = {
     id: Date.now() + Math.random(),
     text: text,
     timestamp: Date.now(),
@@ -4801,12 +4806,24 @@ function addNotificationForUser(text, type, icon, userId, role) {
     type: 'info',
     forUsers: [userId],
     forRoles: role ? [role] : []
-  });
+  };
+  notifications.unshift(notif);
   if(notifications.length > 50) notifications = notifications.slice(0, 50);
   updateNotificationDot();
   shakeNotificationBell();
   playNotificationSound();
   saveNotifications();
+  // Realtime fan-out to the single target user. Chat-related notices (DM/follow)
+  // are skipped entirely here — the chat data channel already delivers the
+  // message AND raises its own DM notification, so broadcasting again would
+  // double-notify. Everything else (e.g. a task assigned to one person) goes out
+  // with a cloud nudge so the target's lists refresh.
+  try {
+    if(type !== 'dm' && type !== 'follow') {
+      cestisRTBroadcast([userId], { type: 'notify', notif: notif, nudge: true });
+      cestisFlushCloudNow();
+    }
+  } catch(e) {}
 }
 
 function getRelativeTime(ts) {
@@ -7438,6 +7455,11 @@ function enterApp(role) {
 
     // Load per-user local data (chat, profiles) for this specific user
     loadPerUserLocalData();
+
+    // Bring up the realtime data-channel peer for the whole session so live
+    // notifications, announcements, assignments and assigned tasks arrive
+    // instantly on ANY page — not only while the chat page is open.
+    try { if(typeof lmsChatRTStart === 'function') lmsChatRTStart(); } catch(e) {}
 
     // Auto-sync from all Google Drive folders on login, then start 5s auto-save
     setTimeout(function() {
@@ -24637,7 +24659,11 @@ function lmsChatRTSend(roomId, msg) {
 
 // A message arrived over a data channel: validate, dedupe, persist and render.
 function lmsChatRTHandleData(data) {
-  if (!data || data.type !== 'chat-msg' || !data.msg || !data.msg.roomId) return;
+  if (!data || !data.type) return;
+  // App-wide live events (notifications + data nudges) ride the same channel.
+  if (data.type === 'notify') { try { cestisRTHandleNotify(data); } catch (e) {} return; }
+  if (data.type === 'data-nudge') { try { cestisRTHandleNudge(); } catch (e) {} return; }
+  if (data.type !== 'chat-msg' || !data.msg || !data.msg.roomId) return;
   var msg = data.msg;
   var roomId = msg.roomId;
   var me = lmsChatGetCurrentUser();
@@ -24690,6 +24716,138 @@ function lmsChatRTStop() {
   lmsChatRTConns = {};
   if (lmsChatRTPeer) { try { lmsChatRTPeer.destroy(); } catch (e) {} lmsChatRTPeer = null; }
   lmsChatRTReady = false;
+}
+
+// ============================================================================
+// APP-WIDE REALTIME EVENTS over the same PeerJS data channels
+// ----------------------------------------------------------------------------
+// The chat fast-lane above carries chat messages; this extends the SAME peer to
+// carry every other live event — notifications, new announcements, assignments,
+// assigned tasks (duty register) and anything else that fires a notification.
+//
+// Model: the originator broadcasts the small notification object (instant bell)
+// plus a lightweight "nudge". On the nudge a recipient pulls the latest cloud
+// backup with the existing additive merge and re-renders the affected views, so
+// the new announcement / assignment / task appears within ~1s — no manual Sync
+// from Cloud. The Drive backup stays the durable source of truth and the
+// offline / other-device fallback (anyone offline still gets it on next login).
+// ============================================================================
+
+// Send a payload to an explicit list of user ids, opening a channel on demand.
+function cestisRTBroadcast(userIds, payload) {
+  if (!lmsChatRTPeer || !lmsChatRTReady || !userIds || !userIds.length) return;
+  var me = lmsChatGetCurrentUser();
+  var sent = {};
+  userIds.forEach(function (uid) {
+    if (!uid || (me && uid === me.id) || sent[uid]) return;
+    sent[uid] = true;
+    var conn = lmsChatRTConns[uid];
+    if (conn && conn.open) {
+      try { conn.send(payload); } catch (e) {}
+    } else {
+      try {
+        var c = lmsChatRTPeer.connect(lmsChatRTPeerId(uid), { reliable: true });
+        if (c) { lmsChatRTBindConn(c, uid); c.on('open', function () { try { c.send(payload); } catch (e) {} }); }
+      } catch (e) {}
+    }
+  });
+}
+
+// Resolve the user ids a role-targeted notification should reach, mirroring the
+// display rule in getFilteredNotifications (admin-staff also see admin notices).
+function cestisUsersForRoles(forRoles) {
+  var roles = (forRoles && forRoles.length) ? forRoles : ['admin', 'instructor', 'student'];
+  var ids = [];
+  (userAccounts || []).forEach(function (u) {
+    if (!u || !u.id) return;
+    var r = u.role;
+    var match = roles.indexOf(r) !== -1 || (r === 'adminstaff' && roles.indexOf('admin') !== -1);
+    if (match) ids.push(u.id);
+  });
+  return ids;
+}
+
+// Does a notification object target the current viewer? (same logic as the bell)
+function cestisNotifTargetsMe(n) {
+  if (!n) return false;
+  var me = lmsChatGetCurrentUser();
+  var myId = me ? me.id : null;
+  if (n.forUsers && n.forUsers.length) return !!myId && n.forUsers.indexOf(myId) !== -1;
+  if (!currentRole) return false;
+  if (!n.forRoles || !n.forRoles.length) return true;
+  if (currentRole === 'adminstaff') return n.forRoles.indexOf('adminstaff') !== -1 || n.forRoles.indexOf('admin') !== -1;
+  return n.forRoles.indexOf(currentRole) !== -1;
+}
+
+// Broadcast a freshly-created notification (+ optional data nudge) to its targets.
+function cestisRTBroadcastNotification(notif, nudge) {
+  if (!notif) return;
+  var targets = (notif.forUsers && notif.forUsers.length) ? notif.forUsers : cestisUsersForRoles(notif.forRoles);
+  cestisRTBroadcast(targets, { type: 'notify', notif: notif, nudge: nudge !== false });
+}
+
+// Push the local data to the cloud right now so a recipient's nudge-pull finds
+// it (instead of waiting up to the 2s debounce / 5s auto-save).
+function cestisFlushCloudNow() {
+  try { if (!isCloudConnected || !googleAccessToken) return; } catch (e) { return; }
+  if (_debouncedCloudSaveTimer) { clearTimeout(_debouncedCloudSaveTimer); _debouncedCloudSaveTimer = null; }
+  try { autoSaveToAllFolders(); } catch (e) {}
+}
+
+// A peer told us data changed: pull + merge + re-render. Debounced so a burst of
+// events (e.g. one announcement notifying 30 students) is one pull per window.
+var _cestisNudgeTimer = null;
+function cestisRTHandleNudge() {
+  if (_cestisNudgeTimer) return;
+  _cestisNudgeTimer = setTimeout(function () {
+    _cestisNudgeTimer = null;
+    cestisPullAndRefresh();
+  }, 1200);
+}
+
+async function cestisPullAndRefresh() {
+  try {
+    if (!isCloudConnected || !googleAccessToken) return;
+    if (!cloudFileId) { try { await findExistingBackupFile(); } catch (e) {} }
+    if (!cloudFileId) return;
+    var changed = await silentMergeFromBackup(cloudFileId);
+    if (!changed) return;
+    try { refreshContentDependentViews(); } catch (e) {}
+    try { if (typeof adrUpdateBadge === 'function') adrUpdateBadge(); } catch (e) {}
+    try { updateNotificationDot(); } catch (e) {}
+    // Re-render the duty register if the viewer is currently on it.
+    try {
+      var dutyPage = document.querySelector('#page-admin-duty-register.active, #page-i-duties.active, #page-as-duties.active');
+      if (dutyPage) {
+        if (dutyPage.id === 'page-admin-duty-register' && typeof adrOnPageShow === 'function') adrOnPageShow();
+        else if (dutyPage.id === 'page-i-duties' && typeof iOnDutiesPageShow === 'function') iOnDutiesPageShow();
+        else if (dutyPage.id === 'page-as-duties' && typeof asOnDutiesPageShow === 'function') asOnDutiesPageShow();
+      }
+    } catch (e) {}
+  } catch (e) { console.warn('cestis realtime pull error', e); }
+}
+
+// Rebuild the notification dropdown in place if it's currently open.
+function cestisRefreshNotifDropdownIfOpen() {
+  var btn = document.querySelector('.topbar-btn[title="Notifications"]');
+  var dd = btn ? btn.querySelector('.notification-dropdown.active') : null;
+  if (dd) { dd.classList.remove('active'); try { toggleNotifications(); } catch (e) {} }
+}
+
+// A notification arrived over a data channel.
+function cestisRTHandleNotify(data) {
+  var n = data && data.notif;
+  if (n && cestisNotifTargetsMe(n) && !notifications.some(function (x) { return x.id === n.id; })) {
+    n.time = 'Just now';
+    notifications.unshift(n);
+    if (notifications.length > 50) notifications = notifications.slice(0, 50);
+    updateNotificationDot();
+    try { shakeNotificationBell(); } catch (e) {}
+    try { playNotificationSound(); } catch (e) {}
+    saveNotifications();
+    cestisRefreshNotifDropdownIfOpen();
+  }
+  if (data && data.nudge) cestisRTHandleNudge();
 }
 
 // ── Unified call initiation (voice or video) ──
