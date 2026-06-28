@@ -1881,6 +1881,7 @@
 
         <!-- Dashboard Module -->
         <div id="dashboard" class="module active">
+            <div id="dashboardQuarterBar"></div>
             <div class="stats-grid">
                 <div class="stat-card">
                     <h3>Total Students</h3>
@@ -1893,10 +1894,12 @@
                 <div class="stat-card">
                     <h3>Total Collected</h3>
                     <div class="value" id="totalCollected">$0.00</div>
+                    <div id="totalCollectedScope" style="font-size:12px;color:var(--text-muted,#5b6b80);margin-top:4px;font-weight:600;"></div>
                 </div>
                 <div class="stat-card">
                     <h3>Total Outstanding</h3>
                     <div class="value" id="totalOutstanding">$0.00</div>
+                    <div style="font-size:12px;color:var(--text-muted,#5b6b80);margin-top:4px;font-weight:600;">All-time balance</div>
                 </div>
             </div>
 
@@ -5756,30 +5759,125 @@
             alert('Payment recorded successfully! Receipt has been generated and downloaded.');
         }
 
-        // True when a payment's date falls in the app-wide active financial quarter.
-        // Outstanding-balance maths stays cumulative (all-time) elsewhere; only the
-        // payment register & reports are scoped to the selected quarter.
+        // ----- Quarterly fee filtering (like the Cashbook) ------------------
+        // Payments are bucketed by their payment date into the CESTIS financial
+        // quarter (Apr–Jun = Q1 … Jan–Mar = Q4). The register and the "Total
+        // Collected" figure can be viewed per quarter or as "All Payments". The
+        // selected quarter is the app-wide shared quarter (cestis_active_quarter),
+        // so it stays in sync with the Cashbook & Virement. Expected/Outstanding
+        // balances remain cumulative (all-time) — only payment-derived figures scope.
+        let feeShowAllPayments = true;   // default: show every payment (unfiltered)
+
+        // True when a payment is in the current view scope (All, or the active quarter).
         function paymentInActiveQuarter(p) {
+            if (feeShowAllPayments) return true;
             if (typeof CESTISCore === 'undefined' || !CESTISCore.getActiveQuarter) return true;
-            // Undated/unparseable payments stay visible in every quarter so they are
-            // never silently hidden by the quarter filter.
+            // Undated/unparseable payments stay visible so they are never silently hidden.
             if (!p || !CESTISCore.deriveQuarter(p.date)) return true;
             const cur = CESTISCore.getActiveQuarter();
             return CESTISCore.recordInQuarter(p, cur.fy, cur.q, 'date');
         }
 
-        // Mount the shared FY/quarter selector above the payments register. The
-        // active quarter is shared across every CESTIS page, so switching it here
-        // (or on another page/tab) re-renders the register for that quarter.
-        let _schoolFeeQuarterBar = null;
+        // Payments currently in scope (used by the dashboard "Total Collected").
+        function paymentsInScope() { return payments.filter(paymentInActiveQuarter); }
+
+        // A short label for the active scope, e.g. "All Payments" or "Q1 · Apr–Jun 2026".
+        function feeScopeLabel() {
+            if (feeShowAllPayments || typeof CESTISCore === 'undefined' || !CESTISCore.getActiveQuarter) return 'All Payments';
+            const cur = CESTISCore.getActiveQuarter();
+            return CESTISCore.quarterShortLabel(cur.fy, cur.q) + ' ' + CESTISCore.quarterCalendarYear(cur.fy, cur.q);
+        }
+
+        // Inject the filter-bar styles once.
+        function _ensureFeeQFilterStyles() {
+            if (document.getElementById('fee-qfilter-styles')) return;
+            const st = document.createElement('style');
+            st.id = 'fee-qfilter-styles';
+            st.textContent =
+                '.fee-qfilter{display:flex;flex-wrap:wrap;gap:10px;align-items:center;justify-content:center;' +
+                'padding:12px 14px;border-radius:12px;background:linear-gradient(180deg,rgba(13,71,161,.06),rgba(13,71,161,.02));' +
+                'border:1px solid rgba(13,71,161,.18);margin:0 0 16px;}' +
+                '.fee-qfilter-fy{display:flex;align-items:center;gap:10px;}' +
+                '.fee-qfy-label{font-weight:700;font-size:14px;letter-spacing:.4px;min-width:120px;text-align:center;}' +
+                '.fee-qtabs{display:flex;flex-wrap:wrap;gap:8px;align-items:center;justify-content:center;}' +
+                '.fee-qtab,.fee-qbtn{cursor:pointer;border:1px solid rgba(13,71,161,.25);background:transparent;' +
+                'color:inherit;padding:6px 14px;border-radius:8px;font-size:13px;font-weight:600;transition:all .15s;}' +
+                '.fee-qtab:hover,.fee-qbtn:hover{background:rgba(13,71,161,.10);}' +
+                '.fee-qtab.active{background:#0D47A1;color:#fff;border-color:#0D47A1;box-shadow:0 0 0 3px rgba(13,71,161,.18);}' +
+                '.fee-allpay.active{background:#1b8a5a;border-color:#1b8a5a;box-shadow:0 0 0 3px rgba(27,138,90,.18);}';
+            document.head.appendChild(st);
+        }
+
+        // Render the All/Q1–Q4 filter bar (image-4 style) into a container.
+        function renderFeeQuarterFilter(containerId) {
+            const el = document.getElementById(containerId);
+            if (!el) return;
+            _ensureFeeQFilterStyles();
+            const cur = (typeof CESTISCore !== 'undefined' && CESTISCore.getActiveQuarter)
+                ? CESTISCore.getActiveQuarter() : { fy: '', q: 1 };
+            const quarters = [
+                { q: 1, label: 'Q1 · Apr–Jun' }, { q: 2, label: 'Q2 · Jul–Sep' },
+                { q: 3, label: 'Q3 · Oct–Dec' }, { q: 4, label: 'Q4 · Jan–Mar' }
+            ];
+            el.className = 'fee-qfilter';
+            el.innerHTML =
+                '<div class="fee-qfilter-fy">' +
+                    '<button class="fee-qbtn" onclick="feeShiftFY(-1)" title="Previous financial year">◀</button>' +
+                    '<span class="fee-qfy-label">FY ' + cur.fy + '</span>' +
+                    '<button class="fee-qbtn" onclick="feeShiftFY(1)" title="Next financial year">▶</button>' +
+                '</div>' +
+                '<div class="fee-qtabs">' +
+                    '<button class="fee-qtab fee-allpay' + (feeShowAllPayments ? ' active' : '') + '" onclick="feeSelectAll()">All Payments</button>' +
+                    quarters.map(function (m) {
+                        return '<button class="fee-qtab' + ((!feeShowAllPayments && m.q === cur.q) ? ' active' : '') +
+                            '" onclick="feeSelectQuarter(' + m.q + ')">' + m.label + '</button>';
+                    }).join('') +
+                '</div>';
+        }
+
+        function _renderFeeFilters() {
+            renderFeeQuarterFilter('dashboardQuarterBar');
+            renderFeeQuarterFilter('paymentsQuarterBar');
+        }
+
+        // Re-render the filter bars + every quarter-scoped view.
+        function feeApplyQuarterChange() {
+            _renderFeeFilters();
+            if (typeof renderPaymentsTable === 'function') renderPaymentsTable();
+            if (typeof updateDashboard === 'function') updateDashboard();
+        }
+
+        function feeSelectAll() { feeShowAllPayments = true; feeApplyQuarterChange(); }
+        function feeSelectQuarter(q) {
+            feeShowAllPayments = false;
+            // Persist to the shared quarter so the Cashbook/Virement follow; the
+            // onQuarterChange handler below performs the single re-render.
+            if (typeof CESTISCore !== 'undefined' && CESTISCore.setActiveQuarter && CESTISCore.onQuarterChange) {
+                const cur = CESTISCore.getActiveQuarter();
+                CESTISCore.setActiveQuarter(cur.fy, q);
+            } else {
+                feeApplyQuarterChange();
+            }
+        }
+        function feeShiftFY(dir) {
+            if (typeof CESTISCore !== 'undefined' && CESTISCore.setActiveQuarter && CESTISCore.onQuarterChange) {
+                const cur = CESTISCore.getActiveQuarter();
+                const start = parseInt(String(cur.fy).split('/')[0], 10) + dir;
+                CESTISCore.setActiveQuarter(start + '/' + (start + 1), cur.q);
+            } else {
+                _renderFeeFilters();
+            }
+        }
+
+        // Set up the filter bars and follow quarter switches made on other pages/tabs.
         function mountSchoolFeeQuarterBar() {
-            if (typeof CESTISCore === 'undefined' || !CESTISCore.mountQuarterBar) return;
-            if (_schoolFeeQuarterBar || !document.getElementById('paymentsQuarterBar')) return;
-            _schoolFeeQuarterBar = CESTISCore.mountQuarterBar('paymentsQuarterBar', {
-                onChange: function () {
-                    if (typeof renderPaymentsTable === 'function') renderPaymentsTable();
-                }
-            });
+            _renderFeeFilters();
+            if (typeof CESTISCore !== 'undefined' && CESTISCore.onQuarterChange) {
+                CESTISCore.onQuarterChange(function () {
+                    if (feeShowAllPayments) { _renderFeeFilters(); }
+                    else { feeApplyQuarterChange(); }
+                });
+            }
         }
 
         // Render payments table
@@ -5791,9 +5889,8 @@
                 .filter(paymentInActiveQuarter)
                 .sort((a, b) => new Date(b.date) - new Date(a.date));
             const qLbl = document.getElementById('paymentsQuarterLabel');
-            if (qLbl && typeof CESTISCore !== 'undefined' && CESTISCore.getActiveQuarter) {
-                const cur = CESTISCore.getActiveQuarter();
-                qLbl.textContent = 'Showing ' + CESTISCore.quarterPeriodLabel(cur.fy, cur.q) +
+            if (qLbl) {
+                qLbl.textContent = 'Showing ' + feeScopeLabel() +
                     ' — ' + sortedPayments.length + ' payment' + (sortedPayments.length === 1 ? '' : 's');
             }
 
@@ -6579,13 +6676,18 @@
 
             const totalStudents = students.length;
             const totalExpected = students.reduce((sum, s) => sum + (parseFloat(s.tuitionFee) || 0), 0);
-            const totalCollected = payments.reduce((sum, p) => sum + (parseFloat(p.amount) || 0), 0);
-            const totalOutstanding = totalExpected - totalCollected;
+            // Collected reflects the active scope (All Payments, or the selected quarter);
+            // Outstanding stays a cumulative all-time balance (Expected − all collected).
+            const collectedInScope = paymentsInScope().reduce((sum, p) => sum + (parseFloat(p.amount) || 0), 0);
+            const collectedAllTime = payments.reduce((sum, p) => sum + (parseFloat(p.amount) || 0), 0);
+            const totalOutstanding = totalExpected - collectedAllTime;
 
             document.getElementById('totalStudents').textContent = totalStudents.toLocaleString();
             document.getElementById('totalExpected').textContent = formatCurrency(totalExpected);
-            document.getElementById('totalCollected').textContent = formatCurrency(totalCollected);
+            document.getElementById('totalCollected').textContent = formatCurrency(collectedInScope);
             document.getElementById('totalOutstanding').textContent = formatCurrency(totalOutstanding);
+            const _scopeEl = document.getElementById('totalCollectedScope');
+            if (_scopeEl) _scopeEl.textContent = feeScopeLabel();
 
             const recentPayments = [...payments].sort((a, b) => new Date(b.date) - new Date(a.date)).slice(0, 5);
             const activityDiv = document.getElementById('recentActivity');
