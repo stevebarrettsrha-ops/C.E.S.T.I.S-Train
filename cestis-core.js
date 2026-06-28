@@ -861,7 +861,15 @@
       while (q > 4) { q -= 4; fy = shiftFY(fy, 1); }
       Core.setActiveQuarter(fy, q);
     }
-    el.addEventListener('click', function (e) {
+    // Hosts re-mount the bar on the SAME element every time their page is
+    // re-visited (the attendance/cashbook/etc. pages just re-run their init).
+    // Each mount used to stack another click listener on `el`, so after N visits
+    // one Prev/Next click fired N times and jumped N quarters at once — making
+    // quarter navigation look broken ("can't go to previous/next"). Tear down any
+    // bar previously mounted on this element first so mounting is idempotent.
+    if (typeof el._cestisQbarTeardown === 'function') { try { el._cestisQbarTeardown(); } catch (e) {} }
+
+    function onBarClick(e) {
       var t = e.target.closest('[data-q],[data-act]');
       if (!t || !el.contains(t)) return;
       var cur = Core.getActiveQuarter();
@@ -872,7 +880,8 @@
         case 'q-1': go(cur.fy, cur.q - 1); break;
         case 'q+1': go(cur.fy, cur.q + 1); break;
       }
-    });
+    }
+    el.addEventListener('click', onBarClick);
 
     var unsub = Core.onQuarterChange(function (cur) {
       paint();
@@ -880,9 +889,16 @@
     });
     paint();
 
+    function teardown() {
+      try { unsub(); } catch (e) {}
+      el.removeEventListener('click', onBarClick);
+      try { delete el._cestisQbarTeardown; } catch (e) { el._cestisQbarTeardown = null; }
+    }
+    el._cestisQbarTeardown = teardown;
+
     return {
       refresh: paint,
-      destroy: function () { unsub(); el.innerHTML = ''; el.classList.remove('cestis-qbar'); }
+      destroy: function () { teardown(); el.innerHTML = ''; el.classList.remove('cestis-qbar'); }
     };
   };
 

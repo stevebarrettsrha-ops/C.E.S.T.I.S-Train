@@ -8273,7 +8273,7 @@ var cestisFeatureConfig = {
     onMount: function() {
       cestisSetAttDate();
       cestisSafe('populateCourseDropdowns');
-      cestisMountAttQuarterBar('attendanceQuarterBar', 'renderAttendancePage');
+      cestisMountAttQuarterBar('attendanceQuarterBar', 'cestisRenderAttendanceWithDate');
       cestisSafe('renderAttendancePage');
     }
   },
@@ -8437,7 +8437,55 @@ var cestisFeatureConfig = {
 };
 
 // ---- Helpers for externally hosted admin feature pages (run from onMount) ----
-function cestisSetAttDate(){ var el=document.getElementById('attendanceDate'); if(el && !el.value){ el.value=new Date().toISOString().split('T')[0]; } }
+// A date that falls inside the currently active financial quarter. Used to keep
+// the Attendance "Date" field consistent with the quarter whose roster is shown
+// (the register is stored one roster per quarter).
+function cestisAttQuarterDate(){
+  try {
+    if(typeof CESTISCore==='undefined' || typeof CESTISCore.getActiveQuarter!=='function') return new Date().toISOString().split('T')[0];
+    var cur = CESTISCore.getActiveQuarter();
+    var today = new Date().toISOString().split('T')[0];
+    var todayQ = CESTISCore.deriveQuarter(today);
+    if(todayQ && todayQ.fy===cur.fy && todayQ.q===cur.q) return today; // today is already in the active quarter
+    var meta = CESTISCore.getQuarterMeta(cur.q);
+    var yr = CESTISCore.quarterCalendarYear(cur.fy, cur.q);
+    var mm = ('0'+(meta?meta.startMonth:1)).slice(-2);
+    return yr + '-' + mm + '-01'; // first day of the active quarter
+  } catch(e){ return new Date().toISOString().split('T')[0]; }
+}
+// Snap the Date field into the active quarter, but preserve a user-chosen date
+// that already falls within it (so picking a specific day isn't overwritten).
+function cestisSetAttDate(){
+  var el=document.getElementById('attendanceDate');
+  if(!el) return;
+  var inQuarter = false;
+  try {
+    if(el.value && typeof CESTISCore!=='undefined' && typeof CESTISCore.deriveQuarter==='function'){
+      var dq = CESTISCore.deriveQuarter(el.value);
+      var cur = CESTISCore.getActiveQuarter();
+      inQuarter = !!dq && dq.fy===cur.fy && dq.q===cur.q;
+    }
+  } catch(e){}
+  if(!inQuarter) el.value = cestisAttQuarterDate();
+}
+// Date field handler: the roster is stored per financial quarter, so picking a
+// date NAVIGATES to that date's quarter (loading its roster) rather than trying
+// to filter a single day out of the weekly register. setActiveQuarter triggers
+// the roster swap + re-render through the existing onQuarterChange wiring.
+function onAttendanceDateChange(value){
+  currentAttendanceDate = value;
+  try {
+    if(value && typeof CESTISCore!=='undefined' && typeof CESTISCore.deriveQuarter==='function'){
+      var dq = CESTISCore.deriveQuarter(value);
+      var cur = CESTISCore.getActiveQuarter();
+      if(dq && (dq.fy!==cur.fy || dq.q!==cur.q)){ CESTISCore.setActiveQuarter(dq.fy, dq.q); return; }
+    }
+  } catch(e){}
+  renderAttendancePage();
+}
+// Quarter-bar onChange target for the attendance page: keep the Date field in
+// step with the newly-selected quarter, then re-render the roster.
+function cestisRenderAttendanceWithDate(){ cestisSetAttDate(); renderAttendancePage(); }
 // Mount the shared FY/quarter selector bar above an attendance view. The global
 // onQuarterChange handler (initAttendanceQuarters) swaps the roster data; the
 // bar's onChange just re-renders this particular view once the swap has run.

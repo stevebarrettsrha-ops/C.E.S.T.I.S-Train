@@ -15,7 +15,7 @@
 <div class="attendance-summary" id="attendanceSummary"></div>
 <div style="display:flex;gap:12px;margin-bottom:20px;align-items:center;">
   <label style="font-size:13px;font-weight:600;">Date:</label>
-  <input type="date" class="form-control" style="width:180px;" id="attendanceDate" onchange="currentAttendanceDate=this.value;renderAttendancePage()">
+  <input type="date" class="form-control" style="width:180px;" id="attendanceDate" onchange="onAttendanceDateChange(this.value)">
   <select class="form-control" style="width:200px;" id="attendanceCourseFilter" onchange="renderAttendancePage()"><option value="all">All Courses</option></select>
   <button class="btn btn-primary" onclick="saveAttendance()">Save Attendance</button>
   <button class="btn-export" onclick="exportStudentsCSV()">📄 Export</button>
