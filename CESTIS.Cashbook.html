@@ -4962,7 +4962,12 @@ function saveTransaction() {
     }
     closeModal();
     saveToStorage();
-    if (savedTxn) syncSalaryToPayslip(savedTxn);
+    if (savedTxn) {
+        // Unwind any prior contribution first so edits that change the name,
+        // category, month, or amount don't leave a stale synced entry behind.
+        unsyncSalaryFromPayslip(savedTxn);
+        syncSalaryToPayslip(savedTxn);
+    }
     refreshAll();
 }
 
@@ -5007,21 +5012,15 @@ function syncSalaryToPayslip(txn) {
         // Find or update result entry for this employee in this run
         const emkLow = empName.toLowerCase();
         let res = run.results.find(function(r) { return (r.empName || '').trim().toLowerCase() === emkLow; });
-        if (res) {
-            res.gross = txn.payment;
-            res.netPay = txn.payment;
-            res.designation = emp.designation || txn.category;
-            res.cashbookSynced = true;
-            res.cashbookTxnId = txn.id;
-        } else {
-            run.results.push({
+        if (!res) {
+            res = {
                 empName: empName,
                 empType: emp.type,
                 designation: emp.designation || txn.category,
                 trn: emp.trn || '',
                 nis: emp.nis || '',
-                gross: txn.payment,
-                netPay: txn.payment,
+                gross: 0,
+                netPay: 0,
                 nisEmp: 0, nisEr: 0,
                 edTaxEmp: 0, edTaxEr: 0,
                 nhtEmp: 0, nhtEr: 0,
@@ -5029,10 +5028,20 @@ function syncSalaryToPayslip(txn) {
                 incomeTax: 0,
                 totalEmpDeductions: 0,
                 totalErContributions: 0,
-                cashbookSynced: true,
-                cashbookTxnId: txn.id
-            });
+                cashbookSynced: true
+            };
+            run.results.push(res);
         }
+        // Track each contributing cashbook transaction by id so re-saves/edits are
+        // idempotent and multiple payments in the same month accumulate correctly.
+        if (!res.cashbookTxns || typeof res.cashbookTxns !== 'object') res.cashbookTxns = {};
+        res.cashbookTxns[txn.id] = txn.payment;
+        const cbTotal = Object.keys(res.cashbookTxns).reduce(function(s, id) { return s + (res.cashbookTxns[id] || 0); }, 0);
+        res.gross = cbTotal;
+        res.netPay = cbTotal;
+        res.designation = emp.designation || txn.category;
+        res.cashbookSynced = true;
+        res.cashbookTxnId = txn.id; // last-contributing id (kept for backward compat)
 
         CESTISStore.setItem(PAYSLIP_KEY, JSON.stringify(pd));
     } catch(e) {
@@ -5042,11 +5051,42 @@ function syncSalaryToPayslip(txn) {
 
 function deleteTxn(id) {
     if (!confirm('Delete this transaction?')) return;
+    const removed = transactions.find(function(t){ return t.id === id; });
     transactions = transactions.filter(t=>t.id!==id);
     // Track deleted ID so cloud sync doesn't re-add it
     if (deletedTxnIds.indexOf(id) === -1) deletedTxnIds.push(id);
+    if (removed) unsyncSalaryFromPayslip(removed);
     saveToStorage();
     refreshAll();
+}
+
+// Reverse a previously-synced salary/instructor contribution from cestisPayroll
+// when its source transaction is deleted, so the payslip gross stays accurate.
+function unsyncSalaryFromPayslip(txn) {
+    if (!txn || !txn.id) return;
+    try {
+        const PAYSLIP_KEY = 'cestisPayroll';
+        const raw = CESTISStore.getItem(PAYSLIP_KEY);
+        if (!raw) return;
+        const pd = JSON.parse(raw);
+        if (!pd || !Array.isArray(pd.payrollRuns)) return;
+        let changed = false;
+        pd.payrollRuns.forEach(function(run) {
+            if (!Array.isArray(run.results)) return;
+            run.results.forEach(function(res) {
+                if (res.cashbookTxns && Object.prototype.hasOwnProperty.call(res.cashbookTxns, txn.id)) {
+                    delete res.cashbookTxns[txn.id];
+                    const cbTotal = Object.keys(res.cashbookTxns).reduce(function(s, k) { return s + (res.cashbookTxns[k] || 0); }, 0);
+                    res.gross = cbTotal;
+                    res.netPay = cbTotal;
+                    changed = true;
+                }
+            });
+        });
+        if (changed) CESTISStore.setItem(PAYSLIP_KEY, JSON.stringify(pd));
+    } catch(e) {
+        console.warn('unsyncSalaryFromPayslip failed:', e);
+    }
 }
 
 // ============================================================

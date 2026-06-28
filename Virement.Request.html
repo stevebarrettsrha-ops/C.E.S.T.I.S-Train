@@ -1525,8 +1525,25 @@ const CASHBOOK_CATEGORY_MAP = {
     'Math Instructor':          { id:'math_inst',        name:'Math Instructor' },
     'Bank Charges':             { id:'bank_charge',      name:'Bank Charges' },
     'Travelling':               { id:'travelling',       name:'Travelling' },
-    'Lunch':                    { id:'lunch',             name:'Lunch' }
+    'Lunch':                    { id:'lunch',             name:'Lunch' },
+    'Administrative Assistant': { id:'admin_asst',       name:'Administrative Assistant' },
+    'Administrative Clerk/Secretary': { id:'admin_clerk', name:'Admin Clerk / Secretary' },
+    'Cleaning Services':        { id:'cleaning',         name:'Cleaning Services' },
+    'Prepare Lunches':          { id:'prep_lunches',     name:'Prepare Lunches' },
+    'Beauty Therapy Instructor':{ id:'bt_beauty_inst',   name:'Beauty Therapy Instructor' },
+    'Cosmetology Instructor':   { id:'cosmet_inst',      name:'Cosmetology Instructor' },
+    'Other':                    { id:'other',             name:'Other' }
 };
+
+// Return a {id, name} mapping for any cashbook category name.
+// Prefers the hardcoded CASHBOOK_CATEGORY_MAP so existing IDs/display-names
+// are preserved; unknown categories fall through with a generated id.
+function getCategoryMapping(catName) {
+    if (CASHBOOK_CATEGORY_MAP[catName]) return CASHBOOK_CATEGORY_MAP[catName];
+    // Auto-generate a stable id from the name (lowercase, spaces→underscore, strip punctuation)
+    const id = catName.toLowerCase().replace(/[^a-z0-9]+/g, '_').replace(/^_+|_+$/g, '');
+    return { id: id || 'cat_' + Math.abs(catName.split('').reduce((h, c) => (h * 31 + c.charCodeAt(0)) | 0, 0)), name: catName };
+}
 
 function getQuarterMeta(q) { return QUARTER_META.find(m => m.q === q); }
 
@@ -3604,11 +3621,13 @@ function loadBudgetForQuarter() {
             }
         });
 
-        // Build budgetData
+        // Build budgetData — all cashbook categories included (mapped or auto-generated)
         const newBudgetData = [];
+        const seenIds = new Set();
         Object.keys(sourceBudget).forEach(catName => {
-            const mapping = CASHBOOK_CATEGORY_MAP[catName];
-            if (mapping) {
+            const mapping = getCategoryMapping(catName);
+            if (!seenIds.has(mapping.id)) {
+                seenIds.add(mapping.id);
                 newBudgetData.push({
                     id: mapping.id,
                     name: mapping.name,
@@ -3618,11 +3637,12 @@ function loadBudgetForQuarter() {
             }
         });
 
-        // Add any categories with actual spend that aren't in the budget
+        // Add any categories with actual spend not already in budget
         Object.keys(catSpend).forEach(catName => {
             if (!sourceBudget.hasOwnProperty(catName)) {
-                const mapping = CASHBOOK_CATEGORY_MAP[catName];
-                if (mapping && !newBudgetData.find(b => b.id === mapping.id)) {
+                const mapping = getCategoryMapping(catName);
+                if (!seenIds.has(mapping.id)) {
+                    seenIds.add(mapping.id);
                     newBudgetData.push({
                         id: mapping.id,
                         name: mapping.name,
@@ -3660,9 +3680,11 @@ function loadBudgetForQuarter() {
             });
 
             const newBudgetData = [];
+            const seenIds2 = new Set();
             Object.keys(sourceBudget).forEach(function(catName) {
-                const mapping = CASHBOOK_CATEGORY_MAP[catName];
-                if (mapping) {
+                const mapping = getCategoryMapping(catName);
+                if (!seenIds2.has(mapping.id)) {
+                    seenIds2.add(mapping.id);
                     newBudgetData.push({
                         id: mapping.id,
                         name: mapping.name,
@@ -3673,8 +3695,9 @@ function loadBudgetForQuarter() {
             });
             Object.keys(catSpend).forEach(function(catName) {
                 if (!sourceBudget.hasOwnProperty(catName)) {
-                    const mapping = CASHBOOK_CATEGORY_MAP[catName];
-                    if (mapping && !newBudgetData.find(function(b) { return b.id === mapping.id; })) {
+                    const mapping = getCategoryMapping(catName);
+                    if (!seenIds2.has(mapping.id)) {
+                        seenIds2.add(mapping.id);
                         newBudgetData.push({ id: mapping.id, name: mapping.name, allocated: 0, actual: catSpend[catName] });
                     }
                 }
@@ -3699,13 +3722,10 @@ function loadBudgetForQuarter() {
         console.warn('loadBudgetForQuarter: localStorage fallback failed', e);
     }
 
-    // No data anywhere — all zeros
-    budgetData = Object.values(CASHBOOK_CATEGORY_MAP).map(mapping => ({
-        id: mapping.id,
-        name: mapping.name,
-        allocated: 0,
-        actual: 0
-    }));
+    // No data anywhere — show hardcoded map categories at zero
+    budgetData = Object.values(CASHBOOK_CATEGORY_MAP).map(function(mapping) {
+        return { id: mapping.id, name: mapping.name, allocated: 0, actual: 0 };
+    });
     budgetDataSource = 'no-data';
     updateQuarterDisplay();
     refreshVirementDropdowns();
