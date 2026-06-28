@@ -3642,7 +3642,64 @@ function loadBudgetForQuarter() {
         }
     }
 
-    // No cloud data for this quarter — all zeros
+    // No cloud data — try reading directly from Cashbook's localStorage keys
+    try {
+        const lsBudgetRaw = CESTISStore.getItem('cestis_budget_' + cacheKey);
+        const lsQuarterRaw = CESTISStore.getItem('cestis_quarter_' + cacheKey);
+        if (lsBudgetRaw) {
+            const lsBudget = JSON.parse(lsBudgetRaw);
+            const sourceBudget = lsBudget.budget || lsBudget;
+            const lsQuarter = lsQuarterRaw ? JSON.parse(lsQuarterRaw) : {};
+            const lsTxns = lsQuarter.transactions || [];
+
+            const catSpend = {};
+            lsTxns.forEach(function(t) {
+                if (t.category !== 'Cancelled' && t.category !== 'Subvention' && t.payment > 0) {
+                    catSpend[t.category] = (catSpend[t.category] || 0) + t.payment;
+                }
+            });
+
+            const newBudgetData = [];
+            Object.keys(sourceBudget).forEach(function(catName) {
+                const mapping = CASHBOOK_CATEGORY_MAP[catName];
+                if (mapping) {
+                    newBudgetData.push({
+                        id: mapping.id,
+                        name: mapping.name,
+                        allocated: sourceBudget[catName],
+                        actual: catSpend[catName] || 0
+                    });
+                }
+            });
+            Object.keys(catSpend).forEach(function(catName) {
+                if (!sourceBudget.hasOwnProperty(catName)) {
+                    const mapping = CASHBOOK_CATEGORY_MAP[catName];
+                    if (mapping && !newBudgetData.find(function(b) { return b.id === mapping.id; })) {
+                        newBudgetData.push({ id: mapping.id, name: mapping.name, allocated: 0, actual: catSpend[catName] });
+                    }
+                }
+            });
+
+            if (newBudgetData.length > 0) {
+                // Populate cache so a subsequent cloud sync can merge into it
+                cloudQuarterCache[cacheKey] = {
+                    budget: sourceBudget,
+                    transactions: lsTxns,
+                    openingBalance: lsQuarter.openingBalance || 0
+                };
+                saveCloudCache();
+                budgetData = newBudgetData;
+                budgetDataSource = 'cashbook-local';
+                updateQuarterDisplay();
+                refreshVirementDropdowns();
+                return true;
+            }
+        }
+    } catch(e) {
+        console.warn('loadBudgetForQuarter: localStorage fallback failed', e);
+    }
+
+    // No data anywhere — all zeros
     budgetData = Object.values(CASHBOOK_CATEGORY_MAP).map(mapping => ({
         id: mapping.id,
         name: mapping.name,

@@ -78,6 +78,7 @@
 <script src="https://accounts.google.com/gsi/client" async defer></script>
 <!-- EmailJS SDK for sending OTP emails -->
 <script src="https://cdn.jsdelivr.net/npm/@emailjs/browser@4/dist/email.min.js"></script>
+<script src="https://cdn.sheetjs.com/xlsx-0.20.2/package/dist/xlsx.full.min.js"></script>
 <script>
     // Initialize EmailJS with public key
     (function() {
@@ -798,6 +799,7 @@ tr:hover td{background:rgba(59,130,246,.04)}
       <div class="nav-item" onclick="showPage('payslips')"><span class="icon">🧾</span><span class="nav-text">Payslips</span></div>
       <div class="nav-item" onclick="showPage('salaryrecords')"><span class="icon">📆</span><span class="nav-text">Salary Records</span></div>
       <div class="nav-item" onclick="showPage('deductions')"><span class="icon">📋</span><span class="nav-text">Tax Summary</span></div>
+      <div class="nav-item" onclick="showPage('so1')"><span class="icon">📄</span><span class="nav-text">SO1 Schedule A</span></div>
       <div class="nav-item" onclick="showPage('permissions')"><span class="icon">🔑</span><span class="nav-text">Permissions</span><span class="notif-badge" id="permNotifBadge" style="display:none">0</span></div>
       <div class="nav-item settings-btn" onclick="showPage('settings')"><span class="icon">⚙️</span><span class="nav-text">Settings</span></div>
       <div class="nav-item" id="navUserMgmt" onclick="showPage('usermanagement')" style="display:none"><span class="icon">🛡️</span><span class="nav-text">User Management</span></div>
@@ -907,13 +909,17 @@ tr:hover td{background:rgba(59,130,246,.04)}
           <div class="form-grid">
             <div class="form-group">
               <label>Employee</label>
-              <select id="payslipEmployee"></select>
+              <select id="payslipEmployee" onchange="onPayslipEmployeeChange()"></select>
             </div>
             <div class="form-group">
               <label>Pay Cycle</label>
               <select id="payslipCycle"></select>
             </div>
-            <div class="form-group" style="justify-content:flex-end">
+            <div class="form-group">
+              <label>Cashbook Name <span style="font-size:.75rem;color:var(--text-muted)">(match to transaction)</span></label>
+              <select id="cashbookNameLink" title="Select the name as it appears in cashbook transactions to link payment history"></select>
+            </div>
+            <div class="form-group" style="justify-content:flex-end;align-self:flex-end">
               <button class="btn btn-primary" onclick="generatePayslipPreview()">👁 Preview Payslip</button>
             </div>
           </div>
@@ -1062,6 +1068,80 @@ tr:hover td{background:rgba(59,130,246,.04)}
       <div class="panel">
         <div class="panel-head"><h3>System Users</h3></div>
         <div class="panel-body"><div class="table-wrap" id="usersTable"></div></div>
+      </div>
+    </div>
+
+    <!-- ===== SO1 SCHEDULE A ===== -->
+    <div id="page-so1" class="page">
+      <div class="page-header">
+        <div><h2>SO1 Schedule A</h2><div class="subtitle">TAJ Monthly Statutory Deduction Return</div></div>
+        <div class="btn-group">
+          <button class="btn btn-ghost" onclick="so1LoadFromPayroll()">📂 Load from Payroll</button>
+          <button class="btn btn-primary" onclick="so1DownloadExcel()">⬇ Download Excel</button>
+        </div>
+      </div>
+
+      <!-- Period selector + source toggle -->
+      <div class="panel">
+        <div class="panel-body" style="display:flex;gap:1.5rem;flex-wrap:wrap;align-items:flex-end;">
+          <div class="form-group" style="min-width:160px;">
+            <label>Month / Pay Cycle</label>
+            <select id="so1Cycle" onchange="so1OnCycleChange()"></select>
+          </div>
+          <div class="form-group" style="min-width:140px;">
+            <label>Data Source</label>
+            <div style="display:flex;gap:.5rem;margin-top:.35rem;">
+              <button class="btn btn-ghost btn-sm" id="so1BtnLoad" onclick="so1LoadFromPayroll()" title="Pull amounts from the selected pay cycle">📂 From Payroll</button>
+              <button class="btn btn-ghost btn-sm" id="so1BtnManual" onclick="so1ManualMode()" title="Clear table and enter amounts manually">✏ Manual Entry</button>
+            </div>
+          </div>
+          <div class="form-group" style="min-width:160px;">
+            <label>Upload SO1 Excel</label>
+            <input type="file" id="so1FileInput" accept=".xls,.xlsx" onchange="so1LoadFromFile(event)" style="font-size:.8rem;margin-top:.35rem;">
+          </div>
+        </div>
+        <div id="so1StatusBar" style="padding:.4rem 1rem .6rem;font-size:.8rem;color:var(--text-muted);"></div>
+      </div>
+
+      <!-- Editable SO1 table -->
+      <div class="panel" style="overflow-x:auto;">
+        <div class="panel-body" style="padding:0;">
+          <table id="so1Table" style="width:100%;border-collapse:collapse;font-size:.78rem;min-width:900px;">
+            <thead>
+              <tr style="background:#1a2540;color:#fff;text-align:center;">
+                <th style="padding:6px 4px;white-space:nowrap;min-width:90px;">Surname</th>
+                <th style="padding:6px 4px;white-space:nowrap;min-width:80px;">Firstname</th>
+                <th style="padding:6px 4px;white-space:nowrap;min-width:50px;">MI</th>
+                <th style="padding:6px 4px;white-space:nowrap;min-width:90px;">TRN</th>
+                <th style="padding:6px 4px;white-space:nowrap;min-width:80px;">NIS #</th>
+                <th style="padding:6px 4px;white-space:nowrap;min-width:90px;">Gross (Cash)</th>
+                <th style="padding:6px 4px;white-space:nowrap;min-width:80px;">Gross (Kind)</th>
+                <th style="padding:6px 4px;white-space:nowrap;min-width:80px;">Super/Pension</th>
+                <th style="padding:6px 4px;white-space:nowrap;min-width:50px;"># Wks</th>
+                <th style="padding:6px 4px;white-space:nowrap;min-width:80px;">NIS Total</th>
+                <th style="padding:6px 4px;white-space:nowrap;min-width:80px;">NHT Total</th>
+                <th style="padding:6px 4px;white-space:nowrap;min-width:80px;">Ed Tax</th>
+                <th style="padding:6px 4px;white-space:nowrap;min-width:80px;">PAYE</th>
+              </tr>
+            </thead>
+            <tbody id="so1Body">
+              <tr><td colspan="13" style="text-align:center;padding:2rem;color:var(--text-muted);">Select a pay cycle and click "From Payroll" or "Manual Entry"</td></tr>
+            </tbody>
+            <tfoot id="so1Foot"></tfoot>
+          </table>
+        </div>
+      </div>
+
+      <!-- HEART NSTA summary -->
+      <div class="panel" style="max-width:400px;">
+        <div class="panel-head"><h3>HEART/NSTA Trust (3%)</h3></div>
+        <div class="panel-body">
+          <table style="width:100%;font-size:.85rem;">
+            <tr><td>Total Gross Emoluments</td><td id="so1HeartGross" style="text-align:right;font-weight:600;">—</td></tr>
+            <tr><td>HEART/NSTA Tax (3%)</td><td id="so1HeartTax" style="text-align:right;font-weight:600;color:#ef4444;">—</td></tr>
+            <tr style="border-top:2px solid #ccc;font-weight:700;"><td>Total All Taxes</td><td id="so1TotalTax" style="text-align:right;">—</td></tr>
+          </table>
+        </div>
       </div>
     </div>
 
@@ -1599,7 +1679,7 @@ function showPage(name){
   document.querySelectorAll('.nav-item').forEach(n=>n.classList.remove('active'));
   document.getElementById('page-'+name).classList.add('active');
   const navItems=document.querySelectorAll('.nav-item');
-  const pages=['dashboard','employees','payroll','payslips','salaryrecords','deductions','permissions','settings','usermanagement'];
+  const pages=['dashboard','employees','payroll','payslips','salaryrecords','deductions','so1','permissions','settings','usermanagement'];
   const idx=pages.indexOf(name);
   if(idx>=0)navItems[idx].classList.add('active');
   if(name==='dashboard')renderDashboard();
@@ -1608,6 +1688,7 @@ function showPage(name){
   if(name==='payslips')populatePayslipSelects();
   if(name==='salaryrecords')renderSalaryRecords();
   if(name==='deductions')renderTaxSummary();
+  if(name==='so1')renderSO1Page();
   if(name==='permissions')renderPermissions();
   if(name==='settings')loadSettings();
   if(name==='usermanagement')renderUserManagement();
@@ -2265,12 +2346,25 @@ function recalculateExistingPayroll(runIdx){
 
 // ==================== PAYSLIPS ====================
 function populatePayslipSelects(){
+  // Re-merge from storage so cashbook-synced entries are visible immediately
+  try {
+    const fresh = CESTISStore.getItem('cestisPayroll');
+    if (fresh) {
+      const parsed = JSON.parse(fresh);
+      if (parsed && Array.isArray(parsed.employees)) _mergeDataIntoLocal(parsed);
+    }
+  } catch(e) {}
   const empSel=document.getElementById('payslipEmployee');
   const cycSel=document.getElementById('payslipCycle');
   empSel.innerHTML='<option value="">— Select —</option>';
   DATA.employees.forEach((e,i)=>{empSel.innerHTML+=`<option value="${i}">${e.name} (${e.type})</option>`;});
   cycSel.innerHTML='<option value="">— Select —</option>';
-  DATA.payrollRuns.forEach((r,i)=>{cycSel.innerHTML+=`<option value="${i}">${fmtDate(r.date)}</option>`;});
+  DATA.payrollRuns.forEach((r,i)=>{
+    const tag = r.cashbookSynced ? ' [CB]' : '';
+    cycSel.innerHTML+=`<option value="${i}">${fmtDate(r.date)}${tag}</option>`;
+  });
+  // Populate cashbook name dropdown (no auto-select until employee chosen)
+  populateCashbookNameDropdown('');
 }
 
 function generatePayslipPreview(){
@@ -2292,7 +2386,8 @@ function generatePayslipPreview(){
     if(match){ytd.nis+=match.nisEmp;ytd.edTax+=match.edTaxEmp;ytd.nht+=match.nhtEmp;ytd.incomeTax+=match.incomeTax;ytd.gross+=match.gross;ytd.heartEr+=(match.heartEr||0);ytd.netPay+=match.netPay;}
   });
 
-  const psHtml=buildPayslipHTML(emp,result,run.date,ytd);
+  const cashbookName = (document.getElementById('cashbookNameLink') || {}).value || '';
+  const psHtml=buildPayslipHTML(emp,result,run.date,ytd,cashbookName);
   document.getElementById('payslipPreviewArea').innerHTML=`
     <div class="panel" style="margin-top:1rem">
       <div class="panel-head"><h3>Payslip Preview</h3><div class="btn-group"><button class="btn btn-primary btn-sm" onclick="printPayslip()">🖨 Print / Save as PDF</button></div></div>
@@ -2301,7 +2396,7 @@ function generatePayslipPreview(){
   document.getElementById('payslipPrintArea').innerHTML=psHtml.replace('payslip-preview','payslip-print');
 }
 
-function buildPayslipHTML(emp,result,date,ytd){
+function buildPayslipHTML(emp,result,date,ytd,cashbookName){
   return `<div class="payslip-preview">
     <div class="ps-header">
       <p style="font-size:.85rem;font-weight:700;color:#1a2540;margin-bottom:.25rem">Community Educational and Skills Training Institute and Services Limited</p>
@@ -2333,7 +2428,107 @@ function buildPayslipHTML(emp,result,date,ytd){
       <div class="box" style="border-color:#10b981"><div class="lbl">Net Pay</div><div class="val" style="color:#10b981">${fmt(result.netPay)}</div></div>
     </div>
     <div class="ps-footer">This is a computer-generated payslip. For queries, contact the Project Coordinator.</div>
+    ${(function(){
+      const cbPayments = getCashbookPaymentsForEmployee(cashbookName);
+      if (!cbPayments.length) return '';
+      let rows = cbPayments.map(function(p){
+        return '<tr><td>'+p.date+'</td><td class="mono">'+(p.cheque||'—')+'</td><td>'+p.details+'</td><td class="amt">'+fmt(p.payment)+'</td></tr>';
+      }).join('');
+      const total = cbPayments.reduce(function(s,p){return s+p.payment;},0);
+      return '<div style="margin-top:1rem;border-top:1px solid #ccc;padding-top:.75rem">'
+        +'<div style="font-weight:700;font-size:.8rem;margin-bottom:.4rem;color:#1a2540">CASHBOOK PAYMENT HISTORY</div>'
+        +'<table style="width:100%;border-collapse:collapse;font-size:.75rem">'
+        +'<thead><tr style="background:#1a2540;color:#fff"><th style="padding:3px 6px;text-align:left">Date</th><th style="padding:3px 6px;text-align:left">Cheque #</th><th style="padding:3px 6px;text-align:left">Details</th><th style="padding:3px 6px;text-align:right">Amount</th></tr></thead>'
+        +'<tbody>'+rows+'</tbody>'
+        +'<tfoot><tr style="font-weight:700;border-top:2px solid #1a2540"><td colspan="3" style="padding:3px 6px;text-align:right">Total Paid from Cashbook:</td><td class="amt" style="padding:3px 6px;text-align:right">'+fmt(total)+'</td></tr></tfoot>'
+        +'</table></div>';
+    })()}
   </div>`;
+}
+
+// Collect every unique payee name that appears in cashbook payment transactions.
+function getCashbookPayeeNames() {
+  const names = new Set();
+  try {
+    CESTISStore.keys().forEach(function(k) {
+      if (!k.startsWith('cestis_quarter_')) return;
+      try {
+        const raw = CESTISStore.getItem(k);
+        if (!raw) return;
+        const qData = JSON.parse(raw);
+        const txns = Array.isArray(qData.transactions) ? qData.transactions : [];
+        txns.forEach(function(t) {
+          if (t.category === 'Cancelled' || t.category === 'Subvention') return;
+          if ((t.payment || 0) <= 0 || !t.details) return;
+          names.add(t.details.trim());
+        });
+      } catch(e) {}
+    });
+  } catch(e) {}
+  return Array.from(names).sort();
+}
+
+// Fetch all cashbook payment transactions whose 'details' field exactly matches
+// cashbookName (the value chosen from the dropdown — no fuzzy matching).
+function getCashbookPaymentsForEmployee(cashbookName) {
+  if (!cashbookName) return [];
+  const results = [];
+  try {
+    CESTISStore.keys().forEach(function(k) {
+      if (!k.startsWith('cestis_quarter_')) return;
+      try {
+        const raw = CESTISStore.getItem(k);
+        if (!raw) return;
+        const qData = JSON.parse(raw);
+        const txns = Array.isArray(qData.transactions) ? qData.transactions : [];
+        txns.forEach(function(t) {
+          if (t.category === 'Cancelled') return;
+          if ((t.payment || 0) <= 0) return;
+          if ((t.details || '').trim() !== cashbookName) return;
+          results.push({
+            date: t.date || '',
+            cheque: t.cheque || '',
+            details: t.details,
+            payment: t.payment || 0
+          });
+        });
+      } catch(e) {}
+    });
+  } catch(e) {}
+  results.sort(function(a,b){ return a.date < b.date ? -1 : a.date > b.date ? 1 : 0; });
+  return results;
+}
+
+// Populate the cashbook-name dropdown and auto-suggest the closest match
+// for the selected employee name.
+function populateCashbookNameDropdown(empName) {
+  const sel = document.getElementById('cashbookNameLink');
+  if (!sel) return;
+  const payeeNames = getCashbookPayeeNames();
+  sel.innerHTML = '<option value="">— Not linked (no history) —</option>';
+  payeeNames.forEach(function(n) {
+    const opt = document.createElement('option');
+    opt.value = n;
+    opt.textContent = n;
+    sel.appendChild(opt);
+  });
+  // Auto-select: find the first cashbook name that contains the employee name
+  // or vice-versa (case-insensitive). User can override if wrong.
+  if (empName) {
+    const needle = empName.trim().toLowerCase();
+    const match = payeeNames.find(function(n) {
+      const hay = n.toLowerCase();
+      return hay === needle || hay.indexOf(needle) !== -1 || needle.indexOf(hay) !== -1;
+    });
+    if (match) sel.value = match;
+  }
+}
+
+function onPayslipEmployeeChange() {
+  const empIdx = parseInt(document.getElementById('payslipEmployee').value);
+  if (isNaN(empIdx)) return;
+  const emp = DATA.employees[empIdx];
+  if (emp) populateCashbookNameDropdown(emp.name);
 }
 
 function printPayslip(){
@@ -2341,6 +2536,281 @@ function printPayslip(){
   area.style.display='block';
   window.print();
   setTimeout(()=>{area.style.display='none';},500);
+}
+
+// ==================== SO1 SCHEDULE A ====================
+
+// SO1 columns definition
+const SO1_COLS = ['Surname','Firstname','MI','TRN','NIS #','Gross (Cash)','Gross (Kind)','Super/Pension','# Wks','NIS Total','NHT Total','Ed Tax','PAYE'];
+// Column headers matching the TAJ form exactly (for Excel export)
+const SO1_EXCEL_HEADERS = [
+  'Surname','Firstname','Middle Initials','Employee TRN','Employee NIS',
+  'Gross Emoluments\nReceived in Cash',
+  'Gross Emoluments\nReceived in Kind',
+  'Superannuation / Pension, Agreed Expenses, ESOP',
+  'Number of weekly NIS and NHT Contributions for the month',
+  'NIS\n(Emp Rate + Er Rate) x Gross',
+  'NHT\n(Emp Rate + Er Rate) x Gross',
+  'Education Tax\n(Emp Rate + Er Rate) x (Gross after Deductions and NIS)',
+  'PAYE Income Tax / (Refunds)'
+];
+
+// In-memory table rows: array of 13-element arrays (one per column)
+let so1Rows = [];
+
+function renderSO1Page() {
+  // Populate cycle dropdown
+  const cyc = document.getElementById('so1Cycle');
+  if (cyc) {
+    cyc.innerHTML = '<option value="">— Select month —</option>';
+    DATA.payrollRuns.forEach(function(r, i) {
+      const tag = r.cashbookSynced ? ' [CB]' : '';
+      cyc.innerHTML += '<option value="' + i + '">' + fmtDate(r.date) + tag + '</option>';
+    });
+  }
+  so1RenderTable();
+}
+
+function so1OnCycleChange() {
+  // Reset rows when cycle changes so user consciously picks a source
+  so1Rows = [];
+  so1RenderTable();
+  document.getElementById('so1StatusBar').textContent = 'Cycle changed — click "From Payroll" or "Manual Entry".';
+}
+
+function so1LoadFromPayroll() {
+  const idx = parseInt(document.getElementById('so1Cycle').value);
+  if (isNaN(idx)) { alert('Select a pay cycle first.'); return; }
+  const run = DATA.payrollRuns[idx];
+  if (!run) return;
+
+  so1Rows = run.results.map(function(r) {
+    // Split name: "Tracy-Ann Johnson" → surname = last word, first = rest
+    const nameParts = (r.empName || '').trim().split(/\s+/);
+    const surname = nameParts.length > 1 ? nameParts[nameParts.length - 1].toUpperCase() : (r.empName || '').toUpperCase();
+    const firstname = nameParts.length > 1 ? nameParts.slice(0, -1).join(' ') : '';
+    const emp = DATA.employees.find(function(e){ return (e.name||'').trim().toLowerCase() === (r.empName||'').trim().toLowerCase(); });
+    return [
+      surname,
+      firstname.toUpperCase(),
+      '',                                          // Middle initials
+      emp ? (emp.trn || '') : (r.trn || ''),
+      emp ? (emp.nis || '') : (r.nis || ''),
+      r.gross || 0,                                // Gross cash
+      0,                                           // Gross kind
+      0,                                           // Super/pension
+      4,                                           // Default 4 weeks
+      (r.nisEmp || 0) + (r.nisEr || 0),           // NIS (both rates)
+      (r.nhtEmp || 0) + (r.nhtEr || 0),           // NHT (both rates)
+      (r.edTaxEmp || 0) + (r.edTaxEr || 0),       // Ed Tax (both rates)
+      r.incomeTax || 0                             // PAYE
+    ];
+  });
+
+  so1RenderTable();
+  document.getElementById('so1StatusBar').textContent = '✓ Loaded ' + so1Rows.length + ' employees from payroll run: ' + fmtDate(run.date);
+}
+
+function so1ManualMode() {
+  // Add one blank row if table is empty
+  if (so1Rows.length === 0) {
+    so1Rows.push(['', '', '', '', '', 0, 0, 0, 4, 0, 0, 0, 0]);
+  }
+  so1RenderTable();
+  document.getElementById('so1StatusBar').textContent = '✏ Manual entry mode — edit cells directly, use "+ Add Row" to add employees.';
+}
+
+function so1AddRow() {
+  so1Rows.push(['', '', '', '', '', 0, 0, 0, 4, 0, 0, 0, 0]);
+  so1RenderTable();
+}
+
+function so1RemoveRow(i) {
+  so1Rows.splice(i, 1);
+  so1RenderTable();
+}
+
+// Collect current cell values back into so1Rows from the DOM
+function so1CollectFromDOM() {
+  const tbody = document.getElementById('so1Body');
+  if (!tbody) return;
+  tbody.querySelectorAll('tr[data-so1-row]').forEach(function(tr) {
+    const i = parseInt(tr.getAttribute('data-so1-row'));
+    if (isNaN(i) || !so1Rows[i]) return;
+    tr.querySelectorAll('td[data-col]').forEach(function(td) {
+      const c = parseInt(td.getAttribute('data-col'));
+      const val = td.innerText.replace(/,/g, '').trim();
+      so1Rows[i][c] = (c >= 5) ? (parseFloat(val) || 0) : val;
+    });
+  });
+}
+
+function so1RenderTable() {
+  const tbody = document.getElementById('so1Body');
+  const tfoot = document.getElementById('so1Foot');
+  if (!tbody) return;
+
+  if (so1Rows.length === 0) {
+    tbody.innerHTML = '<tr><td colspan="13" style="text-align:center;padding:2rem;color:var(--text-muted);">Select a pay cycle and click "From Payroll" or "Manual Entry"</td></tr>';
+    tfoot.innerHTML = '';
+    so1UpdateTotals([]);
+    return;
+  }
+
+  const numericCols = [5,6,7,8,9,10,11,12];
+  let html = '';
+  so1Rows.forEach(function(row, i) {
+    html += '<tr data-so1-row="' + i + '" style="border-bottom:1px solid #e5e7eb;">';
+    row.forEach(function(val, c) {
+      const isNum = numericCols.indexOf(c) !== -1;
+      const display = isNum ? (parseFloat(val)||0).toLocaleString('en-US',{minimumFractionDigits:2,maximumFractionDigits:2}) : val;
+      html += '<td data-col="' + c + '" contenteditable="true" '
+        + 'style="padding:4px 6px;' + (isNum ? 'text-align:right;' : '') + 'border:1px solid #e5e7eb;" '
+        + 'oninput="so1OnCellEdit(' + i + ',' + c + ',this)">'
+        + display + '</td>';
+    });
+    html += '<td style="padding:4px;text-align:center;"><button class="btn btn-danger btn-sm" onclick="so1RemoveRow(' + i + ')" style="padding:2px 6px;font-size:.7rem;">✕</button></td>';
+    html += '</tr>';
+  });
+  tbody.innerHTML = html;
+
+  // Totals footer
+  const totals = Array(13).fill(0);
+  so1Rows.forEach(function(row) {
+    numericCols.forEach(function(c){ totals[c] += parseFloat(row[c]) || 0; });
+  });
+  let footHtml = '<tr style="background:#1a2540;color:#fff;font-weight:700;">';
+  footHtml += '<td colspan="5" style="padding:5px 6px;text-align:right;">TOTALS</td>';
+  for (var c = 5; c <= 12; c++) {
+    footHtml += '<td style="padding:5px 6px;text-align:right;">' + totals[c].toLocaleString('en-US',{minimumFractionDigits:2,maximumFractionDigits:2}) + '</td>';
+  }
+  footHtml += '<td></td></tr>';
+  footHtml += '<tr><td colspan="13" style="text-align:right;padding:4px 6px;"><button class="btn btn-ghost btn-sm" onclick="so1AddRow()" style="margin-top:4px;">+ Add Row</button></td></tr>';
+  tfoot.innerHTML = footHtml;
+
+  so1UpdateTotals(totals);
+}
+
+function so1OnCellEdit(rowIdx, colIdx, el) {
+  const val = el.innerText.replace(/,/g, '').trim();
+  if (colIdx >= 5) {
+    so1Rows[rowIdx][colIdx] = parseFloat(val) || 0;
+  } else {
+    so1Rows[rowIdx][colIdx] = val;
+  }
+  // Recalculate totals live
+  const numericCols = [5,6,7,8,9,10,11,12];
+  const totals = Array(13).fill(0);
+  so1Rows.forEach(function(row){ numericCols.forEach(function(c){ totals[c] += parseFloat(row[c])||0; }); });
+  so1UpdateTotals(totals);
+}
+
+function so1UpdateTotals(totals) {
+  const grossTotal = (totals[5] || 0) + (totals[6] || 0);
+  const heartTax = grossTotal * 0.03;
+  const allOtherTax = (totals[9]||0) + (totals[10]||0) + (totals[11]||0) + (totals[12]||0);
+  const fmtN = function(n){ return n.toLocaleString('en-US',{minimumFractionDigits:2,maximumFractionDigits:2}); };
+  const hg = document.getElementById('so1HeartGross');
+  const ht = document.getElementById('so1HeartTax');
+  const tt = document.getElementById('so1TotalTax');
+  if (hg) hg.textContent = '$' + fmtN(grossTotal);
+  if (ht) ht.textContent = '$' + fmtN(heartTax);
+  if (tt) tt.textContent = '$' + fmtN(allOtherTax + heartTax);
+}
+
+// Load from uploaded Excel file (parse and populate so1Rows)
+function so1LoadFromFile(event) {
+  const file = event.target.files[0];
+  if (!file) return;
+  const reader = new FileReader();
+  reader.onload = function(e) {
+    try {
+      const wb = XLSX.read(e.target.result, { type: 'array' });
+      // Try the first sheet that looks like Schedule A (has Surname in A1)
+      let ws = null;
+      for (var i = 0; i < wb.SheetNames.length; i++) {
+        const sheet = wb.Sheets[wb.SheetNames[i]];
+        const a1 = sheet['A1'] ? sheet['A1'].v : '';
+        if (String(a1).toLowerCase().indexOf('surname') !== -1) { ws = sheet; break; }
+      }
+      if (!ws) { ws = wb.Sheets[wb.SheetNames[0]]; }
+      const rows = XLSX.utils.sheet_to_json(ws, { header: 1, defval: '' });
+      so1Rows = [];
+      rows.slice(1).forEach(function(r) {
+        if (!r[0] && !r[1] && !r[5]) return; // Skip empty rows
+        so1Rows.push([
+          String(r[0] || ''), String(r[1] || ''), String(r[2] || ''),
+          String(r[3] || ''), String(r[4] || ''),
+          parseFloat(r[5]) || 0, parseFloat(r[6]) || 0, parseFloat(r[7]) || 0,
+          parseFloat(r[8]) || 4,
+          parseFloat(r[9]) || 0, parseFloat(r[10]) || 0, parseFloat(r[11]) || 0, parseFloat(r[12]) || 0
+        ]);
+      });
+      so1RenderTable();
+      document.getElementById('so1StatusBar').textContent = '✓ Loaded ' + so1Rows.length + ' rows from ' + file.name;
+    } catch(ex) {
+      alert('Could not read Excel file: ' + ex.message);
+    }
+  };
+  reader.readAsArrayBuffer(file);
+  event.target.value = '';
+}
+
+// Generate and download an Excel file matching the TAJ SO1 Schedule A format
+function so1DownloadExcel() {
+  if (so1Rows.length === 0) { alert('No data to export. Load from payroll or enter manually first.'); return; }
+
+  const wb = XLSX.utils.book_new();
+
+  // === Sheet 1: S01 Schedule A ===
+  const wsData = [SO1_EXCEL_HEADERS];
+  let grossSum=0, nisSum=0, nhtSum=0, edSum=0;
+  so1Rows.forEach(function(r) {
+    grossSum += parseFloat(r[5])||0;
+    nisSum   += parseFloat(r[9])||0;
+    nhtSum   += parseFloat(r[10])||0;
+    edSum    += parseFloat(r[11])||0;
+    wsData.push([r[0],r[1],r[2],r[3],r[4],
+      parseFloat(r[5])||0, parseFloat(r[6])||0, parseFloat(r[7])||0,
+      parseFloat(r[8])||0,
+      parseFloat(r[9])||0, parseFloat(r[10])||0, parseFloat(r[11])||0, parseFloat(r[12])||0
+    ]);
+  });
+  // Blank spacer + totals row
+  wsData.push([]);
+  wsData.push(['','','','','', grossSum,'','','', nisSum, nhtSum, edSum,'']);
+  const ws1 = XLSX.utils.aoa_to_sheet(wsData);
+  // Column widths
+  ws1['!cols'] = [12,12,6,14,12,16,14,14,8,12,12,14,14].map(function(w){return {wch:w};});
+  XLSX.utils.book_append_sheet(wb, ws1, 'S01ScheduleA');
+
+  // === Sheet 2: HEART NSTA ===
+  const heartTax = grossSum * 0.03;
+  const allTax = nisSum + nhtSum + edSum + heartTax;
+  const ws2Data = [
+    ['','Gross Emoluments','HEART NSTA Tax = 3%'],
+    ['', grossSum, heartTax],
+    [],[],[],[],[],[],[],
+    ['','Total Taxes',''],
+    ['', nisSum + nhtSum + edSum,''],
+    ['', allTax,''],
+    [],[],
+    ['','', allTax]
+  ];
+  const ws2 = XLSX.utils.aoa_to_sheet(ws2Data);
+  ws2['!cols'] = [{wch:14},{wch:20},{wch:20}];
+  XLSX.utils.book_append_sheet(wb, ws2, 'HEART NSTA');
+
+  // Determine filename from selected cycle
+  let monthLabel = 'SO1';
+  const cycIdx = parseInt(document.getElementById('so1Cycle').value);
+  if (!isNaN(cycIdx) && DATA.payrollRuns[cycIdx]) {
+    const d = DATA.payrollRuns[cycIdx].date;
+    const parts = d.split('-');
+    const mn = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+    monthLabel = 'SO1_' + (mn[parseInt(parts[1])-1]||parts[1]) + parts[0];
+  }
+  XLSX.writeFile(wb, monthLabel + '.xlsx');
 }
 
 // ==================== SALARY RECORDS ====================

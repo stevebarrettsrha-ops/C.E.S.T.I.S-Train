@@ -4946,20 +4946,98 @@ function saveTransaction() {
     };
     if (!data.details) { alert('Please enter details'); return; }
 
+    let savedTxn;
     if (editingTxnId !== null) {
         const idx = transactions.findIndex(t => t.id === editingTxnId);
         if (idx !== -1) {
             transactions[idx] = Object.assign({}, transactions[idx], data);
+            savedTxn = transactions[idx];
         }
     } else {
         // Skip past any IDs that are in the deletedTxnIds list to avoid collisions
         while (deletedTxnIds.indexOf(nextId) !== -1) { nextId++; }
         data.id = nextId++;
         transactions.push(data);
+        savedTxn = data;
     }
     closeModal();
     saveToStorage();
+    if (savedTxn) syncSalaryToPayslip(savedTxn);
     refreshAll();
+}
+
+// Salary/Instructor categories auto-sync to cestisPayroll so the payslip
+// page is pre-populated without manual re-entry.
+function syncSalaryToPayslip(txn) {
+    if (!txn || !txn.payment || txn.payment <= 0) return;
+    if (!txn.details || !txn.date) return;
+
+    // Only sync Salaries and Instructors sections
+    const section = getBudgetLineSection(txn.category);
+    if (section !== 'Salaries' && section !== 'Instructors') return;
+
+    try {
+        const PAYSLIP_KEY = 'cestisPayroll';
+        let pd;
+        try { const raw = CESTISStore.getItem(PAYSLIP_KEY); pd = raw ? JSON.parse(raw) : null; } catch(e) { pd = null; }
+        if (!pd || typeof pd !== 'object') pd = { settings: {}, employees: [], payrollRuns: [] };
+        if (!Array.isArray(pd.employees)) pd.employees = [];
+        if (!Array.isArray(pd.payrollRuns)) pd.payrollRuns = [];
+
+        const empName = txn.details.trim();
+
+        // Find or create employee record
+        let emp = pd.employees.find(function(e) { return (e.name || '').trim().toLowerCase() === empName.toLowerCase(); });
+        if (!emp) {
+            emp = { name: empName, designation: txn.category, type: 'FT', mobile: '', dob: '', trn: '', nis: '', startDate: txn.date, salary: txn.payment };
+            pd.employees.push(emp);
+        }
+
+        // Group by month — use first day of the transaction's month as the run date
+        const parts = txn.date.split('-');
+        const runDate = parts[0] + '-' + parts[1] + '-01';
+
+        // Find or create the payroll run for this month
+        let run = pd.payrollRuns.find(function(r) { return r.date === runDate; });
+        if (!run) {
+            run = { date: runDate, results: [], cashbookSynced: true };
+            pd.payrollRuns.push(run);
+        }
+
+        // Find or update result entry for this employee in this run
+        const emkLow = empName.toLowerCase();
+        let res = run.results.find(function(r) { return (r.empName || '').trim().toLowerCase() === emkLow; });
+        if (res) {
+            res.gross = txn.payment;
+            res.netPay = txn.payment;
+            res.designation = emp.designation || txn.category;
+            res.cashbookSynced = true;
+            res.cashbookTxnId = txn.id;
+        } else {
+            run.results.push({
+                empName: empName,
+                empType: emp.type,
+                designation: emp.designation || txn.category,
+                trn: emp.trn || '',
+                nis: emp.nis || '',
+                gross: txn.payment,
+                netPay: txn.payment,
+                nisEmp: 0, nisEr: 0,
+                edTaxEmp: 0, edTaxEr: 0,
+                nhtEmp: 0, nhtEr: 0,
+                heartEr: 0,
+                incomeTax: 0,
+                totalEmpDeductions: 0,
+                totalErContributions: 0,
+                cashbookSynced: true,
+                cashbookTxnId: txn.id
+            });
+        }
+
+        CESTISStore.setItem(PAYSLIP_KEY, JSON.stringify(pd));
+    } catch(e) {
+        console.warn('syncSalaryToPayslip failed:', e);
+    }
 }
 
 function deleteTxn(id) {
