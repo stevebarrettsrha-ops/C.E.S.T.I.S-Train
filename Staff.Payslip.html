@@ -907,13 +907,17 @@ tr:hover td{background:rgba(59,130,246,.04)}
           <div class="form-grid">
             <div class="form-group">
               <label>Employee</label>
-              <select id="payslipEmployee"></select>
+              <select id="payslipEmployee" onchange="onPayslipEmployeeChange()"></select>
             </div>
             <div class="form-group">
               <label>Pay Cycle</label>
               <select id="payslipCycle"></select>
             </div>
-            <div class="form-group" style="justify-content:flex-end">
+            <div class="form-group">
+              <label>Cashbook Name <span style="font-size:.75rem;color:var(--text-muted)">(match to transaction)</span></label>
+              <select id="cashbookNameLink" title="Select the name as it appears in cashbook transactions to link payment history"></select>
+            </div>
+            <div class="form-group" style="justify-content:flex-end;align-self:flex-end">
               <button class="btn btn-primary" onclick="generatePayslipPreview()">👁 Preview Payslip</button>
             </div>
           </div>
@@ -2271,6 +2275,8 @@ function populatePayslipSelects(){
   DATA.employees.forEach((e,i)=>{empSel.innerHTML+=`<option value="${i}">${e.name} (${e.type})</option>`;});
   cycSel.innerHTML='<option value="">— Select —</option>';
   DATA.payrollRuns.forEach((r,i)=>{cycSel.innerHTML+=`<option value="${i}">${fmtDate(r.date)}</option>`;});
+  // Populate cashbook name dropdown (no auto-select until employee chosen)
+  populateCashbookNameDropdown('');
 }
 
 function generatePayslipPreview(){
@@ -2292,7 +2298,8 @@ function generatePayslipPreview(){
     if(match){ytd.nis+=match.nisEmp;ytd.edTax+=match.edTaxEmp;ytd.nht+=match.nhtEmp;ytd.incomeTax+=match.incomeTax;ytd.gross+=match.gross;ytd.heartEr+=(match.heartEr||0);ytd.netPay+=match.netPay;}
   });
 
-  const psHtml=buildPayslipHTML(emp,result,run.date,ytd);
+  const cashbookName = (document.getElementById('cashbookNameLink') || {}).value || '';
+  const psHtml=buildPayslipHTML(emp,result,run.date,ytd,cashbookName);
   document.getElementById('payslipPreviewArea').innerHTML=`
     <div class="panel" style="margin-top:1rem">
       <div class="panel-head"><h3>Payslip Preview</h3><div class="btn-group"><button class="btn btn-primary btn-sm" onclick="printPayslip()">🖨 Print / Save as PDF</button></div></div>
@@ -2301,7 +2308,7 @@ function generatePayslipPreview(){
   document.getElementById('payslipPrintArea').innerHTML=psHtml.replace('payslip-preview','payslip-print');
 }
 
-function buildPayslipHTML(emp,result,date,ytd){
+function buildPayslipHTML(emp,result,date,ytd,cashbookName){
   return `<div class="payslip-preview">
     <div class="ps-header">
       <p style="font-size:.85rem;font-weight:700;color:#1a2540;margin-bottom:.25rem">Community Educational and Skills Training Institute and Services Limited</p>
@@ -2334,7 +2341,7 @@ function buildPayslipHTML(emp,result,date,ytd){
     </div>
     <div class="ps-footer">This is a computer-generated payslip. For queries, contact the Project Coordinator.</div>
     ${(function(){
-      const cbPayments = getCashbookPaymentsForEmployee(result.empName);
+      const cbPayments = getCashbookPaymentsForEmployee(cashbookName);
       if (!cbPayments.length) return '';
       let rows = cbPayments.map(function(p){
         return '<tr><td>'+p.date+'</td><td class="mono">'+(p.cheque||'—')+'</td><td>'+p.details+'</td><td class="amt">'+fmt(p.payment)+'</td></tr>';
@@ -2351,10 +2358,32 @@ function buildPayslipHTML(emp,result,date,ytd){
   </div>`;
 }
 
-// Read all cashbook transactions for all quarters and return those whose
-// 'details' field contains empName (case-insensitive, trimmed).
-function getCashbookPaymentsForEmployee(empName) {
-  const needle = empName.trim().toLowerCase();
+// Collect every unique payee name that appears in cashbook payment transactions.
+function getCashbookPayeeNames() {
+  const names = new Set();
+  try {
+    CESTISStore.keys().forEach(function(k) {
+      if (!k.startsWith('cestis_quarter_')) return;
+      try {
+        const raw = CESTISStore.getItem(k);
+        if (!raw) return;
+        const qData = JSON.parse(raw);
+        const txns = Array.isArray(qData.transactions) ? qData.transactions : [];
+        txns.forEach(function(t) {
+          if (t.category === 'Cancelled' || t.category === 'Subvention') return;
+          if ((t.payment || 0) <= 0 || !t.details) return;
+          names.add(t.details.trim());
+        });
+      } catch(e) {}
+    });
+  } catch(e) {}
+  return Array.from(names).sort();
+}
+
+// Fetch all cashbook payment transactions whose 'details' field exactly matches
+// cashbookName (the value chosen from the dropdown — no fuzzy matching).
+function getCashbookPaymentsForEmployee(cashbookName) {
+  if (!cashbookName) return [];
   const results = [];
   try {
     CESTISStore.keys().forEach(function(k) {
@@ -2366,9 +2395,8 @@ function getCashbookPaymentsForEmployee(empName) {
         const txns = Array.isArray(qData.transactions) ? qData.transactions : [];
         txns.forEach(function(t) {
           if (t.category === 'Cancelled') return;
-          if (!t.details) return;
-          if (t.details.trim().toLowerCase().indexOf(needle) === -1) return;
           if ((t.payment || 0) <= 0) return;
+          if ((t.details || '').trim() !== cashbookName) return;
           results.push({
             date: t.date || '',
             cheque: t.cheque || '',
@@ -2381,6 +2409,38 @@ function getCashbookPaymentsForEmployee(empName) {
   } catch(e) {}
   results.sort(function(a,b){ return a.date < b.date ? -1 : a.date > b.date ? 1 : 0; });
   return results;
+}
+
+// Populate the cashbook-name dropdown and auto-suggest the closest match
+// for the selected employee name.
+function populateCashbookNameDropdown(empName) {
+  const sel = document.getElementById('cashbookNameLink');
+  if (!sel) return;
+  const payeeNames = getCashbookPayeeNames();
+  sel.innerHTML = '<option value="">— Not linked (no history) —</option>';
+  payeeNames.forEach(function(n) {
+    const opt = document.createElement('option');
+    opt.value = n;
+    opt.textContent = n;
+    sel.appendChild(opt);
+  });
+  // Auto-select: find the first cashbook name that contains the employee name
+  // or vice-versa (case-insensitive). User can override if wrong.
+  if (empName) {
+    const needle = empName.trim().toLowerCase();
+    const match = payeeNames.find(function(n) {
+      const hay = n.toLowerCase();
+      return hay === needle || hay.indexOf(needle) !== -1 || needle.indexOf(hay) !== -1;
+    });
+    if (match) sel.value = match;
+  }
+}
+
+function onPayslipEmployeeChange() {
+  const empIdx = parseInt(document.getElementById('payslipEmployee').value);
+  if (isNaN(empIdx)) return;
+  const emp = DATA.employees[empIdx];
+  if (emp) populateCashbookNameDropdown(emp.name);
 }
 
 function printPayslip(){
