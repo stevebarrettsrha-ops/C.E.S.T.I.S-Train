@@ -2269,12 +2269,23 @@ function recalculateExistingPayroll(runIdx){
 
 // ==================== PAYSLIPS ====================
 function populatePayslipSelects(){
+  // Re-merge from storage so cashbook-synced entries are visible immediately
+  try {
+    const fresh = CESTISStore.getItem('cestisPayroll');
+    if (fresh) {
+      const parsed = JSON.parse(fresh);
+      if (parsed && Array.isArray(parsed.employees)) _mergeDataIntoLocal(parsed);
+    }
+  } catch(e) {}
   const empSel=document.getElementById('payslipEmployee');
   const cycSel=document.getElementById('payslipCycle');
   empSel.innerHTML='<option value="">— Select —</option>';
   DATA.employees.forEach((e,i)=>{empSel.innerHTML+=`<option value="${i}">${e.name} (${e.type})</option>`;});
   cycSel.innerHTML='<option value="">— Select —</option>';
-  DATA.payrollRuns.forEach((r,i)=>{cycSel.innerHTML+=`<option value="${i}">${fmtDate(r.date)}</option>`;});
+  DATA.payrollRuns.forEach((r,i)=>{
+    const tag = r.cashbookSynced ? ' [CB]' : '';
+    cycSel.innerHTML+=`<option value="${i}">${fmtDate(r.date)}${tag}</option>`;
+  });
   // Populate cashbook name dropdown (no auto-select until employee chosen)
   populateCashbookNameDropdown('');
 }
