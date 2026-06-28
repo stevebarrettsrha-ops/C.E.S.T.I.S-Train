@@ -7960,7 +7960,8 @@
             
             let imported = 0;
             let errors = 0;
-            
+            let skippedEnded = 0;
+
             importData.forEach(row => {
                 try {
                     const skillArea = row['Skill Area'] || row['SkillArea'] || row['skill_area'];
@@ -7968,7 +7969,10 @@
                         errors++;
                         return;
                     }
-                    
+                    // Enrolment lifecycle: never import a new trainee into an ended course.
+                    var _dur = feeCourseDurationInfo(skillArea);
+                    if (_dur && _dur.ended) { skippedEnded++; return; }
+
                     const student = {
                         id: row['Student ID'] || row['StudentID'] || 'STU' + Date.now() + Math.random(),
                         name: row['Name'] || row['Student Name'] || '',
@@ -7998,7 +8002,8 @@
             
             cancelImport();
             
-            alert(`Import complete!\nImported: ${imported}\nErrors: ${errors}`);
+            alert(`Import complete!\nImported: ${imported}\nErrors: ${errors}` +
+                (skippedEnded ? `\nSkipped (course ended): ${skippedEnded} — create a new training centre with a new duration to enrol these.` : ''));
         }
 
         function cancelImport() {
