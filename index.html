@@ -15229,7 +15229,14 @@ function syncStudentsFromLocalFeeSystem() {
       // (those are handled by its own push path) only if they already exist.
       var studentId = norm(fee.id) || ('STU-FEE-' + Date.now() + '-' + Math.floor(Math.random()*1000));
 
+      // Deterministic stable id (name|course) and the fee page's 'SF-' twin id — the
+      // forms a delete may have been tombstoned under. Without these, a student deleted
+      // in the LMS (tombstoned by stable id) or via the fee page is silently resurrected.
+      var feeSid = (window.CESTISCore && typeof CESTISCore.stableStudentId === 'function')
+        ? CESTISCore.stableStudentId({ name: name, course: course }) : null;
       if (deleted[studentId]) return;                 // removed on the dashboard
+      if (feeSid && deleted[feeSid]) return;          // tombstoned under its stable id
+      if (deleted['SF-' + norm(fee.id)]) return;      // tombstoned under the fee twin id
       if (existingIds[studentId]) return;             // already present by id
       var dupKey = (name + '|' + course).toLowerCase();
       if (existingKeys[dupKey]) return;               // already present by name+course
@@ -15515,6 +15522,32 @@ function confirmDeleteStudent() {
   // it instead of resurrecting it — even if a copy returns under a different id.
   recordDeletedStudent(sid);
   if (window.CESTISCore) { var _stableSid = CESTISCore.stableStudentId(s); if (_stableSid && _stableSid !== sid) recordDeletedStudent(_stableSid); }
+
+  // Symmetric School-Fee delete: remove the linked fee record (matched by explicit
+  // link only) and tombstone its lms id in cestiSchoolFeeDeletedLmsIds so the fee
+  // page neither shows a ghost nor re-mirrors the student back into the dashboard.
+  try {
+    var _feeRaw = CESTISStore.getItem('cestiSchoolFeeStudents');
+    var _fee = _feeRaw ? (JSON.parse(_feeRaw) || []) : [];
+    if (Array.isArray(_fee) && _fee.length) {
+      var _fbefore = _fee.length;
+      var _removedFeeIds = [];
+      _fee = _fee.filter(function(f){
+        var hit = f && ((s.schoolFeeId && f.id === s.schoolFeeId) || f.lmsId === sid || f.id === sid);
+        if (hit) _removedFeeIds.push(f.lmsId || f.id);
+        return !hit;
+      });
+      if (_fee.length !== _fbefore) {
+        CESTISStore.setItem('cestiSchoolFeeStudents', JSON.stringify(_fee));
+        var _ldRaw = CESTISStore.getItem('cestiSchoolFeeDeletedLmsIds');
+        var _ld = _ldRaw ? (JSON.parse(_ldRaw) || []) : [];
+        if (!Array.isArray(_ld)) _ld = [];
+        var _ldset = {}; _ld.forEach(function(id){ if (id) _ldset[id] = true; });
+        [sid].concat(_removedFeeIds).forEach(function(id){ if (id) _ldset[id] = true; });
+        CESTISStore.setItem('cestiSchoolFeeDeletedLmsIds', JSON.stringify(Object.keys(_ldset)));
+      }
+    }
+  } catch(e) { console.warn('symmetric fee delete failed:', e); }
   closeModal('deleteStudentModal');
   filterStudents();
   updatePipelineCounts();

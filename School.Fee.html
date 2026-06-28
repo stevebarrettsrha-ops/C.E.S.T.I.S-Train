@@ -4410,6 +4410,10 @@
             if (savedStudents) students = JSON.parse(savedStudents);
             if (savedPayments) payments = JSON.parse(savedPayments);
             if (savedDocuments) documents = JSON.parse(savedDocuments);
+            // Self-heal: drop any fee student that has been tombstoned (deleted here or
+            // in the LMS). This stops a record removed via the LMS from lingering as a
+            // ghost and from being resurrected the next time this page saves its list.
+            try { if (dropTombstonedFeeStudents()) CESTISStore.setItem('cestiSchoolFeeStudents', JSON.stringify(students)); } catch (e) {}
             // Migrate auto-generated ids to deterministic stable ids on load and
             // persist once, so cross-device duplicates collapse before anything
             // else reads the list.
@@ -4425,6 +4429,33 @@
             // If embedded in the LMS dashboard, push the live list to the parent
             // so it can refresh the Student Progress page immediately.
             broadcastStudentsToParent();
+        }
+
+        // Remove fee students that have been tombstoned — either here (their id/lmsId is
+        // in cestiSchoolFeeDeletedLmsIds) or in the LMS (their stable id is in
+        // voctrain_deletedStudentIds). Mirrors the LMS-side dropTombstonedStudents so a
+        // deletion on either page is honoured symmetrically and cannot be resurrected.
+        function dropTombstonedFeeStudents() {
+            try {
+                if (!Array.isArray(students) || !students.length) return false;
+                const feeDel = {};
+                const r1 = CESTISStore.getItem('cestiSchoolFeeDeletedLmsIds');
+                (r1 ? (JSON.parse(r1) || []) : []).forEach(id => { if (id) feeDel[id] = true; });
+                const vdel = {};
+                const r2 = CESTISStore.getItem('voctrain_deletedStudentIds');
+                (r2 ? (JSON.parse(r2) || []) : []).forEach(id => { if (id) vdel[id] = true; });
+                if (!Object.keys(feeDel).length && !Object.keys(vdel).length) return false;
+                const before = students.length;
+                students = students.filter(s => {
+                    if (!s) return false;
+                    const sid = (window.CESTISCore && typeof CESTISCore.stableStudentId === 'function')
+                        ? CESTISCore.stableStudentId({ name: s.name, course: s.skillArea }) : null;
+                    if (feeDel[s.id] || (s.lmsId && feeDel[s.lmsId]) || feeDel['SF-' + s.id]) return false;
+                    if (vdel[s.id] || (s.lmsId && vdel[s.lmsId]) || vdel['SF-' + s.id] || (sid && vdel[sid])) return false;
+                    return true;
+                });
+                return students.length !== before;
+            } catch (e) { return false; }
         }
 
         // --- Academic stage (from the LMS Student Progress dashboard) ---------
@@ -4596,9 +4627,14 @@
                     if (!sf || !sf.name) return;
 
                     const linkId = 'SF-' + sf.id;          // stable dashboard id for this fee record
-                    // Skip if removed on the dashboard (twin id, raw fee id, or linked lms id).
+                    // Deterministic stable id (name|course) — the form the LMS tombstones a
+                    // record under when it is deleted there (its twin's id is migrated to STU-hash).
+                    const feeSid = (window.CESTISCore && typeof CESTISCore.stableStudentId === 'function')
+                        ? CESTISCore.stableStudentId({ name: sf.name, course: sf.skillArea }) : null;
+                    // Skip if removed on the dashboard (twin id, raw fee id, stable id, or linked lms id).
                     if (delIds.indexOf(linkId) !== -1 ||
                         delIds.indexOf(sf.id) !== -1 ||
+                        (feeSid && delIds.indexOf(feeSid) !== -1) ||
                         (sf.lmsId && delIds.indexOf(sf.lmsId) !== -1)) return;
 
                     // Match an existing dashboard record by link id, raw fee id,
@@ -5370,8 +5406,9 @@
         // Delete student
         function deleteStudent(index) {
             if (confirm('Are you sure you want to delete this student? All payment records and documents will also be deleted.')) {
-                const studentId = students[index].id;
-                const _delLmsId = students[index].lmsId || students[index].id;
+                const _stu = students[index];
+                const studentId = _stu.id;
+                const _delLmsId = _stu.lmsId || _stu.id;
                 students.splice(index, 1);
                 // Tombstone the link so the Student Progress dashboard does not
                 // recreate this student's fee record on its next sync.
@@ -5382,6 +5419,30 @@
                     if (!Array.isArray(_tomb)) _tomb = [];
                     if (_delLmsId && _tomb.indexOf(_delLmsId) === -1) { _tomb.push(_delLmsId); CESTISStore.setItem('cestiSchoolFeeDeletedLmsIds', JSON.stringify(_tomb)); }
                 } catch (e) {}
+
+                // Symmetric LMS-side delete: remove the mirrored voctrain_students twin
+                // (matched by explicit link only) and tombstone its id(s) — including the
+                // deterministic stable id — under voctrain_deletedStudentIds, so the LMS
+                // honours the deletion and never resurrects the student on its next sync
+                // or a cloud merge (even if a copy returns carrying a different id).
+                try {
+                    const _linkId = 'SF-' + studentId;
+                    const _sid = (window.CESTISCore && typeof CESTISCore.stableStudentId === 'function')
+                        ? CESTISCore.stableStudentId({ name: _stu.name, course: _stu.skillArea }) : null;
+                    let _lms = [];
+                    try { _lms = JSON.parse(CESTISStore.getItem('voctrain_students') || '[]') || []; } catch (e) { _lms = []; }
+                    if (Array.isArray(_lms)) {
+                        const _before = _lms.length;
+                        _lms = _lms.filter(ls => !(ls && (
+                            ls.id === _linkId || ls.id === studentId ||
+                            (_stu.lmsId && ls.id === _stu.lmsId) || ls.schoolFeeId === studentId)));
+                        if (_lms.length !== _before) CESTISStore.setItem('voctrain_students', JSON.stringify(_lms));
+                    }
+                    if (window.CESTISCore && typeof CESTISCore.recordDeletedStudent === 'function') {
+                        [_linkId, studentId, _stu.lmsId, _sid].forEach(id => { if (id) CESTISCore.recordDeletedStudent(id, CESTISStore); });
+                    }
+                } catch (e) {}
+
                 payments = payments.filter(p => p.studentId !== studentId);
                 documents = documents.filter(d => d.studentId !== studentId);
                 
