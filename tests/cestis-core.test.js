@@ -454,4 +454,55 @@ test('sameQuarter compares FY+quarter pairs null-safely', function () {
   assert.strictEqual(Core.sameQuarter(null, { fy: '2026/2027', q: 2 }), false);
 });
 
+/* ---- course duration -------------------------------------------------- */
+var CD = Core.courseDuration;
+
+test('courseDuration.status classifies not-started / active / ended / no-dates', function () {
+  assert.strictEqual(CD.status('2026-01-01', '2026-12-31', '2025-12-31'), 'not-started');
+  assert.strictEqual(CD.status('2026-01-01', '2026-12-31', '2026-06-15'), 'active');
+  assert.strictEqual(CD.status('2026-01-01', '2026-12-31', '2027-01-01'), 'ended');
+  assert.strictEqual(CD.status('', '', '2026-06-15'), 'no-dates');
+  // boundary days are inclusive
+  assert.strictEqual(CD.status('2026-01-01', '2026-12-31', '2026-01-01'), 'active', 'start day inclusive');
+  assert.strictEqual(CD.status('2026-01-01', '2026-12-31', '2026-12-31'), 'active', 'end day inclusive');
+});
+
+test('courseDuration.isActive treats a dateless course as open and an ended course as closed', function () {
+  assert.strictEqual(CD.isActive('', '', '2026-06-15'), true);
+  assert.strictEqual(CD.isActive('2026-01-01', '2026-12-31', '2026-06-15'), true);
+  assert.strictEqual(CD.isActive('2026-01-01', '2026-12-31', '2027-02-01'), false);
+});
+
+test('courseDuration.grantExpiry gives 12h for half day and 24h for full day', function () {
+  var now = 1000000000000;
+  assert.strictEqual(CD.grantExpiry(now, 'half'), now + 12 * 60 * 60 * 1000);
+  assert.strictEqual(CD.grantExpiry(now, 'full'), now + 24 * 60 * 60 * 1000);
+});
+
+test('courseDuration.permissionActiveAt detects an unexpired reopen permission', function () {
+  var now = 2000000;
+  assert.strictEqual(CD.permissionActiveAt([{ expiresAtMs: now + 1000 }], now), true);
+  assert.strictEqual(CD.permissionActiveAt([{ expiresAtMs: now - 1000 }], now), false, 'expired');
+  assert.strictEqual(CD.permissionActiveAt([], now), false);
+  assert.strictEqual(CD.permissionActiveAt(null, now), false);
+});
+
+test('courseDuration.isRegisterOpen: open while active, closed after end, reopened by permission', function () {
+  var active = { startDate: '2026-01-01', endDate: '2026-12-31' };
+  var ended  = { startDate: '2026-01-01', endDate: '2026-12-31' };
+  assert.strictEqual(CD.isRegisterOpen(active, '2026-06-15', 0), true, 'active course open');
+  assert.strictEqual(CD.isRegisterOpen(ended, '2027-02-01', 5000), false, 'ended course closed');
+  var withPerm = { startDate: '2026-01-01', endDate: '2026-12-31', instructorPermissions: [{ expiresAtMs: 9000 }] };
+  assert.strictEqual(CD.isRegisterOpen(withPerm, '2027-02-01', 5000), true, 'unexpired permission reopens');
+  assert.strictEqual(CD.isRegisterOpen(withPerm, '2027-02-01', 9000), false, 'expired permission no longer reopens');
+  assert.strictEqual(CD.isRegisterOpen(null, '2027-02-01', 5000), true, 'no course = open');
+});
+
+test('courseDuration.prunePermissions drops expired grants only', function () {
+  var now = 1000;
+  var pruned = CD.prunePermissions([{ expiresAtMs: 500 }, { expiresAtMs: 1500 }, { expiresAtMs: 2000 }], now);
+  assert.strictEqual(pruned.length, 2);
+  assert.deepStrictEqual(pruned.map(function (p) { return p.expiresAtMs; }), [1500, 2000]);
+});
+
 console.log('\nAll ' + passed + ' tests passed.');

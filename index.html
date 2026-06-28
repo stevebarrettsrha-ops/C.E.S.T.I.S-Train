@@ -4586,10 +4586,12 @@ var skillAreas = [
   {id:20,name:"Customer Service",icon:"\uD83C\uDFAF",color:"#7e57c2",students:0,materials:0,desc:"Communication skills, conflict resolution, CRM systems"}
 ];
 
-var stages = ['testing','interview','training','certified','collected','incomplete'];
-var stageLabels = {testing:'Testing',interview:'Interview',training:'In Training',certified:'Certified',collected:'Collected',incomplete:'Incomplete'};
-var stageBadge = {testing:'badge-blue',interview:'badge-purple',training:'badge-amber',certified:'badge-green',collected:'badge-green',incomplete:'badge-red'};
-var stageIcons = {testing:'\uD83D\uDCDD',interview:'\uD83D\uDDE3\uFE0F',training:'\uD83D\uDCDA',certified:'\uD83C\uDF93',collected:'\u2705',incomplete:'\u26A0\uFE0F'};
+// 'nyc' = Not Yet Competent \u2014 assigned automatically when a course ends and the
+// student was never certified, and held until an administrator updates them.
+var stages = ['testing','interview','training','certified','collected','nyc','incomplete'];
+var stageLabels = {testing:'Testing',interview:'Interview',training:'In Training',certified:'Certified',collected:'Collected',nyc:'Not Yet Competent',incomplete:'Incomplete'};
+var stageBadge = {testing:'badge-blue',interview:'badge-purple',training:'badge-amber',certified:'badge-green',collected:'badge-green',nyc:'badge-red',incomplete:'badge-red'};
+var stageIcons = {testing:'\uD83D\uDCDD',interview:'\uD83D\uDDE3\uFE0F',training:'\uD83D\uDCDA',certified:'\uD83C\uDF93',collected:'\u2705',nyc:'\u23F3',incomplete:'\u26A0\uFE0F'};
 function getCourseList() {
   var courseSet = {};
   // Include all skill area names
@@ -6555,6 +6557,8 @@ function initAttendanceQuarters() {
 }
 
 loadState();
+// Normalize training-centre durations and auto-mark NYC for any ended courses.
+try { recomputeCourseStatuses(false); } catch(e) {}
 // IndexedDB hydrates the store asynchronously and may hold far more data than
 // the synchronous localStorage seed (which is capped at ~5MB). Once the durable
 // IndexedDB store has finished loading into the cache, re-run loadState so any
@@ -6564,6 +6568,7 @@ try {
   CESTISStore.whenReady(function(){
     try {
       loadState();
+      try { recomputeCourseStatuses(true); } catch(e) {}
       if(window.CESTISCore && typeof CESTISCore.emit === 'function') CESTISCore.emit('cestis:state-saved');
       if(typeof refreshStorageUsage === 'function' && document.getElementById('storageUsageInfo')) refreshStorageUsage();
     } catch(e) { console.warn('[loadState] post-IndexedDB reload failed:', e && e.message); }
@@ -8046,6 +8051,8 @@ function buildAdminSidebar() {
     <div class="nav-section-label">Learning</div>
     <div class="nav-item" data-page="training" onclick="showPage('training')">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/></svg>Training Centres</div>
+    <div class="nav-item" data-page="course-duration" onclick="showPage('course-duration')">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/><path d="M9 16l2 2 4-4"/></svg>Course Duration</div>
     <div class="nav-item" data-page="a-resources" onclick="showPage('a-resources')">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/></svg>Resource Manager</div>
     <div class="nav-item" data-page="qual-plan" onclick="showPage('qual-plan')">
@@ -8553,7 +8560,7 @@ function showPage(pageId) {
   if(navItem) navItem.classList.add('active');
   const titles = {
     dashboard:'Dashboard',video:'Video Conference',students:'Student Progress',
-    training:'Training Centres','a-resources':'Resource Manager',exams:'Online Exams','import-exam':'Import Exam',certificates:'Certificate Tracking','cert-downloads':'Certificate Downloads',
+    training:'Training Centres','course-duration':'Course / Training Centre Duration','a-resources':'Resource Manager',exams:'Online Exams','import-exam':'Import Exam',certificates:'Certificate Tracking','cert-downloads':'Certificate Downloads',
     reports:'Reports & Analytics','verify-users':'Verify Users',settings:'Settings',
     attendance:'Attendance Management',announcements:'Announcements',calendar:'Calendar & Schedule',
     's-dashboard':'My Dashboard','s-video':'My Classes','s-progress':'My Progress',
@@ -8588,6 +8595,7 @@ function showPage(pageId) {
   // files and initialised by the mount onMount hooks (see the .cestis-mount block
   // near the end of showPage), so no inline init is needed here.
   if(pageId === 'training') { initTrainingAdminControls(); renderSkills(); updateCentreCount(); }
+  if(pageId === 'course-duration') { renderCourseDurationPage(); }
   // Mount the inlined Time Tracking app into the active page (replaces the old iframe).
   if(pageId === 'timetracking' || pageId === 'i-timetracking' || pageId === 'as-timetracking'){
     if(typeof ttMountInto === 'function') ttMountInto(pageId);
@@ -8783,6 +8791,12 @@ function buildAdminPages() {
       </div>
     </div>
     <div id="skillDetailPage" style="display:none;"></div>
+  </section>
+
+  <!-- COURSE / TRAINING CENTRE DURATION -->
+  <section class="page" id="page-course-duration">
+    <p style="color:var(--text-secondary);margin-bottom:20px;font-size:14px;">Set each training centre's start and end date. When a course ends, its attendance register closes automatically and uncertified students are marked <strong>Not Yet Competent (NYC)</strong> until you update them. Extend the end date — or grant an instructor a ½-day / 1-day window — to reopen the register.</p>
+    <div id="courseDurationContent"></div>
   </section>
 
   <!-- EXAMS -->
@@ -10074,11 +10088,15 @@ function renderInstructorAttendance() {
   const tbody = document.getElementById('iAttendanceTableBody');
   if(!tbody) return;
   const days = ['Mon','Tue','Wed','Thu','Fri'];
+  var iClosed = {};
   tbody.innerHTML = myRecords.map(r => {
-    return '<tr><td><strong>' + r.studentName + '</strong></td><td style="font-family:monospace;font-size:12px;">' + r.studentId + '</td>' +
+    var open = isRegisterOpenForCourse(r.course);
+    if(!open && r.course) iClosed[r.course] = true;
+    var lockBadge = open ? '' : ' <span title="Course ended — register closed" style="font-size:10px;color:#e74c3c;font-weight:700;">🔒</span>';
+    return '<tr' + (open?'':' style="opacity:.7;"') + '><td><strong>' + r.studentName + '</strong>' + lockBadge + '</td><td style="font-family:monospace;font-size:12px;">' + r.studentId + '</td>' +
     days.map(d => {
       const st = r.days[d];
-      return '<td><select class="form-control" style="width:90px;padding:4px 6px;font-size:11px;" data-sid="' + r.studentId + '" data-day="' + d + '" onchange="updateAttendanceCell(this)">' +
+      return '<td><select class="form-control" style="width:90px;padding:4px 6px;font-size:11px;" data-sid="' + r.studentId + '" data-day="' + d + '" onchange="updateAttendanceCell(this)"' + (open?'':' disabled') + '>' +
         '<option value="present"' + (st==='present'?' selected':'') + '>Present</option>' +
         '<option value="absent"' + (st==='absent'?' selected':'') + '>Absent</option>' +
         '<option value="late"' + (st==='late'?' selected':'') + '>Late</option></select></td>';
@@ -10086,6 +10104,17 @@ function renderInstructorAttendance() {
   }).join('');
   const countEl = document.getElementById('iAttCount');
   if(countEl) countEl.textContent = myRecords.length + ' students';
+  var iBannerHost = document.getElementById('iAttendanceSummary');
+  var iOldBanner = document.getElementById('iAttendanceLockBanner');
+  if(iOldBanner) iOldBanner.remove();
+  var iClosedNames = Object.keys(iClosed);
+  if(iBannerHost && iClosedNames.length) {
+    var b = document.createElement('div');
+    b.id = 'iAttendanceLockBanner';
+    b.style.cssText = 'margin:0 0 14px;padding:12px 16px;border-radius:10px;background:rgba(231,76,60,.12);border:1px solid rgba(231,76,60,.35);font-size:13px;';
+    b.innerHTML = '🔒 <strong>Register closed</strong> — '+iClosedNames.map(function(c){return escapeHtml(c);}).join(', ')+' has ended. Ask an administrator to extend the course or grant you a ½-day / 1-day reopen window.';
+    iBannerHost.parentNode.insertBefore(b, iBannerHost);
+  }
   renderInstructorAttSummary(myRecords);
   renderInstructorWeeklyChart(myRecords);
 }
@@ -15875,8 +15904,21 @@ function renderSkills() {
   var isAdmin = currentRole === 'admin';
   grid.innerHTML = skillAreas.map(function(s) {
     var adminBtns = isAdmin ? '<div style="display:flex;gap:6px;margin-top:8px;justify-content:center;" onclick="event.stopPropagation()"><button class="btn btn-sm btn-secondary" onclick="openEditCentre('+s.id+')" style="font-size:11px;padding:3px 8px;">✎ Edit</button><button class="btn btn-sm" style="background:#e74c3c;color:#fff;font-size:11px;padding:3px 8px;border:none;border-radius:var(--radius-sm);cursor:pointer;" onclick="openDeleteCentre('+s.id+')">✕ Delete</button></div>' : '';
-    return '<div class="skill-card" onclick="showSkillDetail('+s.id+')"><div class="skill-icon" style="background:'+s.color+'22;color:'+s.color+';">'+s.icon+'</div><h4>'+s.name+'</h4><p>'+s.desc+'</p><div class="skill-meta"><span>👥 '+s.students+'</span><span>📄 '+s.materials+'</span></div>'+adminBtns+'</div>';
+    return '<div class="skill-card" onclick="showSkillDetail('+s.id+')"><div class="skill-icon" style="background:'+s.color+'22;color:'+s.color+';">'+s.icon+'</div><h4>'+s.name+'</h4><p>'+s.desc+'</p>'+cdCardDurationBadge(s)+'<div class="skill-meta"><span>👥 '+s.students+'</span><span>📄 '+s.materials+'</span></div>'+adminBtns+'</div>';
   }).join('');
+}
+
+// Compact duration/status line for a training-centre card (only when dated).
+function cdCardDurationBadge(s) {
+  if (typeof CESTISCore === 'undefined' || !CESTISCore.courseDuration) return '';
+  if (!s || (!s.startDate && !s.endDate)) return '';
+  var status = CESTISCore.courseDuration.status(s.startDate, s.endDate);
+  var open = CESTISCore.courseDuration.isRegisterOpen(s, undefined, Date.now());
+  var m = (typeof CD_STATUS_META !== 'undefined' && CD_STATUS_META[status]) ? CD_STATUS_META[status] : {label:status,bg:'rgba(149,165,166,.15)',fg:'#95a5a6'};
+  var range = (s.startDate||'…') + ' → ' + (s.endDate||'…');
+  return '<div style="display:flex;align-items:center;gap:6px;justify-content:center;margin:6px 0 2px;flex-wrap:wrap;">'+
+    '<span style="font-size:10px;font-weight:700;padding:2px 8px;border-radius:9px;background:'+m.bg+';color:'+m.fg+';">'+m.label+(open?'':' 🔒')+'</span>'+
+    '<span style="font-size:10px;color:var(--text-muted);">'+range+'</span></div>';
 }
 function showSkillDetail(id) {
   const skill = skillAreas.find(s=>s.id===id);
@@ -16039,6 +16081,240 @@ function populateCourseDropdowns() {
   if(typeof populateCertTemplateSkillSelect === 'function') populateCertTemplateSkillSelect();
 }
 
+// ============================== COURSE / TRAINING-CENTRE DURATION ============
+// Each training centre carries a start & end date (plus Level / Project, mirroring
+// the CTI enrollment register). The attendance register and other course-scoped
+// editing close automatically when a course ends, and reopen when an admin
+// extends the end date or grants an instructor a temporary (½-day / 1-day)
+// permission. When a course ends, students who were never certified become
+// "Not Yet Competent" (NYC) until an administrator updates them.
+// The pure date/permission logic lives in CESTISCore.courseDuration (tested).
+
+// Ensure every centre has the duration fields, and drop expired permissions.
+function normalizeCourseDurations() {
+  if (typeof skillAreas === 'undefined' || !Array.isArray(skillAreas)) return;
+  var nowMs = Date.now();
+  skillAreas.forEach(function(sk) {
+    if (!sk) return;
+    if (typeof sk.startDate !== 'string') sk.startDate = '';
+    if (typeof sk.endDate !== 'string') sk.endDate = '';
+    if (typeof sk.level !== 'string') sk.level = (sk.level != null ? String(sk.level) : '');
+    if (typeof sk.project !== 'string') sk.project = (sk.project != null ? String(sk.project) : '');
+    if (!Array.isArray(sk.instructorPermissions)) sk.instructorPermissions = [];
+    sk.instructorPermissions = CESTISCore.courseDuration.prunePermissions(sk.instructorPermissions, nowMs);
+  });
+}
+
+// Resolve a course NAME to its training-centre record (exact, then alias match).
+// Returns null when no centre matches, so a course with no centre never blocks.
+function courseDurationRecord(courseName) {
+  if (!courseName || typeof skillAreas === 'undefined' || !Array.isArray(skillAreas)) return null;
+  var cn = String(courseName).toLowerCase().trim();
+  var rec = skillAreas.find(function(s){ return s.name && s.name.toLowerCase().trim() === cn; });
+  if (rec) return rec;
+  if (typeof instructorCourseMatch === 'function') {
+    rec = skillAreas.find(function(s){ return s.name && instructorCourseMatch(s.name, courseName); });
+    if (rec) return rec;
+  }
+  return null;
+}
+
+// 'no-dates' | 'not-started' | 'active' | 'ended' | 'unknown'
+function courseStatus(courseName) {
+  var rec = courseDurationRecord(courseName);
+  if (!rec) return 'unknown';
+  return CESTISCore.courseDuration.status(rec.startDate, rec.endDate);
+}
+
+// Is the attendance register / course-scoped editing open for this course?
+function isRegisterOpenForCourse(courseName) {
+  var rec = courseDurationRecord(courseName);
+  if (!rec) return true; // unknown course / no centre => never block
+  return CESTISCore.courseDuration.isRegisterOpen(rec, undefined, Date.now());
+}
+
+// When a course has ended, non-certified students become NYC; if a course is
+// later extended (active again), students we auto-marked revert to In Training.
+function applyCourseEndStatuses() {
+  if (typeof students === 'undefined' || !Array.isArray(students)) return false;
+  var changed = false;
+  students.forEach(function(s){
+    if (!s || !s.course) return;
+    var rec = courseDurationRecord(s.course);
+    if (!rec) return;
+    var st = CESTISCore.courseDuration.status(rec.startDate, rec.endDate);
+    if (st === 'ended') {
+      // Auto-mark NYC ONCE per course-end. Certified/collected are never
+      // overridden, and a student an admin has already handled for this same
+      // end date is left alone ("...until updated by Administrator").
+      var endKey = rec.endDate || 'ended';
+      if (s.stage !== 'certified' && s.stage !== 'collected' && s.stage !== 'nyc'
+          && s._nycForCourseEnd !== endKey) {
+        s.stage = 'nyc'; s._nycAuto = true; s._nycForCourseEnd = endKey; changed = true;
+      }
+    } else {
+      // Course is open again (extended / not yet started): undo only the
+      // statuses WE auto-applied, returning the student to In Training.
+      if (s.stage === 'nyc' && s._nycAuto) {
+        s.stage = 'training'; delete s._nycAuto; delete s._nycForCourseEnd; changed = true;
+      }
+    }
+  });
+  return changed;
+}
+
+// Normalize + recompute NYC. Persists & refreshes dependent views when asked.
+function recomputeCourseStatuses(persist) {
+  normalizeCourseDurations();
+  var changed = applyCourseEndStatuses();
+  if (changed && persist) {
+    try { saveState(); } catch(e) {}
+    if (typeof refreshStudentDependentViews === 'function') { try { refreshStudentDependentViews(); } catch(e) {} }
+  }
+  return changed;
+}
+
+// ---- Course Duration admin page ----
+var CD_STATUS_META = {
+  'active':      {label:'Active',      bg:'rgba(46,204,113,.15)', fg:'#2ecc71'},
+  'not-started': {label:'Not Started', bg:'rgba(52,152,219,.15)', fg:'#3498db'},
+  'ended':       {label:'Ended',       bg:'rgba(231,76,60,.15)',  fg:'#e74c3c'},
+  'no-dates':    {label:'No Dates',    bg:'rgba(149,165,166,.15)',fg:'#95a5a6'}
+};
+
+function cdStatusPill(status) {
+  var m = CD_STATUS_META[status] || CD_STATUS_META['no-dates'];
+  return '<span style="display:inline-block;padding:3px 10px;border-radius:10px;font-size:11px;font-weight:700;background:'+m.bg+';color:'+m.fg+';">'+m.label+'</span>';
+}
+
+function cdPermissionInfo(sk) {
+  var nowMs = Date.now();
+  var active = (sk.instructorPermissions||[]).filter(function(p){ return p && p.expiresAtMs > nowMs; });
+  if (!active.length) return '';
+  var soonest = active.reduce(function(a,b){ return a.expiresAtMs < b.expiresAtMs ? a : b; });
+  var d = new Date(soonest.expiresAtMs);
+  return '<div style="font-size:11px;color:#2ecc71;margin-top:4px;">🔓 Reopened until '+d.toLocaleString()+'</div>';
+}
+
+function renderCourseDurationPage() {
+  var el = document.getElementById('courseDurationContent');
+  if (!el) return;
+  if (currentRole !== 'admin') { el.innerHTML = '<div class="card" style="padding:24px;">Only administrators can manage course durations.</div>'; return; }
+  normalizeCourseDurations();
+  var rows = skillAreas.map(function(sk) {
+    var status = CESTISCore.courseDuration.status(sk.startDate, sk.endDate);
+    var open = CESTISCore.courseDuration.isRegisterOpen(sk, undefined, Date.now());
+    var enrolled = (typeof students !== 'undefined' && Array.isArray(students))
+      ? students.filter(function(st){ return st.course && courseDurationRecord(st.course) === sk; }).length : 0;
+    return '<tr>'+
+      '<td><div style="display:flex;align-items:center;gap:8px;"><span style="font-size:18px;">'+(sk.icon||'📋')+'</span><strong>'+escapeHtml(sk.name)+'</strong></div>'+
+        '<div style="font-size:11px;color:var(--text-muted);">'+enrolled+' student'+(enrolled===1?'':'s')+'</div>'+cdPermissionInfo(sk)+'</td>'+
+      '<td><input type="text" class="form-control" style="width:60px;padding:4px 6px;" id="cdLevel_'+sk.id+'" value="'+escapeHtml(sk.level||'')+'" placeholder="–"></td>'+
+      '<td><input type="text" class="form-control" style="width:160px;padding:4px 6px;" id="cdProject_'+sk.id+'" value="'+escapeHtml(sk.project||'')+'" placeholder="Project / Centre"></td>'+
+      '<td><input type="date" class="form-control" style="width:150px;padding:4px 6px;" id="cdStart_'+sk.id+'" value="'+(sk.startDate||'')+'"></td>'+
+      '<td><input type="date" class="form-control" style="width:150px;padding:4px 6px;" id="cdEnd_'+sk.id+'" value="'+(sk.endDate||'')+'"></td>'+
+      '<td>'+cdStatusPill(status)+'<div style="font-size:11px;margin-top:4px;color:'+(open?'#2ecc71':'#e74c3c')+';font-weight:600;">Register '+(open?'OPEN':'CLOSED')+'</div></td>'+
+      '<td><div style="display:flex;flex-wrap:wrap;gap:5px;">'+
+        '<button class="btn btn-sm btn-primary" style="font-size:11px;padding:4px 9px;" onclick="cdSaveCentre('+sk.id+')">Save</button>'+
+        '<button class="btn btn-sm btn-secondary" style="font-size:11px;padding:4px 9px;" onclick="cdGrantPermission('+sk.id+",'half'"+')" title="Reopen the register for half a day">+½ day</button>'+
+        '<button class="btn btn-sm btn-secondary" style="font-size:11px;padding:4px 9px;" onclick="cdGrantPermission('+sk.id+",'full'"+')" title="Reopen the register for one day">+1 day</button>'+
+        ((sk.instructorPermissions||[]).some(function(p){return p.expiresAtMs>Date.now();}) ? '<button class="btn btn-sm" style="font-size:11px;padding:4px 9px;background:#e74c3c;color:#fff;border:none;border-radius:var(--radius-sm);cursor:pointer;" onclick="cdRevokePermissions('+sk.id+')" title="Close the register now">Revoke</button>' : '')+
+      '</div></td>'+
+    '</tr>';
+  }).join('');
+
+  el.innerHTML =
+    '<div class="card" style="margin-bottom:18px;">'+
+      '<div class="card-header"><h3>Set duration for ALL centres</h3></div>'+
+      '<div style="padding:14px 16px;display:flex;flex-wrap:wrap;gap:12px;align-items:flex-end;">'+
+        '<div><label style="font-size:12px;font-weight:600;display:block;margin-bottom:4px;">Start Date</label><input type="date" class="form-control" style="width:160px;" id="cdBulkStart"></div>'+
+        '<div><label style="font-size:12px;font-weight:600;display:block;margin-bottom:4px;">End Date</label><input type="date" class="form-control" style="width:160px;" id="cdBulkEnd"></div>'+
+        '<div><label style="font-size:12px;font-weight:600;display:block;margin-bottom:4px;">Level (optional)</label><input type="text" class="form-control" style="width:90px;" id="cdBulkLevel" placeholder="e.g. 2"></div>'+
+        '<div><label style="font-size:12px;font-weight:600;display:block;margin-bottom:4px;">Project (optional)</label><input type="text" class="form-control" style="width:220px;" id="cdBulkProject" placeholder="e.g. Hazard Skills Training Centre"></div>'+
+        '<button class="btn btn-primary" onclick="cdBulkApply()">Apply to all centres</button>'+
+      '</div>'+
+      '<div style="padding:0 16px 14px;font-size:12px;color:var(--text-muted);">Only the fields you fill are applied; empty fields leave each centre unchanged. Setting an end date in the past closes that centre\'s register and marks its uncertified students as Not&nbsp;Yet&nbsp;Competent.</div>'+
+    '</div>'+
+    '<div class="card">'+
+      '<div class="card-header"><h3>Training Centre Durations</h3><span style="font-size:13px;color:var(--text-muted);">'+skillAreas.length+' centres</span></div>'+
+      '<div class="table-wrapper"><table><thead><tr><th>Training Centre</th><th>Level</th><th>Project</th><th>Start</th><th>End</th><th>Status</th><th>Actions</th></tr></thead><tbody>'+rows+'</tbody></table></div>'+
+    '</div>';
+}
+
+// Persist one centre's dates/level/project from the row inputs.
+function cdSaveCentre(id) {
+  if (currentRole !== 'admin') { alert('Only administrators can manage course durations.'); return; }
+  var sk = skillAreas.find(function(s){ return s.id === id; });
+  if (!sk) return;
+  var start = (document.getElementById('cdStart_'+id)||{}).value || '';
+  var end = (document.getElementById('cdEnd_'+id)||{}).value || '';
+  if (start && end && end < start) { alert('End date cannot be before the start date.'); return; }
+  sk.startDate = start;
+  sk.endDate = end;
+  sk.level = ((document.getElementById('cdLevel_'+id)||{}).value || '').trim();
+  sk.project = ((document.getElementById('cdProject_'+id)||{}).value || '').trim();
+  recomputeCourseStatuses(false);
+  saveState();
+  if (typeof refreshStudentDependentViews === 'function') { try { refreshStudentDependentViews(); } catch(e) {} }
+  renderCourseDurationPage();
+  showToast(sk.name + ' duration saved.');
+}
+
+// Apply the bulk fields to every centre (only non-empty fields).
+function cdBulkApply() {
+  if (currentRole !== 'admin') { alert('Only administrators can manage course durations.'); return; }
+  var start = (document.getElementById('cdBulkStart')||{}).value || '';
+  var end = (document.getElementById('cdBulkEnd')||{}).value || '';
+  var level = ((document.getElementById('cdBulkLevel')||{}).value || '').trim();
+  var project = ((document.getElementById('cdBulkProject')||{}).value || '').trim();
+  if (start && end && end < start) { alert('End date cannot be before the start date.'); return; }
+  if (!start && !end && !level && !project) { alert('Fill at least one field to apply.'); return; }
+  if (!confirm('Apply the filled fields to ALL ' + skillAreas.length + ' training centres?')) return;
+  skillAreas.forEach(function(sk){
+    if (start) sk.startDate = start;
+    if (end) sk.endDate = end;
+    if (level) sk.level = level;
+    if (project) sk.project = project;
+  });
+  recomputeCourseStatuses(false);
+  saveState();
+  if (typeof refreshStudentDependentViews === 'function') { try { refreshStudentDependentViews(); } catch(e) {} }
+  renderCourseDurationPage();
+  showToast('Duration applied to all centres.');
+  addNotification('Course durations updated for all training centres', 'system', null, ['admin']);
+}
+
+// Grant a temporary instructor reopen permission (half / full day).
+function cdGrantPermission(id, type) {
+  if (currentRole !== 'admin') { alert('Only administrators can grant register permissions.'); return; }
+  var sk = skillAreas.find(function(s){ return s.id === id; });
+  if (!sk) return;
+  if (!Array.isArray(sk.instructorPermissions)) sk.instructorPermissions = [];
+  var nowMs = Date.now();
+  sk.instructorPermissions.push({
+    grantedAtMs: nowMs,
+    expiresAtMs: CESTISCore.courseDuration.grantExpiry(nowMs, type === 'half' ? 'half' : 'full'),
+    type: type === 'half' ? 'half' : 'full',
+    grantedBy: (currentLoggedInUser && currentLoggedInUser.name) || 'Administrator'
+  });
+  saveState();
+  renderCourseDurationPage();
+  var label = type === 'half' ? 'half-day' : 'one-day';
+  showToast(sk.name + ': register reopened for a ' + label + ' window.');
+  addNotification('Register reopened (' + label + ') for ' + sk.name, 'attendance', null, ['admin','instructor']);
+}
+
+// Revoke all active reopen permissions for a centre (closes the register now).
+function cdRevokePermissions(id) {
+  if (currentRole !== 'admin') { alert('Only administrators can manage register permissions.'); return; }
+  var sk = skillAreas.find(function(s){ return s.id === id; });
+  if (!sk) return;
+  sk.instructorPermissions = [];
+  saveState();
+  renderCourseDurationPage();
+  showToast(sk.name + ': register permissions revoked.');
+}
+
 function initTrainingAdminControls() {
   var ctrl = document.getElementById('trainingAdminControls');
   if(ctrl && currentRole === 'admin') {
@@ -16116,7 +16392,12 @@ function addTrainingCentre() {
     color: color,
     students: 0,
     materials: 0,
-    desc: desc
+    desc: desc,
+    startDate: '',
+    endDate: '',
+    level: '',
+    project: '',
+    instructorPermissions: []
   });
   closeModal('addCentreModal');
   document.getElementById('newCentreName').value = '';
@@ -17887,11 +18168,16 @@ function renderAttendancePage() {
     return false;
   });
   const days = ['Mon','Tue','Wed','Thu','Fri'];
+  // Which courses in view have a CLOSED register (course ended, no permission)?
+  var closedCourses = {};
   tbody.innerHTML = records.map((r,idx) => {
-    return `<tr><td><strong>${r.studentName}</strong></td><td style="font-family:monospace;font-size:12px;">${r.studentId}</td><td>${r.course}</td>
+    var open = isRegisterOpenForCourse(r.course);
+    if(!open && r.course) closedCourses[r.course] = true;
+    var lockBadge = open ? '' : ' <span title="Course ended — register closed" style="font-size:10px;color:#e74c3c;font-weight:700;">🔒</span>';
+    return `<tr${open?'':' style="opacity:.7;"'}><td><strong>${r.studentName}</strong></td><td style="font-family:monospace;font-size:12px;">${r.studentId}</td><td>${r.course}${lockBadge}</td>
     ${days.map(d => {
       const st = r.days[d];
-      return `<td><select class="form-control" style="width:90px;padding:4px 6px;font-size:11px;" data-sid="${r.studentId}" data-day="${d}" onchange="updateAttendanceCell(this)">
+      return `<td><select class="form-control" style="width:90px;padding:4px 6px;font-size:11px;" data-sid="${r.studentId}" data-day="${d}" onchange="updateAttendanceCell(this)" ${open?'':'disabled'}>
         <option value="present" ${st==='present'?'selected':''}>Present</option>
         <option value="absent" ${st==='absent'?'selected':''}>Absent</option>
         <option value="late" ${st==='late'?'selected':''}>Late</option>
@@ -17900,8 +18186,27 @@ function renderAttendancePage() {
   }).join('');
   const countEl = document.getElementById('attCount');
   if(countEl) countEl.textContent = `${records.length} students`;
+  renderAttendanceLockBanner(Object.keys(closedCourses));
   renderAttendanceSummary(records);
   renderWeeklyAttChart(records);
+}
+
+// Show/refresh a banner above the register listing any closed (ended) courses.
+function renderAttendanceLockBanner(closedCourseNames) {
+  var host = document.getElementById('attendanceSummary');
+  if(!host) return;
+  var existing = document.getElementById('attendanceLockBanner');
+  if(existing) existing.remove();
+  if(!closedCourseNames || !closedCourseNames.length) return;
+  var banner = document.createElement('div');
+  banner.id = 'attendanceLockBanner';
+  banner.style.cssText = 'margin:0 0 14px;padding:12px 16px;border-radius:10px;background:rgba(231,76,60,.12);border:1px solid rgba(231,76,60,.35);color:var(--text-primary);font-size:13px;';
+  banner.innerHTML = '🔒 <strong>Register closed</strong> for ended course'+(closedCourseNames.length>1?'s':'')+': '+
+    closedCourseNames.map(function(c){return escapeHtml(c);}).join(', ')+
+    '. '+(currentRole==='admin'
+      ? 'Extend the end date or grant a ½-day / 1-day window on the <a href="#" onclick="showPage(\'course-duration\');return false;" style="color:var(--accent);font-weight:600;">Course Duration</a> page to reopen.'
+      : 'Ask an administrator to extend the course or grant a reopen permission.');
+  host.parentNode.insertBefore(banner, host);
 }
 
 function renderAttendanceSummary(records) {
@@ -17955,6 +18260,14 @@ function updateAttendanceCell(sel) {
   const sid = sel.getAttribute('data-sid');
   const day = sel.getAttribute('data-day');
   const rec = attendanceRecords.find(r=>r.studentId===sid);
+  // Guard: the register is closed once a course has ended (unless an admin has
+  // extended it or granted a reopen permission). Revert the change and warn.
+  if(rec && !isRegisterOpenForCourse(rec.course)) {
+    showToast('Register closed — ' + rec.course + ' has ended. Ask an admin to reopen it.');
+    sel.value = rec.days[day];
+    renderAttendancePage();
+    return;
+  }
   if(rec) rec.days[day] = sel.value;
   // Keep the student's stored attendance % in step with the marking so every
   // page that reads students[].attendance reflects it.

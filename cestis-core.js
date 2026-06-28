@@ -902,6 +902,74 @@
     };
   };
 
+  /* ============================== COURSE DURATION ============================
+     Every training centre / course carries a start and end date. Course-scoped
+     activity (the attendance register first and foremost, plus tests, fee entry,
+     certification, etc.) is "open" only while the course is running — OR when an
+     instructor has been granted a temporary, time-boxed reopen permission
+     (half-day = 12h, full-day = 24h from the grant instant). When a course has
+     ended, students who were never certified become Not-Yet-Competent (NYC).
+
+     These helpers are PURE (dates/timestamps passed in, or defaulted to "now")
+     so they are unit-testable without a browser and shared by every page.
+     ------------------------------------------------------------------------- */
+  var COURSE_DAY_MS = 24 * 60 * 60 * 1000;
+  Core.courseDuration = (function () {
+    function normDate(s) {
+      return (typeof s === 'string' && /^\d{4}-\d{2}-\d{2}/.test(s)) ? s.slice(0, 10) : '';
+    }
+    function todayStr(injected) {
+      if (injected) return normDate(injected);
+      var d = new Date();
+      var mo = String(d.getMonth() + 1), da = String(d.getDate());
+      return d.getFullYear() + '-' + (mo.length < 2 ? '0' + mo : mo) + '-' + (da.length < 2 ? '0' + da : da);
+    }
+    // 'no-dates' | 'not-started' | 'active' | 'ended'
+    function status(startDate, endDate, today) {
+      var t = todayStr(today), s = normDate(startDate), e = normDate(endDate);
+      if (!s && !e) return 'no-dates';
+      if (s && t < s) return 'not-started';
+      if (e && t > e) return 'ended';
+      return 'active';
+    }
+    // A course with no dates is treated as open (never blocks) until dates are set.
+    function isActive(startDate, endDate, today) {
+      var st = status(startDate, endDate, today);
+      return st === 'active' || st === 'no-dates';
+    }
+    // Expiry timestamp (ms) for a freshly-granted reopen permission.
+    function grantExpiry(nowMs, type) {
+      return nowMs + (type === 'half' ? (COURSE_DAY_MS / 2) : COURSE_DAY_MS);
+    }
+    // Any unexpired instructor reopen permission? permissions: [{expiresAtMs}]
+    function permissionActiveAt(permissions, nowMs) {
+      if (!permissions || !permissions.length) return false;
+      var now = (typeof nowMs === 'number') ? nowMs : Date.now();
+      for (var i = 0; i < permissions.length; i++) {
+        var p = permissions[i];
+        if (p && typeof p.expiresAtMs === 'number' && p.expiresAtMs > now) return true;
+      }
+      return false;
+    }
+    // course = { startDate, endDate, instructorPermissions:[{expiresAtMs}] }
+    function isRegisterOpen(course, today, nowMs) {
+      if (!course) return true;
+      if (isActive(course.startDate, course.endDate, today)) return true;
+      return permissionActiveAt(course.instructorPermissions, nowMs);
+    }
+    // Drop permissions that have already expired (housekeeping before persist).
+    function prunePermissions(permissions, nowMs) {
+      if (!permissions || !permissions.length) return [];
+      var now = (typeof nowMs === 'number') ? nowMs : Date.now();
+      return permissions.filter(function (p) { return p && typeof p.expiresAtMs === 'number' && p.expiresAtMs > now; });
+    }
+    return {
+      normDate: normDate, todayStr: todayStr, status: status, isActive: isActive,
+      grantExpiry: grantExpiry, permissionActiveAt: permissionActiveAt,
+      isRegisterOpen: isRegisterOpen, prunePermissions: prunePermissions
+    };
+  })();
+
   root.CESTISCore = Core;
 
   if (typeof module !== 'undefined' && module.exports) {
