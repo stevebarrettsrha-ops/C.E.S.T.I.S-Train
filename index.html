@@ -8053,6 +8053,8 @@ function buildAdminSidebar() {
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/></svg>Training Centres</div>
     <div class="nav-item" data-page="course-duration" onclick="showPage('course-duration')">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/><path d="M9 16l2 2 4-4"/></svg>Course Duration</div>
+    <div class="nav-item" data-page="enrolment-registers" onclick="showPage('enrolment-registers')">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/><polyline points="10 9 9 9 8 9"/></svg>Enrolment Registers</div>
     <div class="nav-item" data-page="a-resources" onclick="showPage('a-resources')">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/></svg>Resource Manager</div>
     <div class="nav-item" data-page="qual-plan" onclick="showPage('qual-plan')">
@@ -8560,7 +8562,7 @@ function showPage(pageId) {
   if(navItem) navItem.classList.add('active');
   const titles = {
     dashboard:'Dashboard',video:'Video Conference',students:'Student Progress',
-    training:'Training Centres','course-duration':'Course / Training Centre Duration','a-resources':'Resource Manager',exams:'Online Exams','import-exam':'Import Exam',certificates:'Certificate Tracking','cert-downloads':'Certificate Downloads',
+    training:'Training Centres','course-duration':'Course / Training Centre Duration','enrolment-registers':'Enrolment Registers','a-resources':'Resource Manager',exams:'Online Exams','import-exam':'Import Exam',certificates:'Certificate Tracking','cert-downloads':'Certificate Downloads',
     reports:'Reports & Analytics','verify-users':'Verify Users',settings:'Settings',
     attendance:'Attendance Management',announcements:'Announcements',calendar:'Calendar & Schedule',
     's-dashboard':'My Dashboard','s-video':'My Classes','s-progress':'My Progress',
@@ -8597,6 +8599,7 @@ function showPage(pageId) {
   // near the end of showPage), so no inline init is needed here.
   if(pageId === 'training') { initTrainingAdminControls(); renderSkills(); updateCentreCount(); }
   if(pageId === 'course-duration') { renderCourseDurationPage(); }
+  if(pageId === 'enrolment-registers') { renderEnrolmentRegistersPage(); }
   // Mount the inlined Time Tracking app into the active page (replaces the old iframe).
   if(pageId === 'timetracking' || pageId === 'i-timetracking' || pageId === 'as-timetracking'){
     if(typeof ttMountInto === 'function') ttMountInto(pageId);
@@ -8792,6 +8795,12 @@ function buildAdminPages() {
       </div>
     </div>
     <div id="skillDetailPage" style="display:none;"></div>
+  </section>
+
+  <!-- ENROLMENT REGISTERS -->
+  <section class="page" id="page-enrolment-registers">
+    <p style="color:var(--text-secondary);margin-bottom:20px;font-size:14px;">Download a printable HEART/NSTA-style CTI <strong>Enrolment Register</strong> (PDF) for any training centre. Each register is pre-filled with that course's enrolled students and details, with blank rows for completing by hand.</p>
+    <div id="enrolmentRegistersContent"></div>
   </section>
 
   <!-- COURSE / TRAINING CENTRE DURATION -->
@@ -16345,6 +16354,265 @@ function cdRevokePermissions(id) {
   saveState();
   renderCourseDurationPage();
   showToast(sk.name + ': register permissions revoked.');
+}
+
+// ============================== ENROLMENT REGISTERS (Admin) =================
+// Download a HEART/NSTA-style CTI enrolment register (PDF) for any training
+// centre. Course meta (Project / Skill / Level / Start / End) comes from the
+// duration fields; rows are the enrolled students, padded with blank lines so
+// the printed form can be completed by hand.
+
+function enrolFmtMonthYear(d) {
+  if (!d || !/^\d{4}-\d{2}-\d{2}/.test(d)) return d || '';
+  var months = ['January','February','March','April','May','June','July','August','September','October','November','December'];
+  var p = d.split('-');
+  return months[parseInt(p[1], 10) - 1] + ' ' + p[0];
+}
+
+function enrolStudentsForCentre(sk) {
+  if (typeof students === 'undefined' || !Array.isArray(students)) return [];
+  var list = students.filter(function(s){ return s && s.course && courseDurationRecord(s.course) === sk; });
+  list.sort(function(a, b){ return (a.name || '').localeCompare(b.name || ''); });
+  return list;
+}
+
+function enrolField(s, key) {
+  var prof = (typeof studentProfiles !== 'undefined' && studentProfiles[s.id]) || {};
+  switch (key) {
+    case 'name': return s.name || '';
+    case 'dob': return s.dob || '';
+    case 'gender': return s.gender || '';
+    case 'trn': return s.trn || s.TRN || '';
+    case 'address': return s.address || '';
+    case 'phone': return prof.phone || s.phone || '';
+    case 'nqs': return s.nqs || s.NQS || '';
+    case 'email': return prof.email || s.email || '';
+  }
+  return '';
+}
+
+function renderEnrolmentRegistersPage() {
+  var el = document.getElementById('enrolmentRegistersContent');
+  if (!el) return;
+  if (currentRole !== 'admin') { el.innerHTML = '<div class="card" style="padding:24px;">Only administrators can download enrolment registers.</div>'; return; }
+  normalizeCourseDurations();
+  var rows = skillAreas.map(function(sk) {
+    var enrolled = enrolStudentsForCentre(sk).length;
+    var meta = [];
+    if (sk.level) meta.push('Level ' + escapeHtml(sk.level));
+    if (sk.project) meta.push(escapeHtml(sk.project));
+    var dates = (sk.startDate || sk.endDate)
+      ? ((enrolFmtMonthYear(sk.startDate) || '…') + ' – ' + (enrolFmtMonthYear(sk.endDate) || '…'))
+      : '<span style="color:var(--text-muted);">No dates set</span>';
+    return '<tr>' +
+      '<td><div style="display:flex;align-items:center;gap:8px;"><span style="font-size:18px;">' + (sk.icon || '📋') + '</span><strong>' + escapeHtml(sk.name) + '</strong></div>' +
+        (meta.length ? '<div style="font-size:11px;color:var(--text-muted);">' + meta.join(' · ') + '</div>' : '') + '</td>' +
+      '<td style="font-size:12px;">' + dates + '</td>' +
+      '<td style="text-align:center;">' + enrolled + '</td>' +
+      '<td><button class="btn btn-sm btn-primary" style="font-size:12px;" onclick="generateEnrolmentRegisterPDF(' + sk.id + ')">📄 Download PDF</button></td>' +
+    '</tr>';
+  }).join('');
+  el.innerHTML =
+    '<div class="card" style="margin-bottom:16px;"><div style="padding:14px 16px;display:flex;flex-wrap:wrap;gap:12px;align-items:center;justify-content:space-between;">' +
+      '<div style="font-size:13px;color:var(--text-muted);max-width:680px;">Each register is a printable HEART/NSTA-style CTI form. Set a centre\'s Skill, Level, Project and dates on the <a href="#" onclick="showPage(\'course-duration\');return false;" style="color:var(--accent);font-weight:600;">Course Duration</a> page; enrolled students are listed automatically and blank rows are added for handwriting.</div>' +
+      '<button class="btn btn-primary" onclick="downloadAllEnrolmentRegisters()">⬇ Download All</button>' +
+    '</div></div>' +
+    '<div class="card"><div class="card-header"><h3>Training Centres</h3><span style="font-size:13px;color:var(--text-muted);">' + skillAreas.length + ' centres</span></div>' +
+    '<div class="table-wrapper"><table><thead><tr><th>Training Centre</th><th>Duration</th><th style="text-align:center;">Enrolled</th><th>Register</th></tr></thead><tbody>' + rows + '</tbody></table></div></div>';
+}
+
+function downloadAllEnrolmentRegisters() {
+  if (currentRole !== 'admin') { alert('Only administrators can download enrolment registers.'); return; }
+  if (!skillAreas.length) return;
+  if (!confirm('Generate and download an enrolment register PDF for all ' + skillAreas.length + ' training centres?')) return;
+  var i = 0;
+  (function next(){
+    if (i >= skillAreas.length) { showToast('All enrolment registers downloaded.'); return; }
+    try { generateEnrolmentRegisterPDF(skillAreas[i].id); } catch (e) { console.warn('[EnrolReg] failed for', skillAreas[i] && skillAreas[i].name, e); }
+    i++;
+    setTimeout(next, 900); // space out so the browser does not block the downloads
+  })();
+}
+
+// Lazy-load jsPDF (same CDN as certificates) then build the register.
+function generateEnrolmentRegisterPDF(skillAreaId) {
+  if (currentRole !== 'admin') { alert('Only administrators can download enrolment registers.'); return; }
+  var sk = skillAreas.find(function(s){ return s.id === skillAreaId; });
+  if (!sk) return;
+  if (!window.jspdf || !window.jspdf.jsPDF) {
+    showToast('Loading PDF library, please wait...');
+    var script = document.createElement('script');
+    script.src = 'https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js';
+    script.onload = function(){ generateEnrolmentRegisterPDF(skillAreaId); };
+    script.onerror = function(){ showToast('Failed to load PDF library. Check your internet connection.'); };
+    document.head.appendChild(script);
+    return;
+  }
+  try { _buildEnrolmentRegisterPDF(sk); }
+  catch (e) { console.error('[EnrolReg] build error', e); showToast('Could not generate the register PDF.'); }
+}
+
+function _buildEnrolmentRegisterPDF(sk) {
+  var jsPDF = window.jspdf.jsPDF;
+  var doc = new jsPDF({ orientation: 'landscape', unit: 'mm', format: 'a4' });
+  var pageW = 297, pageH = 210, margin = 10;
+
+  var COLS = [
+    { key:'name',    title:'Full Name (Last, First, Middle)', w:46, align:'left' },
+    { key:'dob',     title:'D.O.B',   w:22, align:'center' },
+    { key:'gender',  title:'Gender',  w:20, align:'center' },
+    { key:'trn',     title:'TRN',     w:28, align:'center' },
+    { key:'address', title:'Address', w:54, align:'left' },
+    { key:'phone',   title:'Phone#',  w:44, align:'left' },
+    { key:'nqs',     title:'NQS#',    w:20, align:'center' },
+    { key:'email',   title:'Email Address', w:43, align:'left' }
+  ];
+
+  var roster = enrolStudentsForCentre(sk);
+  var rows = roster.map(function(s){ return COLS.map(function(c){ return enrolField(s, c.key); }); });
+  var minRows = 15;
+  while (rows.length < minRows) rows.push(COLS.map(function(){ return ''; }));
+
+  var lineH = 3.4, fontSize = 7.5, pad = 1.2;
+  function colX(i){ var x = margin; for (var j = 0; j < i; j++) x += COLS[j].w; return x; }
+
+  function drawHeaderArea() {
+    var y = 10;
+    // HEART / NSTA TRUST text logo (top-left)
+    doc.setTextColor(41,128,185); doc.setFont('helvetica','bold');
+    doc.setFontSize(13); doc.text('HEART', margin + 1, y + 1);
+    doc.text('NSTA', margin + 1, y + 7);
+    doc.setFontSize(5); doc.setTextColor(120); doc.text('T R U S T', margin + 1, y + 10.5);
+    // Centered title
+    doc.setTextColor(90); doc.setFont('times','normal'); doc.setFontSize(13);
+    doc.text('COMMUNITY TRAINING INTERVENTIONS', pageW / 2, y + 2, { align:'center' });
+    doc.setFont('times','bold'); doc.setFontSize(12);
+    doc.text('ENROLLMENT REGISTER', pageW / 2, y + 8, { align:'center' });
+    doc.setTextColor(0);
+
+    // Meta row
+    var my = y + 18;
+    function meta(label, value, x, valW) {
+      doc.setFont('helvetica','bold'); doc.setFontSize(9); doc.setTextColor(90);
+      doc.text(label, x, my);
+      var vx = x + doc.getTextWidth(label) + 2;
+      doc.setFont('helvetica','normal'); doc.setTextColor(60);
+      doc.text(String(value || ''), vx + 1, my - 0.5);
+      doc.setDrawColor(150); doc.line(vx, my + 1, vx + valW, my + 1);
+      doc.setTextColor(0);
+    }
+    meta('Project:', sk.project, margin, 55);
+    meta('Skill:', sk.name, margin + 80, 48);
+    meta('Level:', sk.level, margin + 140, 12);
+    meta('Start Date:', enrolFmtMonthYear(sk.startDate), margin + 168, 28);
+    meta('End Date:', enrolFmtMonthYear(sk.endDate), margin + 222, 30);
+
+    // Colour legend
+    var ly = my + 8, lx = margin;
+    doc.setFontSize(9); doc.setFont('helvetica','bolditalic');
+    function chip(text, bg, fg) {
+      var w = doc.getTextWidth(text) + 2;
+      if (bg) { doc.setFillColor(bg[0],bg[1],bg[2]); doc.rect(lx, ly - 3.2, w, 4.6, 'F'); }
+      doc.setTextColor(fg[0],fg[1],fg[2]); doc.text(text, lx + 1, ly); lx += w + 2;
+    }
+    chip('===============', [46,204,113], [0,0,0]);
+    chip('ATTENDEE', [46,204,113], [0,0,0]);
+    chip('ABSENTEE', [120,210,240], [0,0,0]);
+    chip('DROPOUTS', [231,76,60], [255,255,255]);
+    chip('NEW TRAINEES', [241,196,15], [0,0,0]);
+    chip('WORKING', [142,68,173], [255,255,255]);
+    doc.setTextColor(0);
+
+    // Alphabetical-order note
+    var ay = ly + 6;
+    doc.setFont('helvetica','bolditalic'); doc.setFontSize(9);
+    var note = 'Please Write Names in Alphabetical Order';
+    var nw = doc.getTextWidth(note) + 2;
+    doc.setFillColor(241,196,15); doc.rect(margin, ay - 3.2, nw, 4.8, 'F');
+    doc.setTextColor(0); doc.text(note, margin + 1, ay);
+
+    return ay + 4;
+  }
+
+  function drawTableHeader(y) {
+    doc.setFont('helvetica','bold'); doc.setFontSize(fontSize);
+    var wrapped = COLS.map(function(c){ return doc.splitTextToSize(c.title, c.w - pad * 2); });
+    var maxLines = wrapped.reduce(function(m, t){ return Math.max(m, t.length); }, 1);
+    var h = maxLines * lineH + pad * 2;
+    doc.setDrawColor(120);
+    for (var i = 0; i < COLS.length; i++) {
+      var x = colX(i);
+      // Re-set the fill on every cell: jsPDF's text drawing sets the fill colour
+      // to the text colour, so without this the cells after the first fill black.
+      doc.setFillColor(225,225,225);
+      doc.rect(x, y, COLS[i].w, h, 'FD');
+      doc.setTextColor(0);
+      var lines = wrapped[i], ty = y + pad + lineH - 0.8;
+      for (var k = 0; k < lines.length; k++) doc.text(lines[k], x + COLS[i].w / 2, ty + k * lineH, { align:'center' });
+    }
+    return y + h;
+  }
+
+  function rowHeight(cells) {
+    doc.setFont('helvetica','normal'); doc.setFontSize(fontSize);
+    var maxLines = 1;
+    for (var i = 0; i < COLS.length; i++) {
+      var t = doc.splitTextToSize(String(cells[i] || ''), COLS[i].w - pad * 2);
+      if (t.length > maxLines) maxLines = t.length;
+    }
+    return Math.max(7, maxLines * lineH + pad * 2);
+  }
+
+  function drawRow(y, cells) {
+    doc.setFont('helvetica','normal'); doc.setFontSize(fontSize); doc.setDrawColor(120); doc.setTextColor(0);
+    var h = rowHeight(cells);
+    for (var i = 0; i < COLS.length; i++) {
+      var x = colX(i);
+      doc.rect(x, y, COLS[i].w, h);
+      var t = doc.splitTextToSize(String(cells[i] || ''), COLS[i].w - pad * 2);
+      var ty = y + pad + lineH - 0.8;
+      for (var k = 0; k < t.length; k++) {
+        if (COLS[i].align === 'center') doc.text(t[k], x + COLS[i].w / 2, ty + k * lineH, { align:'center' });
+        else doc.text(t[k], x + pad, ty + k * lineH);
+      }
+    }
+    return y + h;
+  }
+
+  function drawFooter() {
+    var fy = pageH - margin - 8;
+    doc.setFont('helvetica','bold'); doc.setFontSize(8.5); doc.setTextColor(60);
+    doc.text('Declaration:', margin, fy);
+    var dw = doc.getTextWidth('Declaration:');
+    doc.setFont('helvetica','normal');
+    doc.text(' I declare that the information given on this form is accurate and complete.', margin + dw, fy);
+    var sy = fy + 7;
+    doc.text('Signature of Coordinator:', margin, sy);
+    doc.setDrawColor(120); doc.line(margin + 44, sy + 0.5, margin + 120, sy + 0.5);
+    doc.text('Date:', margin + 135, sy);
+    doc.line(margin + 146, sy + 0.5, margin + 200, sy + 0.5);
+    doc.setFontSize(6.5); doc.setTextColor(120);
+    doc.text('CTI/Enrollment Register/Version 3.0: 16/06/2020', margin, pageH - margin + 2);
+    doc.setTextColor(0);
+  }
+
+  var y = drawHeaderArea();
+  y = drawTableHeader(y);
+  for (var r = 0; r < rows.length; r++) {
+    var h = rowHeight(rows[r]);
+    if (y + h > pageH - margin - 4) { doc.addPage(); y = drawHeaderArea(); y = drawTableHeader(y); }
+    y = drawRow(y, rows[r]);
+  }
+  if (y > pageH - margin - 22) { doc.addPage(); y = drawHeaderArea(); }
+  drawFooter();
+
+  var safe = function(t){ return String(t || '').replace(/[^A-Za-z0-9]+/g, '_').replace(/^_+|_+$/g, ''); };
+  var fname = 'Enrolment_Register__' + safe(sk.name || 'Course') +
+    (sk.level ? ('__Level_' + safe(sk.level)) : '') +
+    (sk.startDate ? ('_' + safe(enrolFmtMonthYear(sk.startDate))) : '') +
+    (sk.endDate ? ('_to_' + safe(enrolFmtMonthYear(sk.endDate))) : '') + '.pdf';
+  doc.save(fname);
+  showToast('Enrolment register downloaded: ' + (sk.name || ''));
 }
 
 function initTrainingAdminControls() {
