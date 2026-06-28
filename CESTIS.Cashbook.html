@@ -5539,7 +5539,7 @@ function generateReport() {
             html += stickyTd(2, '', '', 'background:#4caf50;');
             html += stickyTd(3, '', '', 'background:#4caf50;');
             html += stickyTd(4, 'BALANCE', '', 'background:#4caf50;text-align:right;');
-            html += stickyTd(5, fmt(totalBudgetAllocated - totalSpent), 'amount', 'background:#4caf50;');
+            html += stickyTd(5, fmt(d.closingBalance), 'amount', 'background:#4caf50;');
             if (showMinor) {
                 budgetKeys.forEach(function(k) {
                     var bal = (BUDGET[k] || 0) - catSpent[k];
