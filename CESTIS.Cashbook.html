@@ -4057,12 +4057,17 @@ async function mergeFromCloud() {
             });
         }
 
-        // Merge staff members — add by name match (case-insensitive)
+        // Merge staff members — dedup by stable identity (id → username → name).
+        // Staff records use `fullName`, never `name`, so the old `s.name` key collapsed
+        // every record to '' and either dropped all incoming cloud staff (local non-empty)
+        // or duplicated them (local empty). Match the id/username dedup Clock-in & index.html use.
         if (Array.isArray(d.staffMembers)) {
-            var localStaffNames = staffMembers.map(function(s) { return (s.name || '').toLowerCase(); });
+            var localStaffKeys = new Set(staffMembers.map(function(s) { return s.id || s.username || (s.fullName || s.name || '').toLowerCase(); }));
             d.staffMembers.forEach(function(cloudStaff) {
-                if (!localStaffNames.includes((cloudStaff.name || '').toLowerCase())) {
+                var ck = cloudStaff.id || cloudStaff.username || (cloudStaff.fullName || cloudStaff.name || '').toLowerCase();
+                if (!localStaffKeys.has(ck)) {
                     staffMembers.push(cloudStaff);
+                    localStaffKeys.add(ck);
                     mergeStats.staffAdded++;
                 }
             });
@@ -4071,15 +4076,18 @@ async function mergeFromCloud() {
             }
         }
 
-        // Merge time records — add by matching on a composite key (date + staffId/name)
+        // Merge time records — dedup by unique session id (Clock-in writes id:'SESSION_<ts>').
+        // The old `date|staffId` key collapsed multiple same-day clock-in sessions for one
+        // person into a single record, dropping later sessions and undercounting hours.
         if (Array.isArray(d.timeRecords)) {
             var localRecordKeys = new Set(timeRecords.map(function(r) {
-                return (r.date || '') + '|' + (r.staffId || r.name || '');
+                return r.id || ((r.date || '') + '|' + (r.staffId || '') + '|' + (r.clockIn || ''));
             }));
             d.timeRecords.forEach(function(cloudRecord) {
-                var key = (cloudRecord.date || '') + '|' + (cloudRecord.staffId || cloudRecord.name || '');
+                var key = cloudRecord.id || ((cloudRecord.date || '') + '|' + (cloudRecord.staffId || '') + '|' + (cloudRecord.clockIn || ''));
                 if (!localRecordKeys.has(key)) {
                     timeRecords.push(cloudRecord);
+                    localRecordKeys.add(key);
                     mergeStats.timeRecordsAdded++;
                 }
             });
@@ -8540,12 +8548,14 @@ function silentMerge(backupData) {
         }
     }
 
-    // Merge staff members
+    // Merge staff members — dedup by stable identity (id → username → name); see note above.
     if (Array.isArray(d.staffMembers)) {
-        var localStaffNames = staffMembers.map(function(s) { return (s.name || '').toLowerCase(); });
+        var localStaffKeys = new Set(staffMembers.map(function(s) { return s.id || s.username || (s.fullName || s.name || '').toLowerCase(); }));
         d.staffMembers.forEach(function(cloudStaff) {
-            if (!localStaffNames.includes((cloudStaff.name || '').toLowerCase())) {
+            var ck = cloudStaff.id || cloudStaff.username || (cloudStaff.fullName || cloudStaff.name || '').toLowerCase();
+            if (!localStaffKeys.has(ck)) {
                 staffMembers.push(cloudStaff);
+                localStaffKeys.add(ck);
                 changed = true;
             }
         });
@@ -8554,15 +8564,16 @@ function silentMerge(backupData) {
         }
     }
 
-    // Merge time records
+    // Merge time records — dedup by unique session id; see note above.
     if (Array.isArray(d.timeRecords)) {
         var localRecordKeys = new Set(timeRecords.map(function(r) {
-            return (r.date || '') + '|' + (r.staffId || r.name || '');
+            return r.id || ((r.date || '') + '|' + (r.staffId || '') + '|' + (r.clockIn || ''));
         }));
         d.timeRecords.forEach(function(cloudRecord) {
-            var key = (cloudRecord.date || '') + '|' + (cloudRecord.staffId || cloudRecord.name || '');
+            var key = cloudRecord.id || ((cloudRecord.date || '') + '|' + (cloudRecord.staffId || '') + '|' + (cloudRecord.clockIn || ''));
             if (!localRecordKeys.has(key)) {
                 timeRecords.push(cloudRecord);
+                localRecordKeys.add(key);
             }
         });
         try { CESTISStore.setItem('cestisTimeRecords', JSON.stringify(timeRecords)); } catch(e) {}

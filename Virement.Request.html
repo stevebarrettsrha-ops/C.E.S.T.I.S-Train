@@ -1482,8 +1482,11 @@ const QUARTER_META = [
     { q:4, label:'Q4 Jan-Mar', shortLabel:'Jan-Mar', months:['jan','feb','mar'], monthNums:[1,2,3], monthNames:['January','February','March'] }
 ];
 
-// Active quarter state for the Virement Dashboard
-// Auto-detect current fiscal year: FY starts in April
+// Active quarter state for the Virement Dashboard.
+// Use the app-wide shared selection (cestis_active_quarter) so Virement opens on the
+// SAME financial quarter the user last selected in the Cashbook (and vice-versa),
+// instead of always defaulting to today's calendar quarter. Falls back to today only
+// when no shared selection exists and the shared engine is unavailable.
 const _now = new Date();
 const _curMonth = _now.getMonth() + 1;
 const _fyStart = _curMonth >= 4 ? _now.getFullYear() : _now.getFullYear() - 1;
@@ -1492,6 +1495,23 @@ let virementActiveFY = _fyStart + '/' + (_fyStart + 1);
 let virementActiveQ = _curMonth >= 4 && _curMonth <= 6 ? 1
     : _curMonth >= 7 && _curMonth <= 9 ? 2
     : _curMonth >= 10 && _curMonth <= 12 ? 3 : 4;
+try {
+    if (window.CESTISCore && typeof CESTISCore.getActiveQuarter === 'function') {
+        const _shared = CESTISCore.getActiveQuarter();
+        if (_shared && _shared.fy && _shared.q) {
+            virementActiveFY = _shared.fy;
+            virementActiveQ = parseInt(_shared.q, 10);
+        }
+    }
+} catch (e) {}
+// Persist the active quarter to the shared key so other pages follow Virement's switches.
+function persistActiveQuarter() {
+    try {
+        if (window.CESTISCore && typeof CESTISCore.setActiveQuarter === 'function') {
+            CESTISCore.setActiveQuarter(virementActiveFY, virementActiveQ);
+        }
+    } catch (e) {}
+}
 let budgetDataSource = 'no-data'; // 'no-data', 'cashbook-cloud'
 
 // Per-quarter cloud cache: stores budget data synced from Google Drive
@@ -1543,6 +1563,17 @@ function getCategoryMapping(catName) {
     // Auto-generate a stable id from the name (lowercase, spaces→underscore, strip punctuation)
     const id = catName.toLowerCase().replace(/[^a-z0-9]+/g, '_').replace(/^_+|_+$/g, '');
     return { id: id || 'cat_' + Math.abs(catName.split('').reduce((h, c) => (h * 31 + c.charCodeAt(0)) | 0, 0)), name: catName };
+}
+
+// Two distinct cashbook category names can slugify to the SAME auto-generated id
+// (e.g. "Admin" and "Admin Expenses" → "admin"). The budget build loops dedup by id,
+// which silently dropped the second colliding line and hid its allocation/spend.
+// Disambiguate so every distinct category keeps its own row and id.
+function uniqueBudgetId(baseId, seen) {
+    let id = baseId, n = 2;
+    while (seen.has(id)) { id = baseId + '_' + n; n++; }
+    seen.add(id);
+    return id;
 }
 
 function getQuarterMeta(q) { return QUARTER_META.find(m => m.q === q); }
@@ -1962,11 +1993,25 @@ function renderLivePreview() {
         }
     }
 
-    // Update budget source badge
+    // Update budget source badge — mirror updateQuarterDisplay() so live-synced
+    // Cashbook data isn't mislabeled "DEFAULT DATA" (it previously only recognised
+    // the cloud source, so real cashbook-local data showed the placeholder label).
     const badge = document.getElementById('budgetSourceBadgeLP');
     if (badge) {
-        badge.className = 'budget-source-badge ' + (budgetDataSource === 'cashbook-cloud' ? 'cloud' : 'default');
-        badge.textContent = budgetDataSource === 'cashbook-cloud' ? 'CLOUD DATA' : 'DEFAULT DATA';
+        const cachedCount = getCachedQuarterKeys().length;
+        if (budgetDataSource === 'cashbook-local') {
+            badge.textContent = 'SYNCED FROM CASHBOOK';
+            badge.className = 'budget-source-badge synced';
+        } else if (budgetDataSource === 'cashbook-cloud') {
+            badge.textContent = cachedCount > 1 ? 'SYNCED (' + cachedCount + ' QUARTERS)' : 'SYNCED FROM CLOUD';
+            badge.className = 'budget-source-badge cloud';
+        } else if (budgetDataSource === 'no-data') {
+            badge.textContent = cachedCount > 0 ? 'NO DATA (other quarters available)' : 'NO DATA';
+            badge.className = 'budget-source-badge no-data';
+        } else {
+            badge.textContent = 'DEFAULT DATA';
+            badge.className = 'budget-source-badge default';
+        }
     }
 
     // Calculate net virement effect per budget line
@@ -3398,6 +3443,7 @@ document.addEventListener('visibilitychange', function(){
 function switchVirementQuarter(q) {
     if (q === virementActiveQ) return;
     virementActiveQ = q;
+    persistActiveQuarter();
     // Update quarter tab buttons
     document.querySelectorAll('.quarter-tab-btn').forEach((btn, i) => {
         btn.classList.toggle('active', i + 1 === q);
@@ -3534,6 +3580,7 @@ function populateFYSelector() {
 function switchFiscalYear(fy) {
     if (fy === virementActiveFY) return;
     virementActiveFY = fy;
+    persistActiveQuarter();
     // Reload budget data for the new FY + current quarter
     loadBudgetForQuarter();
     updateVirementPeriod();
@@ -3626,30 +3673,24 @@ function loadBudgetForQuarter() {
         const seenIds = new Set();
         Object.keys(sourceBudget).forEach(catName => {
             const mapping = getCategoryMapping(catName);
-            if (!seenIds.has(mapping.id)) {
-                seenIds.add(mapping.id);
-                newBudgetData.push({
-                    id: mapping.id,
-                    name: mapping.name,
-                    allocated: sourceBudget[catName],
-                    actual: catSpend[catName] || 0
-                });
-            }
+            newBudgetData.push({
+                id: uniqueBudgetId(mapping.id, seenIds),
+                name: mapping.name,
+                allocated: sourceBudget[catName],
+                actual: catSpend[catName] || 0
+            });
         });
 
         // Add any categories with actual spend not already in budget
         Object.keys(catSpend).forEach(catName => {
             if (!sourceBudget.hasOwnProperty(catName)) {
                 const mapping = getCategoryMapping(catName);
-                if (!seenIds.has(mapping.id)) {
-                    seenIds.add(mapping.id);
-                    newBudgetData.push({
-                        id: mapping.id,
-                        name: mapping.name,
-                        allocated: 0,
-                        actual: catSpend[catName]
-                    });
-                }
+                newBudgetData.push({
+                    id: uniqueBudgetId(mapping.id, seenIds),
+                    name: mapping.name,
+                    allocated: 0,
+                    actual: catSpend[catName]
+                });
             }
         });
 
@@ -3683,23 +3724,17 @@ function loadBudgetForQuarter() {
             const seenIds2 = new Set();
             Object.keys(sourceBudget).forEach(function(catName) {
                 const mapping = getCategoryMapping(catName);
-                if (!seenIds2.has(mapping.id)) {
-                    seenIds2.add(mapping.id);
-                    newBudgetData.push({
-                        id: mapping.id,
-                        name: mapping.name,
-                        allocated: sourceBudget[catName],
-                        actual: catSpend[catName] || 0
-                    });
-                }
+                newBudgetData.push({
+                    id: uniqueBudgetId(mapping.id, seenIds2),
+                    name: mapping.name,
+                    allocated: sourceBudget[catName],
+                    actual: catSpend[catName] || 0
+                });
             });
             Object.keys(catSpend).forEach(function(catName) {
                 if (!sourceBudget.hasOwnProperty(catName)) {
                     const mapping = getCategoryMapping(catName);
-                    if (!seenIds2.has(mapping.id)) {
-                        seenIds2.add(mapping.id);
-                        newBudgetData.push({ id: mapping.id, name: mapping.name, allocated: 0, actual: catSpend[catName] });
-                    }
+                    newBudgetData.push({ id: uniqueBudgetId(mapping.id, seenIds2), name: mapping.name, allocated: 0, actual: catSpend[catName] });
                 }
             });
 
