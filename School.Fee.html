@@ -2248,11 +2248,12 @@
             <!-- Admin Controls -->
             <div id="feeStructureAdminControls" style="display: none; margin-bottom: 2rem;">
                 <div class="form-section">
-                    <h2>Add New Skill Area</h2>
+                    <h2>Set Programme Cost</h2>
+                    <p style="margin:0 0 1rem;color:var(--text-secondary);font-size:0.9rem;">Courses are created in <strong>VocTrain → Training Centres</strong>. Here, choose an <strong>active</strong> training centre and set its tuition cost. Ended courses are not listed.</p>
                     <div class="form-grid">
                         <div class="form-group">
-                            <label>Skill Area Name *</label>
-                            <input type="text" id="newSkillAreaName" placeholder="e.g., Digital Marketing">
+                            <label>Training Centre / Course * <span style="font-weight:400;font-size:0.8rem;color:var(--text-secondary);">(from VocTrain)</span></label>
+                            <select id="newSkillAreaName"><option value="">— Select Training Centre / Course —</option></select>
                         </div>
                         <div class="form-group">
                             <label>Total Tuition Fee ($) *</label>
@@ -2263,7 +2264,7 @@
                             <input type="number" id="newSkillAreaTerms" min="1" max="9" placeholder="e.g., 6">
                         </div>
                     </div>
-                    <button class="btn" onclick="addNewSkillArea()">➕ Add Skill Area</button>
+                    <button class="btn" onclick="addNewSkillArea()">➕ Add Programme Cost</button>
                 </div>
             </div>
             
@@ -2916,8 +2917,8 @@
             <div id="editFeeContent">
                 <div class="form-grid">
                     <div class="form-group">
-                        <label>Skill Area Name *</label>
-                        <input type="text" id="editFeeSkillArea" required>
+                        <label>Training Centre / Course <span style="font-weight:400;font-size:0.8rem;color:var(--text-secondary);">(managed in VocTrain)</span></label>
+                        <input type="text" id="editFeeSkillArea" readonly style="background:var(--bg-primary);opacity:0.75;cursor:not-allowed;">
                     </div>
                     <div class="form-group">
                         <label>Total Tuition Fee ($) *</label>
@@ -3857,17 +3858,26 @@
                 return;
             }
             
-            const name = document.getElementById('newSkillAreaName').value.trim().toUpperCase();
+            // Course name comes from the VocTrain training-centre dropdown — no
+            // free-text course creation here. Use the name verbatim so the fee key
+            // matches the LMS course name (and therefore students' skillArea).
+            const name = document.getElementById('newSkillAreaName').value.trim();
             const fee = parseFloat(document.getElementById('newSkillAreaFee').value);
             const termCount = parseInt(document.getElementById('newSkillAreaTerms').value);
-            
-            if (!name || !fee || !termCount) {
-                alert('Please fill in all required fields');
+
+            if (!name) {
+                alert('Please select a training centre / course from VocTrain.');
                 return;
             }
-            
-            if (feeStructure[name]) {
-                alert('❌ This skill area already exists. Please use Edit to modify it.');
+            if (!fee || !termCount) {
+                alert('Please fill in the Total Tuition Fee and Number of Terms.');
+                return;
+            }
+
+            // Case-insensitive duplicate guard (legacy keys may be upper-cased).
+            var _existsKey = Object.keys(feeStructure).find(function(k){ return k.toLowerCase().trim() === name.toLowerCase().trim(); });
+            if (_existsKey) {
+                alert('❌ A cost is already set for "' + _existsKey + '". Use Edit to modify it.');
                 return;
             }
             
@@ -3900,16 +3910,58 @@
             feeStructure[name] = { total: fee, terms: terms };
             saveFeeStructure();
             renderFeeStructure();
-            
+
             // Clear form
-            document.getElementById('newSkillAreaName').value = '';
             document.getElementById('newSkillAreaFee').value = '';
             document.getElementById('newSkillAreaTerms').value = '';
-            
+            populateSkillAreaCourseDropdown(); // refresh: the just-priced course drops off the list
+
             // Update skill area dropdown in student form
             updateSkillAreaOptions();
-            
-            alert('✅ Skill area added successfully!');
+
+            alert('✅ Programme cost added for "' + name + '"!');
+        }
+
+        // Active VocTrain training centres/courses (durations live on the LMS
+        // skillAreas, shared via voctrain_skillAreas). Excludes ended courses.
+        function getVoctrainActiveCourses() {
+            try {
+                var raw = CESTISStore.getItem('voctrain_skillAreas');
+                var areas = raw ? JSON.parse(raw) : [];
+                if (!Array.isArray(areas)) return [];
+                return areas.filter(function(s){
+                    if (!s || !s.name) return false;
+                    if (typeof CESTISCore !== 'undefined' && CESTISCore.courseDuration) {
+                        return CESTISCore.courseDuration.status(s.startDate, s.endDate) !== 'ended';
+                    }
+                    return true;
+                });
+            } catch (e) { return []; }
+        }
+
+        // Fill the "Set Programme Cost" dropdown with active VocTrain courses that
+        // do not yet have a fee/cost (already-priced ones are managed via Edit).
+        function populateSkillAreaCourseDropdown() {
+            var sel = document.getElementById('newSkillAreaName');
+            if (!sel || sel.tagName !== 'SELECT') return;
+            var prev = sel.value;
+            var priced = {};
+            Object.keys(feeStructure || {}).forEach(function(k){ priced[k.toLowerCase().trim()] = true; });
+            var avail = getVoctrainActiveCourses().filter(function(c){ return !priced[c.name.toLowerCase().trim()]; });
+            if (!avail.length) {
+                sel.innerHTML = '<option value="">— No unpriced active courses (create one in VocTrain) —</option>';
+                sel.disabled = true;
+                return;
+            }
+            sel.disabled = false;
+            sel.innerHTML = '<option value="">— Select Training Centre / Course —</option>' +
+                avail.map(function(c){
+                    var st = (typeof CESTISCore !== 'undefined' && CESTISCore.courseDuration) ? CESTISCore.courseDuration.status(c.startDate, c.endDate) : '';
+                    var tag = st === 'not-started' ? ' (not started)' : (st === 'no-dates' ? ' (no dates)' : '');
+                    var nm = String(c.name).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/"/g,'&quot;');
+                    return '<option value="' + nm + '">' + nm + tag + '</option>';
+                }).join('');
+            if (prev) { sel.value = prev; }
         }
 
         // Edit fee structure
@@ -3944,12 +3996,15 @@
                 return;
             }
             
-            const newName = document.getElementById('editFeeSkillArea').value.trim().toUpperCase();
+            // The course name is owned by VocTrain and is NOT editable here — only
+            // the cost/terms change. Keep the existing key verbatim (no rename, no
+            // case change) so it stays aligned with the LMS course name.
+            const newName = editingFeeSkillArea;
             const fee = parseFloat(document.getElementById('editFeeTotalFee').value);
             const termCount = parseInt(document.getElementById('editFeeTermCount').value);
-            
-            if (!newName || !fee || !termCount) {
-                alert('Please fill in all required fields');
+
+            if (!fee || !termCount) {
+                alert('Please fill in the Total Tuition Fee and Number of Terms.');
                 return;
             }
             
@@ -6681,7 +6736,8 @@
         function renderFeeStructure() {
             const tbody = document.getElementById('feeStructureBody');
             tbody.innerHTML = '';
-            
+            try { populateSkillAreaCourseDropdown(); } catch (e) {}
+
             const isAdmin = currentUser && currentUser.role === 'Admin';
             const actionsHeader = document.getElementById('feeStructureActionsHeader');
             
