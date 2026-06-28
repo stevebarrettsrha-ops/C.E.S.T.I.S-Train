@@ -1384,13 +1384,37 @@ function _mergeFromLocalStorage(){
         }
       });
     }
-    // Merge payroll runs: add any from localStorage not in memory (by date)
+    // Merge payroll runs: add new runs AND merge results within existing runs.
+    // This is critical: syncSalaryToPayslip (cashbook) writes results into an
+    // existing run's results array directly in storage. Without merging results
+    // here, those entries would be overwritten the next time saveStore() fires.
     if(storedData.payrollRuns&&Array.isArray(storedData.payrollRuns)){
       var memDates=DATA.payrollRuns.map(function(r){return r.date;});
-      storedData.payrollRuns.forEach(function(run){
-        if(!memDates.includes(run.date)){
-          DATA.payrollRuns.push(run);
-          memDates.push(run.date);
+      storedData.payrollRuns.forEach(function(storedRun){
+        var existingRun=DATA.payrollRuns.find(function(r){return r.date===storedRun.date;});
+        if(!existingRun){
+          // Entirely new run — add it
+          DATA.payrollRuns.push(storedRun);
+        } else {
+          // Run already in memory — merge results so cashbook-synced entries
+          // are not lost when saveStore() is called before the user opens the
+          // Payslips tab (which is the only other place _mergeDataIntoLocal runs).
+          if(Array.isArray(storedRun.results)){
+            if(!Array.isArray(existingRun.results))existingRun.results=[];
+            storedRun.results.forEach(function(sr){
+              if(!sr||!sr.empName)return;
+              var key=sr.empName.trim().toLowerCase();
+              var local=existingRun.results.find(function(lr){return (lr.empName||'').trim().toLowerCase()===key;});
+              if(!local){
+                existingRun.results.push(Object.assign({},sr));
+              } else if(sr.cashbookSynced&&!local.cashbookSynced){
+                // Cashbook wrote a net-pay entry; local doesn't have it yet — update
+                Object.keys(sr).forEach(function(k){
+                  if(sr[k]!==undefined&&sr[k]!==null&&sr[k]!=='')local[k]=sr[k];
+                });
+              }
+            });
+          }
         }
       });
     }
@@ -1527,7 +1551,11 @@ function _updateHighWaterMark(){
 function _isSuspiciousDataLoss(){
   var hw=_getHighWaterMark();
   var e=Array.isArray(DATA.employees)?DATA.employees.length:0;
-  return hw.employees>0 && e===0;
+  var p=Array.isArray(DATA.payrollRuns)?DATA.payrollRuns.length:0;
+  // Suspicious if we've ever had employees AND both arrays are now empty.
+  // Checking both prevents a false-positive block when employees were
+  // deliberately deleted (runs are also purged at that point, so both = 0).
+  return hw.employees>0 && e===0 && p===0;
 }
 
 function saveStore(){
@@ -1654,11 +1682,37 @@ function restoreFromBackup(){
 // so the same safety guards (high-water mark, empty-refusal, backup copy)
 // apply — a last-second tab close can never flush an empty DATA over the
 // real localStorage contents.
-window.addEventListener('beforeunload',function(){
+window.addEventListener('beforeunload',function(e){
   try{
     var currentHash=_dataHash(DATA);
-    if(_dataDirty||currentHash!==_lastSaveHash){
-      saveStore();
+    var isDirty=_dataDirty||currentHash!==_lastSaveHash;
+    if(isDirty){ saveStore(); }
+
+    // Best-effort cloud push on close. Uses sendBeacon so it fires even as
+    // the page tears down. Only runs if cloud is connected, the initial merge
+    // has completed (so we never push empty data), and data is not suspicious.
+    if(isDirty && _cloudMergeCompleted && !_isSuspiciousDataLoss()
+        && typeof isCloudConnected!=='undefined' && isCloudConnected
+        && typeof googleAccessToken!=='undefined' && googleAccessToken
+        && typeof GOOGLE_DRIVE_CONFIG!=='undefined' && cloudFileId){
+      try{
+        var payload=JSON.stringify({
+          version:'1.1',
+          timestamp:new Date().toISOString(),
+          savedBy:(typeof currentUser!=='undefined'&&currentUser)?currentUser.displayName:'Dashboard User',
+          data:DATA
+        });
+        // Drive v3 update endpoint — sendBeacon fires the request as the page closes
+        var url='https://www.googleapis.com/upload/drive/v3/files/'+cloudFileId+'?uploadType=media';
+        var blob=new Blob([payload],{type:'application/json'});
+        navigator.sendBeacon(url+'&access_token='+encodeURIComponent(googleAccessToken),blob);
+      }catch(_){}
+    }
+
+    // Warn if SO1 table has unsaved data
+    if(typeof so1Rows!=='undefined' && so1Rows.length>0){
+      e.preventDefault();
+      e.returnValue='You have an unsaved SO1 Schedule A table. Download it before leaving?';
     }
   }catch(e){}
 });
@@ -2346,12 +2400,19 @@ function recalculateExistingPayroll(runIdx){
 
 // ==================== PAYSLIPS ====================
 function populatePayslipSelects(){
-  // Re-merge from storage so cashbook-synced entries are visible immediately
+  // Re-merge from storage so cashbook-synced entries are visible immediately,
+  // then immediately persist so any merged data survives the next saveStore() call.
   try {
     const fresh = CESTISStore.getItem('cestisPayroll');
     if (fresh) {
       const parsed = JSON.parse(fresh);
-      if (parsed && Array.isArray(parsed.employees)) _mergeDataIntoLocal(parsed);
+      if (parsed && Array.isArray(parsed.employees)) {
+        const summary = _mergeDataIntoLocal(parsed);
+        if (summary.addedEmployees > 0 || summary.addedRuns > 0 || summary.updatedRuns > 0) {
+          markDataDirty();
+          saveStore();
+        }
+      }
     }
   } catch(e) {}
   const empSel=document.getElementById('payslipEmployee');
