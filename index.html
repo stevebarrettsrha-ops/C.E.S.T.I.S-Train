@@ -30996,12 +30996,20 @@ function checkCertificatePublic() {
       '<p style="font-size:13px;color:var(--text-muted);margin-top:4px;">To download your certificate, please search using your <strong>Student ID Number</strong> instead.</p>';
   }
 
+  // Privacy: only reveal the Student ID when the search was BY student ID (the
+  // student looking up their own record to download). For certificate-number
+  // lookups (employer verification) the Student ID is withheld — the employer
+  // only confirms the certificate is genuine, and cannot download it.
+  var studentIdRow = searchedByStudentId
+    ? '<div class="cert-detail-item"><div class="label">Student ID</div><div class="value">' + student.id + '</div></div>'
+    : '';
+
   resultDiv.innerHTML = '<div class="cert-result-card success">' +
     '<div class="cert-result-header"><div class="cert-result-icon" style="background:rgba(46,204,113,0.15);color:var(--green);">&#10003;</div>' +
     '<div><div style="font-size:16px;font-weight:700;color:var(--green);">Certificate Verified</div>' +
     '<div style="font-size:12px;color:var(--text-muted);">' + student.name + '</div></div></div>' +
     '<div class="cert-result-details">' +
-    '<div class="cert-detail-item"><div class="label">Student ID</div><div class="value">' + student.id + '</div></div>' +
+    studentIdRow +
     '<div class="cert-detail-item"><div class="label">Certificate No.</div><div class="value" style="font-family:monospace;">' + student.certNo + '</div></div>' +
     '<div class="cert-detail-item"><div class="label">Programme</div><div class="value">' + student.course + '</div></div>' +
     '<div class="cert-detail-item"><div class="label">Date Certified</div><div class="value">' + student.certDate + '</div></div>' +
@@ -31028,9 +31036,53 @@ function _certDownloadStatus(msg, isError) {
   }
 }
 
+// A certificate download is only allowed after an ACTUAL cloud sync, so the
+// download is always recorded centrally (downloadCount/lastDownloaded pushed to
+// the cloud). "Synced" = the public verifier pulled the latest from Drive, OR a
+// cloud-connected login sync completed. A purely-local session (no cloud) is not
+// treated as synced.
+function certSyncDone() {
+  if (_certDriveLastFetched) return true;
+  if (typeof isCloudConnected !== 'undefined' && isCloudConnected &&
+      typeof loginSyncCompleted !== 'undefined' && loginSyncCompleted) return true;
+  return false;
+}
+
+function _certHasCloudToken() {
+  if (typeof googleAccessToken !== 'undefined' && googleAccessToken) return true;
+  try {
+    var t = CESTISStore.getItem('schoolDashboardGoogleAccessToken');
+    var e = CESTISStore.getItem('schoolDashboardGoogleTokenExpiry');
+    return !!(t && e && new Date(e) > new Date());
+  } catch (x) { return false; }
+}
+
 function generateCertificatePDF(studentId) {
   var student = students.find(function(s){ return s.id === studentId; });
   if(!student || !student.certNo) { showToast('Certificate not found'); _certDownloadStatus('Certificate not found.', true); return; }
+
+  // Gate: require a cloud sync first so every download is recorded centrally.
+  if(!certSyncDone()) {
+    var dlBtnG = document.getElementById('certPublicDownloadBtn');
+    if(_certHasCloudToken() && !_certDriveFetchInProgress) {
+      // We can sync silently — pull the latest, then retry the download.
+      if(dlBtnG) dlBtnG.disabled = true;
+      _certDownloadStatus('Syncing with the cloud before download (this records your download)…', false);
+      _certDriveLastFetched = null; // force a fresh pull
+      Promise.resolve(fetchCertDataFromDrive()).then(function(){
+        if(dlBtnG) dlBtnG.disabled = false;
+        if(certSyncDone()) { generateCertificatePDF(studentId); }
+        else { _certDownloadStatus('Could not sync with the cloud. Please use “Sync Now” at the top of the login page, then try again.', true); }
+      }).catch(function(){
+        if(dlBtnG) dlBtnG.disabled = false;
+        _certDownloadStatus('Could not sync with the cloud. Please use “Sync Now” at the top of the login page, then try again.', true);
+      });
+    } else {
+      showToast('Please sync before downloading your certificate.');
+      _certDownloadStatus('Please use “Sync Now” at the top of the login page to sync with the cloud, then download. Syncing ensures every certificate download is recorded.', true);
+    }
+    return;
+  }
 
   // Disable download button for visual feedback
   var dlBtn = document.getElementById('certPublicDownloadBtn');
