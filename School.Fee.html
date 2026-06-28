@@ -6714,6 +6714,12 @@
 
         // Initialize Charts
         function initializeCharts() {
+            // Defensive: if Chart.js failed to load (CDN blocked / offline), skip
+            // chart rendering instead of throwing. updateDashboard() runs during
+            // page init BEFORE mountSchoolFeeQuarterBar() and the other control
+            // wiring, so an uncaught error here would abort init and leave the
+            // quarterly payment filter (and more) dead. Charts are non-critical.
+            if (typeof Chart === 'undefined') return;
             const isDarkMode = document.body.classList.contains('dark-mode');
             const textColor = isDarkMode ? '#e0e0e0' : '#2C3E50';
             const gridColor = isDarkMode ? '#2d4059' : '#e0e0e0';
