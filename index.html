@@ -16391,11 +16391,28 @@ function enrolField(s, key) {
   return '';
 }
 
+var _enrolOpenRoster = null;
 function renderEnrolmentRegistersPage() {
   var el = document.getElementById('enrolmentRegistersContent');
   if (!el) return;
-  if (currentRole !== 'admin') { el.innerHTML = '<div class="card" style="padding:24px;">Only administrators can download enrolment registers.</div>'; return; }
+  if (currentRole !== 'admin') { el.innerHTML = '<div class="card" style="padding:24px;">Only administrators can manage enrolment registers.</div>'; return; }
   normalizeCourseDurations();
+  try { enrolSyncFeeEditsIntoLms(); } catch (e) {} // pull in any edits made on the School Fee page
+
+  var logo = _getEnrolmentLogo();
+  var logoPanel =
+    '<div class="card" style="margin-bottom:16px;"><div class="card-header"><h3>Institution Logo</h3></div>' +
+    '<div style="padding:14px 16px;display:flex;flex-wrap:wrap;gap:16px;align-items:center;">' +
+      '<div style="width:130px;height:64px;border:1px dashed var(--border);border-radius:8px;display:flex;align-items:center;justify-content:center;background:#fff;overflow:hidden;">' +
+        (logo && logo.dataUrl ? '<img src="' + logo.dataUrl + '" style="max-width:100%;max-height:100%;object-fit:contain;">' : '<span style="font-size:11px;color:#888;">No logo</span>') +
+      '</div>' +
+      '<div style="flex:1;min-width:240px;">' +
+        '<div style="font-size:13px;color:var(--text-muted);margin-bottom:8px;">This logo appears in the header of every enrolment register PDF (replacing the old HEART/NSTA text). PNG or JPG — it is resized automatically.</div>' +
+        '<label class="btn btn-primary" style="cursor:pointer;">⬆ Upload Logo<input type="file" accept="image/*" style="display:none;" onchange="enrolUploadLogo(this)"></label> ' +
+        (logo && logo.dataUrl ? '<button class="btn btn-secondary" onclick="enrolRemoveLogo()">Remove</button>' : '') +
+      '</div>' +
+    '</div></div>';
+
   var rows = skillAreas.map(function(sk) {
     var enrolled = enrolStudentsForCentre(sk).length;
     var meta = [];
@@ -16404,21 +16421,207 @@ function renderEnrolmentRegistersPage() {
     var dates = (sk.startDate || sk.endDate)
       ? ((enrolFmtMonthYear(sk.startDate) || '…') + ' – ' + (enrolFmtMonthYear(sk.endDate) || '…'))
       : '<span style="color:var(--text-muted);">No dates set</span>';
-    return '<tr>' +
+    var open = _enrolOpenRoster === sk.id;
+    var mainRow = '<tr>' +
       '<td><div style="display:flex;align-items:center;gap:8px;"><span style="font-size:18px;">' + (sk.icon || '📋') + '</span><strong>' + escapeHtml(sk.name) + '</strong></div>' +
         (meta.length ? '<div style="font-size:11px;color:var(--text-muted);">' + meta.join(' · ') + '</div>' : '') + '</td>' +
       '<td style="font-size:12px;">' + dates + '</td>' +
       '<td style="text-align:center;">' + enrolled + '</td>' +
-      '<td><button class="btn btn-sm btn-primary" style="font-size:12px;" onclick="generateEnrolmentRegisterPDF(' + sk.id + ')">📄 Download PDF</button></td>' +
+      '<td><div style="display:flex;gap:6px;flex-wrap:wrap;">' +
+        '<button class="btn btn-sm btn-secondary" style="font-size:12px;" onclick="enrolToggleRoster(' + sk.id + ')">' + (open ? '▾ Hide Trainees' : '✎ Edit Trainees') + '</button>' +
+        '<button class="btn btn-sm btn-primary" style="font-size:12px;" onclick="generateEnrolmentRegisterPDF(' + sk.id + ')">📄 Download PDF</button>' +
+      '</div></td>' +
     '</tr>';
+    return open ? (mainRow + '<tr><td colspan="4" style="padding:0;background:rgba(255,255,255,0.02);">' + _enrolRosterHtml(sk) + '</td></tr>') : mainRow;
   }).join('');
-  el.innerHTML =
+
+  el.innerHTML = logoPanel +
     '<div class="card" style="margin-bottom:16px;"><div style="padding:14px 16px;display:flex;flex-wrap:wrap;gap:12px;align-items:center;justify-content:space-between;">' +
-      '<div style="font-size:13px;color:var(--text-muted);max-width:680px;">Each register is a printable HEART/NSTA-style CTI form. Set a centre\'s Skill, Level, Project and dates on the <a href="#" onclick="showPage(\'course-duration\');return false;" style="color:var(--accent);font-weight:600;">Course Duration</a> page; enrolled students are listed automatically and blank rows are added for handwriting.</div>' +
+      '<div style="font-size:13px;color:var(--text-muted);max-width:680px;">Use <strong>Edit Trainees</strong> to update a learner\'s name, email, telephone and other details — changes sync with <strong>School Fee Management</strong> both ways. Course meta comes from the <a href="#" onclick="showPage(\'course-duration\');return false;" style="color:var(--accent);font-weight:600;">Course Duration</a> page.</div>' +
       '<button class="btn btn-primary" onclick="downloadAllEnrolmentRegisters()">⬇ Download All</button>' +
     '</div></div>' +
     '<div class="card"><div class="card-header"><h3>Training Centres</h3><span style="font-size:13px;color:var(--text-muted);">' + skillAreas.length + ' centres</span></div>' +
-    '<div class="table-wrapper"><table><thead><tr><th>Training Centre</th><th>Duration</th><th style="text-align:center;">Enrolled</th><th>Register</th></tr></thead><tbody>' + rows + '</tbody></table></div></div>';
+    '<div class="table-wrapper"><table><thead><tr><th>Training Centre</th><th>Duration</th><th style="text-align:center;">Enrolled</th><th>Actions</th></tr></thead><tbody>' + rows + '</tbody></table></div></div>';
+}
+
+function _enrolRosterHtml(sk) {
+  var list = enrolStudentsForCentre(sk);
+  if (!list.length) return '<div style="padding:14px 16px;font-size:13px;color:var(--text-muted);">No trainees enrolled in this course yet. Add students via Student Progress or School Fee Management.</div>';
+  var trs = list.map(function(s) {
+    var prof = (typeof studentProfiles !== 'undefined' && studentProfiles[s.id]) || {};
+    return '<tr>' +
+      '<td><strong>' + escapeHtml(s.name || '') + '</strong></td>' +
+      '<td style="font-size:12px;">' + escapeHtml(prof.email || s.email || '<span style="color:var(--text-muted);">—</span>') + '</td>' +
+      '<td style="font-size:12px;">' + escapeHtml(prof.phone || s.phone || '') + '</td>' +
+      '<td style="font-size:12px;">' + escapeHtml(s.dob || '') + '</td>' +
+      '<td style="text-align:right;"><button class="btn btn-sm btn-secondary" style="font-size:11px;" onclick="enrolEditTrainee(\'' + s.id + '\')">✎ Edit</button></td>' +
+    '</tr>';
+  }).join('');
+  return '<div style="padding:8px 14px 16px;"><table style="width:100%;"><thead><tr>' +
+    '<th style="text-align:left;">Trainee</th><th style="text-align:left;">Email</th><th style="text-align:left;">Telephone</th><th style="text-align:left;">D.O.B</th><th></th>' +
+    '</tr></thead><tbody>' + trs + '</tbody></table></div>';
+}
+
+function enrolToggleRoster(skId) { _enrolOpenRoster = (_enrolOpenRoster === skId) ? null : skId; renderEnrolmentRegistersPage(); }
+
+// ---- Institution logo (global) ----
+var _ENROL_LOGO_KEY = 'voctrain_enrolmentLogo';
+var _enrolLogoCache; // undefined = not loaded yet, null = none, object = {dataUrl,w,h}
+function _getEnrolmentLogo() {
+  if (_enrolLogoCache !== undefined) return _enrolLogoCache;
+  try { var raw = CESTISStore.getItem(_ENROL_LOGO_KEY); _enrolLogoCache = raw ? JSON.parse(raw) : null; }
+  catch (e) { _enrolLogoCache = null; }
+  return _enrolLogoCache;
+}
+function enrolRemoveLogo() {
+  if (currentRole !== 'admin') return;
+  try { CESTISStore.removeItem(_ENROL_LOGO_KEY); } catch (e) {}
+  _enrolLogoCache = null;
+  renderEnrolmentRegistersPage();
+  showToast('Logo removed.');
+}
+function enrolUploadLogo(input) {
+  if (currentRole !== 'admin') return;
+  var file = input && input.files && input.files[0];
+  if (!file) return;
+  if (!/^image\//.test(file.type)) { alert('Please choose an image file (PNG or JPG).'); return; }
+  var reader = new FileReader();
+  reader.onload = function(ev) {
+    var img = new Image();
+    img.onload = function() {
+      var maxW = 480, maxH = 240;
+      var scale = Math.min(1, maxW / img.width, maxH / img.height);
+      var w = Math.max(1, Math.round(img.width * scale)), h = Math.max(1, Math.round(img.height * scale));
+      var canvas = document.createElement('canvas'); canvas.width = w; canvas.height = h;
+      var ctx = canvas.getContext('2d');
+      ctx.fillStyle = '#ffffff'; ctx.fillRect(0, 0, w, h); // flatten transparency for clean printing
+      ctx.drawImage(img, 0, 0, w, h);
+      var dataUrl;
+      try { dataUrl = canvas.toDataURL('image/png'); } catch (e) { alert('Could not process this image.'); return; }
+      var obj = { dataUrl: dataUrl, w: w, h: h };
+      try { CESTISStore.setItem(_ENROL_LOGO_KEY, JSON.stringify(obj)); }
+      catch (e) { alert('That image is too large to store. Please try a smaller one.'); return; }
+      _enrolLogoCache = obj;
+      renderEnrolmentRegistersPage();
+      showToast('Logo uploaded.');
+    };
+    img.onerror = function() { alert('Could not load that image.'); };
+    img.src = ev.target.result;
+  };
+  reader.readAsDataURL(file);
+}
+
+// ---- Edit a trainee (modal) ----
+function enrolEditTrainee(studentId) {
+  if (currentRole !== 'admin') { alert('Only administrators can edit trainees.'); return; }
+  var s = students.find(function(x){ return x.id === studentId; });
+  if (!s) return;
+  var prof = (typeof studentProfiles !== 'undefined' && studentProfiles[s.id]) || {};
+  var old = document.getElementById('enrolEditTraineeModal'); if (old) old.remove();
+  function field(label, id, val, type) {
+    return '<div style="margin-bottom:10px;"><label style="display:block;font-size:12px;font-weight:600;margin-bottom:4px;">' + label + '</label>' +
+      '<input ' + (type === 'email' ? 'type="email"' : 'type="text"') + ' class="form-control" id="' + id + '" value="' + escapeAttr(val || '') + '"></div>';
+  }
+  var ov = document.createElement('div');
+  ov.id = 'enrolEditTraineeModal';
+  ov.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,0.55);z-index:100000;display:flex;align-items:center;justify-content:center;padding:20px;';
+  ov.innerHTML = '<div class="modal" style="max-width:540px;width:100%;background:var(--bg-card,#1b2436);color:var(--text-primary,#e8eef6);border-radius:14px;padding:22px;max-height:88vh;overflow:auto;box-shadow:0 20px 60px rgba(0,0,0,0.45);">' +
+    '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px;"><h3 style="margin:0;">Edit Trainee</h3><button onclick="document.getElementById(\'enrolEditTraineeModal\').remove()" style="background:none;border:none;font-size:20px;cursor:pointer;color:var(--text-muted);">✕</button></div>' +
+    '<input type="hidden" id="enrolEditId" value="' + escapeAttr(s.id) + '">' +
+    field('Full Name (Last, First, Middle)', 'enrolEditName', s.name) +
+    '<div style="display:flex;gap:10px;"><div style="flex:1;">' + field('Email', 'enrolEditEmail', prof.email || s.email, 'email') + '</div><div style="flex:1;">' + field('Telephone', 'enrolEditPhone', prof.phone || s.phone) + '</div></div>' +
+    '<div style="display:flex;gap:10px;"><div style="flex:1;">' + field('D.O.B', 'enrolEditDob', s.dob) + '</div><div style="flex:1;">' + field('Gender', 'enrolEditGender', s.gender) + '</div></div>' +
+    field('Address', 'enrolEditAddress', s.address) +
+    '<div style="display:flex;gap:10px;"><div style="flex:1;">' + field('TRN', 'enrolEditTrn', s.trn) + '</div><div style="flex:1;">' + field('NQS#', 'enrolEditNqs', s.nqs) + '</div></div>' +
+    '<div style="display:flex;gap:10px;justify-content:flex-end;margin-top:16px;"><button class="btn btn-secondary" onclick="document.getElementById(\'enrolEditTraineeModal\').remove()">Cancel</button><button class="btn btn-primary" onclick="enrolSaveTrainee()">Save Changes</button></div>' +
+  '</div>';
+  ov.addEventListener('click', function(e){ if (e.target === ov) ov.remove(); });
+  document.body.appendChild(ov);
+}
+
+function enrolSaveTrainee() {
+  var id = (document.getElementById('enrolEditId') || {}).value;
+  var s = students.find(function(x){ return x.id === id; });
+  if (!s) return;
+  var g = function(i){ var el = document.getElementById(i); return el ? el.value.trim() : ''; };
+  var name = g('enrolEditName');
+  if (!name) { alert('Name cannot be empty.'); return; }
+  s.name = name;
+  s.dob = g('enrolEditDob');
+  s.gender = g('enrolEditGender');
+  s.address = g('enrolEditAddress');
+  s.trn = g('enrolEditTrn');
+  s.nqs = g('enrolEditNqs');
+  var email = g('enrolEditEmail'), phone = g('enrolEditPhone');
+  s.email = email;
+  if (typeof studentProfiles === 'undefined' || !studentProfiles) window.studentProfiles = {};
+  if (!studentProfiles[id]) studentProfiles[id] = {};
+  studentProfiles[id].email = email;
+  studentProfiles[id].phone = phone;
+  s.lastModified = new Date().toISOString();
+  // Two-way sync: overwrite the linked School Fee record before saveState (whose
+  // mirror only backfills empty fields).
+  try { enrolPropagateToFee(s, studentProfiles[id]); } catch (e) { console.warn('[EnrolReg] fee propagate failed', e); }
+  saveState();
+  if (typeof refreshStudentDependentViews === 'function') { try { refreshStudentDependentViews(); } catch (e) {} }
+  var modal = document.getElementById('enrolEditTraineeModal'); if (modal) modal.remove();
+  renderEnrolmentRegistersPage();
+  showToast('Trainee updated: ' + name);
+}
+
+// Overwrite the matching School Fee record with the LMS edit (true two-way sync).
+function enrolPropagateToFee(student, prof) {
+  prof = prof || {};
+  var raw = CESTISStore.getItem('cestiSchoolFeeStudents');
+  var fee = []; if (raw) { try { fee = JSON.parse(raw) || []; } catch (e) { fee = []; } }
+  if (!Array.isArray(fee)) return;
+  var norm = function(v){ return (v == null ? '' : String(v)).trim().toLowerCase().replace(/\s+/g, ' '); };
+  var rec = fee.find(function(f){ return f && (
+    f.lmsId === student.id || f.id === student.id || f.id === student.schoolFeeId ||
+    (norm(f.name) === norm(student.name) && (!f.skillArea || !student.course || norm(f.skillArea) === norm(student.course)))
+  ); });
+  if (!rec) return; // no linked fee record yet; saveState's mirror will create one
+  rec.lmsId = student.id;
+  rec.name = student.name || rec.name;
+  if (student.course && !rec.skillArea) rec.skillArea = student.course;
+  rec.email = prof.email || student.email || '';
+  rec.contact = prof.phone || student.phone || '';
+  rec.gender = student.gender || '';
+  rec.dateOfBirth = student.dob || '';
+  rec.address = student.address || '';
+  if (student.trn) rec.nationalId = student.trn;
+  CESTISStore.setItem('cestiSchoolFeeStudents', JSON.stringify(fee));
+  if (typeof broadcastStudentsToFeeFrames === 'function') { try { broadcastStudentsToFeeFrames(); } catch (e) {} }
+}
+
+// Pull edits made to EXISTING students on the School Fee page back into the LMS.
+function enrolSyncFeeEditsIntoLms() {
+  if (typeof students === 'undefined' || !Array.isArray(students)) return false;
+  var raw = CESTISStore.getItem('cestiSchoolFeeStudents');
+  if (!raw) return false;
+  var fee = []; try { fee = JSON.parse(raw) || []; } catch (e) { return false; }
+  if (!Array.isArray(fee)) return false;
+  var norm = function(v){ return (v == null ? '' : String(v)).trim().toLowerCase().replace(/\s+/g, ' '); };
+  var changed = false;
+  fee.forEach(function(f) {
+    if (!f) return;
+    var s = students.find(function(x){ return x && (
+      x.id === f.lmsId || x.id === f.id || x.schoolFeeId === f.id ||
+      (norm(x.name) === norm(f.name) && (!x.course || !f.skillArea || norm(x.course) === norm(f.skillArea)))
+    ); });
+    if (!s) return;
+    if (typeof studentProfiles === 'undefined' || !studentProfiles) window.studentProfiles = {};
+    if (!studentProfiles[s.id]) studentProfiles[s.id] = {};
+    var p = studentProfiles[s.id];
+    if (f.email && f.email !== p.email) { p.email = f.email; s.email = f.email; changed = true; }
+    if (f.contact && f.contact !== p.phone) { p.phone = f.contact; s.phone = f.contact; changed = true; }
+    if (f.gender && f.gender !== s.gender) { s.gender = f.gender; changed = true; }
+    if (f.dateOfBirth && f.dateOfBirth !== s.dob) { s.dob = f.dateOfBirth; changed = true; }
+    if (f.address && f.address !== s.address) { s.address = f.address; changed = true; }
+    if (f.nationalId && f.nationalId !== s.trn) { s.trn = f.nationalId; changed = true; }
+  });
+  if (changed) { try { saveState(); } catch (e) {} }
+  return changed;
 }
 
 function downloadAllEnrolmentRegisters() {
@@ -16456,6 +16659,7 @@ function _buildEnrolmentRegisterPDF(sk) {
   var jsPDF = window.jspdf.jsPDF;
   var doc = new jsPDF({ orientation: 'landscape', unit: 'mm', format: 'a4' });
   var pageW = 297, pageH = 210, margin = 10;
+  var logo = _getEnrolmentLogo();
 
   var COLS = [
     { key:'name',    title:'Full Name (Last, First, Middle)', w:46, align:'left' },
@@ -16478,11 +16682,18 @@ function _buildEnrolmentRegisterPDF(sk) {
 
   function drawHeaderArea() {
     var y = 10;
-    // HEART / NSTA TRUST text logo (top-left)
-    doc.setTextColor(41,128,185); doc.setFont('helvetica','bold');
-    doc.setFontSize(13); doc.text('HEART', margin + 1, y + 1);
-    doc.text('NSTA', margin + 1, y + 7);
-    doc.setFontSize(5); doc.setTextColor(120); doc.text('T R U S T', margin + 1, y + 10.5);
+    // Institution logo (top-left) — uploaded by an admin; neutral box if none set.
+    var boxX = margin, boxY = y - 2, boxW = 40, boxH = 16;
+    if (logo && logo.dataUrl && logo.w && logo.h) {
+      var sc = Math.min(boxW / logo.w, boxH / logo.h);
+      var dw = logo.w * sc, dh = logo.h * sc;
+      try { doc.addImage(logo.dataUrl, 'PNG', boxX, boxY + (boxH - dh) / 2, dw, dh); } catch (e) {}
+    } else {
+      doc.setDrawColor(200); doc.setFillColor(245,245,245); doc.rect(boxX, boxY, boxW, boxH, 'FD');
+      doc.setTextColor(170); doc.setFont('helvetica','normal'); doc.setFontSize(8);
+      doc.text('LOGO', boxX + boxW / 2, boxY + boxH / 2 + 1, { align:'center' });
+    }
+    doc.setTextColor(0);
     // Centered title
     doc.setTextColor(90); doc.setFont('times','normal'); doc.setFontSize(13);
     doc.text('COMMUNITY TRAINING INTERVENTIONS', pageW / 2, y + 2, { align:'center' });
