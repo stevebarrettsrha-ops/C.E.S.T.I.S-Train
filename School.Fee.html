@@ -4924,7 +4924,7 @@
                     <td>$${student.totalPaid.toFixed(2)}</td>
                     <td>$${student.balance.toFixed(2)}</td>
                     <td><span class="status-badge status-${getStatusClass(student.status)}">${student.status}</span></td>
-                    <td>${renderStageBadge(student)}</td>
+                    <td>${renderStageBadge(student)}${feeEndedBadge(student)}</td>
                     <td>
                         <button class="action-btn btn-success" onclick="viewStudent(${index})">View</button>
                         <button class="action-btn" style="background: #FFA726;" onclick="editStudent(${index})">Edit</button>
@@ -4933,6 +4933,16 @@
                 `;
             });
             updateMergeControls();
+        }
+
+        // Small "Course ended" pill shown beside a student's stage when their
+        // course duration has elapsed (read-only signal; payments still allowed).
+        function feeEndedBadge(student) {
+            var dur = feeCourseDurationInfo(student && student.skillArea);
+            if (dur && dur.ended) {
+                return ' <span class="course-ended-badge" title="Course ended' + (dur.endDate ? (' on ' + dur.endDate) : '') + '" style="display:inline-block;margin-left:4px;padding:2px 8px;border-radius:9px;font-size:10px;font-weight:700;background:rgba(231,76,60,.15);color:#e74c3c;">Course ended</span>';
+            }
+            return '';
         }
 
         // Get status class
@@ -5688,6 +5698,27 @@
         }
 
         // Record payment
+        // Course-duration link (read-only). Durations live on the LMS training
+        // centres (persisted under 'voctrain_skillAreas'), which School Fee shares
+        // via CESTISStore. Returns {ended, endDate, status} or null when unknown.
+        function feeCourseDurationInfo(skillAreaName) {
+            try {
+                if (typeof CESTISCore === 'undefined' || !CESTISCore.courseDuration) return null;
+                var raw = CESTISStore.getItem('voctrain_skillAreas');
+                if (!raw) return null;
+                var areas = JSON.parse(raw);
+                if (!Array.isArray(areas)) return null;
+                var cn = String(skillAreaName || '').toLowerCase().trim();
+                var sk = areas.find(function(s){ return s && s.name && s.name.toLowerCase().trim() === cn; });
+                if (!sk) return null;
+                return {
+                    ended: !CESTISCore.courseDuration.isRegisterOpen(sk, undefined, Date.now()),
+                    endDate: sk.endDate || '',
+                    status: CESTISCore.courseDuration.status(sk.startDate, sk.endDate)
+                };
+            } catch (e) { return null; }
+        }
+
         function recordPayment() {
             const studentId = document.getElementById('paymentStudentId').value;
             const amount = parseFloat(document.getElementById('paymentAmount').value) || 0;
@@ -5713,7 +5744,16 @@
                     return;
                 }
             }
-            
+
+            // Tie to course duration: warn (but allow) when the student's course
+            // has ended, so outstanding balances can still be collected knowingly.
+            const _dur = feeCourseDurationInfo(student.skillArea);
+            if (_dur && _dur.ended) {
+                if (!confirm('⚠️ The course "' + student.skillArea + '" has ended' + (_dur.endDate ? (' on ' + _dur.endDate) : '') + '.\n\nYou can still record this payment to collect an outstanding balance. Record it anyway?')) {
+                    return;
+                }
+            }
+
             const payment = {
                 id: 'PAY' + Date.now(),
                 studentId: studentId,
