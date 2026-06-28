@@ -345,9 +345,11 @@ var certDownloadApprovals = [];
 var userAccounts = [];
 var studentProfiles = {};
 
-var stages = ['testing','interview','training','certified','collected','incomplete'];
-var stageLabels = {testing:'Testing',interview:'Interview',training:'In Training',certified:'Certified',collected:'Collected',incomplete:'Incomplete'};
-var stageBadge = {testing:'badge-blue',interview:'badge-purple',training:'badge-amber',certified:'badge-green',collected:'badge-green',incomplete:'badge-red'};
+// 'nyc' = Not Yet Competent — auto-assigned when a course ends without the
+// student being certified; held until an administrator updates them.
+var stages = ['testing','interview','training','certified','collected','nyc','incomplete'];
+var stageLabels = {testing:'Testing',interview:'Interview',training:'In Training',certified:'Certified',collected:'Collected',nyc:'Not Yet Competent',incomplete:'Incomplete'};
+var stageBadge = {testing:'badge-blue',interview:'badge-purple',training:'badge-amber',certified:'badge-green',collected:'badge-green',nyc:'badge-red',incomplete:'badge-red'};
 
 function safeJsonParse(v, fallback) {
   if(!v) return fallback;
