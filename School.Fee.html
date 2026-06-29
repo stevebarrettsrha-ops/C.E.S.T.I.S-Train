@@ -6887,11 +6887,16 @@
                 }
                 
                 const skillAreas = Object.keys(feeStructure);
+                const _scopedPays = paymentsInScope();
+                const _nrm = function(v){ return (v == null ? '' : String(v)).toLowerCase().trim(); };
                 const collectionData = skillAreas.map(area => {
-                    const areaStudents = students.filter(s => s.skillArea === area);
+                    const areaStudents = students.filter(s => _nrm(s.skillArea) === _nrm(area));
                     const expected = areaStudents.reduce((sum, s) => sum + (parseFloat(s.tuitionFee) || 0), 0);
-                    const collected = areaStudents.reduce((sum, s) => sum + (parseFloat(s.totalPaid) || 0), 0);
-                    return expected > 0 ? (collected / expected * 100).toFixed(1) : 0;
+                    // Collected scopes to the active period (All Payments / selected
+                    // quarter); expected stays cumulative, so the chart reflects the
+                    // current FY/quarter selection instead of being all-time fixed.
+                    const collected = _scopedPays.filter(p => _nrm(p.skillArea) === _nrm(area)).reduce((sum, p) => sum + (parseFloat(p.amount) || 0), 0);
+                    return expected > 0 ? Math.min(100, (collected / expected * 100)).toFixed(1) : 0;
                 });
                 
                 collectionChart = new Chart(collectionCtx, {
@@ -6951,24 +6956,38 @@
                     trendChart.destroy();
                 }
                 
-                // Get last 6 months of payment data
-                const months = [];
-                const amounts = [];
-                const today = new Date();
-                
-                for (let i = 5; i >= 0; i--) {
-                    const date = new Date(today.getFullYear(), today.getMonth() - i, 1);
-                    const monthName = date.toLocaleDateString('en-US', { month: 'short', year: 'numeric' });
-                    const monthPayments = payments.filter(p => {
-                        const paymentDate = new Date(p.date);
-                        return paymentDate.getMonth() === date.getMonth() && 
-                               paymentDate.getFullYear() === date.getFullYear();
+                // The trend window follows the active scope so the dashboard changes
+                // with the FY/quarter: a selected quarter shows its 3 months; All
+                // Payments shows the active financial year's 12 months (Apr–Mar);
+                // with no quarter engine, fall back to the last 6 months from today.
+                const trendMonths = [];
+                const pushMonth = function(year, month0){
+                    const d = new Date(year, month0, 1);
+                    trendMonths.push({
+                        label: d.toLocaleDateString('en-US', { month: 'short', year: 'numeric' }),
+                        ym: year + '-' + String(month0 + 1).padStart(2, '0')
                     });
-                    const totalAmount = monthPayments.reduce((sum, p) => sum + (parseFloat(p.amount) || 0), 0);
-                    
-                    months.push(monthName);
-                    amounts.push(totalAmount);
+                };
+                if (typeof CESTISCore !== 'undefined' && CESTISCore.getActiveQuarter) {
+                    const cur = CESTISCore.getActiveQuarter();
+                    if (!feeShowAllPayments) {
+                        const meta = CESTISCore.getQuarterMeta(cur.q);
+                        const yr = CESTISCore.quarterCalendarYear(cur.fy, cur.q);
+                        const sm = (meta ? meta.startMonth : 1) - 1; // 0-based start month
+                        for (let m = 0; m < 3; m++) { const mm = sm + m; pushMonth(yr + Math.floor(mm / 12), ((mm % 12) + 12) % 12); }
+                    } else {
+                        const sy = parseInt(String(cur.fy).split('/')[0], 10); // FY starts in April
+                        for (let mm = 3; mm < 15; mm++) { pushMonth(sy + Math.floor(mm / 12), ((mm % 12) + 12) % 12); }
+                    }
+                } else {
+                    const today = new Date();
+                    for (let i = 5; i >= 0; i--) { const d = new Date(today.getFullYear(), today.getMonth() - i, 1); pushMonth(d.getFullYear(), d.getMonth()); }
                 }
+                const months = trendMonths.map(t => t.label);
+                const amounts = trendMonths.map(t =>
+                    payments.filter(p => p && typeof p.date === 'string' && p.date.slice(0, 7) === t.ym)
+                            .reduce((sum, p) => sum + (parseFloat(p.amount) || 0), 0)
+                );
                 
                 trendChart = new Chart(trendCtx, {
                     type: 'line',
