@@ -863,6 +863,21 @@ async function addStudent() {
   if(!name){ alert('Please enter a name'); return; }
   var email = (document.getElementById('newStudentEmail').value || '').trim();
   var selectedCourse = document.getElementById('newStudentCourse').value;
+  // Enrolment lifecycle: once a course has ENDED, no new trainee may be enrolled
+  // into it. The admin must create a new Training Centre / course with a fresh
+  // duration first. (Durations live on skillAreas, shared via voctrain_skillAreas.)
+  if (window.CESTISCore && CESTISCore.courseDuration && selectedCourse) {
+    var _cn = selectedCourse.toLowerCase().trim();
+    var _sk = (Array.isArray(skillAreas) ? skillAreas : []).find(function(s){
+      if (!s || !s.name) return false;
+      if (s.name.toLowerCase().trim() === _cn) return true;
+      return (typeof instructorCourseMatch === 'function') && instructorCourseMatch(s.name, selectedCourse);
+    });
+    if (_sk && CESTISCore.courseDuration.status(_sk.startDate, _sk.endDate) === 'ended') {
+      alert('The course "' + selectedCourse + '" has ENDED, so new trainees can no longer be enrolled into it.\n\nCreate a new Training Centre / course with a new duration before adding new trainees.');
+      return;
+    }
+  }
   var assignedInstructor = (instructorData.find(function(ins){
     if(!ins.course) return false;
     if(ins.course.toLowerCase().trim() === selectedCourse.toLowerCase().trim()) return true;
