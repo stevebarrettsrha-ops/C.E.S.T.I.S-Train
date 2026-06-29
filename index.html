@@ -8270,7 +8270,6 @@ var cestisFeatureConfig = {
     file: 'Pages/Online-Exams.html',
     onMount: function() {
       renderExamsUpcoming();
-      cestisSafe('renderInstructorExams');
     }
   },
   'import-exam': {
@@ -15680,7 +15679,7 @@ function refreshStudentDependentViews() {
 // try/catch here), so calling one whose page isn't mounted is a safe no-op.
 function refreshContentDependentViews() {
   var fns = [
-    'renderInstructorExams','renderStudentExams',
+    'renderExams','renderInstructorExams','renderStudentExams',
     'renderAdminAssignments','renderInstructorGradebook','renderStudentAssignments','renderStudentAssignmentsPage',
     'renderAdminResources','renderInstructorCustomResources','renderStudentDriveResources','renderStudentResourcesPage',
     'renderAnnouncements','renderInstructorAnnouncements','renderAsAnnouncements',
@@ -17210,7 +17209,13 @@ function parseExamDateTime(dateStr, timeStr) {
 // Run status resolution periodically (every 30 seconds) so exams go live automatically
 setInterval(resolveExamStatuses, 30000);
 
+// Remember the admin's active exam tab so reactive re-renders (triggered by
+// content changes elsewhere) keep showing the SAME tab instead of snapping
+// back to 'upcoming'. This is what prevents the admin exam table from flickering.
+var adminExamFilter = 'upcoming';
 function renderExams(filter) {
+  if(filter) adminExamFilter = filter;
+  else filter = adminExamFilter;
   resolveExamStatuses();
   const filtered = exams.filter(e=>e.status===(filter||'upcoming'));
   const tbody = document.getElementById('examTableBody');
@@ -17265,12 +17270,16 @@ function renderInstructorExams(filter) {
   var allExams = courseFilter ? exams.filter(function(e){ return e.course === courseFilter; }) : exams;
   var filtered = allExams.filter(function(e){ return e.status === (filter || 'upcoming'); });
 
-  // Use instructor-specific elements if available, fallback to admin ones
-  var tbody = document.getElementById('iExamTableBody') || document.getElementById('examTableBody');
+  // Target ONLY the instructor-specific elements. Never fall back to the admin
+  // examTableBody/examStatsGrid: this function is invoked by refreshContentDependentViews(),
+  // and falling back would let it clobber the admin Online-Exams table (resetting it to the
+  // 'upcoming' tab) — the cause of exams "appearing and disappearing". If the instructor
+  // page isn't mounted, this is a safe no-op.
+  var tbody = document.getElementById('iExamTableBody');
   if(!tbody) return;
 
   // Stats
-  var statsEl = document.getElementById('iExamStatsGrid') || document.getElementById('examStatsGrid');
+  var statsEl = document.getElementById('iExamStatsGrid');
   if(statsEl) {
     var myResults = courseFilter ? examResults.filter(function(r){ var ex = exams.find(function(e){return e.id===r.examId;}); return ex && ex.course===courseFilter; }) : examResults;
     var totalExams = allExams.length;
