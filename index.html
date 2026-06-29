@@ -16409,6 +16409,40 @@ function enrolField(s, key) {
   return '';
 }
 
+// ---- Trainee status palette (single source for the roster, the PDF legend and PDF row fills) ----
+// rgb/fg drive the PDF (jsPDF colour arrays); css/cssText drive the on-screen roster rows.
+var ENROL_STATUSES = [
+  { key:'attendee', label:'ATTENDEE',     rgb:[46,204,113],  fg:[0,0,0],       css:'#2ecc71', cssText:'#0a2f1a' },
+  { key:'absentee', label:'ABSENTEE',     rgb:[120,210,240], fg:[0,0,0],       css:'#78d2f0', cssText:'#06303d' },
+  { key:'dropout',  label:'DROPOUTS',     rgb:[231,76,60],   fg:[255,255,255], css:'#e74c3c', cssText:'#ffffff' },
+  { key:'new',      label:'NEW TRAINEES', rgb:[241,196,15],  fg:[0,0,0],       css:'#f1c40f', cssText:'#4a3b00' },
+  { key:'working',  label:'WORKING',      rgb:[142,68,173],  fg:[255,255,255], css:'#8e44ad', cssText:'#ffffff' }
+];
+function enrolStatusDef(key) {
+  if (!key) return null;
+  for (var i = 0; i < ENROL_STATUSES.length; i++) if (ENROL_STATUSES[i].key === key) return ENROL_STATUSES[i];
+  return null;
+}
+function enrolStatusSelectHtml(s) {
+  var cur = (s && s.enrolStatus) || '';
+  var opts = '<option value="">— set status —</option>' + ENROL_STATUSES.map(function(d){
+    return '<option value="' + d.key + '"' + (cur === d.key ? ' selected' : '') + '>' + d.label + '</option>';
+  }).join('');
+  return '<select class="form-control" style="font-size:11px;padding:4px 6px;min-width:128px;" ' +
+    'onchange="enrolSetStatus(\'' + escapeAttr(s.id) + '\', this.value)">' + opts + '</select>';
+}
+function enrolSetStatus(studentId, statusKey) {
+  if (currentRole !== 'admin') { alert('Only administrators can set trainee status.'); return; }
+  var s = students.find(function(x){ return x.id === studentId; });
+  if (!s) return;
+  s.enrolStatus = statusKey || '';
+  s.lastModified = new Date().toISOString();
+  saveState();
+  renderEnrolmentRegistersPage();
+  var def = enrolStatusDef(statusKey);
+  showToast(def ? ('Status set: ' + def.label) : 'Status cleared');
+}
+
 var _enrolOpenRoster = null;
 function renderEnrolmentRegistersPage() {
   var el = document.getElementById('enrolmentRegistersContent');
@@ -16467,16 +16501,24 @@ function _enrolRosterHtml(sk) {
   if (!list.length) return '<div style="padding:14px 16px;font-size:13px;color:var(--text-muted);">No trainees enrolled in this course yet. Add students via Student Progress or School Fee Management.</div>';
   var trs = list.map(function(s) {
     var prof = (typeof studentProfiles !== 'undefined' && studentProfiles[s.id]) || {};
-    return '<tr>' +
-      '<td><strong>' + escapeHtml(s.name || '') + '</strong></td>' +
-      '<td style="font-size:12px;">' + escapeHtml(prof.email || s.email || '<span style="color:var(--text-muted);">—</span>') + '</td>' +
-      '<td style="font-size:12px;">' + escapeHtml(prof.phone || s.phone || '') + '</td>' +
-      '<td style="font-size:12px;">' + escapeHtml(s.dob || '') + '</td>' +
-      '<td style="text-align:right;"><button class="btn btn-sm btn-secondary" style="font-size:11px;" onclick="enrolEditTrainee(\'' + s.id + '\')">✎ Edit</button></td>' +
+    var def = enrolStatusDef(s.enrolStatus);
+    var rowStyle = def ? ('background:' + def.css + ';color:' + def.cssText + ';') : '';
+    var cellColor = def ? ('color:' + def.cssText + ';') : '';
+    var email = prof.email || s.email || '';
+    var phone = prof.phone || s.phone || '';
+    return '<tr style="' + rowStyle + '">' +
+      '<td style="' + cellColor + '"><strong>' + escapeHtml(s.name || '') + '</strong></td>' +
+      '<td style="font-size:12px;' + cellColor + '">' + (email ? escapeHtml(email) : '—') + '</td>' +
+      '<td style="font-size:12px;' + cellColor + '">' + (phone ? escapeHtml(phone) : '—') + '</td>' +
+      '<td style="font-size:12px;' + cellColor + '">' + (s.dob ? escapeHtml(s.dob) : '—') + '</td>' +
+      '<td>' + enrolStatusSelectHtml(s) + '</td>' +
+      '<td style="text-align:right;"><button class="btn btn-sm btn-secondary" style="font-size:11px;" onclick="enrolEditTrainee(\'' + escapeAttr(s.id) + '\')">✎ Edit</button></td>' +
     '</tr>';
   }).join('');
-  return '<div style="padding:8px 14px 16px;"><table style="width:100%;"><thead><tr>' +
-    '<th style="text-align:left;">Trainee</th><th style="text-align:left;">Email</th><th style="text-align:left;">Telephone</th><th style="text-align:left;">D.O.B</th><th></th>' +
+  return '<div style="padding:8px 14px 16px;">' +
+    '<div style="font-size:11px;color:var(--text-muted);margin-bottom:6px;">Set each trainee\'s <strong>Status</strong> — the row is colour-coded and the same colour fills that trainee\'s row in the downloaded register PDF.</div>' +
+    '<table style="width:100%;"><thead><tr>' +
+    '<th style="text-align:left;">Trainee</th><th style="text-align:left;">Email</th><th style="text-align:left;">Telephone</th><th style="text-align:left;">D.O.B</th><th style="text-align:left;">Status</th><th></th>' +
     '</tr></thead><tbody>' + trs + '</tbody></table></div>';
 }
 
@@ -16649,14 +16691,17 @@ function downloadAllEnrolmentRegisters() {
   var i = 0;
   (function next(){
     if (i >= skillAreas.length) { showToast('All enrolment registers downloaded.'); return; }
-    try { generateEnrolmentRegisterPDF(skillAreas[i].id); } catch (e) { console.warn('[EnrolReg] failed for', skillAreas[i] && skillAreas[i].name, e); }
+    // Bulk download goes straight to file (no per-centre preview).
+    try { generateEnrolmentRegisterPDF(skillAreas[i].id, { direct: true }); } catch (e) { console.warn('[EnrolReg] failed for', skillAreas[i] && skillAreas[i].name, e); }
     i++;
     setTimeout(next, 900); // space out so the browser does not block the downloads
   })();
 }
 
-// Lazy-load jsPDF (same CDN as certificates) then build the register.
-function generateEnrolmentRegisterPDF(skillAreaId) {
+// Lazy-load jsPDF (same CDN as certificates) then preview/build the register.
+// Per-centre "Download PDF" shows a live preview first; bulk "Download All" passes
+// { direct:true } to skip the preview and save straight to file.
+function generateEnrolmentRegisterPDF(skillAreaId, opts) {
   if (currentRole !== 'admin') { alert('Only administrators can download enrolment registers.'); return; }
   var sk = skillAreas.find(function(s){ return s.id === skillAreaId; });
   if (!sk) return;
@@ -16664,16 +16709,76 @@ function generateEnrolmentRegisterPDF(skillAreaId) {
     showToast('Loading PDF library, please wait...');
     var script = document.createElement('script');
     script.src = 'https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js';
-    script.onload = function(){ generateEnrolmentRegisterPDF(skillAreaId); };
+    script.onload = function(){ generateEnrolmentRegisterPDF(skillAreaId, opts); };
     script.onerror = function(){ showToast('Failed to load PDF library. Check your internet connection.'); };
     document.head.appendChild(script);
     return;
   }
-  try { _buildEnrolmentRegisterPDF(sk); }
+  try {
+    if (opts && opts.direct) _buildEnrolmentRegisterPDF(sk);
+    else _previewEnrolmentRegisterPDF(sk);
+  }
   catch (e) { console.error('[EnrolReg] build error', e); showToast('Could not generate the register PDF.'); }
 }
 
+// Show a live, in-app preview of the register PDF, then let the admin confirm the download.
+function _previewEnrolmentRegisterPDF(sk) {
+  var built = _composeEnrolmentRegisterDoc(sk);
+  if (!built) return;
+  var doc = built.doc, fname = built.fname;
+  var url;
+  try { url = doc.output('bloburl'); }
+  catch (e) {
+    try { url = doc.output('datauristring'); }
+    catch (e2) { _buildEnrolmentRegisterPDF(sk); return; } // preview unsupported -> just download
+  }
+  var old = document.getElementById('enrolPreviewModal'); if (old) old.remove();
+  var ov = document.createElement('div');
+  ov.id = 'enrolPreviewModal';
+  ov.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,0.6);z-index:100001;display:flex;align-items:center;justify-content:center;padding:18px;';
+  var subtitle = escapeHtml(sk.name || '') +
+    (sk.level ? (' · Level ' + escapeHtml(sk.level)) : '') +
+    ((sk.startDate || sk.endDate) ? (' · ' + escapeHtml((enrolFmtMonthYear(sk.startDate) || '…') + ' – ' + (enrolFmtMonthYear(sk.endDate) || '…'))) : '');
+  ov.innerHTML = '<div style="background:var(--bg-card,#1b2436);color:var(--text-primary,#e8eef6);border-radius:14px;width:min(1120px,96vw);height:92vh;display:flex;flex-direction:column;box-shadow:0 24px 70px rgba(0,0,0,0.5);overflow:hidden;">' +
+    '<div style="display:flex;justify-content:space-between;align-items:center;padding:14px 18px;border-bottom:1px solid var(--border,#2a3552);">' +
+      '<div><h3 style="margin:0;font-size:16px;">Enrolment Register Preview</h3><div style="font-size:12px;color:var(--text-muted);">' + subtitle + '</div></div>' +
+      '<button onclick="_closeEnrolPreview()" style="background:none;border:none;font-size:22px;cursor:pointer;color:var(--text-muted);">✕</button>' +
+    '</div>' +
+    '<div style="flex:1;background:#525659;min-height:0;"><iframe src="' + url + '" style="width:100%;height:100%;border:0;display:block;"></iframe></div>' +
+    '<div style="display:flex;gap:10px;justify-content:space-between;align-items:center;padding:12px 18px;border-top:1px solid var(--border,#2a3552);">' +
+      '<div style="font-size:12px;color:var(--text-muted);">Review the register above, then download. Status colours fill each trainee\'s row.</div>' +
+      '<div style="display:flex;gap:10px;">' +
+        '<button class="btn btn-secondary" onclick="_closeEnrolPreview()">Cancel</button>' +
+        '<button class="btn btn-primary" id="enrolPreviewDownloadBtn">⬇ Download PDF</button>' +
+      '</div>' +
+    '</div></div>';
+  document.body.appendChild(ov);
+  // Track the blob URL so we can revoke it on close (avoids leaking object URLs).
+  ov._blobUrl = (url && url.indexOf('blob:') === 0) ? url : null;
+  document.getElementById('enrolPreviewDownloadBtn').onclick = function(){
+    try { doc.save(fname); showToast('Enrolment register downloaded: ' + (sk.name || '')); }
+    catch (e) { showToast('Download failed.'); }
+    _closeEnrolPreview();
+  };
+  ov.addEventListener('click', function(e){ if (e.target === ov) _closeEnrolPreview(); });
+}
+function _closeEnrolPreview() {
+  var ov = document.getElementById('enrolPreviewModal');
+  if (!ov) return;
+  try { if (ov._blobUrl && window.URL && URL.revokeObjectURL) URL.revokeObjectURL(ov._blobUrl); } catch (e) {}
+  ov.remove();
+}
+
+// Build the register doc and save straight to file (no preview).
 function _buildEnrolmentRegisterPDF(sk) {
+  var built = _composeEnrolmentRegisterDoc(sk);
+  if (!built) return;
+  built.doc.save(built.fname);
+  showToast('Enrolment register downloaded: ' + (sk.name || ''));
+}
+
+// Compose the register PDF and return { doc, fname } without saving.
+function _composeEnrolmentRegisterDoc(sk) {
   var jsPDF = window.jspdf.jsPDF;
   var doc = new jsPDF({ orientation: 'landscape', unit: 'mm', format: 'a4' });
   var pageW = 297, pageH = 210, margin = 10;
@@ -16691,9 +16796,12 @@ function _buildEnrolmentRegisterPDF(sk) {
   ];
 
   var roster = enrolStudentsForCentre(sk);
-  var rows = roster.map(function(s){ return COLS.map(function(c){ return enrolField(s, c.key); }); });
+  // Each row carries its cells AND the admin-set status (drives the colour fill).
+  var rows = roster.map(function(s){
+    return { cells: COLS.map(function(c){ return enrolField(s, c.key); }), status: enrolStatusDef(s.enrolStatus) };
+  });
   var minRows = 15;
-  while (rows.length < minRows) rows.push(COLS.map(function(){ return ''; }));
+  while (rows.length < minRows) rows.push({ cells: COLS.map(function(){ return ''; }), status: null });
 
   var lineH = 3.4, fontSize = 7.5, pad = 1.2;
   function colX(i){ var x = margin; for (var j = 0; j < i; j++) x += COLS[j].w; return x; }
@@ -16745,11 +16853,8 @@ function _buildEnrolmentRegisterPDF(sk) {
       doc.setTextColor(fg[0],fg[1],fg[2]); doc.text(text, lx + 1, ly); lx += w + 2;
     }
     chip('===============', [46,204,113], [0,0,0]);
-    chip('ATTENDEE', [46,204,113], [0,0,0]);
-    chip('ABSENTEE', [120,210,240], [0,0,0]);
-    chip('DROPOUTS', [231,76,60], [255,255,255]);
-    chip('NEW TRAINEES', [241,196,15], [0,0,0]);
-    chip('WORKING', [142,68,173], [255,255,255]);
+    // Legend is driven by the shared ENROL_STATUSES palette so it always matches the row fills.
+    ENROL_STATUSES.forEach(function(d){ chip(d.label, d.rgb, d.fg); });
     doc.setTextColor(0);
 
     // Alphabetical-order note
@@ -16792,12 +16897,22 @@ function _buildEnrolmentRegisterPDF(sk) {
     return Math.max(7, maxLines * lineH + pad * 2);
   }
 
-  function drawRow(y, cells) {
-    doc.setFont('helvetica','normal'); doc.setFontSize(fontSize); doc.setDrawColor(120); doc.setTextColor(0);
+  function drawRow(y, cells, statusDef) {
+    doc.setFont('helvetica','normal'); doc.setFontSize(fontSize); doc.setDrawColor(120);
     var h = rowHeight(cells);
+    var fill = statusDef ? statusDef.rgb : null;
+    var fg = statusDef ? statusDef.fg : [0,0,0];
     for (var i = 0; i < COLS.length; i++) {
       var x = colX(i);
-      doc.rect(x, y, COLS[i].w, h);
+      if (fill) {
+        // Re-set the fill on every cell: jsPDF's text drawing leaves the fill colour
+        // set to the last text colour, so re-apply before each filled rect.
+        doc.setFillColor(fill[0], fill[1], fill[2]);
+        doc.rect(x, y, COLS[i].w, h, 'FD');
+      } else {
+        doc.rect(x, y, COLS[i].w, h);
+      }
+      doc.setTextColor(fg[0], fg[1], fg[2]);
       var t = doc.splitTextToSize(String(cells[i] || ''), COLS[i].w - pad * 2);
       var ty = y + pad + lineH - 0.8;
       for (var k = 0; k < t.length; k++) {
@@ -16805,6 +16920,7 @@ function _buildEnrolmentRegisterPDF(sk) {
         else doc.text(t[k], x + pad, ty + k * lineH);
       }
     }
+    doc.setTextColor(0);
     return y + h;
   }
 
@@ -16828,9 +16944,9 @@ function _buildEnrolmentRegisterPDF(sk) {
   var y = drawHeaderArea();
   y = drawTableHeader(y);
   for (var r = 0; r < rows.length; r++) {
-    var h = rowHeight(rows[r]);
+    var h = rowHeight(rows[r].cells);
     if (y + h > pageH - margin - 4) { doc.addPage(); y = drawHeaderArea(); y = drawTableHeader(y); }
-    y = drawRow(y, rows[r]);
+    y = drawRow(y, rows[r].cells, rows[r].status);
   }
   if (y > pageH - margin - 22) { doc.addPage(); y = drawHeaderArea(); }
   drawFooter();
@@ -16840,8 +16956,7 @@ function _buildEnrolmentRegisterPDF(sk) {
     (sk.level ? ('__Level_' + safe(sk.level)) : '') +
     (sk.startDate ? ('_' + safe(enrolFmtMonthYear(sk.startDate))) : '') +
     (sk.endDate ? ('_to_' + safe(enrolFmtMonthYear(sk.endDate))) : '') + '.pdf';
-  doc.save(fname);
-  showToast('Enrolment register downloaded: ' + (sk.name || ''));
+  return { doc: doc, fname: fname };
 }
 
 function initTrainingAdminControls() {
