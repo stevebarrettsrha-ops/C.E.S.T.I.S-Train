@@ -3851,6 +3851,48 @@
             CESTISStore.setItem('cestiFeeStructure', JSON.stringify(feeStructure));
         }
 
+        // One-time (idempotent) normalizer: re-align legacy fee-structure keys to
+        // their EXACT VocTrain course name. Older entries were stored upper-cased
+        // (e.g. "WELDING L2") which no longer matches the LMS course name and a
+        // student's skillArea. This renames such keys to the canonical VocTrain
+        // spelling and cascades the change to students[] and payments[] so the
+        // whole system uses one consistent course name. Safe to run on every load:
+        // once aligned it makes no further changes; only acts when there is drift.
+        function normalizeFeeKeysToVoctrain() {
+            try {
+                if (!feeStructure || typeof feeStructure !== 'object') return false;
+                var raw = CESTISStore.getItem('voctrain_skillAreas');
+                var areas = raw ? JSON.parse(raw) : [];
+                if (!Array.isArray(areas) || !areas.length) return false; // nothing to align to yet
+
+                // canonical: lowercased+trimmed VocTrain name -> exact VocTrain name
+                var canon = {};
+                areas.forEach(function(s){ if (s && s.name) { var k = String(s.name).toLowerCase().trim(); if (!canon[k]) canon[k] = String(s.name); } });
+
+                var renames = [];
+                Object.keys(feeStructure).forEach(function(key){
+                    var exact = canon[key.toLowerCase().trim()];
+                    if (exact && exact !== key && !feeStructure[exact]) {
+                        renames.push({ from: key, to: exact });
+                    }
+                });
+                if (!renames.length) return false;
+
+                renames.forEach(function(r){
+                    feeStructure[r.to] = feeStructure[r.from];
+                    delete feeStructure[r.from];
+                    var lf = r.from.toLowerCase().trim();
+                    if (Array.isArray(students)) students.forEach(function(st){ if (st && st.skillArea && String(st.skillArea).toLowerCase().trim() === lf) st.skillArea = r.to; });
+                    if (Array.isArray(payments)) payments.forEach(function(p){ if (p && p.skillArea && String(p.skillArea).toLowerCase().trim() === lf) p.skillArea = r.to; });
+                });
+
+                saveFeeStructure();
+                saveData();
+                console.log('[FeeNormalize] Aligned ' + renames.length + ' fee key(s) to VocTrain course names: ' + renames.map(function(r){ return r.from + ' -> ' + r.to; }).join(', '));
+                return true;
+            } catch (e) { console.warn('[FeeNormalize] failed', e); return false; }
+        }
+
         // Add new skill area
         function addNewSkillArea() {
             if (currentUser.role !== 'Admin') {
@@ -4345,6 +4387,7 @@
             showInactivityScreen();
 
             loadData();
+            normalizeFeeKeysToVoctrain(); // align legacy fee keys to exact VocTrain course names
             renderFeeStructure();
             updateDashboard();
             renderStudentsTable();
