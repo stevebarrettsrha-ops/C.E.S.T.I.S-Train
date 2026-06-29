@@ -5914,6 +5914,7 @@
         // so it stays in sync with the Cashbook & Virement. Expected/Outstanding
         // balances remain cumulative (all-time) — only payment-derived figures scope.
         let feeShowAllPayments = true;   // default: show every payment (unfiltered)
+        let _feeSuppressQuarterSub = false; // set while a LOCAL quarter change renders itself
 
         // True when a payment is in the current view scope (All, or the active quarter).
         function paymentInActiveQuarter(p) {
@@ -5989,38 +5990,44 @@
 
         // Re-render the filter bars + every quarter-scoped view.
         function feeApplyQuarterChange() {
-            _renderFeeFilters();
-            if (typeof renderPaymentsTable === 'function') renderPaymentsTable();
-            if (typeof updateDashboard === 'function') updateDashboard();
+            try { _renderFeeFilters(); } catch (e) {}
+            if (typeof renderPaymentsTable === 'function') { try { renderPaymentsTable(); } catch (e) {} }
+            // Dashboard refresh is non-critical to the filter — never let it block.
+            if (typeof updateDashboard === 'function') { try { updateDashboard(); } catch (e) {} }
         }
 
         function feeSelectAll() { feeShowAllPayments = true; feeApplyQuarterChange(); }
         function feeSelectQuarter(q) {
             feeShowAllPayments = false;
-            // Persist to the shared quarter so the Cashbook/Virement follow; the
-            // onQuarterChange handler below performs the single re-render.
-            if (typeof CESTISCore !== 'undefined' && CESTISCore.setActiveQuarter && CESTISCore.onQuarterChange) {
+            // Persist the shared quarter so the Cashbook/Virement follow, then
+            // render DIRECTLY here. We no longer rely on the onQuarterChange
+            // subscriber for the local re-render — if page init ever aborted before
+            // that subscriber was registered, the filter would silently do nothing.
+            if (typeof CESTISCore !== 'undefined' && CESTISCore.setActiveQuarter) {
                 const cur = CESTISCore.getActiveQuarter();
-                CESTISCore.setActiveQuarter(cur.fy, q);
-            } else {
-                feeApplyQuarterChange();
+                _feeSuppressQuarterSub = true;
+                try { CESTISCore.setActiveQuarter(cur.fy, q); } finally { _feeSuppressQuarterSub = false; }
             }
+            feeApplyQuarterChange();
         }
         function feeShiftFY(dir) {
-            if (typeof CESTISCore !== 'undefined' && CESTISCore.setActiveQuarter && CESTISCore.onQuarterChange) {
+            if (typeof CESTISCore !== 'undefined' && CESTISCore.setActiveQuarter) {
                 const cur = CESTISCore.getActiveQuarter();
                 const start = parseInt(String(cur.fy).split('/')[0], 10) + dir;
-                CESTISCore.setActiveQuarter(start + '/' + (start + 1), cur.q);
-            } else {
-                _renderFeeFilters();
+                _feeSuppressQuarterSub = true;
+                try { CESTISCore.setActiveQuarter(start + '/' + (start + 1), cur.q); } finally { _feeSuppressQuarterSub = false; }
             }
+            feeApplyQuarterChange();
         }
 
-        // Set up the filter bars and follow quarter switches made on other pages/tabs.
+        // Set up the filter bars and follow quarter switches made on OTHER pages/tabs.
+        // Local button clicks render themselves (see above) and suppress this handler
+        // to avoid a double render.
         function mountSchoolFeeQuarterBar() {
             _renderFeeFilters();
             if (typeof CESTISCore !== 'undefined' && CESTISCore.onQuarterChange) {
                 CESTISCore.onQuarterChange(function () {
+                    if (_feeSuppressQuarterSub) return; // a local click already re-rendered
                     if (feeShowAllPayments) { _renderFeeFilters(); }
                     else { feeApplyQuarterChange(); }
                 });
