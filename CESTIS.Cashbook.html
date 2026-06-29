@@ -3624,8 +3624,8 @@ function prepareBackupData() {
             }
         }
     }
-    // Include current in-memory budget for active quarter
-    quarterlyBudgets[getCurrentBudgetQuarterKey()] = { budget: BUDGET, sections: BUDGET_LINE_SECTIONS };
+    // Include current in-memory budget for active quarter (with deletion tombstones)
+    quarterlyBudgets[getCurrentBudgetQuarterKey()] = { budget: BUDGET, sections: BUDGET_LINE_SECTIONS, deleted: deletedBudgetKeys.slice() };
 
     // Collect all quarterly transaction data from localStorage (ensures ALL quarters are backed up)
     var quarterlyTransactions = {};
@@ -3704,14 +3704,14 @@ function restoreBackupData(backupData) {
             } catch(e) {}
         }
     }
+    // Restore current quarter deletion tombstones BEFORE saving the budget,
+    // so they are persisted alongside it and survive the next quarter load.
+    deletedBudgetKeys = Array.isArray(d.deletedBudgetKeys) ? d.deletedBudgetKeys : [];
     // Restore current quarter budget
     if (d.budget && typeof d.budget === 'object') {
         BUDGET = d.budget;
         BUDGET_LINE_SECTIONS = (d.budgetSections && typeof d.budgetSections === 'object') ? d.budgetSections : {};
         saveQuarterBudget();
-    }
-    if (Array.isArray(d.deletedBudgetKeys)) {
-        deletedBudgetKeys = d.deletedBudgetKeys;
     }
     if (Array.isArray(d.staffMembers)) {
         staffMembers = d.staffMembers;
@@ -4019,9 +4019,23 @@ async function mergeFromCloud() {
             }
         }
 
-        // Merge budget amounts — add cloud budget categories not present locally
+        // Merge budget deletion tombstones first, so deleted categories aren't
+        // resurrected by the budget merge below. A category present locally in
+        // BUDGET means the user re-added it, so local presence wins over a stale
+        // cloud tombstone (cloud's active quarter only).
+        var tombstonesChanged = false;
+        if (Array.isArray(d.deletedBudgetKeys) && (d.activeFY || activeFY) === activeFY && (d.activeQ || activeQ) === activeQ) {
+            d.deletedBudgetKeys.forEach(function(k) {
+                if (BUDGET.hasOwnProperty(k)) return; // locally re-added — keep it
+                if (deletedBudgetKeys.indexOf(k) === -1) { deletedBudgetKeys.push(k); tombstonesChanged = true; }
+            });
+        }
+
+        // Merge budget amounts — add cloud budget categories not present locally,
+        // but never re-add a category the user has deleted (tombstoned).
         if (d.budget && typeof d.budget === 'object') {
             Object.keys(d.budget).forEach(function(cat) {
+                if (deletedBudgetKeys.indexOf(cat) !== -1) return; // respect local deletion
                 if (BUDGET[cat] === undefined) {
                     BUDGET[cat] = d.budget[cat];
                     mergeStats.budgetAmountsAdded++;
@@ -4029,14 +4043,15 @@ async function mergeFromCloud() {
             });
             if (d.budgetSections && typeof d.budgetSections === 'object') {
                 Object.keys(d.budgetSections).forEach(function(cat) {
+                    if (deletedBudgetKeys.indexOf(cat) !== -1) return;
                     if (!BUDGET_LINE_SECTIONS[cat]) {
                         BUDGET_LINE_SECTIONS[cat] = d.budgetSections[cat];
                     }
                 });
             }
-            if (mergeStats.budgetAmountsAdded > 0) {
-                saveQuarterBudget();
-            }
+        }
+        if (mergeStats.budgetAmountsAdded > 0 || tombstonesChanged) {
+            saveQuarterBudget();
         }
         // Merge quarterly budget data from cloud
         if (d.quarterlyBudgets && typeof d.quarterlyBudgets === 'object') {
@@ -4264,6 +4279,13 @@ const DEFAULT_BUDGET = {
 // Active BUDGET object (loaded per quarter)
 let BUDGET = {};
 
+// Tombstone list of budget categories the user explicitly deleted in the
+// active quarter. Persisted per-quarter alongside BUDGET so deletions stick:
+// syncBudgetFromTransactions and the cloud merge both skip keys listed here,
+// which stops deleted categories from being re-created from transactions or
+// re-merged from the cloud. Re-adding a category clears its tombstone.
+let deletedBudgetKeys = [];
+
 // Section definitions for budget amount categorization
 const BUDGET_SECTIONS = {
     'Salaries': ['Coordinator Salary', 'Asst. Coordinator'],
@@ -4313,7 +4335,7 @@ function getCurrentBudgetQuarterKey() {
 // Save per-quarter budget to localStorage
 function saveQuarterBudget() {
     var key = getCurrentBudgetQuarterKey();
-    var data = { budget: BUDGET, sections: BUDGET_LINE_SECTIONS };
+    var data = { budget: BUDGET, sections: BUDGET_LINE_SECTIONS, deleted: deletedBudgetKeys };
     try { CESTISStore.setItem(key, JSON.stringify(data)); } catch(e) {}
 }
 
@@ -4326,11 +4348,13 @@ function loadQuarterBudget() {
             var data = JSON.parse(saved);
             BUDGET = data.budget || {};
             BUDGET_LINE_SECTIONS = data.sections || {};
+            deletedBudgetKeys = Array.isArray(data.deleted) ? data.deleted : [];
             return;
         }
     } catch(e) {}
 
-    // No saved data for this quarter
+    // No saved data for this quarter — start with no deletions
+    deletedBudgetKeys = [];
     if (activeFY === '2025/2026' && activeQ === 3) {
         // Load defaults for Q3 FY 2025/2026
         BUDGET = JSON.parse(JSON.stringify(DEFAULT_BUDGET));
@@ -4344,7 +4368,11 @@ function loadQuarterBudget() {
             }
             var deletedKeys = CESTISStore.getItem('cestis_budget_deleted');
             if (deletedKeys) {
-                JSON.parse(deletedKeys).forEach(function(k) { delete BUDGET[k]; });
+                // Honour legacy deletions and keep them tombstoned so sync won't re-add them
+                JSON.parse(deletedKeys).forEach(function(k) {
+                    delete BUDGET[k];
+                    if (deletedBudgetKeys.indexOf(k) === -1) deletedBudgetKeys.push(k);
+                });
             }
         } catch(e) {}
     } else {
@@ -4362,6 +4390,8 @@ function syncBudgetFromTransactions() {
     transactions.forEach(function(t) {
         if (!t.category) return;
         if (specialCategories.indexOf(t.category) !== -1) return;
+        // Respect categories the user explicitly deleted — don't re-create them
+        if (deletedBudgetKeys.indexOf(t.category) !== -1) return;
         if (!BUDGET.hasOwnProperty(t.category)) {
             BUDGET[t.category] = 0;
             if (!BUDGET_LINE_SECTIONS[t.category]) {
@@ -5926,7 +5956,12 @@ function printReport() {
 // Legacy compatibility wrappers (no-ops, data now managed per-quarter)
 function loadBudgetOverrides() { loadQuarterBudget(); }
 function loadDeletedBudgetKeys() { /* no-op, handled by loadQuarterBudget */ }
-let deletedBudgetKeys = [];
+// `deletedBudgetKeys` is declared near the BUDGET object above (per-quarter tombstones).
+// Remove a category from the tombstone list when the user intentionally (re-)adds it.
+function clearBudgetTombstone(name) {
+    var i = deletedBudgetKeys.indexOf(name);
+    if (i !== -1) deletedBudgetKeys.splice(i, 1);
+}
 
 // Modal controls
 function openBudgetLineModal(editKey) {
@@ -5994,6 +6029,9 @@ function saveBudgetLine() {
     // Store section mapping
     BUDGET_LINE_SECTIONS[name] = section;
 
+    // Re-adding a category clears any prior deletion tombstone
+    clearBudgetTombstone(name);
+
     saveQuarterBudget();
     closeBudgetLineModal();
     refreshAll();
@@ -6005,6 +6043,8 @@ function deleteBudgetLine(key) {
     }
     delete BUDGET[key];
     delete BUDGET_LINE_SECTIONS[key];
+    // Tombstone the category so syncBudgetFromTransactions / cloud merge won't re-add it
+    if (deletedBudgetKeys.indexOf(key) === -1) deletedBudgetKeys.push(key);
     saveQuarterBudget();
     refreshAll();
 }
@@ -6073,6 +6113,8 @@ function copyBudgetFromQuarter() {
         });
         BUDGET = newBudget;
         BUDGET_LINE_SECTIONS = sourceData.sections ? JSON.parse(JSON.stringify(sourceData.sections)) : {};
+        // Categories that are being (re-)added by this copy should no longer be tombstoned
+        deletedBudgetKeys = deletedBudgetKeys.filter(function(k) { return !newBudget.hasOwnProperty(k); });
         saveQuarterBudget();
         refreshAll();
         alert('Budget categories copied from ' + selected.label + '. Please enter the budget amounts for each category.');
@@ -6471,6 +6513,7 @@ function saveCopyBudgetLine() {
 
     BUDGET[name] = amount;
     BUDGET_LINE_SECTIONS[name] = section;
+    clearBudgetTombstone(name);
     saveQuarterBudget();
     closeCopyBudgetLineModal();
     refreshAll();
@@ -6488,6 +6531,7 @@ function quickCopyBudgetLine(key) {
     }
     BUDGET[newName] = BUDGET[key] || 0;
     BUDGET_LINE_SECTIONS[newName] = getBudgetLineSection(key);
+    clearBudgetTombstone(newName);
     saveQuarterBudget();
     refreshAll();
 }
