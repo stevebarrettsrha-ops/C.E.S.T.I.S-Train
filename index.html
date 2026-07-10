@@ -7232,7 +7232,7 @@ async function handleAdminClick() {
     // Rate limiting check
     var rateCheck = checkLoginRateLimit(uname);
     if(!rateCheck.allowed) { alert('Too many failed attempts. Please wait ' + rateCheck.remainSeconds + ' seconds before trying again.'); return; }
-    var adminUser = userAccounts.find(function(u){ return u.role==='admin' && (u.username===uname || u.email===uname); });
+    var adminUser = await findLoginAccount('admin', uname);
     // Diagnostic (no secrets): helps distinguish "account not loaded" from "wrong
     // password" when investigating login failures. Safe to leave in.
     try {
@@ -7242,7 +7242,7 @@ async function handleAdminClick() {
     } catch(_) {}
     if(!adminUser) { recordLoginFailure(uname); alert('No admin account found for "' + uname + '" on this device. Try username: cestisadmin — or use "Sync Now" first to pull accounts.'); return; }
     if(adminUser.status==='disabled') { alert('This account has been disabled. Contact a system administrator.'); return; }
-    var pwMatch = await checkPassword(pw, adminUser.password, adminUser);
+    var pwMatch = await checkPasswordWithCloud(pw, adminUser);
     try { console.log('[Login][admin] pwMatch=' + pwMatch); } catch(_) {}
     if(!pwMatch) { recordLoginFailure(uname); alert('Password incorrect for "' + uname + '".'); return; }
     clearLoginFailures(uname);
@@ -7266,23 +7266,16 @@ async function handleStudentClick() {
     // Rate limiting check
     var rateCheck = checkLoginRateLimit(uname);
     if(!rateCheck.allowed) { alert('Too many failed attempts. Please wait ' + rateCheck.remainSeconds + ' seconds before trying again.'); return; }
-    // Look up in userAccounts
-    var userAccount = userAccounts.find(function(u) {
-      return u.role === 'student' && (u.username === uname || u.email === uname);
-    });
+    // Look up in userAccounts — falls back to fetching accounts from Google
+    // Drive when the account was created on another device
+    var userAccount = await findLoginAccount('student', uname);
     if(!userAccount) {
-      // If no local match, try fetching accounts from cloud before failing
-      if(!loginSyncCompleted && !studentCloudLoginAttempted) {
-        studentCloudLoginAttempted = true;
-        studentLightSync(uname, pw);
-        return;
-      }
       recordLoginFailure(uname);
       alert('Invalid email/username or password. If you are a new student, please register first.'); return;
     }
     if(userAccount.status === 'disabled') { alert('This account has been disabled. Contact an administrator.'); return; }
     if(userAccount.status === 'pending') { showPendingApprovalScreen(userAccount); return; }
-    var pwMatch = await checkPassword(pw, userAccount.password, userAccount);
+    var pwMatch = await checkPasswordWithCloud(pw, userAccount);
     if(!pwMatch) { recordLoginFailure(uname); alert('Invalid email/username or password. If you are a new student, please register first.'); return; }
     clearLoginFailures(uname);
     // Find matching student data — try studentDataId first, then name match
@@ -7316,7 +7309,6 @@ async function handleStudentClick() {
     enterApp('student');
   } catch(err) { console.error('handleStudentClick error:', err); alert('Error: ' + err.message); }
 }
-var studentCloudLoginAttempted = false;
 async function handleInstructorClick() {
   try {
     if(!instructorLoginShown) {
@@ -7332,9 +7324,7 @@ async function handleInstructorClick() {
     // Rate limiting check
     var rateCheck = checkLoginRateLimit(uname);
     if(!rateCheck.allowed) { alert('Too many failed attempts. Please wait ' + rateCheck.remainSeconds + ' seconds before trying again.'); return; }
-    var userAccount = userAccounts.find(function(u) {
-      return u.role === 'instructor' && (u.username === uname || u.email === uname);
-    });
+    var userAccount = await findLoginAccount('instructor', uname);
     if(!userAccount) {
       var anyMatch = userAccounts.find(function(u) { return u.role === 'instructor' && (u.username === uname || u.email === uname); });
       if(anyMatch && anyMatch.status === 'disabled') { alert('This account has been disabled. Contact an administrator.'); return; }
@@ -7344,7 +7334,7 @@ async function handleInstructorClick() {
     }
     if(userAccount.status === 'disabled') { alert('This account has been disabled. Contact an administrator.'); return; }
     if(userAccount.status === 'pending') { showPendingApprovalScreen(userAccount); return; }
-    var pwMatch = await checkPassword(pw, userAccount.password, userAccount);
+    var pwMatch = await checkPasswordWithCloud(pw, userAccount);
     if(!pwMatch) { recordLoginFailure(uname); alert('Invalid email/username or password.'); return; }
     clearLoginFailures(uname);
     // Find matching instructor data
@@ -7380,9 +7370,7 @@ async function handleAdminStaffClick() {
     // Rate limiting check
     var rateCheck = checkLoginRateLimit(uname);
     if(!rateCheck.allowed) { alert('Too many failed attempts. Please wait ' + rateCheck.remainSeconds + ' seconds before trying again.'); return; }
-    var userAccount = userAccounts.find(function(u) {
-      return u.role === 'adminstaff' && (u.username === uname || u.email === uname);
-    });
+    var userAccount = await findLoginAccount('adminstaff', uname);
     if(!userAccount) {
       var anyMatch = userAccounts.find(function(u) { return u.role === 'adminstaff' && (u.username === uname || u.email === uname); });
       if(anyMatch && anyMatch.status === 'disabled') { alert('This account has been disabled. Contact the System Administrator.'); return; }
@@ -7392,7 +7380,7 @@ async function handleAdminStaffClick() {
     }
     if(userAccount.status === 'disabled') { alert('This account has been disabled. Contact the System Administrator.'); return; }
     if(userAccount.status === 'pending') { showPendingApprovalScreen(userAccount); return; }
-    var pwMatch = await checkPassword(pw, userAccount.password, userAccount);
+    var pwMatch = await checkPasswordWithCloud(pw, userAccount);
     if(!pwMatch) { recordLoginFailure(uname); alert('Invalid username or password.'); return; }
     clearLoginFailures(uname);
     currentLoggedInUser = userAccount;
@@ -7415,9 +7403,7 @@ async function handleCmcClick() {
     // Rate limiting check
     var rateCheck = checkLoginRateLimit(uname);
     if(!rateCheck.allowed) { alert('Too many failed attempts. Please wait ' + rateCheck.remainSeconds + ' seconds before trying again.'); return; }
-    var userAccount = userAccounts.find(function(u) {
-      return u.role === 'cmc' && (u.username === uname || u.email === uname);
-    });
+    var userAccount = await findLoginAccount('cmc', uname);
     if(!userAccount) {
       var anyMatch = userAccounts.find(function(u) { return u.role === 'cmc' && (u.username === uname || u.email === uname); });
       if(anyMatch && anyMatch.status === 'disabled') { alert('This account has been disabled. Contact the System Administrator.'); return; }
@@ -7427,7 +7413,7 @@ async function handleCmcClick() {
     }
     if(userAccount.status === 'disabled') { alert('This account has been disabled. Contact the System Administrator.'); return; }
     if(userAccount.status === 'pending') { showPendingApprovalScreen(userAccount); return; }
-    var pwMatch = await checkPassword(pw, userAccount.password, userAccount);
+    var pwMatch = await checkPasswordWithCloud(pw, userAccount);
     if(!pwMatch) { recordLoginFailure(uname); alert('Invalid username or password.'); return; }
     clearLoginFailures(uname);
     currentLoggedInUser = userAccount;
@@ -23633,11 +23619,23 @@ document.addEventListener('visibilitychange', function() {
 });
 
 // ============================================
-// STUDENT LIGHT SYNC — Fetch only user accounts & student data from cloud
-// Allows students to login on any device without needing full admin sync
+// LOGIN-TIME CLOUD ACCOUNT FETCH
+// Pulls the latest user accounts (and their passwords) from the Google Drive
+// backup so any user can log in on any device: accounts created or passwords
+// reset on another device are fetched and merged before the login fails.
 // ============================================
 
-async function studentLightSync(uname, pw) {
+var _cloudAcctFetchLastAt = 0;
+var _cloudAcctFetchPromise = null;
+
+// Fetch the main Drive backup and merge user accounts + student data into
+// local state. interactive=true allows the Google sign-in popup when no saved
+// token is available. Resolves true when cloud data was fetched and merged.
+// Rate-limited to one fetch per 30s; concurrent callers share one request.
+function cloudFetchAccountData(interactive) {
+  if (_cloudAcctFetchPromise) return _cloudAcctFetchPromise;
+  if (Date.now() - _cloudAcctFetchLastAt < 30000) return Promise.resolve(false);
+  _cloudAcctFetchPromise = (async function() {
   try {
     updateLoginSyncStatus('Checking cloud for your account...', '');
 
@@ -23648,16 +23646,14 @@ async function studentLightSync(uname, pw) {
       var savedExpiry = CESTISStore.getItem('schoolDashboardGoogleTokenExpiry');
       if (savedToken && savedExpiry && new Date(savedExpiry) > new Date()) {
         token = savedToken;
-      } else {
-        // Request Google auth for student
+      } else if (interactive) {
         token = await loginPageGoogleAuth();
       }
     }
 
     if (!token) {
-      alert('Could not connect to cloud. Please try the Sync button first, or register a new account.');
-      studentCloudLoginAttempted = false;
-      return;
+      updateLoginSyncStatus('Could not connect to cloud. Use the Sync Now button to sign in to Google.', 'error');
+      return false;
     }
 
     // Step 2: Find and read the backup file from Google Drive
@@ -23670,16 +23666,14 @@ async function studentLightSync(uname, pw) {
 
     var searchResp = await fetch(searchUrl, { headers: { Authorization: 'Bearer ' + token } });
     if (!searchResp.ok) {
-      alert('Could not access cloud data. Please ask your administrator to share access, or register a new account.');
-      studentCloudLoginAttempted = false;
-      return;
+      updateLoginSyncStatus('Could not access cloud data. Ask your administrator to share access.', 'error');
+      return false;
     }
 
     var searchData = await searchResp.json();
     if (!searchData.files || searchData.files.length === 0) {
-      alert('No cloud backup found. Please register a new account or contact your administrator.');
-      studentCloudLoginAttempted = false;
-      return;
+      updateLoginSyncStatus('No cloud backup found.', 'error');
+      return false;
     }
 
     // Step 3: Download the backup file
@@ -23688,14 +23682,13 @@ async function studentLightSync(uname, pw) {
       headers: { Authorization: 'Bearer ' + token }
     });
     if (!downloadResp.ok) {
-      alert('Could not download cloud data. Please contact your administrator.');
-      studentCloudLoginAttempted = false;
-      return;
+      updateLoginSyncStatus('Could not download cloud data.', 'error');
+      return false;
     }
 
     var backupData = await downloadResp.json();
 
-    // Step 4: Merge ONLY student-relevant data (user accounts, students, cert approvals)
+    // Step 4: Merge ONLY login-relevant data (user accounts, students, cert approvals)
     // Do NOT overwrite admin data or give access to backup folders
     // Backup structure wraps all data under .data; fall back to top-level for legacy backups
     var _bd = (backupData.data && typeof backupData.data === 'object') ? backupData.data : backupData;
@@ -23704,9 +23697,30 @@ async function studentLightSync(uname, pw) {
     var cloudCertApprovals = _bd.certDownloadApprovals || [];
     var cloudCertTemplates = _bd.certTemplates || {};
 
-    // Merge user accounts (add cloud accounts not already local)
+    // Merge user accounts — update existing records AND add new ones, so that
+    // passwords reset or accounts changed on another device take effect here.
     cloudAccounts.forEach(function(ca) {
-      if (!userAccounts.find(function(la) { return la.id === ca.id || la.email === ca.email; })) {
+      var caUser = (ca.username || '').toLowerCase();
+      var caEmail = (ca.email || '').toLowerCase();
+      var local = userAccounts.find(function(la) {
+        if (la.id === ca.id) return true;
+        if (caUser && la.username && la.username.toLowerCase() === caUser) return true;
+        if (caEmail && la.email && la.email.toLowerCase() === caEmail) return true;
+        return false;
+      });
+      if (local) {
+        if (ca.password && ca.password !== local.password) {
+          local.password = ca.password;
+          // Drop any stale plaintext cache so an old password no longer validates
+          delete local._plaintextPw;
+        }
+        if (ca.status && ca.status !== local.status) local.status = ca.status;
+        if (ca.name && ca.name !== local.name) local.name = ca.name;
+        if (ca.email && ca.email !== local.email) local.email = ca.email;
+        if (ca.role && ca.role !== local.role) local.role = ca.role;
+        if (ca.programme !== undefined && ca.programme !== local.programme) local.programme = ca.programme;
+        if (ca.studentDataId && !local.studentDataId) local.studentDataId = ca.studentDataId;
+      } else {
         userAccounts.push(ca);
       }
     });
@@ -23756,46 +23770,46 @@ async function studentLightSync(uname, pw) {
     });
 
     saveState();
-    updateLoginSyncStatus('Account data synced! Logging in...', 'success');
-    console.log('[StudentLightSync] Merged ' + cloudAccounts.length + ' accounts, ' + cloudStudents.length + ' students, ' + cloudCertApprovals.length + ' cert approvals from cloud');
-
-    // Step 5: Now retry the login with the merged data
-    var userAccount = userAccounts.find(function(u) {
-      return u.role === 'student' && (u.username === uname || u.email === uname) && u.password === pw;
-    });
-
-    if (!userAccount) {
-      var anyMatch = userAccounts.find(function(u) { return u.role === 'student' && (u.username === uname || u.email === uname); });
-      if (anyMatch && anyMatch.status === 'disabled') { alert('This account has been disabled. Contact an administrator.'); return; }
-      if (anyMatch && anyMatch.status === 'pending') { showPendingApprovalScreen(anyMatch); return; }
-      alert('Account not found in cloud data. Please check your credentials or register a new account.');
-      studentCloudLoginAttempted = false;
-      return;
-    }
-
-    if (userAccount.status === 'disabled') { alert('This account has been disabled. Contact an administrator.'); return; }
-    if (userAccount.status === 'pending') { showPendingApprovalScreen(userAccount); return; }
-
-    var studentMatch = students.find(function(s) { return s.name === userAccount.name || s.id === userAccount.studentDataId; });
-    if (!studentMatch) {
-      studentMatch = createStudentDataForAccount(userAccount);
-    }
-    currentStudent = studentMatch;
-    // Resolve instructor name if missing
-    if (!studentMatch.instructor && studentMatch.course) {
-      var matchedIns = instructorData.find(function(ins) { return ins.course && instructorCourseMatch(studentMatch.course, ins.course); });
-      if (matchedIns) { studentMatch.instructor = matchedIns.name; saveState(); }
-    }
-    var savedSP2 = studentProfiles[studentMatch.id];
-    if(savedSP2 && savedSP2.name) { studentMatch.name = savedSP2.name; userAccount.name = savedSP2.name; }
-    currentLoggedInUser = userAccount;
-    enterApp('student');
+    updateLoginSyncStatus('Account data synced from cloud.', 'success');
+    console.log('[CloudAccountFetch] Merged ' + cloudAccounts.length + ' accounts, ' + cloudStudents.length + ' students, ' + cloudCertApprovals.length + ' cert approvals from cloud');
+    return true;
 
   } catch (err) {
-    console.error('[StudentLightSync] Error:', err);
-    alert('Could not fetch your account from the cloud. Please try the Sync button or register a new account.\n\nError: ' + err.message);
-    studentCloudLoginAttempted = false;
+    console.error('[CloudAccountFetch] Error:', err);
+    updateLoginSyncStatus('Could not fetch account data from the cloud: ' + (err.message || 'unknown error'), 'error');
+    return false;
+  } finally {
+    _cloudAcctFetchLastAt = Date.now();
+    _cloudAcctFetchPromise = null;
   }
+  })();
+  return _cloudAcctFetchPromise;
+}
+
+// Find a login account for the given role, falling back to Google Drive when
+// the account isn't on this device (e.g. it was created on another device).
+async function findLoginAccount(role, uname) {
+  function findLocal() {
+    return userAccounts.find(function(u) {
+      return u.role === role && (u.username === uname || u.email === uname);
+    });
+  }
+  var acct = findLocal();
+  if (!acct && await cloudFetchAccountData(true)) {
+    acct = findLocal();
+  }
+  return acct;
+}
+
+// Hash-aware password check that refreshes the account from Google Drive and
+// re-checks once when the local copy might hold a stale password (e.g. the
+// password was reset on another device after this device last synced).
+async function checkPasswordWithCloud(pw, account) {
+  if (await checkPassword(pw, account.password, account)) return true;
+  if (await cloudFetchAccountData(false)) {
+    return await checkPassword(pw, account.password, account);
+  }
+  return false;
 }
 
 // ============================================
