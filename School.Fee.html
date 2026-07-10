@@ -4559,6 +4559,31 @@
             } catch (e) { return false; }
         }
 
+        // Payment deletion tombstones — ids of payments deleted on any device.
+        // Without these, a deleted or refunded payment resurrects from the next
+        // cloud merge and silently re-inflates the student's totalPaid/status.
+        function getDeletedPaymentIds() {
+            try { return JSON.parse(CESTISStore.getItem('cestiSchoolFeeDeletedPaymentIds')) || []; } catch (e) { return []; }
+        }
+        function recordDeletedPaymentId(id) {
+            if (!id) return;
+            const t = getDeletedPaymentIds();
+            if (t.indexOf(id) === -1) { t.push(id); CESTISStore.setItem('cestiSchoolFeeDeletedPaymentIds', JSON.stringify(t)); }
+        }
+        function unionDeletedPaymentIds(ids) {
+            if (!Array.isArray(ids) || !ids.length) return;
+            const t = getDeletedPaymentIds();
+            let changed = false;
+            ids.forEach(id => { if (id && t.indexOf(id) === -1) { t.push(id); changed = true; } });
+            if (changed) CESTISStore.setItem('cestiSchoolFeeDeletedPaymentIds', JSON.stringify(t));
+        }
+        function filterTombstonedPayments(arr) {
+            if (!Array.isArray(arr)) return arr;
+            const t = getDeletedPaymentIds();
+            if (!t.length) return arr;
+            return arr.filter(p => !p || t.indexOf(p.id) === -1);
+        }
+
         // --- Academic stage (from the LMS Student Progress dashboard) ---------
         // The dashboard owns each student's training stage/progress; we read it
         // from voctrain_students (and live messages) so the fee table can show it.
@@ -4855,6 +4880,11 @@
                 try { stabilizeFeeStudentIds(); } catch (e) {}
                 _feeStabilizing = false;
             }
+            // Enforce payment tombstones at the persist chokepoint so any merge or
+            // pull path that resurrected a deleted payment is corrected before save.
+            const _pBefore = payments.length;
+            payments = filterTombstonedPayments(payments);
+            if (payments.length !== _pBefore) recalculateStudentTotals();
             CESTISStore.setItem('cestiSchoolFeeStudents', JSON.stringify(students));
             CESTISStore.setItem('cestiSchoolFeePayments', JSON.stringify(payments));
             CESTISStore.setItem('cestiSchoolFeeDocuments', JSON.stringify(documents));
@@ -6108,6 +6138,7 @@
                 }
                 
                 payments.splice(paymentIndex, 1);
+                recordDeletedPaymentId(paymentId);
                 saveData();
                 
                 renderPaymentsTable();
@@ -9191,7 +9222,8 @@
             if (cloudData && cloudData.data) {
                 cloudUsers = Array.isArray(cloudData.data.users) ? cloudData.data.users : [];
                 cloudStudents = Array.isArray(cloudData.data.students) ? cloudData.data.students : [];
-                cloudPayments = Array.isArray(cloudData.data.payments) ? cloudData.data.payments : [];
+                unionDeletedPaymentIds(cloudData.data.deletedPaymentIds);
+                cloudPayments = filterTombstonedPayments(Array.isArray(cloudData.data.payments) ? cloudData.data.payments : []);
                 cloudDocuments = Array.isArray(cloudData.data.documents) ? cloudData.data.documents : [];
             }
 
@@ -9639,7 +9671,8 @@
                     data: {
                         users: mergedUsers,
                         students: mergedStudents,
-                        payments: mergedPayments,
+                        payments: filterTombstonedPayments(mergedPayments),
+                        deletedPaymentIds: getDeletedPaymentIds(),
                         documents: mergedDocuments,
                         feeStructure: feeStructure
                     }
@@ -9778,6 +9811,8 @@
                                 existingUsers = Array.isArray(cloudData.data.users) ? cloudData.data.users : [];
                                 existingStudents = Array.isArray(cloudData.data.students) ? cloudData.data.students : [];
                                 existingPayments = Array.isArray(cloudData.data.payments) ? cloudData.data.payments : [];
+                        unionDeletedPaymentIds(cloudData.data.deletedPaymentIds);
+                        existingPayments = filterTombstonedPayments(existingPayments);
                                 existingDocuments = Array.isArray(cloudData.data.documents) ? cloudData.data.documents : [];
                             }
                         } catch (parseError) {
@@ -9894,7 +9929,8 @@
                     data: {
                         users: mergedUsers,
                         students: mergedStudents,
-                        payments: mergedPayments,
+                        payments: filterTombstonedPayments(mergedPayments),
+                        deletedPaymentIds: getDeletedPaymentIds(),
                         documents: mergedDocuments,
                         feeStructure: feeStructure
                     }
@@ -11382,6 +11418,8 @@
                         existingUsers = Array.isArray(cloudData.data.users) ? cloudData.data.users : [];
                         existingStudents = Array.isArray(cloudData.data.students) ? cloudData.data.students : [];
                         existingPayments = Array.isArray(cloudData.data.payments) ? cloudData.data.payments : [];
+                        unionDeletedPaymentIds(cloudData.data.deletedPaymentIds);
+                        existingPayments = filterTombstonedPayments(existingPayments);
                         existingDocuments = Array.isArray(cloudData.data.documents) ? cloudData.data.documents : [];
                         existingFeeStructure = cloudData.data.feeStructure || null;
                     }
@@ -11533,7 +11571,8 @@
                         data: {
                             users: mergedUsers,
                             students: mergedStudents,
-                            payments: mergedPayments,
+                            payments: filterTombstonedPayments(mergedPayments),
+                        deletedPaymentIds: getDeletedPaymentIds(),
                             documents: mergedDocuments,
                             feeStructure: mergedFeeStructure
                         }

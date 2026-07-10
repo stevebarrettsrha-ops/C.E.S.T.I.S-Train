@@ -3612,9 +3612,11 @@ function prepareBackupData() {
     saveToStorage();
     saveQuarterBudget();
 
-    // Collect all quarterly budget data from localStorage
+    // Collect all quarterly budget data from localStorage.
+    // Dynamic upper bound: a fixed 2024..2027 range silently dropped every
+    // quarter after FY 2027/2028 from backups and cross-device sync.
     var quarterlyBudgets = {};
-    for (var fy = 2024; fy <= 2027; fy++) {
+    for (var fy = 2024; fy <= new Date().getFullYear() + 1; fy++) {
         var fyStr = fy + '/' + (fy + 1);
         for (var q = 1; q <= 4; q++) {
             var bKey = getBudgetQuarterKey(fyStr, q);
@@ -3629,7 +3631,7 @@ function prepareBackupData() {
 
     // Collect all quarterly transaction data from localStorage (ensures ALL quarters are backed up)
     var quarterlyTransactions = {};
-    for (var fy2 = 2024; fy2 <= 2027; fy2++) {
+    for (var fy2 = 2024; fy2 <= new Date().getFullYear() + 1; fy2++) {
         var fyStr2 = fy2 + '/' + (fy2 + 1);
         for (var q2 = 1; q2 <= 4; q2++) {
             var tKey = getQuarterKey(fyStr2, q2);
@@ -3713,12 +3715,26 @@ function restoreBackupData(backupData) {
     if (Array.isArray(d.deletedBudgetKeys)) {
         deletedBudgetKeys = d.deletedBudgetKeys;
     }
+    // Staff members and time records are OWNED by the Clock-in system and only
+    // embedded in cashbook backups as a convenience copy. Merge missing records
+    // instead of replacing wholesale — a wholesale restore from an old cashbook
+    // backup used to erase newer clock-in/payroll attendance records.
     if (Array.isArray(d.staffMembers)) {
-        staffMembers = d.staffMembers;
+        var _staffKeys = new Set(staffMembers.map(function(st) { return st.id || st.username || (st.fullName || st.name || '').toLowerCase(); }));
+        d.staffMembers.forEach(function(bs) {
+            var sk = bs.id || bs.username || (bs.fullName || bs.name || '').toLowerCase();
+            if (!_staffKeys.has(sk)) { staffMembers.push(bs); _staffKeys.add(sk); }
+        });
         saveStaffMembers();
     }
     if (Array.isArray(d.timeRecords)) {
-        timeRecords = d.timeRecords;
+        var _recKeys = new Set(timeRecords.map(function(r) {
+            return r.id || ((r.date || '') + '|' + (r.staffId || '') + '|' + (r.clockIn || ''));
+        }));
+        d.timeRecords.forEach(function(br) {
+            var rk = br.id || ((br.date || '') + '|' + (br.staffId || '') + '|' + (br.clockIn || ''));
+            if (!_recKeys.has(rk)) { timeRecords.push(br); _recKeys.add(rk); }
+        });
         saveTimeRecords();
     }
 
@@ -4182,7 +4198,7 @@ function getCurrentQuarterKey() { return getQuarterKey(activeFY, activeQ); }
 // One-time cleanup: sanitize ALL quarterly transaction data in localStorage
 // to remove cross-quarter contamination from prior sync bugs.
 function sanitizeAllQuarterlyStorage() {
-    for (var fy = 2024; fy <= 2027; fy++) {
+    for (var fy = 2024; fy <= new Date().getFullYear() + 1; fy++) {
         var fyStr = fy + '/' + (fy + 1);
         for (var q = 1; q <= 4; q++) {
             var key = getQuarterKey(fyStr, q);
@@ -6013,7 +6029,7 @@ function deleteBudgetLine(key) {
 function copyBudgetFromQuarter() {
     // Build list of available quarters that have budget data
     var options = [];
-    for (var fy = 2024; fy <= 2027; fy++) {
+    for (var fy = 2024; fy <= new Date().getFullYear() + 1; fy++) {
         var fyStr = fy + '/' + (fy + 1);
         for (var q = 1; q <= 4; q++) {
             if (fyStr === activeFY && q === activeQ) continue;

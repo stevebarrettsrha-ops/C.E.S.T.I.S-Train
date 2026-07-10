@@ -29,11 +29,30 @@
   try { if(LS){ for(var i=0;i<LS.length;i++){ var k=LS.key(i); cache[k]=LS.getItem(k); } } } catch(e){}
 
   var db=null, ready=false, wq=[];
+  // Durable-write failure tracking: quota errors on the IndexedDB transaction
+  // fire asynchronously (transaction onerror/onabort), so a plain try/catch
+  // never sees them. Record the failure and notify the app so it can warn the
+  // user instead of silently losing every write from that point on.
+  var writeFailCount = 0;
+  function reportWriteFailure(k, err){
+    writeFailCount++;
+    try { window._cestisStoreWriteFailures = writeFailCount; } catch(_){}
+    try { console.error('[CESTISStore] Durable write FAILED for key "' + k + '":', err); } catch(_){}
+    try { window.dispatchEvent(new CustomEvent('cestis-store-write-error', { detail: { key: k, count: writeFailCount } })); } catch(_){}
+  }
   function drainQueue(){ var q=wq; wq=[]; for(var i=0;i<q.length;i++){ writeIDB(q[i].k,q[i].v,q[i].del); } }
   function writeIDB(k,v,del){
     if(!db){ if(!ready){ wq.push({k:k,v:v,del:del}); } return; }
-    try { var os=db.transaction(STORE,'readwrite').objectStore(STORE); if(del){ os.delete(k); } else { os.put(v,k); } } catch(e){}
+    try {
+      var tx=db.transaction(STORE,'readwrite');
+      tx.onerror = function(e){ reportWriteFailure(k, e && e.target && e.target.error); };
+      tx.onabort = function(e){ reportWriteFailure(k, (e && e.target && e.target.error) || 'transaction aborted'); };
+      var os=tx.objectStore(STORE); if(del){ os.delete(k); } else { os.put(v,k); }
+    } catch(e){ reportWriteFailure(k, e); }
   }
+  // Ask the browser to protect this origin's storage from automatic eviction —
+  // essential for a system whose primary datastore is IndexedDB for years.
+  try { if(navigator.storage && navigator.storage.persist) navigator.storage.persist(); } catch(e){}
   try {
     var req = indexedDB.open(DB_NAME,1);
     req.onupgradeneeded = function(e){ var d=e.target.result; if(!d.objectStoreNames.contains(STORE)){ d.createObjectStore(STORE); } };
@@ -4888,6 +4907,15 @@ var currentInstructor = null;
 
 // ============================== MAJOR IMPROVEMENTS: SECURITY, PERFORMANCE, ERROR HANDLING, UX ==============================
 
+// ---------- Local-timezone date stamp ----------
+// Always stamp YYYY-MM-DD dates in LOCAL time. toISOString() is UTC: in
+// Jamaica (UTC-5) any record written after 7:00 PM got tomorrow's date,
+// putting attendance/fees in the wrong day and even the wrong FY quarter.
+function localDateStr(d) {
+  var n = d instanceof Date ? d : new Date();
+  return n.getFullYear() + '-' + String(n.getMonth() + 1).padStart(2, '0') + '-' + String(n.getDate()).padStart(2, '0');
+}
+
 // ---------- SECURITY: SHA-256 Password Hashing ----------
 async function hashPassword(password) {
   var encoder = new TextEncoder();
@@ -4902,6 +4930,22 @@ async function verifyPassword(password, hash) {
   return computed === hash;
 }
 
+// Cache the plaintext password on an account for the CURRENT SESSION ONLY.
+// Defined non-enumerable so JSON.stringify can never serialize it into
+// localStorage, Google Drive backups, or data exports — plaintext passwords
+// must never leave memory.
+function cachePlaintextPw(account, pw) {
+  try {
+    Object.defineProperty(account, '_plaintextPw', { value: pw, writable: true, configurable: true, enumerable: false });
+  } catch(e) {}
+}
+
+// JSON.stringify replacer that strips any plaintext password cache persisted
+// by older versions (belt-and-braces alongside the non-enumerable cache).
+function stripSecretFields(key, value) {
+  return key === '_plaintextPw' ? undefined : value;
+}
+
 // Migrate plaintext passwords to hashed passwords on first load
 var _passwordMigrationDone = false;
 async function migratePasswordsToHash() {
@@ -4912,7 +4956,7 @@ async function migratePasswordsToHash() {
     var u = userAccounts[i];
     // If password is not 64-char hex (SHA-256 hash), it's plaintext — migrate it
     if(u.password && !/^[a-f0-9]{64}$/.test(u.password)) {
-      u._plaintextPw = u.password; // keep temporarily for current session login
+      cachePlaintextPw(u, u.password); // keep temporarily for current session login (in memory only)
       u.password = await hashPassword(u.password);
       changed = true;
     }
@@ -5181,7 +5225,7 @@ function exportDataBackup() {
   var url = URL.createObjectURL(blob);
   var a = document.createElement('a');
   a.href = url;
-  a.download = 'CESTIS_Backup_' + new Date().toISOString().split('T')[0] + '.json';
+  a.download = 'CESTIS_Backup_' + localDateStr() + '.json';
   a.click();
   URL.revokeObjectURL(url);
   showToast('Backup exported successfully!');
@@ -5321,7 +5365,7 @@ var calendarMonth = new Date().getMonth();
 var calendarYear = new Date().getFullYear();
 var selectedCalendarDay = null;
 var announcementFormVisible = false;
-var currentAttendanceDate = new Date().toISOString().split('T')[0];
+var currentAttendanceDate = localDateStr();
 
 // ============================== PERSISTENT DATA ARRAYS ==============================
 var classSessions = [];
@@ -5667,7 +5711,24 @@ function lmsChatEnsureMembership() {
   }
 }
 
+// Cap chat history per room so years of daily use cannot exhaust the ~5MB
+// localStorage quota or turn every Drive sync into a multi-MB upload. The cap
+// applies in memory, so the capped list is what syncs to Drive and the cloud
+// copy shrinks too instead of resurrecting trimmed messages on merge.
+var LMS_CHAT_MAX_MESSAGES_PER_ROOM = 500;
+function trimLmsChatHistory() {
+  try {
+    Object.keys(lmsChatMessages).forEach(function(roomId) {
+      var msgs = lmsChatMessages[roomId];
+      if (Array.isArray(msgs) && msgs.length > LMS_CHAT_MAX_MESSAGES_PER_ROOM) {
+        lmsChatMessages[roomId] = msgs.slice(msgs.length - LMS_CHAT_MAX_MESSAGES_PER_ROOM);
+      }
+    });
+  } catch(e) {}
+}
+
 function saveLmsChatData() {
+  trimLmsChatHistory();
   try {
     CESTISStore.setItem('voctrain_chatRooms', JSON.stringify(lmsChatRooms));
     // Strip large base64 data before saving to localStorage to avoid quota issues
@@ -5939,7 +6000,7 @@ function saveState() {
     CESTISStore.setItem('voctrain_announcements', JSON.stringify(announcements));
     CESTISStore.setItem('voctrain_attendance', JSON.stringify(attendanceRecords));
     if (typeof mirrorActiveAttendance === 'function') mirrorActiveAttendance();
-    CESTISStore.setItem('voctrain_users', JSON.stringify(userAccounts));
+    CESTISStore.setItem('voctrain_users', JSON.stringify(userAccounts, stripSecretFields));
     CESTISStore.setItem('voctrain_classSessions', JSON.stringify(classSessions));
     CESTISStore.setItem('voctrain_adminMeetings', JSON.stringify(adminMeetings));
     CESTISStore.setItem('voctrain_assignments', JSON.stringify(instructorAssignments));
@@ -6419,7 +6480,7 @@ function reconcileStudentsFromAccounts() {
       assignmentsTotal: 10,
       gpa: '0.0',
       gender: '',
-      createdAt: u.createdAt || new Date().toISOString().split('T')[0],
+      createdAt: u.createdAt || localDateStr(),
       instructor: assignedInstructor
     });
 
@@ -6441,7 +6502,7 @@ function reconcileStudentsFromAccounts() {
         studentId: s.id,
         studentName: s.name,
         course: s.course,
-        date: new Date().toISOString().split('T')[0],
+        date: localDateStr(),
         days: {Mon:'absent', Tue:'absent', Wed:'absent', Thu:'absent', Fri:'absent'}
       });
       changed = true;
@@ -6520,7 +6581,7 @@ function backfillAttendanceRoster() {
     if (!seen[s.id]) {
       attendanceRecords.push({
         studentId: s.id, studentName: s.name, course: s.course,
-        date: new Date().toISOString().split('T')[0],
+        date: localDateStr(),
         days: { Mon: 'absent', Tue: 'absent', Wed: 'absent', Thu: 'absent', Fri: 'absent' }
       });
       added = true;
@@ -6596,7 +6657,7 @@ var userAccounts = [
 var umSelectedIds = [];
 
 function saveUserAccounts() {
-  try { CESTISStore.setItem('voctrain_users', JSON.stringify(userAccounts)); } catch(e) {}
+  try { CESTISStore.setItem('voctrain_users', JSON.stringify(userAccounts, stripSecretFields)); } catch(e) {}
   // Push changes to Google Drive immediately (debounced)
   scheduleDebouncedCloudSave();
 }
@@ -6605,39 +6666,43 @@ function loadUserAccounts() {
     var u = CESTISStore.getItem('voctrain_users');
     if(u) userAccounts = JSON.parse(u);
     if(!Array.isArray(userAccounts)) userAccounts = [];
-    // Guarantee the built-in admin recovery login ALWAYS exists and uses the
-    // known default credentials. Without this, a cloud-sync/backup-restore that
-    // replaced the seed accounts could leave no working admin to sign in with.
+    // Guarantee the built-in admin recovery login ALWAYS exists and stays
+    // active — but NEVER reset its password: force-resetting to the published
+    // default on every load silently undid admin password changes and left a
+    // permanent default-credentials backdoor that synced to every device.
+    // The default password is only seeded when the account has no password.
     var defAdmin = {id:'USR-001',name:'Administrator',role:'admin',username:'cestisadmin',password:'cestisadmin123$',email:'admin@heartlms.edu.jm',programme:'',status:'active',createdAt:'2026-01-01'};
     var adminAcct = userAccounts.find(function(a){ return a.id === 'USR-001' && a.role === 'admin'; });
     if(adminAcct) {
       adminAcct.username = 'cestisadmin';
-      adminAcct.password = 'cestisadmin123$';
-      delete adminAcct._plaintextPw;
+      if(!adminAcct.password) adminAcct.password = 'cestisadmin123$';
       adminAcct.status = 'active';
     } else {
       userAccounts.push(defAdmin);
     }
-    // Migrate: ensure default admin staff account exists
+    // Migrate: ensure default admin staff account exists (password seeded only if missing)
     var defAS = {id:'USR-011',name:'Admin Staff',role:'adminstaff',username:'adminstaff',password:'cestisadmin123$',email:'adminstaff@heartlms.edu.jm',programme:'',status:'active',createdAt:'2026-01-15'};
     var existingAS = userAccounts.find(function(u){ return u.id === 'USR-011'; });
     if(!existingAS) {
       userAccounts.push(defAS);
     } else {
       existingAS.username = 'adminstaff';
-      existingAS.password = 'cestisadmin123$';
+      if(!existingAS.password) existingAS.password = 'cestisadmin123$';
       existingAS.role = 'adminstaff';
     }
-    // Migrate: ensure default CMC board member account exists
+    // Migrate: ensure default CMC board member account exists (password seeded only if missing)
     var defCMC = {id:'USR-021',name:'Board Chair',role:'cmc',username:'cmcadmin',password:'cestisadmin123$',email:'cmc@heartlms.edu.jm',programme:'',status:'active',createdAt:'2026-01-01'};
     var existingCMC = userAccounts.find(function(u){ return u.id === 'USR-021'; });
     if(!existingCMC) {
       userAccounts.push(defCMC);
     } else {
       existingCMC.username = 'cmcadmin';
-      existingCMC.password = 'cestisadmin123$';
+      if(!existingCMC.password) existingCMC.password = 'cestisadmin123$';
       existingCMC.role = 'cmc';
     }
+    // Purge any plaintext password caches that older versions persisted to
+    // storage/backups — they are transient, in-memory-only session caches.
+    userAccounts.forEach(function(a){ delete a._plaintextPw; });
   } catch(e) {}
 }
 loadUserAccounts();
@@ -6751,7 +6816,8 @@ async function createUserAccount() {
   if(role === 'student') { var _enrolBlk = courseEnrolmentBlockReason(programme); if(_enrolBlk) { alert(_enrolBlk); return; } }
   var now = new Date(); var dateStr = now.getFullYear()+'-'+String(now.getMonth()+1).padStart(2,'0')+'-'+String(now.getDate()).padStart(2,'0');
   var hashedPw = await hashPassword(password);
-  var newAccount = {id:getNextUserId(),name:name,role:role,username:username,password:hashedPw,_plaintextPw:password,email:email,programme:(role==='admin'||role==='adminstaff'||role==='cmc')?'':programme,status:'active',createdAt:dateStr,registeredVia:'admin-created'};
+  var newAccount = {id:getNextUserId(),name:name,role:role,username:username,password:hashedPw,email:email,programme:(role==='admin'||role==='adminstaff'||role==='cmc')?'':programme,status:'active',createdAt:dateStr,registeredVia:'admin-created'};
+  cachePlaintextPw(newAccount, password);
   userAccounts.push(newAccount);
   // Create linked student/instructor data so the account is immediately usable
   if (role === 'student') {
@@ -6847,7 +6913,7 @@ async function confirmResetPassword() {
   var user = userAccounts.find(function(u){ return u.id === userId; });
   if(!user) return;
   user.password = await hashPassword(newPw);
-  user._plaintextPw = newPw;
+  cachePlaintextPw(user, newPw);
   saveUserAccounts();
   closeModal('resetPasswordModal');
   showToast('Password reset successfully for ' + user.name);
@@ -7694,13 +7760,13 @@ async function submitRegistration() {
     role: role,
     username: email.split('@')[0],
     password: hashedPassword,
-    _plaintextPw: password,
     email: email,
     programme: programme,
     status: 'pending',
-    createdAt: new Date().toISOString().split('T')[0],
+    createdAt: localDateStr(),
     registeredVia: 'registration'
   };
+  cachePlaintextPw(newUser, password);
 
   userAccounts.push(newUser);
   saveState();
@@ -7766,13 +7832,13 @@ function createStudentDataForAccount(userAccount) {
     assignmentsTotal: 10,
     gpa: '0.0',
     gender: '',
-    createdAt: new Date().toISOString().split('T')[0],
+    createdAt: localDateStr(),
     instructor: assignedInstructor
   };
   if (window.CESTISCore) { var _sid = CESTISCore.stableStudentId(newStudent); if (_sid) newStudent.id = _sid; }
   students.push(newStudent);
   // Auto-create attendance record so the student appears in attendance pages
-  attendanceRecords.push({studentId:newStudent.id, studentName:newStudent.name, course:newStudent.course, date:new Date().toISOString().split('T')[0], days:{Mon:'absent',Tue:'absent',Wed:'absent',Thu:'absent',Fri:'absent'}});
+  attendanceRecords.push({studentId:newStudent.id, studentName:newStudent.name, course:newStudent.course, date:localDateStr(), days:{Mon:'absent',Tue:'absent',Wed:'absent',Thu:'absent',Fri:'absent'}});
   updateSkillAreaCounts();
   userAccount.studentDataId = newStudent.id;
   saveState();
@@ -7876,7 +7942,7 @@ function approveUser(userId) {
   var user = userAccounts.find(function(u) { return u.id === userId; });
   if(!user) return;
   user.status = 'active';
-  user.approvedAt = new Date().toISOString().split('T')[0];
+  user.approvedAt = localDateStr();
   user.approvedBy = 'admin';
   // Ensure student data is created and linked when approving a student account
   if (user.role === 'student' && !user.studentDataId) {
@@ -7906,7 +7972,7 @@ function rejectUser(userId) {
   if(!user) return;
   if(!confirm('Reject the account for "' + user.name + '"? They will not be able to log in.')) return;
   user.status = 'rejected';
-  user.approvedAt = new Date().toISOString().split('T')[0];
+  user.approvedAt = localDateStr();
   user.approvedBy = 'admin';
   saveState();
   renderVerifyUsersPage();
@@ -7918,7 +7984,7 @@ function approveAllPending() {
   var pending = userAccounts.filter(function(u) { return u.status === 'pending' || (u.status === 'disabled' && u.role !== 'admin'); });
   if(pending.length === 0) { alert('No pending accounts to approve.'); return; }
   if(!confirm('Activate all ' + pending.length + ' pending/disabled account(s)?')) return;
-  var dateStr = new Date().toISOString().split('T')[0];
+  var dateStr = localDateStr();
   pending.forEach(function(u) {
     u.status = 'active';
     u.approvedAt = dateStr;
@@ -7950,7 +8016,7 @@ function rejectAllPending() {
   var pending = userAccounts.filter(function(u) { return u.status === 'pending' || (u.status === 'disabled' && u.role !== 'admin'); });
   if(pending.length === 0) { alert('No pending accounts to reject.'); return; }
   if(!confirm('Reject all ' + pending.length + ' pending account(s)?')) return;
-  var dateStr = new Date().toISOString().split('T')[0];
+  var dateStr = localDateStr();
   pending.forEach(function(u) {
     u.status = 'rejected';
     u.approvedAt = dateStr;
@@ -8438,16 +8504,16 @@ var cestisFeatureConfig = {
 // (the register is stored one roster per quarter).
 function cestisAttQuarterDate(){
   try {
-    if(typeof CESTISCore==='undefined' || typeof CESTISCore.getActiveQuarter!=='function') return new Date().toISOString().split('T')[0];
+    if(typeof CESTISCore==='undefined' || typeof CESTISCore.getActiveQuarter!=='function') return localDateStr();
     var cur = CESTISCore.getActiveQuarter();
-    var today = new Date().toISOString().split('T')[0];
+    var today = localDateStr();
     var todayQ = CESTISCore.deriveQuarter(today);
     if(todayQ && todayQ.fy===cur.fy && todayQ.q===cur.q) return today; // today is already in the active quarter
     var meta = CESTISCore.getQuarterMeta(cur.q);
     var yr = CESTISCore.quarterCalendarYear(cur.fy, cur.q);
     var mm = ('0'+(meta?meta.startMonth:1)).slice(-2);
     return yr + '-' + mm + '-01'; // first day of the active quarter
-  } catch(e){ return new Date().toISOString().split('T')[0]; }
+  } catch(e){ return localDateStr(); }
 }
 // Snap the Date field into the active quarter, but preserve a user-chosen date
 // that already falls within it (so picking a specific day isn't overwritten).
@@ -8500,7 +8566,7 @@ function cestisMountAttQuarterBar(barId, renderFn){
 }
 function renderExamsUpcoming(){ if(typeof renderExams==='function'){ try{ renderExams('upcoming'); }catch(e){} } }
 function cestisCertsAll(){ if(typeof renderCerts==='function'){ try{ renderCerts('all',''); }catch(e){} } }
-function cestisInitIAttendance(){ var d=document.getElementById('iAttendanceDate'); if(d && !d.value){ d.value=new Date().toISOString().split('T')[0]; } var lbl=document.getElementById('iAttCourseLabel'); if(lbl && typeof currentInstructor!=='undefined' && currentInstructor){ lbl.textContent='— '+currentInstructor.course; } if(typeof renderInstructorAttendance==='function'){ try{ renderInstructorAttendance(); }catch(e){} } }
+function cestisInitIAttendance(){ var d=document.getElementById('iAttendanceDate'); if(d && !d.value){ d.value=localDateStr(); } var lbl=document.getElementById('iAttCourseLabel'); if(lbl && typeof currentInstructor!=='undefined' && currentInstructor){ lbl.textContent='— '+currentInstructor.course; } if(typeof renderInstructorAttendance==='function'){ try{ renderInstructorAttendance(); }catch(e){} } }
 
 // Fetch (once) and inject an external feature file into its page mount slot.
 function cestisMountFeature(slot) {
@@ -9477,7 +9543,7 @@ function buildStudentPages() {
     <div class="card">
       <div class="card-header"><h3>Today's Schedule</h3><span style="font-size:12px;color:var(--text-muted);">${new Date().toLocaleDateString('en-US',{weekday:'long',month:'short',day:'numeric',year:'numeric'})}</span></div>
       ${(function(){
-        const today = new Date().toISOString().split('T')[0];
+        const today = localDateStr();
         const todaySessions = classSessions.filter(cs => (cs.course === s.course || instructorCourseMatch(cs.course, s.course)) && cs.date === today);
         const todayEvents = calendarEvents.filter(ce => ce.date === today && (ce.forRoles||[]).indexOf('student') !== -1);
         if(todaySessions.length === 0 && todayEvents.length === 0) {
@@ -10170,7 +10236,7 @@ function createInstructorAnnouncement() {
   if(document.getElementById('iAnnRoleAdminStaff')?.checked) targetRoles.push('adminstaff');
   if(targetRoles.length === 0) { alert('Please select at least one target audience'); return; }
   announcements.unshift({
-    id: Date.now(), title, body, priority, date: new Date().toISOString().split('T')[0], author: currentInstructor.name, forRoles: targetRoles
+    id: Date.now(), title, body, priority, date: localDateStr(), author: currentInstructor.name, forRoles: targetRoles
   });
   document.getElementById('iAnnTitle').value = '';
   document.getElementById('iAnnBody').value = '';
@@ -12370,7 +12436,7 @@ function renderInstructorDashboardDynamic() {
     var mySessions = classSessions.filter(function(s) {
       return s.course === ins.course || instructorCourseMatch(s.course, ins.course) || s.createdBy === ins.name;
     });
-    var today = new Date().toISOString().split('T')[0];
+    var today = localDateStr();
     var todaySessions = mySessions.filter(function(s) { return s.date === today; });
     if (todaySessions.length === 0) {
       // Show next upcoming session
@@ -14136,6 +14202,7 @@ async function recoverCourseDataFromCloud(courseName) {
     var backupData = null;
     for (var i = 0; i < ALL_DRIVE_FOLDERS.length; i++) {
       var fileId = await findBackupFileInFolder(ALL_DRIVE_FOLDERS[i].id);
+      if (fileId === 'LOOKUP_FAILED') fileId = null;
       if (!fileId) continue;
       var resp = await fetch('https://www.googleapis.com/drive/v3/files/' + fileId + '?alt=media', {
         headers: { 'Authorization': 'Bearer ' + googleAccessToken }
@@ -15239,7 +15306,7 @@ function exportExamResults() {
   var blob = new Blob([csv], {type:'text/csv'});
   var a = document.createElement('a');
   a.href = URL.createObjectURL(blob);
-  a.download = 'CESTIS_Exam_Results_' + new Date().toISOString().split('T')[0] + '.csv';
+  a.download = 'CESTIS_Exam_Results_' + localDateStr() + '.csv';
   document.body.appendChild(a);
   a.click();
   document.body.removeChild(a);
@@ -15338,7 +15405,7 @@ function syncStudentsFromLocalFeeSystem() {
         gpa: '0.0',
         gender: norm(fee.gender),
         email: norm(fee.email),
-        createdAt: new Date().toISOString().split('T')[0],
+        createdAt: localDateStr(),
         instructor: assignedInstructor,
         source: 'schoolfee'
       });
@@ -15363,7 +15430,7 @@ function syncStudentsFromLocalFeeSystem() {
               email: norm(fee.email) || '',
               programme: course,
               status: 'disabled',
-              createdAt: new Date().toISOString().split('T')[0],
+              createdAt: localDateStr(),
               registeredVia: 'fee-system',
               studentDataId: studentId,
               approvedBy: 'system'
@@ -15450,7 +15517,7 @@ function updateStudentStage(idx) {
   const newStage = document.getElementById('newStage').value;
   const prevStage = students[idx].stage;
   students[idx].stage = newStage;
-  if(newStage==='certified'){students[idx].progress=90;students[idx].certNo=students[idx].course.substring(0,2).toUpperCase()+'-'+new Date().getFullYear()+'-'+String(Math.floor(Math.random()*9000)+1000);students[idx].certDate=new Date().toLocaleDateString('en-US',{year:'numeric',month:'long',day:'2-digit'});}
+  if(newStage==='certified'){students[idx].progress=90;students[idx].certNo=generateUniqueCertNo(students[idx].course.substring(0,2).toUpperCase());students[idx].certDate=new Date().toLocaleDateString('en-US',{year:'numeric',month:'long',day:'2-digit'});}
   if(newStage==='collected'){students[idx].progress=100;students[idx].certCollected=true;}
   if(newStage==='incomplete')students[idx].progress=Math.min(students[idx].progress,40);
   // Demotion: if the student is no longer certified/collected, strip the
@@ -15548,7 +15615,7 @@ function saveEditStudent() {
     attRec.studentName = s.name;
     attRec.course = s.course;
   } else {
-    attendanceRecords.push({studentId:s.id, studentName:s.name, course:s.course, date:new Date().toISOString().split('T')[0], days:{Mon:'absent',Tue:'absent',Wed:'absent',Thu:'absent',Fri:'absent'}});
+    attendanceRecords.push({studentId:s.id, studentName:s.name, course:s.course, date:localDateStr(), days:{Mon:'absent',Tue:'absent',Wed:'absent',Thu:'absent',Fri:'absent'}});
   }
   // Keep the parallel certificate-download snapshot consistent with edits to
   // the student's identity/course so the Cert Download page shows current data.
@@ -15852,11 +15919,11 @@ async function addStudent() {
   var gender = document.getElementById('newStudentGender').value || '';
   var studentId = generateStudentId();
   if (window.CESTISCore) { var _sid = CESTISCore.stableStudentId({name:name, course:selectedCourse}); if (_sid) studentId = _sid; }
-  students.unshift({id:studentId,name,stage:document.getElementById('newStudentStage').value,course:selectedCourse,score:'',progress:10,certNo:null,certDate:null,certCollected:false,attendance:0,assignments:0,assignmentsTotal:8,gpa:'0.0',instructor:assignedInstructor,gender:gender,createdAt:new Date().toISOString().split('T')[0],lastModified:new Date().toISOString()});
+  students.unshift({id:studentId,name,stage:document.getElementById('newStudentStage').value,course:selectedCourse,score:'',progress:10,certNo:null,certDate:null,certCollected:false,attendance:0,assignments:0,assignmentsTotal:8,gpa:'0.0',instructor:assignedInstructor,gender:gender,createdAt:localDateStr(),lastModified:new Date().toISOString()});
   // Auto-create attendance record so the student appears in attendance pages
   var existingAtt = attendanceRecords.find(function(r){ return r.studentId === studentId; });
   if(!existingAtt) {
-    attendanceRecords.push({studentId:studentId, studentName:name, course:selectedCourse, date:new Date().toISOString().split('T')[0], days:{Mon:'absent',Tue:'absent',Wed:'absent',Thu:'absent',Fri:'absent'}});
+    attendanceRecords.push({studentId:studentId, studentName:name, course:selectedCourse, date:localDateStr(), days:{Mon:'absent',Tue:'absent',Wed:'absent',Thu:'absent',Fri:'absent'}});
   }
   updateSkillAreaCounts();
 
@@ -15879,7 +15946,7 @@ async function addStudent() {
       email: email || '',
       programme: selectedCourse,
       status: 'disabled',
-      createdAt: new Date().toISOString().split('T')[0],
+      createdAt: localDateStr(),
       registeredVia: 'admin-created',
       studentDataId: studentId,
       approvedBy: 'admin'
@@ -17561,7 +17628,7 @@ function createExam() {
     id: examId,
     title: title,
     course: document.getElementById('examCourse').value,
-    date: document.getElementById('examDate').value||new Date().toISOString().split('T')[0],
+    date: document.getElementById('examDate').value||localDateStr(),
     time: document.getElementById('examTime').value||'09:00',
     duration: parseInt(document.getElementById('examDuration').value)||90,
     students: 0,
@@ -18951,7 +19018,7 @@ function createAnnouncement() {
   if(document.getElementById('annRoleAdminStaff')?.checked) targetRoles.push('adminstaff');
   if(targetRoles.length === 0) { alert('Please select at least one target audience'); return; }
   announcements.unshift({
-    id: Date.now(), title, body, priority, date: new Date().toISOString().split('T')[0], author, forRoles: targetRoles
+    id: Date.now(), title, body, priority, date: localDateStr(), author, forRoles: targetRoles
   });
   document.getElementById('annTitle').value = '';
   document.getElementById('annBody').value = '';
@@ -19015,7 +19082,7 @@ function renderStudentClassSessions() {
   if (!container) return;
   var s = currentStudent;
   if (!s) { container.innerHTML = '<p style="color:var(--text-muted);padding:16px;text-align:center;">No student data available.</p>'; return; }
-  var today = new Date().toISOString().split('T')[0];
+  var today = localDateStr();
   var mySessions = classSessions.filter(function(cs) {
     return instructorCourseMatch(cs.course, s.course) && cs.date >= today;
   }).sort(function(a,b){ return (a.date+a.time).localeCompare(b.date+b.time); });
@@ -19352,7 +19419,7 @@ function submitSupportMessage() {
     subject: subject,
     message: message,
     timestamp: Date.now(),
-    date: new Date().toISOString().slice(0,10),
+    date: localDateStr(),
     read: false,
     replied: false
   };
@@ -20063,7 +20130,7 @@ function finalizeImportExam() {
     id: examId,
     title: title,
     course: document.getElementById('importExamCourse').value,
-    date: document.getElementById('importExamDate').value || new Date().toISOString().split('T')[0],
+    date: document.getElementById('importExamDate').value || localDateStr(),
     time: document.getElementById('importExamTime').value || '09:00',
     duration: parseInt(document.getElementById('importExamDuration').value) || 90,
     students: 0,
@@ -20253,7 +20320,7 @@ async function syncStudentsFromFeeSystem() {
         assignmentsTotal: 10,
         gpa: '0.0',
         gender: '',
-        createdAt: new Date().toISOString().split('T')[0],
+        createdAt: localDateStr(),
         instructor: assignedInstructor
       });
 
@@ -20273,7 +20340,7 @@ async function syncStudentsFromFeeSystem() {
           email: '',
           programme: course.trim(),
           status: 'disabled',
-          createdAt: new Date().toISOString().split('T')[0],
+          createdAt: localDateStr(),
           registeredVia: 'fee-system',
           studentDataId: studentId,
           approvedBy: 'system'
@@ -20406,6 +20473,22 @@ function dismissCloudNotification() {
     setTimeout(function(){ if (el && el.parentNode) el.remove(); }, 400);
   }
 }
+
+// Surface durable-storage write failures (e.g. disk/quota exhaustion) that
+// CESTISStore detects — without this the app keeps serving the in-memory
+// cache and looks healthy while every save silently evaporates on reload.
+var _storeWriteErrorNotified = false;
+window.addEventListener('cestis-store-write-error', function(ev) {
+  if (_storeWriteErrorNotified) return;
+  _storeWriteErrorNotified = true;
+  try {
+    showCloudNotification('error', 'Device Storage Is Failing',
+      'This device could not save data to local storage (it may be full). Recent changes may be lost when the page closes. ' +
+      'Free up disk space, then use Settings → Export Backup and verify cloud sync is connected.', false, 0);
+  } catch(e) {
+    try { alert('WARNING: This device could not save data locally. Recent changes may be lost. Export a backup now.'); } catch(_) {}
+  }
+});
 
 // Called whenever the Google Drive token expires or is rejected (401/403).
 // Marks the cloud connection as down WITHOUT touching local data, stops the
@@ -20813,11 +20896,15 @@ async function findExistingBackupFile() {
         cloudFileId = data.files[0].id;
         CESTISStore.setItem('schoolDashboardCloudFileId', cloudFileId);
         console.log('Found existing backup file:', cloudFileId);
+        return 'FOUND';
       }
+      return 'ABSENT'; // confirmed — safe to create the file
     }
+    console.warn('Backup file lookup failed: HTTP ' + response.status);
   } catch (error) {
     console.error('Error finding backup file:', error);
   }
+  return 'LOOKUP_FAILED';
 }
 
 // Check cloud file for changes before saving (multi-user conflict detection)
@@ -20976,10 +21063,21 @@ async function saveToCloud() {
       }
     };
 
-    const jsonContent = JSON.stringify(backupData, null, 2);
+    const jsonContent = JSON.stringify(backupData, stripSecretFields, 2);
     const blob = new Blob([jsonContent], { type: 'application/json' });
 
     let response;
+
+    if (!cloudFileId) {
+      // Re-verify before creating: a transient lookup failure must not fork
+      // the shared backup file into duplicates that devices read at random.
+      const lookup = await findExistingBackupFile();
+      if (lookup === 'LOOKUP_FAILED') {
+        alert('Could not verify the cloud backup file (network error). Please try again.');
+        setCloudSyncing(false);
+        return;
+      }
+    }
 
     if (cloudFileId) {
       // Update existing file
@@ -21876,11 +21974,16 @@ async function findBackupFileInFolder(folderId) {
         _autoSaveFileIds[folderId] = data.files[0].id;
         return data.files[0].id;
       }
+      return null; // confirmed absent — safe for callers to create the file
     }
+    console.warn('[AutoSync] Backup lookup failed in folder ' + folderId + ': HTTP ' + response.status);
   } catch (e) {
     console.warn('[AutoSync] Error finding backup in folder ' + folderId + ':', e);
   }
-  return null;
+  // Lookup FAILED (network/auth) — the file may still exist. Callers must NOT
+  // create a new file on this signal or the backup forks into duplicates that
+  // devices then read/write at random.
+  return 'LOOKUP_FAILED';
 }
 
 // ===================== MASTER SNAPSHOT (single full-store Drive file) =====================
@@ -21907,9 +22010,15 @@ async function findMasterSnapshotFile() {
     var query = "name='" + MASTER_SNAPSHOT_CONFIG.FILE_NAME + "' and '" + MASTER_SNAPSHOT_CONFIG.FOLDER_ID + "' in parents and trashed=false";
     var resp = await fetch('https://www.googleapis.com/drive/v3/files?q=' + encodeURIComponent(query) + '&fields=files(id,name)',
       { headers: { 'Authorization': 'Bearer ' + googleAccessToken } });
-    if (resp.ok) { var d = await resp.json(); if (d.files && d.files.length) { _masterSnapshotFileId = d.files[0].id; return d.files[0].id; } }
+    if (resp.ok) {
+      var d = await resp.json();
+      if (d.files && d.files.length) { _masterSnapshotFileId = d.files[0].id; return d.files[0].id; }
+      return null; // confirmed absent
+    }
+    console.warn('[MasterSnapshot] lookup failed: HTTP ' + resp.status);
   } catch (e) { console.warn('[MasterSnapshot] find failed:', e); }
-  return null;
+  // Lookup failed — do not let callers create a duplicate snapshot file.
+  return 'LOOKUP_FAILED';
 }
 
 // Build + upload the single master snapshot. Never throws. Skips the upload when
@@ -21931,6 +22040,7 @@ async function saveMasterSnapshot(eventName, force) {
     if (!force && snapshot.checksum === _lastMasterSnapshotHash) return { ok: true, skipped: true };
     var blob = new Blob([JSON.stringify(snapshot)], { type: 'application/json' });
     var fileId = _masterSnapshotFileId || await findMasterSnapshotFile();
+    if (fileId === 'LOOKUP_FAILED') return { ok: false, reason: 'lookup-failed' };
     var resp;
     if (fileId) {
       resp = await fetch('https://www.googleapis.com/upload/drive/v3/files/' + fileId + '?uploadType=media',
@@ -21956,7 +22066,7 @@ async function fetchMasterSnapshot() {
   if (!googleAccessToken) return null;
   try {
     var fileId = await findMasterSnapshotFile();
-    if (!fileId) return null;
+    if (!fileId || fileId === 'LOOKUP_FAILED') return null;
     var resp = await fetch('https://www.googleapis.com/drive/v3/files/' + fileId + '?alt=media',
       { headers: { 'Authorization': 'Bearer ' + googleAccessToken } });
     if (!resp.ok) return null;
@@ -22135,7 +22245,7 @@ async function savePerUserBackup() {
     if (isAdmin || documentHubFiles.length > 0) userData.data.documentHubFiles = documentHubFiles;
     userData.data.certTemplateCourseMap = certTemplateCourseMap;
 
-    var blob = new Blob([JSON.stringify(userData)], { type: 'application/json' });
+    var blob = new Blob([JSON.stringify(userData, stripSecretFields)], { type: 'application/json' });
 
     var fileId = await findPerUserBackupFile();
     if (fileId) {
@@ -22191,7 +22301,13 @@ async function silentMergeFromBackup(fileId) {
     if (!response.ok) return false;
 
     const backupData = await response.json();
-    if (!backupData.data || !backupData.version) return false;
+    if (!backupData.data) {
+      console.warn('[AutoSync] Backup file has no .data envelope — skipping merge (file left untouched)');
+      return false;
+    }
+    if (!backupData.version) {
+      console.warn('[AutoSync] Backup file missing version field — merging anyway (legacy format)');
+    }
 
     let changed = false;
 
@@ -22228,7 +22344,8 @@ async function silentMergeFromBackup(fileId) {
           if (cloudUser.studentDataId && !localMatch.studentDataId) { localMatch.studentDataId = cloudUser.studentDataId; userAccountsChanged = true; }
           if (cloudUser.registeredVia && !localMatch.registeredVia) { localMatch.registeredVia = cloudUser.registeredVia; userAccountsChanged = true; }
         } else {
-          // New account — add it
+          // New account — add it (dropping any plaintext cache an old backup leaked)
+          delete cloudUser._plaintextPw;
           userAccounts.push(cloudUser);
           userAccountsChanged = true;
         }
@@ -22291,7 +22408,7 @@ async function silentMergeFromBackup(fileId) {
             email: '',
             programme: s.course || '',
             status: 'disabled',
-            createdAt: s.createdAt || new Date().toISOString().split('T')[0],
+            createdAt: s.createdAt || localDateStr(),
             registeredVia: 'cloud-sync',
             studentDataId: s.id,
             approvedBy: 'system'
@@ -22410,6 +22527,7 @@ async function silentMergeFromBackup(fileId) {
         });
         lmsChatMessages[roomId].sort(function(a, b) { return new Date(a.timestamp) - new Date(b.timestamp); });
       });
+      trimLmsChatHistory();
     }
 
     // Merge chat profiles
@@ -22803,6 +22921,7 @@ async function autoSyncOnLogin() {
     for (const folder of ALL_DRIVE_FOLDERS) {
       try {
         const fileId = await findBackupFileInFolder(folder.id);
+        if (fileId === 'LOOKUP_FAILED') continue;
         if (fileId) {
           console.log('[AutoSync] Merging from ' + folder.label + ' folder...');
           const changed = await silentMergeFromBackup(fileId);
@@ -22881,6 +23000,7 @@ async function autoSyncOnLogin() {
       var _backupData = null;
       for (var _bi = 0; _bi < ALL_DRIVE_FOLDERS.length; _bi++) {
         var _bfId = await findBackupFileInFolder(ALL_DRIVE_FOLDERS[_bi].id);
+        if (_bfId === 'LOOKUP_FAILED') _bfId = null;
         if (!_bfId) continue;
         var _bResp = await fetch('https://www.googleapis.com/drive/v3/files/' + _bfId + '?alt=media', {
           headers: { 'Authorization': 'Bearer ' + googleAccessToken }
@@ -23004,6 +23124,10 @@ async function silentSaveToFolder(folderId, folderLabel, blob) {
     // If we don't have a file ID cached, look for an existing file
     if (!fileId) {
       fileId = await findBackupFileInFolder(folderId);
+      if (fileId === 'LOOKUP_FAILED') {
+        console.warn('[AutoSync] Skipping save to ' + folderLabel + ' this cycle — could not verify whether a backup file already exists');
+        return false;
+      }
     }
 
     let response;
@@ -23136,13 +23260,13 @@ async function autoSaveToAllFolders() {
     // successful save. Hash only backupData.data — not the timestamp/savedBy,
     // which change on every call — so an idle app stops re-uploading identical
     // data to all Drive folders (the main cause of slow, constant syncing).
-    const _dataStr = JSON.stringify(backupData.data);
+    const _dataStr = JSON.stringify(backupData.data, stripSecretFields);
     const _curHash = cestisHashString(_dataStr);
     if (_curHash === _lastAutoSaveHash) {
       return; // unchanged — nothing to push; finally{} clears _isAutoSaving
     }
 
-    const jsonContent = JSON.stringify(backupData);
+    const jsonContent = JSON.stringify(backupData, stripSecretFields);
     const blob = new Blob([jsonContent], { type: 'application/json' });
 
     // Save to ALL Google Drive folders in parallel
@@ -23384,6 +23508,7 @@ async function loginPageSync() {
           updateLoginSyncStatus('Syncing from ' + folder.label + ' (' + (i + 1) + '/' + ALL_DRIVE_FOLDERS.length + ')...', '');
         }
         var fileId = await findBackupFileInFolder(folder.id);
+        if (fileId === 'LOOKUP_FAILED') fileId = null;
         if (fileId) {
           var changed = await silentMergeFromBackup(fileId);
           if (changed) totalMerged++;
@@ -23721,6 +23846,8 @@ function cloudFetchAccountData(interactive) {
         if (ca.programme !== undefined && ca.programme !== local.programme) local.programme = ca.programme;
         if (ca.studentDataId && !local.studentDataId) local.studentDataId = ca.studentDataId;
       } else {
+        // Drop any plaintext cache an old backup leaked before adding
+        delete ca._plaintextPw;
         userAccounts.push(ca);
       }
     });
@@ -23895,7 +24022,7 @@ async function studentPushRegistration(newUserAccount) {
     }
 
     // Step 4: Upload the updated backup back to ALL Drive folders
-    var jsonContent = JSON.stringify(backupData);
+    var jsonContent = JSON.stringify(backupData, stripSecretFields);
     var blob = new Blob([jsonContent], { type: 'application/json' });
 
     // Upload to main folder
@@ -27394,7 +27521,7 @@ function adrOpenAssignTaskModal() {
   document.getElementById('adrTaskDesc').value = '';
   document.getElementById('adrTaskType').value = 'daily';
   document.getElementById('adrTaskPriority').value = 'medium';
-  document.getElementById('adrTaskDeadline').value = new Date().toISOString().split('T')[0];
+  document.getElementById('adrTaskDeadline').value = localDateStr();
   document.getElementById('adrTaskDeadlineTime').value = '17:00';
   document.getElementById('adrTaskFile').value = '';
   openModal('adrAssignTaskModal');
@@ -27886,7 +28013,7 @@ function adrCheckHourlyReminders() {
 function adrCheckLoginNotifications() {
   var currentUid = adrGetCurrentUserId();
   var now = new Date();
-  var today = now.toISOString().split('T')[0];
+  var today = localDateStr(now);
 
   // Monthly tasks: notify on login each day
   adrTasks.forEach(function(task) {
@@ -28454,7 +28581,7 @@ function docHubUploadFile(prefix) {
       fileSize: file.size,
       fileData: e.target.result,
       uploadedBy: uploaderName,
-      uploadedDate: new Date().toISOString().split('T')[0],
+      uploadedDate: localDateStr(),
       downloads: 0
     };
 
@@ -31546,6 +31673,22 @@ function reconcileCertifiedFromApprovals() {
   return changed;
 }
 
+// Generate a certificate number that is unique across all students.
+// A bare 4-digit random has a ~50% collision chance after ~112 certificates
+// per prefix/year (birthday bound); duplicate certNos break the certificate
+// download lookup which matches by exact certNo.
+function generateUniqueCertNo(prefix) {
+  var year = new Date().getFullYear();
+  var existing = {};
+  (students || []).forEach(function(st) { if (st && st.certNo) existing[st.certNo] = true; });
+  for (var attempt = 0; attempt < 50; attempt++) {
+    var candidate = prefix + '-' + year + '-' + String(Math.floor(Math.random() * 9000) + 1000);
+    if (!existing[candidate]) return candidate;
+  }
+  // Number space saturated for this prefix/year — extend with a base36 suffix
+  return prefix + '-' + year + '-' + Date.now().toString(36).toUpperCase();
+}
+
 function backfillCertificateNumbers() {
   if(!Array.isArray(students)) return false;
   var changed = false;
@@ -31555,7 +31698,7 @@ function backfillCertificateNumbers() {
       var code = (typeof certTemplates !== 'undefined' && certTemplates[s.course] && certTemplates[s.course].programmeCode)
         ? certTemplates[s.course].programmeCode
         : s.course.substring(0, 2).toUpperCase();
-      s.certNo = code + '-' + new Date().getFullYear() + '-' + String(Math.floor(Math.random() * 9000) + 1000);
+      s.certNo = generateUniqueCertNo(code);
       if(!s.certDate) s.certDate = new Date().toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: '2-digit' });
       if(s.stage === 'collected') s.certCollected = true;
       changed = true;
@@ -38558,7 +38701,7 @@ function ttUnmount(){
                 staffId: ttc_currentUser.id,
                 staffName: ttc_currentUser.fullName,
                 workType: ttc_currentUser.workType,
-                date: now.toISOString().split('T')[0],
+                date: localDateStr(now),
                 clockIn: now.toISOString(),
                 clockOut: null,
                 status: 'working',
@@ -38784,7 +38927,7 @@ function ttUnmount(){
 
         // Load Today's Session
         function loadTodaysSession() {
-            const today = new Date().toISOString().split('T')[0];
+            const today = localDateStr();
             // Find any in-progress session for this user (regardless of date) so
             // sessions that crossed midnight or were left open before a computer
             // restart still resume instead of being orphaned in CESTISStore.
@@ -38828,7 +38971,7 @@ function ttUnmount(){
 
         // Render Today's Log
         function renderTodayLog() {
-            const today = new Date().toISOString().split('T')[0];
+            const today = localDateStr();
             const todayRecords = timeRecords.filter(r => r.staffId === ttc_currentUser.id && r.date === today);
 
             const tbody = document.getElementById('todayLogTable');
@@ -41006,7 +41149,7 @@ function ttUnmount(){
             checkFirstTimeSyncPrompt();
 
             // Set dates
-            const today = new Date().toISOString().split('T')[0];
+            const today = localDateStr();
             document.getElementById('historyToDate').value = today;
             document.getElementById('reportToDate').value = today;
             document.getElementById('editToDate').value = today;
@@ -41091,7 +41234,7 @@ function ttInitApp(){
     if(ttc_currentUser.role !== 'Viewer'){ loadTodaysSession(); renderTodayLog(); }
     renderHistory();
     try { checkFirstTimeSyncPrompt(); } catch(e){}
-    var today = new Date().toISOString().split('T')[0];
+    var today = localDateStr();
     ['historyToDate','reportToDate','editToDate'].forEach(function(id){ var el=document.getElementById(id); if(el) el.value = today; });
     var weekAgo = new Date(); weekAgo.setDate(weekAgo.getDate() - 7);
     var wa = weekAgo.toISOString().split('T')[0];
@@ -41187,7 +41330,7 @@ function ttRefreshOnShow(){
           tuitionFee: 0,
           contact: prof.phone || vs.phone || '',
           email: vs.email || prof.email || '',
-          enrollmentDate: vs.createdAt || new Date().toISOString().split('T')[0],
+          enrollmentDate: vs.createdAt || localDateStr(),
           dateOfBirth: '',
           gender: vs.gender || '',
           nationalId: '',
