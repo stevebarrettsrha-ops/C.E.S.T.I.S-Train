@@ -1,0 +1,232 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<script src="cestis-core.js?v=20260711d"></script>
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Certificate / Transcript Requests — C.E.S.T.I.S</title>
+<style>
+  :root {
+    --bg-primary: #0c1117;
+    --bg-secondary: #141b24;
+    --bg-card: #1a2332;
+    --bg-input: #0f1820;
+    --accent: #f0a500;
+    --accent-dim: rgba(240,165,0,0.15);
+    --green: #2ecc71;
+    --green-dim: rgba(46,204,113,0.15);
+    --blue: #3498db;
+    --blue-dim: rgba(52,152,219,0.15);
+    --purple: #9b59b6;
+    --red: #e74c3c;
+    --red-dim: rgba(231,76,60,0.15);
+    --text-primary: #e8edf3;
+    --text-secondary: #8899aa;
+    --text-muted: #556677;
+    --border: rgba(255,255,255,0.06);
+    --border-light: rgba(255,255,255,0.1);
+    --radius: 12px;
+    --radius-sm: 8px;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+    background: var(--bg-primary); color: var(--text-primary); padding: 18px;
+    -webkit-font-smoothing: antialiased;
+  }
+  .cr-header { display:flex; justify-content:space-between; align-items:flex-start; flex-wrap:wrap; gap:12px; margin-bottom:16px; }
+  .cr-header h1 { font-size:21px; font-weight:700; }
+  .cr-header p { font-size:13px; color:var(--text-muted); margin-top:4px; max-width:680px; line-height:1.45; }
+  .cr-stats { display:grid; grid-template-columns:repeat(auto-fit,minmax(140px,1fr)); gap:10px; margin-bottom:16px; }
+  .cr-stat { background:var(--bg-card); border:1px solid var(--border); border-radius:var(--radius-sm); padding:12px 14px; }
+  .cr-stat .v { font-size:21px; font-weight:700; }
+  .cr-stat .l { font-size:11px; color:var(--text-muted); text-transform:uppercase; letter-spacing:0.4px; margin-top:2px; }
+  .cr-controls { display:flex; gap:10px; flex-wrap:wrap; margin-bottom:14px; }
+  .cr-input, .cr-select {
+    background:var(--bg-input); border:1px solid var(--border-light); color:var(--text-primary);
+    border-radius:var(--radius-sm); padding:9px 12px; font-size:13px; outline:none;
+  }
+  .cr-input:focus, .cr-select:focus { border-color:var(--accent); }
+  .cr-card { background:var(--bg-card); border:1px solid var(--border); border-radius:var(--radius); overflow:hidden; }
+  table.cr-table { width:100%; border-collapse:collapse; font-size:13px; }
+  .cr-table th { text-align:left; font-size:10.5px; text-transform:uppercase; letter-spacing:0.5px; color:var(--text-muted); padding:11px 14px; border-bottom:1px solid var(--border-light); }
+  .cr-table td { padding:11px 14px; border-bottom:1px solid var(--border); vertical-align:middle; }
+  .cr-table tr:last-child td { border-bottom:none; }
+  .cr-table tr:hover td { background:rgba(255,255,255,0.02); }
+  .cr-badge { display:inline-block; font-size:10px; font-weight:700; letter-spacing:0.4px; padding:3px 9px; border-radius:20px; text-transform:uppercase; white-space:nowrap; }
+  .b-pending    { background:var(--accent-dim); color:var(--accent); }
+  .b-processing { background:var(--blue-dim); color:var(--blue); }
+  .b-ready      { background:var(--green-dim); color:var(--green); }
+  .b-collected  { background:rgba(255,255,255,0.07); color:var(--text-secondary); }
+  .b-declined   { background:var(--red-dim); color:var(--red); }
+  .t-transcript   { background:var(--blue-dim); color:var(--blue); }
+  .t-certificate  { background:var(--purple); background:rgba(155,89,182,0.15); color:#c39bd3; }
+  .t-both         { background:var(--accent-dim); color:var(--accent); }
+  .cr-select.sm { padding:6px 8px; font-size:12px; }
+  .cr-empty { text-align:center; color:var(--text-muted); padding:56px 20px; font-size:13.5px; line-height:1.7; }
+  .cr-empty .big { font-size:36px; margin-bottom:8px; }
+  .cr-live-dot { display:inline-block; width:8px; height:8px; border-radius:50%; background:var(--green); margin-right:6px; animation:crPulse 1.6s infinite; vertical-align:1px; }
+  @keyframes crPulse { 0%,100%{opacity:1;} 50%{opacity:0.35;} }
+  #crToast { position:fixed; bottom:22px; left:50%; transform:translateX(-50%); background:#0f1820; color:var(--text-primary); border:1px solid var(--border-light); border-left:4px solid var(--green); border-radius:10px; padding:12px 18px; font-size:13px; box-shadow:0 10px 30px rgba(0,0,0,0.5); opacity:0; pointer-events:none; transition:opacity .25s; z-index:99999; }
+  #crToast.show { opacity:1; }
+</style>
+</head>
+<body>
+
+<div class="cr-header">
+  <div>
+    <h1>Certificate / Transcript Requests</h1>
+    <p><span class="cr-live-dot"></span>Requests raised by trainees from their Transcript/Grades page arrive here in real time.
+    Move each request through Pending → Processing → Ready for Collection → Collected.</p>
+  </div>
+</div>
+
+<div class="cr-stats" id="crStats"></div>
+
+<div class="cr-controls">
+  <input class="cr-input" id="crSearch" placeholder="Search trainee or programme…" oninput="render()">
+  <select class="cr-select" id="crStatusFilter" onchange="render()">
+    <option value="open">Open requests (pending / processing / ready)</option>
+    <option value="all">All requests</option>
+    <option value="pending">Pending</option>
+    <option value="processing">Processing</option>
+    <option value="ready">Ready for Collection</option>
+    <option value="collected">Collected</option>
+    <option value="declined">Declined</option>
+  </select>
+  <select class="cr-select" id="crTypeFilter" onchange="render()">
+    <option value="all">All types</option>
+    <option value="transcript">Transcript</option>
+    <option value="certificate">Certificate</option>
+    <option value="both">Transcript &amp; Certificate</option>
+  </select>
+</div>
+
+<div class="cr-card">
+  <table class="cr-table">
+    <thead><tr>
+      <th>Trainee</th><th>Programme</th><th>Requested</th><th>Type</th><th>Status</th><th style="width:190px;">Update Status</th>
+    </tr></thead>
+    <tbody id="crRows"></tbody>
+  </table>
+</div>
+
+<div id="crToast"></div>
+
+<script>
+'use strict';
+var T = window.CESTISCore && CESTISCore.Transcript;
+var KEY = T ? T.KEYS.requests : 'voctrain_certTranscriptRequests';
+function param(n) { try { return new URLSearchParams(location.search).get(n) || ''; } catch (e) { return ''; } }
+var ACTOR = param('actor') || 'Admin';
+var requests = [];
+
+function esc(s) {
+  return String(s == null ? '' : s).replace(/[&<>"']/g, function (c) {
+    return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c];
+  });
+}
+var toastTimer = null;
+function toast(m) {
+  var el = document.getElementById('crToast');
+  el.textContent = m; el.className = 'show';
+  clearTimeout(toastTimer); toastTimer = setTimeout(function () { el.className = ''; }, 2800);
+}
+
+function load() {
+  try { requests = JSON.parse(CESTISStore.getItem(KEY) || '[]'); } catch (e) { requests = []; }
+  if (!Array.isArray(requests)) requests = [];
+}
+function save() {
+  CESTISStore.setItem(KEY, JSON.stringify(requests));
+  try { window.top.postMessage({ type: 'transcript-data-updated', requests: true }, '*'); } catch (e) {}
+}
+
+function fmtDT(iso) {
+  if (!iso) return '—';
+  var d = new Date(iso);
+  if (isNaN(d.getTime())) return esc(iso);
+  return d.toLocaleDateString() + ' ' + d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+}
+
+function renderStats() {
+  var open = requests.filter(function (r) { return r.status === 'pending' || r.status === 'processing'; }).length;
+  var ready = requests.filter(function (r) { return r.status === 'ready'; }).length;
+  var done = requests.filter(function (r) { return r.status === 'collected'; }).length;
+  document.getElementById('crStats').innerHTML =
+    '<div class="cr-stat"><div class="v" style="color:var(--accent);">' + open + '</div><div class="l">Awaiting action</div></div>' +
+    '<div class="cr-stat"><div class="v" style="color:var(--green);">' + ready + '</div><div class="l">Ready for collection</div></div>' +
+    '<div class="cr-stat"><div class="v">' + done + '</div><div class="l">Collected</div></div>' +
+    '<div class="cr-stat"><div class="v">' + requests.length + '</div><div class="l">All time</div></div>';
+}
+
+function render() {
+  renderStats();
+  var q = (document.getElementById('crSearch').value || '').toLowerCase().trim();
+  var st = document.getElementById('crStatusFilter').value;
+  var ty = document.getElementById('crTypeFilter').value;
+  var list = requests.slice().sort(function (a, b) { return String(b.requestedAt).localeCompare(String(a.requestedAt)); })
+    .filter(function (r) {
+      if (!r) return false;
+      if (st === 'open' && ['pending', 'processing', 'ready'].indexOf(r.status) === -1) return false;
+      if (st !== 'open' && st !== 'all' && r.status !== st) return false;
+      if (ty !== 'all' && r.type !== ty) return false;
+      if (q && (String(r.studentName).toLowerCase().indexOf(q) === -1 && String(r.course).toLowerCase().indexOf(q) === -1)) return false;
+      return true;
+    });
+  var tbody = document.getElementById('crRows');
+  if (!list.length) {
+    tbody.innerHTML = '<tr><td colspan="6"><div class="cr-empty"><div class="big">📮</div>No requests match this view.<br>Trainees raise requests from their <b>Transcript/Grades</b> page.</div></td></tr>';
+    return;
+  }
+  var statuses = T ? T.REQUEST_STATUSES : ['pending', 'processing', 'ready', 'collected', 'declined'];
+  var labels = T ? T.REQUEST_STATUS_LABELS : {};
+  tbody.innerHTML = list.map(function (r) {
+    var idx = requests.indexOf(r);
+    return '<tr>' +
+      '<td style="font-weight:600;">' + esc(r.studentName || r.studentId) + '</td>' +
+      '<td style="color:var(--text-secondary);">' + esc(r.course || '—') + '</td>' +
+      '<td style="color:var(--text-secondary);">' + fmtDT(r.requestedAt) +
+        (r.handledBy ? '<div style="font-size:10.5px;color:var(--text-muted);margin-top:2px;">last update: ' + esc(r.handledBy) + '</div>' : '') + '</td>' +
+      '<td><span class="cr-badge t-' + esc(r.type) + '">' + esc((T && T.REQUEST_TYPES[r.type]) || r.type) + '</span></td>' +
+      '<td><span class="cr-badge b-' + esc(r.status) + '">' + esc(labels[r.status] || r.status) + '</span></td>' +
+      '<td><select class="cr-select sm" onchange="setStatus(' + idx + ', this.value)">' +
+        statuses.map(function (s) {
+          return '<option value="' + s + '"' + (s === r.status ? ' selected' : '') + '>' + esc(labels[s] || s) + '</option>';
+        }).join('') +
+      '</select></td>' +
+    '</tr>';
+  }).join('');
+}
+
+function setStatus(idx, status) {
+  var r = requests[idx];
+  if (!r) return;
+  r.status = status;
+  r.handledBy = ACTOR;
+  r.handledAt = new Date().toISOString();
+  save();
+  render();
+  toast((r.studentName || 'Request') + ' → ' + ((T && T.REQUEST_STATUS_LABELS[status]) || status));
+}
+
+/* live updates: storage events from other tabs / the trainee's device sync,
+   plus a polling safety net for IndexedDB-only writes. */
+window.addEventListener('storage', function (e) {
+  if (e.key === KEY) { load(); render(); }
+});
+var lastLen = -1;
+setInterval(function () {
+  var raw = '';
+  try { raw = String(CESTISStore.getItem(KEY) || ''); } catch (e) {}
+  if (raw.length !== lastLen) { lastLen = raw.length; load(); render(); }
+}, 5000);
+
+function boot() { load(); render(); }
+document.addEventListener('DOMContentLoaded', function () {
+  if (window.CESTISStore && typeof CESTISStore.whenReady === 'function') CESTISStore.whenReady(boot);
+  else boot();
+});
+</script>
+</body>
+</html>

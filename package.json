@@ -4,6 +4,6 @@
   "private": true,
   "description": "CESTIS Training LMS — static dashboards backed by a shared data core (cestis-core.js).",
   "scripts": {
-    "test": "node tests/cestis-core.test.js"
+    "test": "node tests/cestis-core.test.js && node tests/transcript-core.test.js"
   }
 }

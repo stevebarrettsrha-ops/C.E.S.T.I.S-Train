@@ -1,0 +1,1203 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<script src="cestis-core.js?v=20260711d"></script>
+<script src="transcript-assets.js?v=20260711b"></script>
+<script src="vendor/jspdf-2.5.1.umd.min.js"></script>
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Transcript / Grades — C.E.S.T.I.S</title>
+<style>
+  :root {
+    --bg-primary: #0c1117;
+    --bg-secondary: #141b24;
+    --bg-card: #1a2332;
+    --bg-card-hover: #1f2b3d;
+    --bg-input: #0f1820;
+    --accent: #f0a500;
+    --accent-dim: rgba(240,165,0,0.15);
+    --green: #2ecc71;
+    --green-dim: rgba(46,204,113,0.15);
+    --blue: #3498db;
+    --blue-dim: rgba(52,152,219,0.15);
+    --purple: #9b59b6;
+    --red: #e74c3c;
+    --red-dim: rgba(231,76,60,0.15);
+    --text-primary: #e8edf3;
+    --text-secondary: #8899aa;
+    --text-muted: #556677;
+    --border: rgba(255,255,255,0.06);
+    --border-light: rgba(255,255,255,0.1);
+    --radius: 12px;
+    --radius-sm: 8px;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+    background: var(--bg-primary);
+    color: var(--text-primary);
+    padding: 18px;
+    -webkit-font-smoothing: antialiased;
+  }
+  /* The official transcript typeface ('EB Garamond T') is embedded from
+     transcript-assets.js by the loader script at the end of this page. */
+
+  .tg-header { display:flex; justify-content:space-between; align-items:flex-start; flex-wrap:wrap; gap:12px; margin-bottom:16px; }
+  .tg-header h1 { font-size:21px; font-weight:700; }
+  .tg-header p { font-size:13px; color:var(--text-muted); margin-top:4px; max-width:720px; line-height:1.45; }
+  .tg-live-dot { display:inline-block; width:8px; height:8px; border-radius:50%; background:var(--green); margin-right:6px; animation:tgPulse 1.6s infinite; vertical-align:1px; }
+  @keyframes tgPulse { 0%,100%{opacity:1;} 50%{opacity:0.35;} }
+
+  .tg-controls { display:flex; gap:10px; flex-wrap:wrap; align-items:center; margin-bottom:16px; }
+  .tg-input, .tg-select {
+    background: var(--bg-input);
+    border: 1px solid var(--border-light);
+    color: var(--text-primary);
+    border-radius: var(--radius-sm);
+    padding: 9px 12px;
+    font-size: 13px;
+    outline: none;
+  }
+  .tg-input:focus, .tg-select:focus { border-color: var(--accent); }
+  .tg-select { min-width: 220px; max-width: 340px; }
+
+  .tg-btn {
+    border: none; border-radius: var(--radius-sm); padding: 9px 15px; font-size: 13px; font-weight: 600;
+    cursor: pointer; display:inline-flex; align-items:center; gap:7px; transition: filter .15s, background .15s;
+    background: var(--bg-card-hover); color: var(--text-primary); border: 1px solid var(--border-light);
+  }
+  .tg-btn:hover { filter: brightness(1.15); }
+  .tg-btn.primary { background: var(--accent); color: #14100a; border-color: transparent; }
+  .tg-btn.green { background: var(--green); color: #06180d; border-color: transparent; }
+  .tg-btn.blue { background: var(--blue); color: #06121b; border-color: transparent; }
+  .tg-btn.danger { background: var(--red-dim); color: #f3b6ae; border-color: rgba(231,76,60,0.35); }
+  .tg-btn.sm { padding: 5px 10px; font-size: 11.5px; border-radius: 6px; }
+  .tg-btn:disabled { opacity: 0.5; cursor: not-allowed; }
+
+  .tg-layout { display:grid; grid-template-columns: minmax(430px, 46%) 1fr; gap:18px; align-items:start; }
+  @media (max-width: 1100px) { .tg-layout { grid-template-columns: 1fr; } }
+
+  .tg-card { background: var(--bg-card); border:1px solid var(--border); border-radius: var(--radius); overflow:hidden; }
+  .tg-card + .tg-card { margin-top: 16px; }
+  .tg-card-head { display:flex; align-items:center; justify-content:space-between; gap:10px; padding:13px 16px; border-bottom:1px solid var(--border); flex-wrap:wrap; }
+  .tg-card-head h2 { font-size:14.5px; font-weight:700; }
+  .tg-card-head .sub { font-size:12px; color:var(--text-muted); margin-top:2px; }
+  .tg-card-body { padding: 14px 16px; }
+
+  .tg-stats { display:grid; grid-template-columns: repeat(auto-fit, minmax(120px,1fr)); gap:10px; margin-bottom:14px; }
+  .tg-stat { background: var(--bg-input); border:1px solid var(--border); border-radius: var(--radius-sm); padding: 10px 12px; }
+  .tg-stat .v { font-size:19px; font-weight:700; }
+  .tg-stat .l { font-size:11px; color:var(--text-muted); text-transform:uppercase; letter-spacing:0.4px; margin-top:2px; }
+
+  table.tg-table { width:100%; border-collapse:collapse; font-size:12.5px; }
+  .tg-table th { text-align:left; font-size:10.5px; text-transform:uppercase; letter-spacing:0.5px; color:var(--text-muted); padding:8px 8px; border-bottom:1px solid var(--border-light); }
+  .tg-table td { padding:7px 8px; border-bottom:1px solid var(--border); vertical-align:middle; }
+  .tg-table tr:hover td { background: rgba(255,255,255,0.02); }
+  .tg-table .unit-name { line-height:1.35; }
+  .tg-table .unit-code { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size:11.5px; color:var(--text-secondary); white-space:nowrap; }
+  .tg-grade-input { width:74px; text-align:center; background:var(--bg-input); border:1px solid var(--border-light); color:var(--text-primary); border-radius:6px; padding:5px 6px; font-size:12.5px; outline:none; }
+  .tg-date-input { width:112px; }
+  .tg-grade-input:focus { border-color: var(--accent); }
+  .tg-src { display:inline-block; font-size:9.5px; font-weight:700; letter-spacing:0.5px; padding:2px 7px; border-radius:20px; text-transform:uppercase; white-space:nowrap; }
+  .tg-src.exam   { background: var(--green-dim); color: var(--green); }
+  .tg-src.manual { background: var(--blue-dim); color: var(--blue); }
+  .tg-src.none   { background: rgba(255,255,255,0.05); color: var(--text-muted); }
+
+  .tg-note { font-size:12px; color:var(--text-secondary); line-height:1.5; background:var(--bg-input); border:1px solid var(--border); border-radius:var(--radius-sm); padding:10px 12px; margin-bottom:12px; }
+  .tg-note b { color: var(--text-primary); }
+  .tg-check { display:flex; gap:8px; align-items:flex-start; font-size:12.5px; color:var(--text-secondary); margin:10px 0; line-height:1.4; }
+  .tg-check input { margin-top:2px; accent-color: var(--accent); }
+
+  .tg-field-grid { display:grid; grid-template-columns:repeat(auto-fit,minmax(190px,1fr)); gap:10px; }
+  .tg-field label { display:block; font-size:11px; color:var(--text-muted); text-transform:uppercase; letter-spacing:0.4px; margin-bottom:5px; }
+  .tg-field .tg-input { width:100%; }
+
+  .tg-empty { text-align:center; color:var(--text-muted); padding:44px 20px; font-size:13.5px; line-height:1.6; }
+  .tg-empty .big { font-size:34px; margin-bottom:10px; }
+
+  /* ---------- Toasts ---------- */
+  #tgToast { position:fixed; bottom:22px; left:50%; transform:translateX(-50%); background:#0f1820; color:var(--text-primary); border:1px solid var(--border-light); border-left:4px solid var(--green); border-radius:10px; padding:12px 18px; font-size:13px; box-shadow:0 10px 30px rgba(0,0,0,0.5); opacity:0; pointer-events:none; transition:opacity .25s, transform .25s; z-index:99999; max-width:90vw; }
+  #tgToast.show { opacity:1; transform:translateX(-50%) translateY(-6px); }
+  #tgToast.warn { border-left-color: var(--accent); }
+  #tgToast.err { border-left-color: var(--red); }
+
+  /* ======================================================================
+     OFFICIAL TRANSCRIPT PREVIEW — replica of the approved paper transcript.
+     Letter-and-a-half (8.5in × 14in legal) pages, dot-dot-dash blue page
+     border, Garamond serif, and the exact four-column unit table.
+     Rendered at 96dpi CSS pixels: 816 × 1344 per page.
+     ====================================================================== */
+  .tr-preview-wrap { background: #2b3442; border-radius: var(--radius); padding: 22px; overflow:auto; }
+  .tr-preview-scale { transform-origin: top left; }
+  .tr-page {
+    position: relative;
+    width: 816px; height: 1344px;
+    background: #ffffff;
+    color: #000;
+    margin: 0 auto 26px;
+    box-shadow: 0 12px 34px rgba(0,0,0,0.45);
+    font-family: 'EB Garamond T', 'Adobe Garamond Pro', Garamond, 'Times New Roman', serif;
+    overflow: hidden;
+  }
+  .tr-border {
+    position:absolute; inset: 32px;              /* 24pt = 32px offset from page edge */
+    border: 1.4px dashed #0070C0;                /* dot-dot-dash approximation */
+    pointer-events:none;
+  }
+  /* Faithful dot-dot-dash: painted with a repeating gradient on 4 edges. */
+  .tr-border { border: none; }
+  .tr-border::before, .tr-border::after,
+  .tr-border .v1, .tr-border .v2 { content:''; position:absolute; }
+  .tr-border::before { top:0; left:0; right:0; height:1.4px;
+    background: repeating-linear-gradient(90deg,#0070C0 0 2px,transparent 2px 5px,#0070C0 5px 7px,transparent 7px 10px,#0070C0 10px 18px,transparent 18px 21px); }
+  .tr-border::after { bottom:0; left:0; right:0; height:1.4px;
+    background: repeating-linear-gradient(90deg,#0070C0 0 2px,transparent 2px 5px,#0070C0 5px 7px,transparent 7px 10px,#0070C0 10px 18px,transparent 18px 21px); }
+  .tr-border .v1 { top:0; bottom:0; left:0; width:1.4px;
+    background: repeating-linear-gradient(180deg,#0070C0 0 2px,transparent 2px 5px,#0070C0 5px 7px,transparent 7px 10px,#0070C0 10px 18px,transparent 18px 21px); }
+  .tr-border .v2 { top:0; bottom:0; right:0; width:1.4px;
+    background: repeating-linear-gradient(180deg,#0070C0 0 2px,transparent 2px 5px,#0070C0 5px 7px,transparent 7px 10px,#0070C0 10px 18px,transparent 18px 21px); }
+
+  .tr-content { position:absolute; left:96px; right:96px; top:26px; bottom:42px; }
+  .tr-head { position:relative; }
+  .tr-crest { position:absolute; left:0; top:6px; width:150px; height:150px; }
+  .tr-inst { text-align:right; font-size:13.5px; line-height:1.32; padding-top:2px; }
+  .tr-inst .nm { font-weight:700; font-size:14.5px; line-height:1.25; }
+  .tr-inst .email a, .tr-inst .email span { color:#0563C1; text-decoration:underline; }
+  .tr-title { text-align:center; font-weight:700; font-size:15px; letter-spacing:0.4px; margin-top:8px; }
+  .tr-bio { margin-top:10px; font-size:13px; line-height:1.45; }
+  .tr-bio-row { display:flex; }
+  .tr-bio-row .left { flex:1 1 auto; padding-right:14px; }
+  .tr-bio-row .right { flex:0 0 200px; }
+  .tr-dots { font-size:11px; letter-spacing:1px; color:#000; overflow:hidden; white-space:nowrap; margin-top:4px; }
+  .tr-qual { text-align:center; font-weight:700; font-size:13.5px; margin:10px 0 6px; letter-spacing:0.2px; }
+
+  table.tr-units { width:100%; border-collapse:collapse; font-size:11.5px; line-height:1.25; table-layout:fixed; }
+  .tr-units col.c1 { width:19.86%; } .tr-units col.c2 { width:46.51%; }
+  .tr-units col.c3 { width:19.43%; } .tr-units col.c4 { width:14.2%; }
+  .tr-units th, .tr-units td { border:1px solid #000; padding:2px 6px; vertical-align:top; }
+  .tr-units th { font-weight:700; text-align:center; font-size:11.5px; }
+  .tr-units td.code { text-align:left; }
+  .tr-units td.name { text-align:left; }
+  .tr-units td.ce, .tr-units td.grade { text-align:center; }
+
+  /* Hidden measurer used to paginate rows exactly like the paper layout. */
+  #trMeasure { position:absolute; left:-9999px; top:0; width:816px; visibility:hidden; }
+
+  @media print {
+    body * { visibility: hidden; }
+  }
+</style>
+</head>
+<body>
+
+<div id="tgApp"></div>
+
+<div id="tgToast"></div>
+<div id="trMeasure" aria-hidden="true"></div>
+
+<script>
+'use strict';
+/* ============================================================================
+   Transcript / Grades — one page, three roles (set by ?role= URL param):
+     admin / adminstaff : input section + exact live transcript preview +
+                          Transcript PDF & Grade Sheet PDF downloads +
+                          manual grade override (optionally writing back to
+                          the live VocTrain exam result) + unit catalogue editor.
+     instructor         : live grade tables for the instructor's trainees +
+                          Grade Sheet download (carries the instructor's name).
+     student            : the trainee's own live unit/grade view + "Request
+                          Transcript / Certificate" buttons feeding the Admin
+                          "Certificate/Transcript Requests" queue.
+
+   Grades resolve through CESTISCore.Transcript.effectiveGrades — live VocTrain
+   exam results first, manual Admin overrides always winning — so every role
+   sees identical numbers, updating in real time (storage events + polling).
+   ============================================================================ */
+
+var T = window.CESTISCore && CESTISCore.Transcript;
+var ASSETS = window.CESTIS_TRANSCRIPT_ASSETS || {};
+var CREST_DATA_URI = 'data:image/png;base64,' + (ASSETS.crestPng || '');
+
+function param(name) {
+  try { var v = new URLSearchParams(location.search).get(name); return v ? v : ''; }
+  catch (e) { return ''; }
+}
+var ROLE = param('role') || 'admin';
+var IS_STAFF = (ROLE === 'admin' || ROLE === 'adminstaff');
+var MY_STUDENT_ID = param('studentId');
+var MY_NAME = param('name');
+var MY_COURSE = param('course');
+var ACTOR = param('actor') || (IS_STAFF ? 'Admin' : MY_NAME || ROLE);
+
+/* ------------------------------ data access ------------------------------ */
+function readJSON(key, fallback) {
+  try { var v = JSON.parse(CESTISStore.getItem(key) || 'null'); return (v == null) ? fallback : v; }
+  catch (e) { return fallback; }
+}
+function writeJSON(key, val) { CESTISStore.setItem(key, JSON.stringify(val)); }
+
+var db = { students: [], exams: [], examResults: [], catalogs: [], grades: [], requests: [], profiles: {}, instructors: [] };
+
+function loadAll() {
+  db.students = readJSON('voctrain_students', []);
+  db.exams = readJSON('voctrain_exams', []);
+  db.examResults = readJSON('voctrain_examResults', []);
+  db.grades = readJSON(T.KEYS.grades, []);
+  db.requests = readJSON(T.KEYS.requests, []);
+  db.profiles = readJSON(T.KEYS.profiles, {});
+  db.instructors = readJSON('voctrain_instructorData', []);
+  var cats = readJSON(T.KEYS.catalogs, []);
+  var seeded = T.ensureSeeded(cats);
+  if (IS_STAFF && seeded.length !== cats.length) { writeJSON(T.KEYS.catalogs, seeded); }
+  db.catalogs = seeded;
+}
+
+// Tell the host LMS the transcript data changed so it reloads its in-memory
+// copies, refreshes badges and pushes the change to cloud sync.
+function notifyHost(extra) {
+  try { window.top.postMessage(Object.assign({ type: 'transcript-data-updated' }, extra || {}), '*'); } catch (e) {}
+}
+
+function esc(s) {
+  return String(s == null ? '' : s).replace(/[&<>"']/g, function (c) {
+    return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c];
+  });
+}
+function escAttr(s) { return esc(s).replace(/\n/g, ' '); }
+
+var toastTimer = null;
+function toast(msg, kind) {
+  var el = document.getElementById('tgToast');
+  el.textContent = msg;
+  el.className = 'show' + (kind ? ' ' + kind : '');
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(function () { el.className = ''; }, 3200);
+}
+
+/* --------------------------- shared helpers --------------------------- */
+function studentById(id) {
+  return db.students.filter(function (s) { return s && s.id === id; })[0] || null;
+}
+function profileFor(id) { return db.profiles[id] || {}; }
+
+function headerInfo(student) {
+  var p = student ? profileFor(student.id) : {};
+  return {
+    name: (student && student.name) || '',
+    dob: p.dob || (student && student.dob) || '',
+    address: p.address || (student && student.address) || '',
+    idNo: p.idNo || (student && (student.idNo || student.idNumber)) || ''
+  };
+}
+
+function qualById(id) { return db.catalogs.filter(function (q) { return q && q.id === id; })[0] || null; }
+
+function rowsFor(studentId, qual) {
+  return T.effectiveGrades({
+    qual: qual, studentId: studentId,
+    exams: db.exams, examResults: db.examResults, manualGrades: db.grades
+  });
+}
+
+function instructorNameFor(student) {
+  if (!student) return '';
+  if (student.instructor) return student.instructor;
+  var c = T.normText(student.course);
+  var hit = db.instructors.filter(function (i) {
+    if (!i) return false;
+    var ic = T.normText(i.course);
+    return ic && c && (ic === c || ic.indexOf(c) !== -1 || c.indexOf(ic) !== -1);
+  })[0];
+  return hit ? hit.name : '';
+}
+
+/* ============================================================================
+   OFFICIAL TRANSCRIPT RENDERING (exact replica of the approved document)
+   ============================================================================ */
+function trHeaderHTML(info) {
+  var I = T.INSTITUTION;
+  return '' +
+    '<div class="tr-head">' +
+      '<img class="tr-crest" src="' + CREST_DATA_URI + '" alt="">' +
+      '<div class="tr-inst">' +
+        '<div class="nm">' + esc(I.nameLine1) + '<br>' + esc(I.nameLine2) + '</div>' +
+        '<div style="height:8px;"></div>' +
+        '<div>' + esc(I.centre) + '</div>' +
+        I.addressLines.map(function (l) { return '<div>' + esc(l) + '</div>'; }).join('') +
+        '<div class="email">Email: <span>' + esc(I.email) + '</span></div>' +
+        '<div>Tel: ' + esc(I.tel) + '</div>' +
+      '</div>' +
+      '<div style="clear:both;"></div>' +
+      '<div class="tr-title">TRANSCRIPT</div>' +
+      '<div class="tr-bio">' +
+        '<div class="tr-bio-row"><div class="left">Name: ' + esc(info.name) + '</div><div class="right">D.O.B: ' + esc(info.dob) + '</div></div>' +
+        '<div class="tr-bio-row"><div class="left">Address: ' + esc(info.address) + '</div><div class="right">ID No: ' + esc(info.idNo) + '</div></div>' +
+      '</div>' +
+    '</div>';
+}
+
+function trUnitRowHTML(row) {
+  return '<tr>' +
+    '<td class="code">' + esc(row.code) + '</td>' +
+    '<td class="name">' + esc(row.name) + '</td>' +
+    '<td class="ce">' + esc(row.date || '') + '</td>' +
+    '<td class="grade">' + esc(T.formatGrade(row.grade)) + '</td>' +
+  '</tr>';
+}
+
+function trTableOpen() {
+  return '<table class="tr-units"><colgroup><col class="c1"><col class="c2"><col class="c3"><col class="c4"></colgroup>' +
+    '<tr><th>UNIT CODE</th><th>UNIT NAME</th><th>Core/Elective</th><th>FINAL<br>GRADE</th></tr>';
+}
+
+/* Paginate by measuring real row heights at the real page width, mirroring
+   how the paper document flows onto continuation pages. */
+function paginateTranscript(info, qualTitle, rows) {
+  var measure = document.getElementById('trMeasure');
+  var PAGE_INNER = 1344 - 26 - 42;   /* content top/bottom offsets */
+  measure.innerHTML =
+    '<div class="tr-page" style="height:auto;box-shadow:none;"><div class="tr-content" style="position:static;padding:0 0;width:624px;margin:0;">' +
+      '<div id="trmHead">' + trHeaderHTML(info) + '<div class="tr-dots" id="trmDots">' + Array(120).join('.') + '</div><div class="tr-qual" id="trmQual">' + esc(qualTitle) + '</div></div>' +
+      trTableOpen() + rows.map(trUnitRowHTML).join('') + '</table>' +
+    '</div></div>';
+  var headEl = measure.querySelector('#trmHead');
+  var headH = headEl ? headEl.offsetHeight : 330;
+  var dotsEl = measure.querySelector('#trmDots');
+  var qualEl = measure.querySelector('#trmQual');
+  var dotsQualH = (dotsEl ? dotsEl.offsetHeight : 18) + (qualEl ? qualEl.offsetHeight : 28);
+  var headerOnlyH = headH - dotsQualH;
+  var trEls = measure.querySelectorAll('.tr-units tr');
+  var thH = trEls.length ? trEls[0].offsetHeight : 24;
+  var pages = [];
+  var current = [], avail = PAGE_INNER - headH - thH - 8;
+  for (var i = 1; i < trEls.length; i++) {
+    var h = trEls[i].offsetHeight;
+    if (h > avail && current.length) {
+      pages.push(current);
+      current = [];
+      avail = PAGE_INNER - headerOnlyH - thH - 20;
+    }
+    current.push(rows[i - 1]);
+    avail -= h;
+  }
+  if (current.length || !pages.length) pages.push(current);
+  measure.innerHTML = '';
+  return pages;
+}
+
+function renderTranscriptPreviewHTML(student, qual) {
+  if (!student || !qual) return '<div class="tg-empty"><div class="big">📜</div>Select a trainee and qualification to preview the transcript.</div>';
+  var info = headerInfo(student);
+  var rows = rowsFor(student.id, qual);
+  var pages = paginateTranscript(info, qual.title, rows);
+  return pages.map(function (pageRows, pi) {
+    return '<div class="tr-page">' +
+      '<div class="tr-border"><span class="v1"></span><span class="v2"></span></div>' +
+      '<div class="tr-content">' +
+        trHeaderHTML(info) +
+        (pi === 0 ? '<div class="tr-dots">' + Array(120).join('.') + '</div><div class="tr-qual">' + esc(qual.title) + '</div>' : '<div style="height:14px;"></div>') +
+        trTableOpen() + pageRows.map(trUnitRowHTML).join('') + '</table>' +
+      '</div>' +
+    '</div>';
+  }).join('');
+}
+
+/* ============================================================================
+   PDF GENERATION
+   ============================================================================ */
+function pdfDoc(format, orientation) {
+  var JS = window.jspdf && window.jspdf.jsPDF;
+  if (!JS) { toast('PDF library not loaded', 'err'); return null; }
+  var doc = new JS({ orientation: orientation || 'portrait', unit: 'pt', format: format });
+  try {
+    doc.addFileToVFS('EBGaramond-Regular.ttf', ASSETS.garamondRegular);
+    doc.addFont('EBGaramond-Regular.ttf', 'EBGaramond', 'normal');
+    doc.addFileToVFS('EBGaramond-Bold.ttf', ASSETS.garamondBold);
+    doc.addFont('EBGaramond-Bold.ttf', 'EBGaramond', 'bold');
+  } catch (e) { /* falls back to Times below */ }
+  return doc;
+}
+function setSerif(doc, style, size) {
+  try { doc.setFont('EBGaramond', style); } catch (e) { doc.setFont('times', style); }
+  doc.setFontSize(size);
+}
+
+/* ---- Official Transcript PDF (8.5in × 14in, exact replica) ---- */
+var TR_PAGE_W = 612, TR_PAGE_H = 1008, TR_MARGIN_X = 72, TR_TOP = 20, TR_BOTTOM = 32;
+var TR_COLW = [0.1986, 0.4651, 0.1943, 0.142].map(function (f) { return f * (TR_PAGE_W - 2 * TR_MARGIN_X); });
+
+function trPdfBorder(doc) {
+  doc.setDrawColor(0, 112, 192);
+  doc.setLineWidth(1);
+  try { doc.setLineDashPattern([1.5, 2.2, 1.5, 2.2, 6, 2.2], 0); } catch (e) {}
+  doc.rect(24, 24, TR_PAGE_W - 48, TR_PAGE_H - 48);
+  try { doc.setLineDashPattern([], 0); } catch (e) {}
+  doc.setDrawColor(0);
+}
+
+function trPdfHeader(doc, info) {
+  var I = T.INSTITUTION, rightX = TR_PAGE_W - TR_MARGIN_X;
+  trPdfBorder(doc);
+  try { doc.addImage(CREST_DATA_URI, 'PNG', TR_MARGIN_X, TR_TOP + 6, 112, 112); } catch (e) {}
+  var y = TR_TOP + 12;
+  setSerif(doc, 'bold', 11);
+  doc.text(I.nameLine1, rightX, y, { align: 'right' }); y += 13;
+  doc.text(I.nameLine2, rightX, y, { align: 'right' }); y += 19;
+  setSerif(doc, 'normal', 10);
+  [I.centre].concat(I.addressLines).forEach(function (l) { doc.text(l, rightX, y, { align: 'right' }); y += 12.5; });
+  var emailLabel = 'Email: ', emailTxt = I.email;
+  var wLbl = doc.getTextWidth(emailLabel), wEm = doc.getTextWidth(emailTxt);
+  doc.text(emailLabel, rightX - wEm - wLbl, y, { align: 'left' });
+  doc.setTextColor(5, 99, 193);
+  doc.text(emailTxt, rightX - wEm, y, { align: 'left' });
+  doc.setLineWidth(0.6); doc.setDrawColor(5, 99, 193);
+  doc.line(rightX - wEm, y + 1.5, rightX, y + 1.5);
+  doc.setTextColor(0); doc.setDrawColor(0);
+  y += 12.5;
+  doc.text('Tel: ' + I.tel, rightX, y, { align: 'right' }); y += 12.5;
+
+  var yTitle = Math.max(y, TR_TOP + 126) + 6;
+  setSerif(doc, 'bold', 12);
+  doc.text('TRANSCRIPT', TR_PAGE_W / 2, yTitle, { align: 'center' });
+
+  var yBio = yTitle + 18, rightCol = TR_PAGE_W - TR_MARGIN_X - 150;
+  setSerif(doc, 'normal', 10);
+  doc.text('Name: ' + info.name, TR_MARGIN_X, yBio);
+  doc.text('D.O.B: ' + info.dob, rightCol, yBio);
+  yBio += 14;
+  var addrLines = doc.splitTextToSize('Address: ' + info.address, rightCol - TR_MARGIN_X - 16);
+  doc.text(addrLines, TR_MARGIN_X, yBio);
+  doc.text('ID No: ' + info.idNo, rightCol, yBio);
+  return yBio + addrLines.length * 12 + 6;
+}
+
+function trPdfTableHeader(doc, y) {
+  var x = TR_MARGIN_X, h = 26;
+  setSerif(doc, 'bold', 8.5);
+  doc.setLineWidth(0.75);
+  var heads = ['UNIT CODE', 'UNIT NAME', 'Core/Elective', 'FINAL\nGRADE'];
+  for (var c = 0; c < 4; c++) {
+    doc.rect(x, y, TR_COLW[c], h);
+    var lines = heads[c].split('\n');
+    var ty = y + h / 2 - (lines.length - 1) * 4.5 + 3;
+    lines.forEach(function (l, li) { doc.text(l, x + TR_COLW[c] / 2, ty + li * 9, { align: 'center' }); });
+    x += TR_COLW[c];
+  }
+  return y + h;
+}
+
+function generateTranscriptPDF(student, qual) {
+  var doc = pdfDoc([TR_PAGE_W, TR_PAGE_H]);
+  if (!doc) return;
+  var info = headerInfo(student);
+  var rows = rowsFor(student.id, qual);
+  var y = trPdfHeader(doc, info);
+
+  /* page-1 dotted rule + qualification title */
+  setSerif(doc, 'normal', 8.5);
+  doc.text(Array(150).join('.'), TR_PAGE_W / 2, y + 8, { align: 'center', maxWidth: TR_PAGE_W - 2 * TR_MARGIN_X });
+  y += 20;
+  setSerif(doc, 'bold', 10.5);
+  doc.text(qual.title, TR_PAGE_W / 2, y, { align: 'center' });
+  y += 8;
+  y = trPdfTableHeader(doc, y);
+
+  setSerif(doc, 'normal', 8.5);
+  var PAD = 4, LH = 9.6;
+  rows.forEach(function (r) {
+    var nameLines = doc.splitTextToSize(String(r.name || ''), TR_COLW[1] - 2 * PAD);
+    var h = Math.max(14, nameLines.length * LH + 5);
+    if (y + h > TR_PAGE_H - TR_BOTTOM) {
+      doc.addPage([TR_PAGE_W, TR_PAGE_H]);
+      y = trPdfHeader(doc, info) + 12;
+      y = trPdfTableHeader(doc, y);
+      setSerif(doc, 'normal', 8.5);
+    }
+    var x = TR_MARGIN_X;
+    doc.setLineWidth(0.75);
+    for (var c = 0; c < 4; c++) { doc.rect(x, y, TR_COLW[c], h); x += TR_COLW[c]; }
+    doc.text(String(r.code || ''), TR_MARGIN_X + PAD, y + 10);
+    doc.text(nameLines, TR_MARGIN_X + TR_COLW[0] + PAD, y + 10);
+    doc.text(String(r.date || ''), TR_MARGIN_X + TR_COLW[0] + TR_COLW[1] + TR_COLW[2] / 2, y + 10, { align: 'center' });
+    doc.text(T.formatGrade(r.grade), TR_MARGIN_X + TR_COLW[0] + TR_COLW[1] + TR_COLW[2] + TR_COLW[3] / 2, y + 10, { align: 'center' });
+    y += h;
+  });
+
+  doc.save('Transcript - ' + (info.name || 'Trainee') + '.pdf');
+}
+
+/* ---- Grade Results Sheet PDF (professional A4, with instructor name) ---- */
+function generateGradeSheetPDF(student, qual) {
+  var doc = pdfDoc('a4');
+  if (!doc) return;
+  var W = doc.internal.pageSize.getWidth(), H = doc.internal.pageSize.getHeight();
+  var M = 46;
+  var info = headerInfo(student);
+  var rows = rowsFor(student.id, qual);
+  var stats = T.gradeStats(rows);
+  var instructor = instructorNameFor(student);
+  var GREEN = [11, 122, 62], DARK = [16, 42, 28], GREY = [110, 120, 130];
+
+  function sheetHeader() {
+    doc.setFillColor(GREEN[0], GREEN[1], GREEN[2]);
+    doc.rect(0, 0, W, 6, 'F');
+    try { doc.addImage(CREST_DATA_URI, 'PNG', M, 20, 64, 64); } catch (e) {}
+    setSerif(doc, 'bold', 14);
+    doc.setTextColor(DARK[0], DARK[1], DARK[2]);
+    doc.text(T.INSTITUTION.nameLine1, M + 78, 38);
+    doc.text(T.INSTITUTION.nameLine2, M + 78, 54);
+    setSerif(doc, 'normal', 9);
+    doc.setTextColor(GREY[0], GREY[1], GREY[2]);
+    doc.text(T.INSTITUTION.centre + ' — ' + T.INSTITUTION.addressLines.join(', '), M + 78, 68);
+    doc.text('Email: ' + T.INSTITUTION.email + '   Tel: ' + T.INSTITUTION.tel, M + 78, 80);
+    doc.setTextColor(0);
+    doc.setDrawColor(GREEN[0], GREEN[1], GREEN[2]);
+    doc.setLineWidth(1.2);
+    doc.line(M, 94, W - M, 94);
+    setSerif(doc, 'bold', 13);
+    doc.setTextColor(GREEN[0], GREEN[1], GREEN[2]);
+    doc.text('OFFICIAL GRADE RESULTS SHEET', W / 2, 114, { align: 'center' });
+    doc.setTextColor(0);
+    return 128;
+  }
+
+  var y = sheetHeader();
+  /* trainee / programme info panel — the programme title gets a full-width
+     row so long qualification names never collide with the right column. */
+  doc.setFillColor(243, 247, 244);
+  doc.setDrawColor(210, 220, 214);
+  doc.setLineWidth(0.8);
+  doc.roundedRect(M, y, W - 2 * M, 82, 5, 5, 'FD');
+  var colA = M + 12, colB = W / 2 + 6, ly = y + 16;
+  function infoLine(x, yy, label, value, maxRight) {
+    setSerif(doc, 'bold', 9.5); doc.text(label, x, yy);
+    var vx = x + doc.getTextWidth(label) + 4;
+    setSerif(doc, 'normal', 9.5);
+    var v = String(value || '—');
+    var avail = (maxRight || (W - M - 12)) - vx;
+    var lines = doc.splitTextToSize(v, avail);
+    doc.text(lines.length > 1 ? lines[0].replace(/\s+\S*$/, '') + '…' : lines[0], vx, yy);
+  }
+  infoLine(colA, ly, 'Trainee:', info.name, colB - 10);
+  infoLine(colB, ly, 'ID No:', info.idNo);
+  infoLine(colA, ly + 16, 'Programme:', qual.title);
+  infoLine(colA, ly + 32, 'Instructor:', instructor || 'Not assigned', colB - 10);
+  infoLine(colB, ly + 32, 'D.O.B:', info.dob);
+  infoLine(colA, ly + 48, 'Training Centre:', qual.centre || T.INSTITUTION.centre, colB - 10);
+  infoLine(colB, ly + 48, 'Skill Area:', qual.skillArea || student.course || '');
+  infoLine(colA, ly + 64, 'Issued:', T.formatDateDMY(new Date().toISOString()));
+  y += 96;
+
+  /* table */
+  var cw = [(W - 2 * M) * 0.17, (W - 2 * M) * 0.43, (W - 2 * M) * 0.14, (W - 2 * M) * 0.13, (W - 2 * M) * 0.13];
+  function tableHead(yy) {
+    doc.setFillColor(GREEN[0], GREEN[1], GREEN[2]);
+    doc.rect(M, yy, W - 2 * M, 20, 'F');
+    setSerif(doc, 'bold', 8.5);
+    doc.setTextColor(255);
+    var x = M;
+    [['UNIT CODE', 'left'], ['UNIT NAME', 'left'], ['DATE', 'center'], ['FINAL GRADE', 'center'], ['RESULT', 'center']].forEach(function (hcol, i) {
+      doc.text(hcol[0], hcol[1] === 'left' ? x + 6 : x + cw[i] / 2, yy + 13.5, { align: hcol[1] });
+      x += cw[i];
+    });
+    doc.setTextColor(0);
+    return yy + 20;
+  }
+  y = tableHead(y);
+  setSerif(doc, 'normal', 8.5);
+  rows.forEach(function (r, idx) {
+    var nameLines = doc.splitTextToSize(String(r.name || ''), cw[1] - 12);
+    var h = Math.max(16, nameLines.length * 9.4 + 7);
+    if (y + h > H - 130) {
+      doc.addPage('a4');
+      y = sheetHeader() + 6;
+      y = tableHead(y);
+      setSerif(doc, 'normal', 8.5);
+    }
+    if (idx % 2 === 1) { doc.setFillColor(245, 248, 246); doc.rect(M, y, W - 2 * M, h, 'F'); }
+    var graded = r.grade != null && r.grade !== '';
+    var n = Number(r.grade);
+    doc.setTextColor(0);
+    doc.text(String(r.code || ''), M + 6, y + 11);
+    doc.text(nameLines, M + cw[0] + 6, y + 11);
+    doc.text(String(r.date || '—'), M + cw[0] + cw[1] + cw[2] / 2, y + 11, { align: 'center' });
+    setSerif(doc, 'bold', 8.5);
+    doc.text(graded ? T.formatGrade(r.grade) : '—', M + cw[0] + cw[1] + cw[2] + cw[3] / 2, y + 11, { align: 'center' });
+    if (graded && !isNaN(n)) {
+      var pass = n >= 60;
+      doc.setTextColor(pass ? GREEN[0] : 180, pass ? GREEN[1] : 40, pass ? GREEN[2] : 30);
+      doc.text(pass ? 'COMPETENT' : 'NYC', M + cw[0] + cw[1] + cw[2] + cw[3] + cw[4] / 2, y + 11, { align: 'center' });
+    } else {
+      doc.setTextColor(GREY[0], GREY[1], GREY[2]);
+      doc.text('PENDING', M + cw[0] + cw[1] + cw[2] + cw[3] + cw[4] / 2, y + 11, { align: 'center' });
+    }
+    doc.setTextColor(0);
+    setSerif(doc, 'normal', 8.5);
+    doc.setDrawColor(228, 234, 230);
+    doc.setLineWidth(0.5);
+    doc.line(M, y + h, W - M, y + h);
+    y += h;
+  });
+
+  /* summary + signatures */
+  y += 14;
+  if (y > H - 120) { doc.addPage('a4'); y = sheetHeader() + 10; }
+  doc.setFillColor(243, 247, 244);
+  doc.setDrawColor(210, 220, 214);
+  doc.roundedRect(M, y, W - 2 * M, 34, 5, 5, 'FD');
+  setSerif(doc, 'bold', 9.5);
+  doc.text('Units graded: ' + stats.graded + ' of ' + stats.total, M + 12, y + 21);
+  doc.text('Programme average: ' + (stats.average == null ? '—' : T.formatGrade(stats.average)), W / 2 - 40, y + 21);
+  doc.text('Completion: ' + (stats.total ? Math.round(stats.graded / stats.total * 100) : 0) + '%', W - M - 110, y + 21);
+  y += 66;
+  doc.setDrawColor(120, 130, 125);
+  doc.setLineWidth(0.8);
+  doc.line(M, y, M + 170, y);
+  doc.line(W - M - 170, y, W - M, y);
+  setSerif(doc, 'normal', 8.5);
+  doc.setTextColor(GREY[0], GREY[1], GREY[2]);
+  doc.text('Instructor: ' + (instructor || ''), M, y + 12);
+  doc.text('Training Director', W - M - 170, y + 12);
+  doc.text('Generated by C.E.S.T.I.S VocTrain — ' + T.formatDateDMY(new Date().toISOString()), W / 2, H - 24, { align: 'center' });
+  doc.save('Grade Sheet - ' + (info.name || 'Trainee') + '.pdf');
+}
+
+/* ============================================================================
+   ADMIN / ADMIN-STAFF VIEW
+   ============================================================================ */
+var sel = { studentId: '', qualId: '', alsoUpdateExam: true };
+
+function adminHTML() {
+  return '' +
+  '<div class="tg-header">' +
+    '<div>' +
+      '<h1>Transcript / Grades</h1>' +
+      '<p><span class="tg-live-dot"></span>Grades update live from VocTrain online exams; manual entries below override them. ' +
+      'The preview on the right is the official transcript, exactly as issued.</p>' +
+    '</div>' +
+    '<div style="display:flex;gap:9px;flex-wrap:wrap;">' +
+      '<button class="tg-btn primary" onclick="downloadTranscript()">⬇ Download Transcript (PDF)</button>' +
+      '<button class="tg-btn green" onclick="downloadGradeSheet()">⬇ Download Grade Sheet (PDF)</button>' +
+    '</div>' +
+  '</div>' +
+  '<div class="tg-controls">' +
+    '<select class="tg-select" id="tgStudentSel" onchange="onPickStudent(this.value)"></select>' +
+    '<select class="tg-select" id="tgQualSel" onchange="onPickQual(this.value)"></select>' +
+    '<button class="tg-btn" onclick="openCatalogEditor()">🗂 Edit Unit Catalogue</button>' +
+  '</div>' +
+  '<div class="tg-layout">' +
+    '<div>' +
+      '<div class="tg-card">' +
+        '<div class="tg-card-head"><div><h2>Trainee Details (transcript header)</h2><div class="sub">Printed on the transcript exactly as entered.</div></div>' +
+        '<button class="tg-btn sm blue" onclick="saveProfile()">Save Details</button></div>' +
+        '<div class="tg-card-body"><div class="tg-field-grid">' +
+          '<div class="tg-field"><label>Date of Birth</label><input class="tg-input" id="tgpDob" placeholder="03/11/1996"></div>' +
+          '<div class="tg-field"><label>ID Number</label><input class="tg-input" id="tgpIdNo" placeholder="127-009-850"></div>' +
+          '<div class="tg-field" style="grid-column:1/-1;"><label>Address</label><input class="tg-input" id="tgpAddr" placeholder="Street, District, Parish"></div>' +
+        '</div></div>' +
+      '</div>' +
+      '<div class="tg-card">' +
+        '<div class="tg-card-head"><div><h2>Unit Grades</h2><div class="sub" id="tgGradesSub"></div></div></div>' +
+        '<div class="tg-card-body" style="padding-top:8px;">' +
+          '<div class="tg-check"><input type="checkbox" id="tgAlsoExam" ' + (sel.alsoUpdateExam ? 'checked' : '') + ' onchange="sel.alsoUpdateExam=this.checked;">' +
+            '<span><b>Manual override also updates the live exam record.</b> When a unit\'s grade came from a VocTrain exam, saving a manual grade rewrites that exam result\'s score for this trainee.</span></div>' +
+          '<div id="tgStats" class="tg-stats"></div>' +
+          '<div style="max-height:520px;overflow:auto;margin:0 -16px;padding:0 16px;">' +
+          '<table class="tg-table"><thead><tr><th style="width:110px;">Unit</th><th>Name</th><th style="width:82px;">Grade %</th><th style="width:120px;">Date</th><th style="width:86px;">Source</th><th style="width:66px;"></th></tr></thead>' +
+          '<tbody id="tgGradeRows"></tbody></table></div>' +
+        '</div>' +
+      '</div>' +
+    '</div>' +
+    '<div>' +
+      '<div class="tg-card">' +
+        '<div class="tg-card-head"><div><h2>Live Transcript Preview</h2><div class="sub">Official format — updates as you type.</div></div>' +
+        '<div style="display:flex;gap:8px;align-items:center;"><label class="sub" for="tgZoom">Zoom</label>' +
+        '<input type="range" id="tgZoom" min="45" max="100" value="66" oninput="applyPreviewZoom(this.value)"></div></div>' +
+        '<div class="tr-preview-wrap"><div class="tr-preview-scale" id="tgPreviewScale"><div id="tgPreview"></div></div></div>' +
+      '</div>' +
+    '</div>' +
+  '</div>' +
+  '<div id="tgCatalogModal"></div>';
+}
+
+function fillStudentSelect() {
+  var el = document.getElementById('tgStudentSel');
+  if (!el) return;
+  var groups = {};
+  db.students.forEach(function (s) {
+    if (!s || !s.name) return;
+    var c = s.course || 'Unassigned';
+    (groups[c] = groups[c] || []).push(s);
+  });
+  var html = '<option value="">— Select trainee —</option>';
+  Object.keys(groups).sort().forEach(function (c) {
+    html += '<optgroup label="' + escAttr(c) + '">';
+    groups[c].sort(function (a, b) { return String(a.name).localeCompare(String(b.name)); }).forEach(function (s) {
+      html += '<option value="' + escAttr(s.id) + '"' + (s.id === sel.studentId ? ' selected' : '') + '>' + esc(s.name) + '</option>';
+    });
+    html += '</optgroup>';
+  });
+  el.innerHTML = html;
+}
+
+function fillQualSelect() {
+  var el = document.getElementById('tgQualSel');
+  if (!el) return;
+  el.innerHTML = '<option value="">— Select qualification —</option>' + db.catalogs.map(function (q) {
+    return '<option value="' + escAttr(q.id) + '"' + (q.id === sel.qualId ? ' selected' : '') + '>' + esc(q.title) + ' (' + q.units.length + ' units)</option>';
+  }).join('');
+}
+
+function onPickStudent(id) {
+  sel.studentId = id;
+  var s = studentById(id);
+  if (s && !sel.qualId) {
+    var q = T.qualForCourse(db.catalogs, s.course);
+    if (q) sel.qualId = q.id;
+  } else if (s) {
+    var q2 = T.qualForCourse(db.catalogs, s.course);
+    if (q2) sel.qualId = q2.id;
+  }
+  renderAdmin();
+}
+function onPickQual(id) { sel.qualId = id; renderAdmin(); }
+
+function renderProfileInputs() {
+  var s = studentById(sel.studentId);
+  var info = s ? headerInfo(s) : { dob: '', address: '', idNo: '' };
+  var d = document.getElementById('tgpDob'), a = document.getElementById('tgpAddr'), i = document.getElementById('tgpIdNo');
+  if (d) d.value = info.dob; if (a) a.value = info.address; if (i) i.value = info.idNo;
+}
+
+function saveProfile() {
+  if (!sel.studentId) { toast('Select a trainee first', 'warn'); return; }
+  db.profiles[sel.studentId] = {
+    dob: document.getElementById('tgpDob').value.trim(),
+    address: document.getElementById('tgpAddr').value.trim(),
+    idNo: document.getElementById('tgpIdNo').value.trim()
+  };
+  writeJSON(T.KEYS.profiles, db.profiles);
+  notifyHost();
+  refreshPreview();
+  toast('Trainee details saved');
+}
+
+function renderGradeRows() {
+  var tbody = document.getElementById('tgGradeRows');
+  var sub = document.getElementById('tgGradesSub');
+  var statsEl = document.getElementById('tgStats');
+  if (!tbody) return;
+  var s = studentById(sel.studentId), q = qualById(sel.qualId);
+  if (!s || !q) {
+    tbody.innerHTML = '<tr><td colspan="6" style="color:var(--text-muted);padding:22px 8px;text-align:center;">Select a trainee and a qualification to manage grades.</td></tr>';
+    if (sub) sub.textContent = '';
+    if (statsEl) statsEl.innerHTML = '';
+    return;
+  }
+  if (!q.units.length) {
+    tbody.innerHTML = '<tr><td colspan="6" style="color:var(--text-muted);padding:22px 8px;text-align:center;">This qualification has no units yet — add them via “Edit Unit Catalogue”.</td></tr>';
+  }
+  var rows = rowsFor(s.id, q);
+  var stats = T.gradeStats(rows);
+  if (sub) sub.textContent = s.name + ' — ' + q.title;
+  if (statsEl) statsEl.innerHTML =
+    '<div class="tg-stat"><div class="v">' + stats.graded + '/' + stats.total + '</div><div class="l">Units graded</div></div>' +
+    '<div class="tg-stat"><div class="v">' + (stats.average == null ? '—' : T.formatGrade(stats.average)) + '</div><div class="l">Average</div></div>' +
+    '<div class="tg-stat"><div class="v">' + (stats.total ? Math.round(stats.graded / stats.total * 100) : 0) + '%</div><div class="l">Completion</div></div>';
+  tbody.innerHTML = rows.map(function (r, i) {
+    var srcLabel = r.source === 'exam' ? 'Live exam' : (r.source === 'manual' ? 'Manual' : '—');
+    return '<tr>' +
+      '<td class="unit-code">' + esc(r.code) + '</td>' +
+      '<td class="unit-name">' + esc(r.name) + (r.source === 'exam' && r.examTitle ? '<div style="font-size:10.5px;color:var(--text-muted);margin-top:2px;">from exam: ' + esc(r.examTitle) + '</div>' : '') + '</td>' +
+      '<td><input class="tg-grade-input" id="tgg-' + i + '" value="' + escAttr(r.grade == null ? '' : r.grade) + '" placeholder="—"></td>' +
+      '<td><input class="tg-grade-input tg-date-input" id="tgd-' + i + '" value="' + escAttr(r.date || '') + '" placeholder="DD/MM/YYYY"></td>' +
+      '<td><span class="tg-src ' + r.source + '">' + srcLabel + '</span></td>' +
+      '<td style="white-space:nowrap;">' +
+        '<button class="tg-btn sm blue" title="Save this grade" onclick="saveUnitGrade(' + i + ')">Save</button> ' +
+        (r.source === 'manual' ? '<button class="tg-btn sm danger" title="Remove manual override (falls back to live exam result)" onclick="clearUnitGrade(' + i + ')">✕</button>' : '') +
+      '</td>' +
+    '</tr>';
+  }).join('');
+}
+
+function saveUnitGrade(i) {
+  var s = studentById(sel.studentId), q = qualById(sel.qualId);
+  if (!s || !q) return;
+  var unit = q.units[i];
+  var gv = document.getElementById('tgg-' + i).value.trim();
+  var dv = document.getElementById('tgd-' + i).value.trim();
+  if (gv === '') { toast('Enter a grade first (or use ✕ to clear an override)', 'warn'); return; }
+  var num = Number(String(gv).replace('%', ''));
+  var gradeVal = isNaN(num) ? gv : num;
+  if (!isNaN(num) && (num < 0 || num > 100)) { toast('Grade must be between 0 and 100', 'warn'); return; }
+
+  var currentRows = rowsFor(s.id, q);
+  var current = currentRows[i];
+  var examResultId = current && current.examResultId;
+
+  db.grades = T.upsertManualGrade(db.grades, {
+    studentId: s.id, qualId: q.id, unitCode: unit.code,
+    grade: gradeVal, date: dv || T.formatDateDMY(new Date().toISOString()),
+    examResultId: examResultId, updatedBy: ACTOR
+  });
+  writeJSON(T.KEYS.grades, db.grades);
+
+  /* Manual override write-back into the live VocTrain exam result. */
+  if (sel.alsoUpdateExam && examResultId && !isNaN(num)) {
+    var res = db.examResults.filter(function (r) { return r && r.id === examResultId; })[0];
+    if (res) {
+      var exam = db.exams.filter(function (e) { return e && e.id === res.examId; })[0];
+      res.score = Math.round(num * 10) / 10;
+      res.passed = num >= ((exam && exam.passMark) || 60);
+      res.manualOverride = true;
+      res.overriddenBy = ACTOR;
+      res.overriddenAt = new Date().toISOString();
+      writeJSON('voctrain_examResults', db.examResults);
+    }
+  }
+  notifyHost();
+  renderGradeRows();
+  refreshPreview();
+  toast('Grade saved — ' + unit.code + ' → ' + T.formatGrade(gradeVal));
+}
+
+function clearUnitGrade(i) {
+  var s = studentById(sel.studentId), q = qualById(sel.qualId);
+  if (!s || !q) return;
+  var unit = q.units[i];
+  db.grades = T.removeManualGrade(db.grades, s.id, q.id, unit.code);
+  writeJSON(T.KEYS.grades, db.grades);
+  notifyHost();
+  renderGradeRows();
+  refreshPreview();
+  toast('Manual override removed — live exam grade (if any) now applies');
+}
+
+function refreshPreview() {
+  var host = document.getElementById('tgPreview');
+  if (!host) return;
+  host.innerHTML = renderTranscriptPreviewHTML(studentById(sel.studentId), qualById(sel.qualId));
+}
+
+function applyPreviewZoom(v) {
+  var el = document.getElementById('tgPreviewScale');
+  if (el) el.style.transform = 'scale(' + (v / 100) + ')';
+  var host = el && el.parentElement;
+  if (host) { el.style.width = (100 * 100 / v) + '%'; }
+}
+
+function downloadTranscript() {
+  var s = studentById(sel.studentId), q = qualById(sel.qualId);
+  if (!s || !q) { toast('Select a trainee and qualification first', 'warn'); return; }
+  generateTranscriptPDF(s, q);
+}
+function downloadGradeSheet() {
+  var s = studentById(sel.studentId), q = qualById(sel.qualId);
+  if (!s || !q) { toast('Select a trainee and qualification first', 'warn'); return; }
+  generateGradeSheetPDF(s, q);
+}
+
+/* ---- unit catalogue editor (input section for each skill area) ---- */
+function openCatalogEditor() {
+  var q = qualById(sel.qualId);
+  if (!q) { toast('Select a qualification first', 'warn'); return; }
+  renderCatalogEditor(q.id);
+}
+
+function renderCatalogEditor(qualId) {
+  var q = qualById(qualId);
+  var host = document.getElementById('tgCatalogModal');
+  if (!q || !host) return;
+  host.innerHTML =
+  '<div style="position:fixed;inset:0;background:rgba(4,8,12,0.82);backdrop-filter:blur(3px);display:flex;align-items:center;justify-content:center;z-index:9999;padding:24px;" onclick="if(event.target===this)closeCatalogEditor()">' +
+    '<div style="background:var(--bg-secondary);border:1px solid var(--border-light);border-radius:var(--radius);width:100%;max-width:860px;max-height:90vh;display:flex;flex-direction:column;overflow:hidden;">' +
+      '<div class="tg-card-head"><div><h2>Unit Catalogue — ' + esc(q.title) + '</h2>' +
+        '<div class="sub">These units define the transcript for every trainee in ' + esc(q.skillArea || 'this programme') + '.</div></div>' +
+        '<button class="tg-btn sm" onclick="closeCatalogEditor()">✕ Close</button></div>' +
+      '<div style="padding:14px 16px;overflow:auto;">' +
+        '<div class="tg-field-grid" style="margin-bottom:12px;">' +
+          '<div class="tg-field"><label>Qualification title (printed on transcript)</label><input class="tg-input" id="tgcTitle" value="' + escAttr(q.title) + '"></div>' +
+          '<div class="tg-field"><label>Skill area</label><input class="tg-input" id="tgcSkill" value="' + escAttr(q.skillArea || '') + '"></div>' +
+          '<div class="tg-field"><label>Training centre</label><input class="tg-input" id="tgcCentre" value="' + escAttr(q.centre || '') + '"></div>' +
+        '</div>' +
+        '<table class="tg-table"><thead><tr><th style="width:140px;">Unit code</th><th>Unit name</th><th style="width:120px;">Core/Elective</th><th style="width:52px;"></th></tr></thead><tbody id="tgcRows">' +
+        q.units.map(function (u, i) {
+          return '<tr>' +
+            '<td><input class="tg-input" style="width:100%;" id="tgcC-' + i + '" value="' + escAttr(u.code) + '"></td>' +
+            '<td><input class="tg-input" style="width:100%;" id="tgcN-' + i + '" value="' + escAttr(u.name) + '"></td>' +
+            '<td><select class="tg-select" style="min-width:100px;width:100%;" id="tgcE-' + i + '">' +
+              '<option' + (u.coreElective !== 'Elective' ? ' selected' : '') + '>Core</option>' +
+              '<option' + (u.coreElective === 'Elective' ? ' selected' : '') + '>Elective</option></select></td>' +
+            '<td><button class="tg-btn sm danger" onclick="removeCatalogUnit(\'' + escAttr(q.id) + '\',' + i + ')">✕</button></td>' +
+          '</tr>';
+        }).join('') +
+        '</tbody></table>' +
+        '<div style="display:flex;gap:9px;margin-top:12px;flex-wrap:wrap;">' +
+          '<button class="tg-btn" onclick="addCatalogUnit(\'' + escAttr(q.id) + '\')">＋ Add Unit</button>' +
+          '<button class="tg-btn green" onclick="saveCatalog(\'' + escAttr(q.id) + '\')">💾 Save Catalogue</button>' +
+        '</div>' +
+      '</div>' +
+    '</div>' +
+  '</div>';
+}
+function closeCatalogEditor() { document.getElementById('tgCatalogModal').innerHTML = ''; }
+
+function collectCatalogEdits(q) {
+  var rows = document.getElementById('tgcRows');
+  if (!rows) return;
+  var units = [];
+  for (var i = 0; ; i++) {
+    var c = document.getElementById('tgcC-' + i);
+    if (!c) break;
+    var code = c.value.trim(), name = document.getElementById('tgcN-' + i).value.trim();
+    if (!code && !name) continue;
+    units.push({ code: code, name: name, coreElective: document.getElementById('tgcE-' + i).value });
+  }
+  q.units = units;
+  q.title = document.getElementById('tgcTitle').value.trim() || q.title;
+  q.skillArea = document.getElementById('tgcSkill').value.trim();
+  q.centre = document.getElementById('tgcCentre').value.trim();
+}
+function addCatalogUnit(qualId) {
+  var q = qualById(qualId); if (!q) return;
+  collectCatalogEdits(q);
+  q.units.push({ code: '', name: '', coreElective: 'Core' });
+  renderCatalogEditor(qualId);
+}
+function removeCatalogUnit(qualId, i) {
+  var q = qualById(qualId); if (!q) return;
+  collectCatalogEdits(q);
+  q.units.splice(i, 1);
+  renderCatalogEditor(qualId);
+}
+function saveCatalog(qualId) {
+  var q = qualById(qualId); if (!q) return;
+  collectCatalogEdits(q);
+  q.updatedAt = new Date().toISOString();
+  writeJSON(T.KEYS.catalogs, db.catalogs);
+  notifyHost();
+  closeCatalogEditor();
+  fillQualSelect();
+  renderGradeRows();
+  refreshPreview();
+  toast('Unit catalogue saved — trainee grade pages update automatically');
+}
+
+function renderAdmin() {
+  if (!document.getElementById('tgStudentSel')) {
+    document.getElementById('tgApp').innerHTML = adminHTML();
+    applyPreviewZoom(document.getElementById('tgZoom').value);
+  }
+  fillStudentSelect();
+  fillQualSelect();
+  renderProfileInputs();
+  renderGradeRows();
+  refreshPreview();
+}
+
+/* ============================================================================
+   STUDENT (TRAINEE) VIEW — live grades + transcript/certificate requests
+   ============================================================================ */
+function myStudentRecord() {
+  var s = MY_STUDENT_ID ? studentById(MY_STUDENT_ID) : null;
+  if (s) return s;
+  var n = T.normText(MY_NAME), c = T.normText(MY_COURSE);
+  return db.students.filter(function (st) {
+    return st && T.normText(st.name) === n && (!c || T.normText(st.course) === c);
+  })[0] || null;
+}
+
+function renderStudent() {
+  var app = document.getElementById('tgApp');
+  var s = myStudentRecord();
+  if (!s) {
+    app.innerHTML = '<div class="tg-empty"><div class="big">🎓</div>Your trainee record could not be found yet.<br>Please ask your administrator to enrol you, then reopen this page.</div>';
+    return;
+  }
+  var q = T.qualForCourse(db.catalogs, s.course);
+  var rows = q ? rowsFor(s.id, q) : [];
+  var stats = T.gradeStats(rows);
+  var canTranscript = !T.hasOpenRequest(db.requests, s.id, 'transcript');
+  var canCert = !T.hasOpenRequest(db.requests, s.id, 'certificate');
+  var myReqs = db.requests.filter(function (r) { return r && r.studentId === s.id; })
+    .sort(function (a, b) { return String(b.requestedAt).localeCompare(String(a.requestedAt)); });
+
+  app.innerHTML =
+  '<div class="tg-header">' +
+    '<div><h1>Transcript / Grades</h1>' +
+    '<p><span class="tg-live-dot"></span>Live view — your grades appear here the moment an exam is marked on VocTrain or Admin updates your record.</p></div>' +
+    '<div style="display:flex;gap:9px;flex-wrap:wrap;">' +
+      '<button class="tg-btn primary" ' + (canTranscript ? '' : 'disabled') + ' onclick="requestDoc(\'transcript\')">📜 Request Transcript</button>' +
+      '<button class="tg-btn green" ' + (canCert ? '' : 'disabled') + ' onclick="requestDoc(\'certificate\')">🎖 Request Certificate</button>' +
+    '</div>' +
+  '</div>' +
+  '<div class="tg-stats">' +
+    '<div class="tg-stat"><div class="v">' + esc(s.course || '—') + '</div><div class="l">Programme</div></div>' +
+    '<div class="tg-stat"><div class="v">' + stats.graded + '/' + stats.total + '</div><div class="l">Units graded</div></div>' +
+    '<div class="tg-stat"><div class="v">' + (stats.average == null ? '—' : T.formatGrade(stats.average)) + '</div><div class="l">Average</div></div>' +
+    '<div class="tg-stat"><div class="v">' + (stats.total ? Math.round(stats.graded / stats.total * 100) : 0) + '%</div><div class="l">Completion</div></div>' +
+  '</div>' +
+  (myReqs.length ?
+    '<div class="tg-card" style="margin-bottom:16px;"><div class="tg-card-head"><h2>My Requests</h2></div><div class="tg-card-body" style="padding-top:6px;">' +
+    '<table class="tg-table"><thead><tr><th>Type</th><th>Requested</th><th>Status</th></tr></thead><tbody>' +
+    myReqs.map(function (r) {
+      var color = r.status === 'ready' ? 'exam' : (r.status === 'declined' ? 'none' : 'manual');
+      return '<tr><td>' + esc(T.REQUEST_TYPES[r.type] || r.type) + '</td><td>' + esc(T.formatDateDMY(r.requestedAt)) + '</td>' +
+        '<td><span class="tg-src ' + color + '">' + esc(T.REQUEST_STATUS_LABELS[r.status] || r.status) + '</span>' +
+        (r.adminNote ? '<div style="font-size:10.5px;color:var(--text-muted);margin-top:2px;">' + esc(r.adminNote) + '</div>' : '') + '</td></tr>';
+    }).join('') + '</tbody></table></div></div>' : '') +
+  '<div class="tg-card"><div class="tg-card-head"><div><h2>' + esc(q ? q.title : 'My Units') + '</h2>' +
+    '<div class="sub">' + (q ? q.units.length + ' units on your qualification plan' : 'No unit catalogue has been set up for your programme yet — your administrator can add it on the Transcript/Grades page.') + '</div></div></div>' +
+    '<div class="tg-card-body" style="padding-top:6px;">' +
+    '<table class="tg-table"><thead><tr><th style="width:120px;">Unit code</th><th>Unit name</th><th style="width:110px;">Date</th><th style="width:90px;">Final grade</th></tr></thead><tbody>' +
+    (rows.length ? rows.map(function (r) {
+      var graded = r.grade != null && r.grade !== '';
+      return '<tr><td class="unit-code">' + esc(r.code) + '</td><td class="unit-name">' + esc(r.name) + '</td>' +
+        '<td>' + esc(r.date || '—') + '</td>' +
+        '<td style="font-weight:700;color:' + (graded ? 'var(--green)' : 'var(--text-muted)') + ';">' + (graded ? T.formatGrade(r.grade) : 'Pending') + '</td></tr>';
+    }).join('') : '<tr><td colspan="4" style="text-align:center;color:var(--text-muted);padding:24px;">No units to show yet.</td></tr>') +
+    '</tbody></table></div></div>';
+}
+
+function requestDoc(type) {
+  var s = myStudentRecord();
+  if (!s) return;
+  if (T.hasOpenRequest(db.requests, s.id, type)) { toast('You already have an open ' + type + ' request', 'warn'); return; }
+  db.requests.push(T.newRequest({ studentId: s.id, studentName: s.name, course: s.course, type: type }));
+  writeJSON(T.KEYS.requests, db.requests);
+  notifyHost({ requests: true });
+  renderStudent();
+  toast('Request sent — the administration team has been notified');
+}
+
+/* ============================================================================
+   INSTRUCTOR VIEW — live grades for the instructor's own trainees
+   ============================================================================ */
+var insOpen = {};
+function instructorStudents() {
+  var c = T.normText(MY_COURSE);
+  if (!c) return [];
+  return db.students.filter(function (s) {
+    if (!s) return false;
+    var sc = T.normText(s.course);
+    var byCourse = sc && (sc === c || sc.indexOf(c) !== -1 || c.indexOf(sc) !== -1);
+    var byName = MY_NAME && s.instructor && T.normText(s.instructor) === T.normText(MY_NAME);
+    return byCourse || byName;
+  });
+}
+
+function renderInstructor() {
+  var app = document.getElementById('tgApp');
+  var list = instructorStudents();
+  var q = T.qualForCourse(db.catalogs, MY_COURSE);
+  app.innerHTML =
+  '<div class="tg-header">' +
+    '<div><h1>Trainee Grades</h1>' +
+    '<p><span class="tg-live-dot"></span>Live grades for your trainees' + (MY_COURSE ? ' in <b>' + esc(MY_COURSE) + '</b>' : '') + ' — exam results and Admin updates appear instantly. Grade sheets carry your name as instructor.</p></div>' +
+  '</div>' +
+  (!list.length ? '<div class="tg-empty"><div class="big">🧑‍🏫</div>No trainees found for your course yet.</div>' :
+    list.map(function (s, i) {
+      var rows = q ? rowsFor(s.id, q) : [];
+      var stats = T.gradeStats(rows);
+      var open = !!insOpen[s.id];
+      return '<div class="tg-card" style="margin-bottom:12px;">' +
+        '<div class="tg-card-head" style="cursor:pointer;" onclick="toggleInsRow(\'' + escAttr(s.id) + '\')">' +
+          '<div><h2>' + esc(s.name) + '</h2><div class="sub">' + esc(s.course || '') + ' • ' + stats.graded + '/' + stats.total + ' units graded • avg ' + (stats.average == null ? '—' : T.formatGrade(stats.average)) + '</div></div>' +
+          '<div style="display:flex;gap:8px;align-items:center;">' +
+            '<button class="tg-btn sm green" onclick="event.stopPropagation();insGradeSheet(\'' + escAttr(s.id) + '\')">⬇ Grade Sheet</button>' +
+            '<span style="color:var(--text-muted);font-size:12px;">' + (open ? '▲' : '▼') + '</span></div>' +
+        '</div>' +
+        (open ? '<div class="tg-card-body" style="padding-top:6px;">' +
+          '<table class="tg-table"><thead><tr><th style="width:120px;">Unit code</th><th>Unit name</th><th style="width:110px;">Date</th><th style="width:90px;">Grade</th><th style="width:90px;">Source</th></tr></thead><tbody>' +
+          (rows.length ? rows.map(function (r) {
+            var graded = r.grade != null && r.grade !== '';
+            return '<tr><td class="unit-code">' + esc(r.code) + '</td><td class="unit-name">' + esc(r.name) + '</td><td>' + esc(r.date || '—') + '</td>' +
+              '<td style="font-weight:700;color:' + (graded ? 'var(--green)' : 'var(--text-muted)') + ';">' + (graded ? T.formatGrade(r.grade) : 'Pending') + '</td>' +
+              '<td><span class="tg-src ' + r.source + '">' + (r.source === 'exam' ? 'Live exam' : r.source === 'manual' ? 'Manual' : '—') + '</span></td></tr>';
+          }).join('') : '<tr><td colspan="5" style="text-align:center;color:var(--text-muted);padding:18px;">No unit catalogue for this programme yet.</td></tr>') +
+          '</tbody></table></div>' : '') +
+      '</div>';
+    }).join(''));
+}
+function toggleInsRow(id) { insOpen[id] = !insOpen[id]; renderInstructor(); }
+function insGradeSheet(id) {
+  var s = studentById(id);
+  var q = T.qualForCourse(db.catalogs, MY_COURSE) || T.qualForCourse(db.catalogs, s && s.course);
+  if (!s || !q) { toast('No unit catalogue set up for this programme yet', 'warn'); return; }
+  generateGradeSheetPDF(s, q);
+}
+
+/* ============================================================================
+   BOOT + LIVE UPDATES
+   ============================================================================ */
+function renderForRole() {
+  if (IS_STAFF) renderAdmin();
+  else if (ROLE === 'instructor') renderInstructor();
+  else renderStudent();
+}
+
+var LIVE_KEYS = ['voctrain_examResults', 'voctrain_exams', 'voctrain_students', 'voctrain_instructorData'];
+function isLiveKey(k) {
+  return LIVE_KEYS.indexOf(k) !== -1 ||
+    k === T.KEYS.grades || k === T.KEYS.catalogs || k === T.KEYS.requests || k === T.KEYS.profiles;
+}
+
+/* Other tabs / the host LMS / cloud sync write to the same store — the
+   localStorage mirror fires `storage` here, and we re-render from source. */
+window.addEventListener('storage', function (e) {
+  if (e.key && isLiveKey(e.key)) { loadAll(); renderForRole(); }
+});
+window.addEventListener('message', function (e) {
+  if (e.data && (e.data.type === 'transcript-refresh' || e.data.type === 'refresh-students')) {
+    loadAll(); renderForRole();
+  }
+});
+/* Safety net for writes that only land in IndexedDB (no storage event). */
+var lastFingerprint = '';
+setInterval(function () {
+  var fp = '';
+  try {
+    fp = String(CESTISStore.getItem('voctrain_examResults') || '').length + '|' +
+         String(CESTISStore.getItem(T.KEYS.grades) || '').length + '|' +
+         String(CESTISStore.getItem(T.KEYS.catalogs) || '').length + '|' +
+         String(CESTISStore.getItem(T.KEYS.requests) || '').length + '|' +
+         String(CESTISStore.getItem('voctrain_students') || '').length;
+  } catch (e) {}
+  if (fp !== lastFingerprint) {
+    lastFingerprint = fp;
+    loadAll();
+    renderForRole();
+  }
+}, 5000);
+
+function boot() {
+  if (!window.CESTISCore || !CESTISCore.Transcript || !window.CESTISStore) {
+    document.getElementById('tgApp').innerHTML = '<div class="tg-empty">Shared data core failed to load. Please refresh.</div>';
+    return;
+  }
+  loadAll();
+  renderForRole();
+}
+
+document.addEventListener('DOMContentLoaded', function () {
+  if (window.CESTISStore && typeof CESTISStore.whenReady === 'function') {
+    CESTISStore.whenReady(boot);
+  } else { boot(); }
+});
+</script>
+<script>
+/* Inject the embedded Garamond faces (kept out of the main <style> so the
+   base64 doesn't bloat devtools). */
+(function () {
+  var A = window.CESTIS_TRANSCRIPT_ASSETS || {};
+  if (!A.garamondRegular) return;
+  var css =
+    "@font-face{font-family:'EB Garamond T';src:url(data:font/ttf;base64," + A.garamondRegular + ") format('truetype');font-weight:400;font-style:normal;}" +
+    "@font-face{font-family:'EB Garamond T';src:url(data:font/ttf;base64," + A.garamondBold + ") format('truetype');font-weight:700;font-style:normal;}";
+  var el = document.createElement('style');
+  el.textContent = css;
+  document.head.appendChild(el);
+})();
+</script>
+</body>
+</html>

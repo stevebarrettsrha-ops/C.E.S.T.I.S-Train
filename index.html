@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8">
-<script src="cestis-core.js?v=20260711a"></script>
+<script src="cestis-core.js?v=20260711d"></script>
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <meta name="google-site-verification" content="h1kcrSWbOfqMdqcEuN9crbU73K84WTBd7Qy1lcbcFC4" />
 <title>VocTrain LMS — Vocational Training Management System</title>
@@ -5296,7 +5296,8 @@ function exportDataBackup() {
     'voctrain_systemSettings','voctrain_examResults','voctrain_calendarEvents','voctrain_adrTasks',
     'voctrain_adrStaffMeta','voctrain_adminStaffAccess','voctrain_instructorData','voctrain_certDownloadApprovals',
     'voctrain_skillAreas','voctrain_certTemplates','voctrain_chatRooms','voctrain_chatMessages',
-    'voctrain_chatProfiles','voctrain_chatFollows'];
+    'voctrain_chatProfiles','voctrain_chatFollows',
+    'voctrain_unitCatalogs','voctrain_transcriptGrades','voctrain_certTranscriptRequests','voctrain_transcriptProfiles'];
   // Include every per-quarter attendance bucket so all quarters are backed up.
   try {
     (CESTISStore.keys ? CESTISStore.keys() : Object.keys(CESTISStore._cache || {})).forEach(function(k) {
@@ -8440,6 +8441,10 @@ function buildAdminSidebar() {
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M16 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="8.5" cy="7" r="4"/><path d="M20 8v6"/><path d="M23 11h-6"/></svg>Verify Users<span class="nav-badge" id="pendingUsersBadge" style="display:none;background:var(--red);">0</span></div>
     <div class="nav-item" data-page="certificates" onclick="showPage('certificates')">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="8" r="7"/><polyline points="8.21 13.89 7 23 12 20 17 23 15.79 13.88"/></svg>Certificates</div>
+    <div class="nav-item" data-page="transcript-grades" onclick="showPage('transcript-grades')">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/><line x1="10" y1="9" x2="8" y2="9"/></svg>Transcript/Grades<span class="nav-badge" style="background:var(--green);">NEW</span></div>
+    <div class="nav-item" data-page="cert-transcript-requests" onclick="showPage('cert-transcript-requests')">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 12h-6l-2 3h-4l-2-3H2"/><path d="M5.45 5.11 2 12v6a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2v-6l-3.45-6.89A2 2 0 0 0 16.76 4H7.24a2 2 0 0 0-1.79 1.11z"/></svg>Cert/Transcript Requests<span class="nav-badge" id="ctrRequestsBadge" style="display:none;background:var(--red);">0</span></div>
     <div class="nav-item" data-page="cert-downloads" onclick="showPage('cert-downloads')">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>Cert Downloads</div>
     <div class="nav-item" data-page="reports" onclick="showPage('reports')">
@@ -8457,6 +8462,7 @@ function buildAdminSidebar() {
     <div class="nav-item" data-page="settings" onclick="showPage('settings')">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>Settings</div>
   `;
+  setTimeout(updateCtrRequestsBadge, 200);
 }
 
 function buildStudentSidebar() {
@@ -8479,6 +8485,8 @@ function buildStudentSidebar() {
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><path d="M16 13H8"/><path d="M16 17H8"/><path d="M10 9H8"/></svg>My Assignments</div>
     <div class="nav-item" data-page="s-exams" onclick="showPage('s-exams')">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg>My Exams</div>
+    <div class="nav-item" data-page="s-transcript-grades" onclick="showPage('s-transcript-grades')">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/><line x1="10" y1="9" x2="8" y2="9"/></svg>Transcript/Grades<span class="nav-badge" style="background:var(--green);">NEW</span></div>
     <div class="nav-item" data-page="s-certificate" onclick="showPage('s-certificate')">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="8" r="7"/><polyline points="8.21 13.89 7 23 12 20 17 23 15.79 13.88"/></svg>My Certificate</div>
     <div class="nav-section-label">Account</div>
@@ -8505,6 +8513,8 @@ function buildInstructorSidebar() {
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M16 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="8.5" cy="7" r="4"/><polyline points="17 11 19 13 23 9"/></svg>Attendance</div>
     <div class="nav-item" data-page="i-gradebook" onclick="showPage('i-gradebook')">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg>Gradebook</div>
+    <div class="nav-item" data-page="i-trainee-grades" onclick="showPage('i-trainee-grades')">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/><line x1="10" y1="9" x2="8" y2="9"/></svg>Trainee Grades<span class="nav-badge" style="background:var(--green);">NEW</span></div>
     <div class="nav-item" data-page="i-resources" onclick="showPage('i-resources')">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/></svg>Resources</div>
     <div class="nav-item" data-page="i-qual-plan" onclick="showPage('i-qual-plan')">
@@ -8940,6 +8950,8 @@ function showPage(pageId) {
     'fee-management':'School Fee Management','as-fee-management':'School Fee Management',
     'cashbook':'Cashbook Management','document-hub':'Document Hub','i-document-hub':'Document Hub','as-document-hub':'Document Hub','pdf-workshop':'PDF Workshop','as-pdf-workshop':'PDF Workshop','i-pdf-workshop':'PDF Workshop',
     'qual-plan':'Qual Plan / Curriculum','s-qual-plan':'Qual Plan / Curriculum','i-qual-plan':'Qual Plan / Curriculum','as-qual-plan':'Qual Plan / Curriculum',
+    'transcript-grades':'Transcript / Grades','s-transcript-grades':'Transcript / Grades','as-transcript-grades':'Transcript / Grades','i-trainee-grades':'Trainee Grades',
+    'cert-transcript-requests':'Certificate / Transcript Requests','as-cert-transcript-requests':'Certificate / Transcript Requests',
     'cmc-dashboard':'CMC Analytics Dashboard','cmc-financial':'Financial Overview','cmc-staff':'Staff & HR','cmc-academic':'Academic Performance','cmc-sources':'Source Viewer','cmc-profile':'My Profile'
   };
   document.getElementById('topbarTitle').textContent = titles[pageId]||pageId;
@@ -9015,6 +9027,38 @@ function showPage(pageId) {
       }
       qpEl.src = qpSrc;
       qpEl.setAttribute('data-src-loaded', '1');
+    }
+  }
+  // Transcript/Grades system pages are hosted in Transcript-Grades.html and
+  // Cert-Transcript-Requests.html. The src carries the viewer's role and
+  // identity so each role sees its own view (admin editor / trainee live
+  // grades / instructor trainee grades / requests queue).
+  var transcriptFrameMap = {
+    'transcript-grades':           {id:'transcriptGradesFrame',   role:'admin'},
+    'as-transcript-grades':        {id:'asTranscriptGradesFrame', role:'adminstaff'},
+    's-transcript-grades':         {id:'sTranscriptGradesFrame',  role:'student'},
+    'i-trainee-grades':            {id:'iTraineeGradesFrame',     role:'instructor'},
+    'cert-transcript-requests':    {id:'ctrRequestsFrame',        role:'admin',      requests:true},
+    'as-cert-transcript-requests': {id:'asCtrRequestsFrame',      role:'adminstaff', requests:true}
+  };
+  if(transcriptFrameMap[pageId]) {
+    var tgInfo = transcriptFrameMap[pageId];
+    var tgEl = document.getElementById(tgInfo.id);
+    if(tgEl && !tgEl.getAttribute('data-src-loaded')) {
+      var tgSrc = (tgInfo.requests ? 'Cert-Transcript-Requests.html' : 'Transcript-Grades.html') + '?role=' + encodeURIComponent(tgInfo.role);
+      var tgActor = (typeof currentLoggedInUser !== 'undefined' && currentLoggedInUser && currentLoggedInUser.name) ? currentLoggedInUser.name : tgInfo.role;
+      tgSrc += '&actor=' + encodeURIComponent(tgActor);
+      if(tgInfo.role === 'student' && typeof currentStudent !== 'undefined' && currentStudent) {
+        if(currentStudent.id)     tgSrc += '&studentId=' + encodeURIComponent(currentStudent.id);
+        if(currentStudent.name)   tgSrc += '&name=' + encodeURIComponent(currentStudent.name);
+        if(currentStudent.course) tgSrc += '&course=' + encodeURIComponent(currentStudent.course);
+      } else if(tgInfo.role === 'instructor' && typeof currentInstructor !== 'undefined' && currentInstructor) {
+        var tgCourse = currentInstructor.course || currentInstructor.programme || (currentInstructor.courses && currentInstructor.courses[0]);
+        if(tgCourse) tgSrc += '&course=' + encodeURIComponent(tgCourse);
+        if(currentInstructor.name) tgSrc += '&name=' + encodeURIComponent(currentInstructor.name);
+      }
+      tgEl.src = tgSrc;
+      tgEl.setAttribute('data-src-loaded', '1');
     }
   }
   // Mount any external feature file (LMS Chat / Video Conference) declared on the
@@ -9614,6 +9658,16 @@ function buildAdminPages() {
     <iframe id="qualPlanFrame" style="width:100%;height:calc(100vh - var(--topbar-h) - 56px);border:none;border-radius:12px;"></iframe>
   </section>
 
+  <!-- TRANSCRIPT / GRADES (Admin) -->
+  <section class="page" id="page-transcript-grades">
+    <iframe id="transcriptGradesFrame" style="width:100%;height:calc(100vh - var(--topbar-h) - 56px);border:none;border-radius:12px;"></iframe>
+  </section>
+
+  <!-- CERTIFICATE / TRANSCRIPT REQUESTS (Admin) -->
+  <section class="page" id="page-cert-transcript-requests">
+    <iframe id="ctrRequestsFrame" style="width:100%;height:calc(100vh - var(--topbar-h) - 56px);border:none;border-radius:12px;"></iframe>
+  </section>
+
   <!-- PDF WORKSHOP -->
   <section class="page" id="page-pdf-workshop">
     <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;flex-wrap:wrap;gap:12px;">
@@ -9951,6 +10005,11 @@ function buildStudentPages() {
     <div class="cestis-mount" data-feature="s-resources" data-prefix="student"></div>
   </section>
 
+  <!-- STUDENT TRANSCRIPT / GRADES -->
+  <section class="page" id="page-s-transcript-grades">
+    <iframe id="sTranscriptGradesFrame" style="width:100%;height:calc(100vh - var(--topbar-h) - 56px);border:none;border-radius:12px;"></iframe>
+  </section>
+
   <!-- STUDENT QUAL PLAN / CURRICULUM -->
   <section class="page" id="page-s-qual-plan">
     <iframe id="sQualPlanFrame" style="width:100%;height:calc(100vh - var(--topbar-h) - 56px);border:none;border-radius:12px;"></iframe>
@@ -10251,6 +10310,11 @@ function buildInstructorPages() {
   <!-- INSTRUCTOR RESOURCES -->
   <section class="page" id="page-i-resources">
     <div class="cestis-mount" data-feature="i-resources" data-prefix="instructor"></div>
+  </section>
+
+  <!-- INSTRUCTOR TRAINEE GRADES -->
+  <section class="page" id="page-i-trainee-grades">
+    <iframe id="iTraineeGradesFrame" style="width:100%;height:calc(100vh - var(--topbar-h) - 56px);border:none;border-radius:12px;"></iframe>
   </section>
 
   <!-- INSTRUCTOR QUAL PLAN / CURRICULUM -->
@@ -15510,6 +15574,39 @@ window.addEventListener('message', function(e) {
     updateSkillAreaCounts();
     saveState();
   }
+  // Transcript/Grades iframes announce data changes (grades, unit catalogues,
+  // trainee requests, manual exam-result overrides). Reload the affected
+  // in-memory copies from the shared store, refresh the request badge and
+  // push the change to cloud sync — WITHOUT calling saveState(), which would
+  // overwrite the store with this window's (now stale) arrays.
+  if(e.data && e.data.type === 'transcript-data-updated') {
+    try { examResults = JSON.parse(CESTISStore.getItem('voctrain_examResults') || '[]'); } catch(e2) {}
+    updateCtrRequestsBadge();
+    try { scheduleDebouncedCloudSave(); } catch(e2) {}
+  }
+});
+
+// ============================== CERT/TRANSCRIPT REQUEST BADGE ==============================
+// Pending trainee requests for transcripts/certificates, shown on the
+// admin + admin-staff sidebars. Kept fresh by the transcript iframes'
+// postMessage nudges and by storage events from other tabs / cloud sync.
+function updateCtrRequestsBadge() {
+  var count = 0;
+  try {
+    var reqs = JSON.parse(CESTISStore.getItem('voctrain_certTranscriptRequests') || '[]');
+    if(window.CESTISCore && CESTISCore.Transcript) {
+      count = CESTISCore.Transcript.pendingRequestCount(reqs);
+    } else {
+      count = (reqs || []).filter(function(r){ return r && (r.status === 'pending' || r.status === 'processing'); }).length;
+    }
+  } catch(e) {}
+  ['ctrRequestsBadge', 'asCtrRequestsBadge'].forEach(function(id) {
+    var b = document.getElementById(id);
+    if(b) { b.textContent = count; b.style.display = count > 0 ? '' : 'none'; }
+  });
+}
+window.addEventListener('storage', function(e) {
+  if(e.key === 'voctrain_certTranscriptRequests') updateCtrRequestsBadge();
 });
 
 // ============================== GOOGLE SITE VERIFICATION ==============================
@@ -28505,6 +28602,13 @@ function buildAdminStaffSidebar() {
   html += '<div class="nav-item" data-page="as-pdf-workshop" onclick="showPage(\'as-pdf-workshop\')">' +
     '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><path d="M12 18v-6"/><path d="M9 15l3-3 3 3"/></svg>PDF Workshop</div>';
 
+  // Transcript/Grades records always visible for admin staff
+  html += '<div class="nav-section-label">Records</div>';
+  html += '<div class="nav-item" data-page="as-transcript-grades" onclick="showPage(\'as-transcript-grades\')">' +
+    '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/><line x1="10" y1="9" x2="8" y2="9"/></svg>Transcript/Grades<span class="nav-badge" style="background:var(--green);">NEW</span></div>';
+  html += '<div class="nav-item" data-page="as-cert-transcript-requests" onclick="showPage(\'as-cert-transcript-requests\')">' +
+    '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 12h-6l-2 3h-4l-2-3H2"/><path d="M5.45 5.11 2 12v6a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2v-6l-3.45-6.89A2 2 0 0 0 16.76 4H7.24a2 2 0 0 0-1.79 1.11z"/></svg>Cert/Transcript Requests<span class="nav-badge" id="asCtrRequestsBadge" style="display:none;background:var(--red);">0</span></div>';
+
   // Time Tracking, School Fee Management always visible for admin staff
   html += '<div class="nav-section-label">Tools</div>';
   html += '<div class="nav-item" data-page="as-timetracking" onclick="showPage(\'as-timetracking\')">' +
@@ -28525,6 +28629,7 @@ function buildAdminStaffSidebar() {
     '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>My Profile</div>';
 
   nav.innerHTML = html;
+  setTimeout(updateCtrRequestsBadge, 200);
 }
 
 // ============================== BUILD ADMIN STAFF PAGES ==============================
@@ -28812,6 +28917,16 @@ function buildAdminStaffPages() {
   // ---- Qual Plan / Curriculum (Admin Staff) ----
   html += '<section class="page" id="page-as-qual-plan">' +
     '<iframe id="asQualPlanFrame" style="width:100%;height:calc(100vh - var(--topbar-h) - 56px);border:none;border-radius:12px;"></iframe>' +
+  '</section>';
+
+  // ---- Transcript / Grades (Admin Staff) ----
+  html += '<section class="page" id="page-as-transcript-grades">' +
+    '<iframe id="asTranscriptGradesFrame" style="width:100%;height:calc(100vh - var(--topbar-h) - 56px);border:none;border-radius:12px;"></iframe>' +
+  '</section>';
+
+  // ---- Certificate / Transcript Requests (Admin Staff) ----
+  html += '<section class="page" id="page-as-cert-transcript-requests">' +
+    '<iframe id="asCtrRequestsFrame" style="width:100%;height:calc(100vh - var(--topbar-h) - 56px);border:none;border-radius:12px;"></iframe>' +
   '</section>';
 
   // ---- Task Detail Modal (needed for My Duties click-to-view) ----

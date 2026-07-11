@@ -318,6 +318,18 @@
       });
     }
 
+    if (Array.isArray(data.transcriptGrades)) {
+      data.transcriptGrades.forEach(function (g) {
+        if (g && g.studentId && idMap[g.studentId]) g.studentId = idMap[g.studentId];
+      });
+    }
+
+    if (Array.isArray(data.certTranscriptRequests)) {
+      data.certTranscriptRequests.forEach(function (r) {
+        if (r && r.studentId && idMap[r.studentId]) r.studentId = idMap[r.studentId];
+      });
+    }
+
     return data;
   };
 
@@ -454,6 +466,7 @@
   Core.SNAPSHOT_COUNT_KEYS = [
     'voctrain_students', 'voctrain_users', 'voctrain_attendance', 'voctrain_examResults',
     'voctrain_certDownloadApprovals', 'voctrain_instructorData',
+    'voctrain_unitCatalogs', 'voctrain_transcriptGrades', 'voctrain_certTranscriptRequests',
     'cestiSchoolFeeStudents', 'cestiSchoolFeePayments'
   ];
 
@@ -987,6 +1000,763 @@
       grantExpiry: grantExpiry, permissionActiveAt: permissionActiveAt,
       isRegisterOpen: isRegisterOpen, prunePermissions: prunePermissions
     };
+  })();
+
+  /* ==========================================================================
+     TRANSCRIPT / GRADES ENGINE — shared logic for the Transcript & Grades
+     system (admin editor, trainee live view, instructor view, PDF exports).
+
+     WHY THIS EXISTS
+     ---------------
+     A trainee's final grade for a unit can come from two places:
+       1. LIVE EXAMS taken on VocTrain (voctrain_examResults), matched to a
+          catalogue unit by unit code / unit name appearing in the exam title.
+       2. A MANUAL grade entered (or overridden) by Admin on the
+          Transcript/Grades page (voctrain_transcriptGrades).
+     A manual record always wins over a live exam score for the same unit.
+     Every page (admin, trainee, instructor) must resolve grades identically,
+     so the resolution logic lives here — pure and unit-testable in Node.
+
+     STORAGE KEYS (all JSON in CESTISStore; snapshot-synced like the rest)
+       voctrain_unitCatalogs          [{id,title,skillArea,level,centre,units:[{code,name,coreElective}]}]
+       voctrain_transcriptGrades      [{id,studentId,qualId,unitCode,grade,date,source,examResultId,updatedBy,updatedAt}]
+       voctrain_certTranscriptRequests[{id,studentId,studentName,course,type,note,status,requestedAt,handledBy,handledAt}]
+       voctrain_transcriptProfiles    {studentId:{dob,address,idNo}}
+     ========================================================================== */
+  Core.Transcript = (function () {
+    var T = {};
+
+    T.KEYS = {
+      catalogs: 'voctrain_unitCatalogs',
+      grades: 'voctrain_transcriptGrades',
+      requests: 'voctrain_certTranscriptRequests',
+      profiles: 'voctrain_transcriptProfiles'
+    };
+
+    // Institution block rendered on the official transcript — matches the
+    // approved paper transcript exactly. Do not restyle without approval.
+    T.INSTITUTION = {
+      nameLine1: 'Community Educational and Skills Training',
+      nameLine2: 'Institute and Services Ltd.',
+      centre: 'Hazard Skills Training Centre',
+      addressLines: ['Mack Chem Complex', 'Paisley Avenue, May Pen', 'Clarendon, Jamaica'],
+      email: 'hazardtrainingcentre@gmail.com',
+      tel: '876-679-0111,876-365-2325'
+    };
+
+    T.REQUEST_TYPES = { transcript: 'Transcript', certificate: 'Certificate', both: 'Transcript & Certificate' };
+    T.REQUEST_STATUSES = ['pending', 'processing', 'ready', 'collected', 'declined'];
+    T.REQUEST_STATUS_LABELS = { pending: 'Pending', processing: 'Processing', ready: 'Ready for Collection', collected: 'Collected', declined: 'Declined' };
+
+    /* --- The seeded unit catalogues ---------------------------------------
+       BUSINESS ADMINISTRATION (MANAGEMENT) LEVEL 5 is seeded verbatim from the
+       institution's approved transcript. The other programmes mirror the
+       Qualification Plan page's skill areas; Admin fills their units in from
+       the Transcript/Grades input section. */
+    var BAM_L5_UNITS = [
+      ['BSBBAD0553B', 'Plan and manage meetings'],
+      ['BSBSBM0163A', 'Develop a business proposal'],
+      ['BSBSBM0423A', 'Organize business finances'],
+      ['FSFACC0033B', 'Prepare operational budget'],
+      ['BSBSBM0143A', 'Apply advanced business communication skills'],
+      ['BSBCOR0353B', 'Communicate information relating to work activities'],
+      ['BSBMKP1053B', 'Seize a business opportunity'],
+      ['BSBMKP0173B', 'Conduct research and prepare a marketing plan to achieve goals'],
+      ['BSBMKP0913B', 'Manage business customers'],
+      ['PSSCOR0063B', 'Monitor performance and provide feedback'],
+      ['BSBBAD1273B', 'Lead and manage people'],
+      ['PSSCOR0103B', 'Promote diversity'],
+      ['PSSADM0264B', 'Provide leadership across the organization'],
+      ['FSFACC0134B', 'Produce management reports to enable effective decision making'],
+      ['BSBBAD0274B', 'Manage finances within a budget'],
+      ['FSFADM0074B', 'Provide financial and business performance information'],
+      ['PSSADM0204B', 'Manage policy implementation'],
+      ['BSBSBM0024B', 'Research business opportunities'],
+      ['BSBSBM0054C', 'Develop a business plan'],
+      ['BSBSBM0354A', 'Protect and use intangible assets'],
+      ['PSAHRD0224B', 'Develop and use emotional intelligence'],
+      ['BSBIPR0014A', 'Comply with organizational requirements for protection and use of intellectual property'],
+      ['BSBIPR0044A', 'Manage intellectual property to protect and grow business'],
+      ['FSFACC0884A', 'Implement and maintain internal control procedures'],
+      ['PSSADM0144B', 'Exercise delegations'],
+      ['BSBLEG0014A', 'Apply the principles of contract law'],
+      ['PSSCOR0114B', 'Conduct systems evaluations'],
+      ['PSSCOR0124B', 'Use complex workplace communication strategies'],
+      ['THHWPO0344B', 'Manage quality guest service'],
+      ['PSSCOR0034B', 'Contribute to and manage the change processes'],
+      ['BSBBAD1244B', 'Manage workplace (industrial) relations'],
+      ['PSSCOR0164B', 'Represent and promote the organization'],
+      ['PSSADM0175A', 'Develop partnering arrangements'],
+      ['PSSCOR0145B', 'Prepare high-level-sensitive written materials'],
+      ['PSSPAD0095B', 'Establish and maintain a strategic planning cycle'],
+      ['PSSADM0165B', 'Manage innovation and continuous improvement'],
+      ['BSBEBU0085B', 'Evaluate new technologies for business'],
+      ['BSBFLM0035B', 'Manage effective workplace relationships'],
+      ['BSBBAD1305B', 'Analyse and interpret workforce development trends'],
+      ['BSBEBU0125B', 'Use online systems to support managerial decision- making'],
+      ['BSBFLM0095B', 'Facilitate continuous improvement'],
+      ['PSAHRD0185B', 'Formulate a human resource strategic plan'],
+      ['BSBBAD1365B', 'Manage environmental risks'],
+      ['BSBBAD1345B', 'Monitor and review strategic direction'],
+      ['PSSADM0535B', 'Provide advice to executive team and stakeholders'],
+      ['PSSPAD0065B', 'Evaluate an organization’s OHS performance'],
+      ['PSSPAD0115B', 'Establish and maintain community, government and business partnerships'],
+      ['PSSCOR0023B', 'Develop and implement work unit plan'],
+      ['BSBSBM0313A', 'Lead and facilitate offsite staff'],
+      ['BSBBAD0473B', 'Plan and manage conferences'],
+      ['BSBBAD0793B', 'Promote the business'],
+      ['BSBBAD0384B', 'Ensure sales and service delivery'],
+      ['PSAHRD0214B', 'Manage performance'],
+      ['THTCOT0204B', 'Manage projects'],
+      ['BSBADM0034B', 'Develop and use complex spreadsheets'],
+      ['FSFACC0294B', 'Report on financial activity'],
+      ['BSBBAD1264B', 'Undertake compliance audits'],
+      ['CSCSAD0014A', 'Provide community education projects'],
+      ['BSBMKP0054B', 'Design and deliver a presentation'],
+      ['PSSPAD0075B', 'Develop and implement organizational policies'],
+      ['PSSPAD0105B', 'Plan organizational needs'],
+      ['PSSADM0285B', 'Advise on organisation policy'],
+      ['PSSAPM0065B', 'Negotiate strategic procurement'],
+      ['PSSADM0245B', 'Obtain and manage consultancy services'],
+      ['FSFADM0025B', 'Develop and monitor financial policy statements and operating procedures'],
+      ['BSBFLM0135B', 'Manage budgets and financial plans within the work team'],
+      ['PSAHRD0155B', 'Manage remuneration strategies and plans'],
+      ['PSSADM0235B', 'Manage self as a board member'],
+      ['CSEGCC0075A', 'Provide workplace mentoring'],
+      ['PSSADM0215B', 'Manage a board meeting']
+    ];
+
+    // GENERAL BEAUTY THERAPY LEVEL 2 - NVQ-J CSB21424 - transcribed from the institution's qualification plan.
+    var BT_L2_UNITS = [
+      ['CSBBTH0122C', 'Design and apply facial make-up'],
+      ['CSBBTH0052E', 'Perform facial treatment'],
+      ['CSBBTH0062D', 'Provide lash and brow treatment'],
+      ['CSBBTH0072D', 'Provide temporary epilation and bleaching treatments'],
+      ['CSBBTH0132C', 'Provide paraffin wax treatment'],
+      ['CSBBTH0032C', 'Apply nail art'],
+      ['CSBBTH0092B', 'Apply acrylic nail enhancement'],
+      ['CSBBTH0102B', 'Apply gel nail enhancement'],
+      ['CSBBTH0002D', 'Provide manicure and pedicure service'],
+      ['CSBBTH0202A', 'Acquire foundation knowledge of massage therapy'],
+      ['CSBBTH0212A', 'Apply knowledge of the history of massage'],
+      ['CRIOHS0022A', 'Provide advance first aid'],
+      ['CSACMP0012B', 'Comply with infection prevention and control policies and procedures'],
+      ['CRIHLT0042A', 'Protect self against communicable diseases in the workplace'],
+      ['CSBCOS0032D', 'Sell products and services'],
+      ['CSBCOS0042D', 'Conduct financial transactions'],
+      ['CSBCOS0052D', 'Perform stock control procedures'],
+      ['ITIDAT3552A', 'Perform advanced features of computer applications'],
+      ['ITIWEB1012C', 'Use social media tools for collaboration and engagement'],
+      ['CRICOM0022B', 'Communicate and interact effectively in the workplace'],
+      ['CRICOM0012B', 'Apply language and communication skills'],
+      ['CSBCOS0002D', 'Receive and direct clients'],
+      ['CRICUS0012A', 'Provide quality customer/client service'],
+      ['CSBCOS0012D', 'Schedule and check out clients'],
+      ['BSBCOR0382D', 'Display human relations skills'],
+      ['BSBSBM0012E', 'Craft personal entrepreneurial strategy'],
+      ['CSWCOR0052B', 'Reflect on and improve own professional practice'],
+      ['CRIMAT0012B', 'Perform mathematical computations'],
+      ['CSBBAR0042D', 'Perform face shave', 'Elective'],
+      ['THHFRO0032B', 'Develop and apply conversational skills in a foreign language', 'Elective'],
+      ['CSBCOS0202C', 'Perform hair styling services', 'Elective']
+    ];
+
+    // COSMETOLOGY LEVEL 2 - NVQ-J CSB21323 - transcribed from the institution's qualification plan.
+    var COS_L2_UNITS = [
+      ['CSBCOR0021D', 'Plan and organize work'],
+      ['CSBCOS0001E', 'Prepare clients for salon service'],
+      ['CSBCOS0031C', 'Perform shampooing and conditioning services'],
+      ['CSBHDR0011C', 'Perform head, neck and shoulder massage'],
+      ['CSBCOS0021C', 'Perform wet hair styling and roller placement'],
+      ['CSBCOR0011D', 'Maintain a safe, clean and efficient work environment'],
+      ['CSBCOS0011D', 'Perform temporary hair colour services'],
+      ['CSBCOS0041B', 'Perform basic hair and scalp treatments'],
+      ['CSBBTH0001B', 'Provide basic manicure and pedicure service'],
+      ['CSBBTH0112B', 'Apply knowledge of nail science to nail services'],
+      ['CSBBTH0002D', 'Provide manicure and pedicure service'],
+      ['CSBBTH0132C', 'Provide paraffin wax treatment'],
+      ['CSBBTH0032C', 'Apply nail art'],
+      ['CSBBTH0052E', 'Perform facial treatment'],
+      ['CSBBTH0122C', 'Design and apply facial make-up'],
+      ['CSBBAR0042D', 'Perform face shave'],
+      ['CSBBTH0062D', 'Provide lash and brow treatment'],
+      ['CSBBTH0072D', 'Provide temporary epilation and bleaching treatments'],
+      ['CSBCOS0072C', 'Consult with clients and diagnose hair and scalp conditions'],
+      ['CSBCOS0242A', 'Utilise sensory skills in beauty service for optimal client experience'],
+      ['CSBCOS0162C', 'Perform chemical straightening services'],
+      ['CSBCOS0172C', 'Perform permanent wave services'],
+      ['CSBCOS0192C', 'Provide permanent hair colour services'],
+      ['CSBCOS0102D', 'Perform semi-permanent hair colour services'],
+      ['CSBCOS0022C', 'Perform hair shaping'],
+      ['CSBCOS0132C', 'Maintain wigs and hair pieces'],
+      ['CSBCOS0142C', 'Perform thermal straightening, curling and waving'],
+      ['CSBCOS0182C', 'Perform hair braiding services'],
+      ['CSBCOS0202C', 'Perform hair styling services'],
+      ['CSBBTH0082C', 'Provide advice on retail beauty care products'],
+      ['CRICOM0012B', 'Apply language and communication skills'],
+      ['BMFCRT0182B', 'Collaborate in a creative process'],
+      ['BSSCRE0322C', 'Contribute to effective workplace relationships'],
+      ['CRICUS0012A', 'Provide quality customer/client service'],
+      ['CSBCOS0002D', 'Receive and direct clients'],
+      ['CSBCOS0012D', 'Schedule and check out clients'],
+      ['CSBCOS0032D', 'Sell products and services'],
+      ['CRIMAT0012B', 'Perform mathematical computations'],
+      ['CSBCOS0042D', 'Conduct financial transactions'],
+      ['BSBMKP0192C', 'Undertake research and analysis'],
+      ['BSBSBM0012E', 'Craft personal entrepreneurial strategy'],
+      ['CSBCOS0052D', 'Perform stock control procedures'],
+      ['BSBSBM0872B', 'Comply with regulatory and taxation requirements'],
+      ['BSBBAD0372E', 'Manage time'],
+      ['BMFCUL0072B', 'Exercise professionalism and ethical behaviour'],
+      ['ITIDAT0212D', 'Use advanced features of computer applications'],
+      ['ITIWEB1012C', 'Use social media tools for collaboration and engagement'],
+      ['CSBBAR0022D', 'Perform hair shaping on excessively curly hair', 'Elective'],
+      ['LMFIND0112B', 'Research interior decoration and design influences', 'Elective'],
+      ['THHFRO0032B', 'Develop and apply conversational skills in a foreign language', 'Elective']
+    ];
+
+    // ELECTRICAL INSTALLATION AND MAINTENANCE LEVEL 2 - NVQ-J EEM20723 - transcribed from the institution's qualification plan.
+    var EIM_L2_UNITS = [
+      ['MEMCOR0141D', 'Follow principles of Occupational Health and Safety (OH&S) in work environment'],
+      ['EEMELS0011B', 'Apply basic electrical safety'],
+      ['EEMINS0011B', 'Use and maintain hand and power tools for electrical work'],
+      ['MEMCOR0171D', 'Use and maintain graduated measuring devices'],
+      ['MEMCOR0081E', 'Use marking out tools'],
+      ['MEMCOR0161D', 'Plan to undertake a routine task'],
+      ['EEMTEC0011B', 'Apply principles and practices in electrical installation'],
+      ['MEMCOR0071E', 'Use electrical/electronic measuring devices'],
+      ['MEMCOR0091D', 'Draw and interpret sketches and simple drawings'],
+      ['MEMINS0071D', 'Prepare for electrical conduits/wiring installation'],
+      ['EEMEDR0011B', 'Interpret and draw standard electrical drawings'],
+      ['MEMINS0011E', 'Install, terminate and connect electrical wiring systems'],
+      ['MEMFAB0011D', 'Perform manual soldering/de-soldering of electrical/electronic components'],
+      ['MEMMRD0091D', 'Terminate basic signal and data cables'],
+      ['MEMINS0051D', 'Cut, bend and install electrical conduits'],
+      ['MEMINS0162C', 'Cut, fit and install trunking system'],
+      ['MEMINS0172C', 'Prepare and install basic cable trays'],
+      ['MEMINS0062D', 'Terminate and connect specialist cables'],
+      ['MEMCOR0012C', 'Plan a complete work activity'],
+      ['MEMINS0262D', 'Install distribution panels, metering sockets, terminal mains and meter earthing systems'],
+      ['EEMINS0022B', 'Perform basic testing and inspection on electrical installations'],
+      ['EEMMRD0022B', 'Dismantle and reassemble electromechanical components'],
+      ['EEMMRD0012B', 'Troubleshoot and repair basic electrical/electronic apparatus'],
+      ['MEMCOR0132C', 'Use industrial instrumentation measuring devices'],
+      ['EEMEDR0012B', 'Use electrical software to draw simple circuits'],
+      ['EEMINS0012B', 'Interpret electrical standard, specifications and manuals'],
+      ['MEMMRD0072E', 'Shut down/isolate machines/equipment'],
+      ['MEMINS0092D', 'Install electrical and electronic apparatus, machinery, fixtures and secondary wiring'],
+      ['MEMMRD0182E', 'Locate and repair/rectify electrical circuits'],
+      ['CRICOM0012B', 'Apply language and communication skills'],
+      ['MEMCOR0122D', 'Write basic technical reports'],
+      ['THTCOR0082C', 'Provide quality customer service'],
+      ['CRIMAT0012B', 'Perform mathematical computations'],
+      ['MEMCOR0152C', 'Use graphical techniques and perform simple statistical computations (Basic)'],
+      ['BMFCUL0072B', 'Exercise professionalism and ethical behaviour'],
+      ['BSBSBM0012E', 'Craft personal entrepreneurial strategy'],
+      ['BSBMKP0342D', 'Prepare quotations'],
+      ['MEMMAH0042D', 'Order materials'],
+      ['ITIDAT0212D', 'Use advanced features of computer applications'],
+      ['ITIWEB1012C', 'Use social media tools for collaboration and engagement'],
+      ['EETOPT0092A', 'Develop an understanding of concepts and application of optoelectronics technology', 'Elective'],
+      ['EETOPT0112A', 'Install LED technology signs', 'Elective'],
+      ['EETOPT0152A', 'Apply the fibre optic technology', 'Elective']
+    ];
+
+    // ELECTRICAL INSTALLATION AND MAINTENANCE LEVEL 3 - NVQ MEM32507 - transcribed from the institution's qualification plan.
+    var EIM_L3_UNITS = [
+      ['MEMCOR0051A', 'Perform related computations – basic'],
+      ['MEMCOR0071A', 'Use electrical/electronic measuring devices'],
+      ['MEMCOR0081A', 'Mark off/out (general engineering)'],
+      ['MEMCOR0091A', 'Draw and interpret sketches and simple drawings'],
+      ['MEMCOR0111A', 'Use power tools'],
+      ['MEMCOR0131A', 'Undertake interactive workplace communication'],
+      ['MEMCOR0141A', 'Follow principles of Occupational Health and Safety (OH&S) in work environment'],
+      ['MEMCOR0161A', 'Plan to undertake a routine task'],
+      ['MEMCOR0171A', 'Use graduated measuring devices'],
+      ['MEMCOR0191A', 'Use hand tools'],
+      ['MEMMAH0071A', 'Perform manual handling and lifting'],
+      ['MEMMAH0081A', 'Perform housekeeping duties'],
+      ['MEMFAB0011A', 'Perform manual soldering/de-soldering – electrical/electronic components'],
+      ['MEMINS0011A', 'Install terminate and connect electrical wiring'],
+      ['MEMINS0051A', 'Cut bend and install electrical conduits'],
+      ['MEMINS0071A', 'Prepare for electrical conduits/wiring installation'],
+      ['MEMMRD0091A', 'Terminate signal and data cables – (basic)'],
+      ['MEMMRD0121A', 'Perform basic repair to electrical/electronic apparatus'],
+      ['MEMMRD0161A', 'Disconnect and reconnect fixed wired electrical machinery appliance and fixtures'],
+      ['MEMMRD0181A', 'Attach flexible cables & plugs to electrical machinery appliance and fixtures'],
+      ['MEMCOR0012A', 'Plan a complete activity'],
+      ['MEMCOR0022A', 'Perform related computations'],
+      ['MEMCOR0042A', 'Interpret standard specifications and manuals'],
+      ['MEMCOR0052A', 'Operate in an autonomous team environment'],
+      ['MEMCOR0122A', 'Write technical reports (basic)'],
+      ['MEMINS0062A', 'Terminate and connect specialist cables'],
+      ['MEMINS0092A', 'Install electrical/electronic machinery appliances, fixtures'],
+      ['MEMINS0162A', 'Cut fit and install trunking system'],
+      ['MEMINS0172A', 'Prepare and install cable trays - basic'],
+      ['MEMINS0262A', 'Install distribution panels, metering sockets, terminal mains and meter earthing systems'],
+      ['MEMMRD0072A', 'Shut down/isolate machines/equipment'],
+      ['MEMMRD0182A', 'Fault find and repair/rectify basic electrical circuits and secondary wiring'],
+      ['MEMMRD0402A', 'Check/identify/isolate/rectify malfunctioning electrical machinery appliances and fixtures'],
+      ['MEMMRD0872A', 'Install and maintain electrical equipment'],
+      ['MEMMRD0892A', 'Install and maintain electronic electrical equipment and distribution circuits'],
+      ['MEMQUA0012A', 'Perform inspection (basic)'],
+      ['MEMMAH0073A', 'Purchase materials'],
+      ['MEMPLN0063A', 'Coordinate and manage basic installation projects'],
+      ['MEMPLN0113A', 'Plan for wiring and installation of electrical/electronic machinery appliances and fixtures'],
+      ['MEMCOM0023A', 'Perform internal and external customer service'],
+      ['MEMCOR0093A', 'Plan and organize work'],
+      ['MEMCOR0103A', 'Maintain quality systems within a team'],
+      ['BSBFLM0023A', 'Support leadership in the workplace'],
+      ['MEMMRD0423A', 'Diagnose and repair faults in electrical and electronic systems'],
+      ['MEMMRD0663A', 'Perform testing and inspection of electrical installations'],
+      ['MEMMRD0673A', 'Coordinate the installation of electrical wiring support system infrastructure'],
+      ['MEMMRD0683A', 'Coordinate the installation of electrical cable and fixture'],
+      ['MEMMRD0693A', 'Coordinate the installation of electrical equipment, ancillary apparatus and secondary wiring'],
+      ['MEMCOR0101A', 'Prepare basic engineering drawing', 'Elective'],
+      ['MEMCOR0121A', 'Classify engineering materials – (basic)', 'Elective'],
+      ['ITICOR0011A', 'Carry out data entry and retrieval procedures', 'Elective'],
+      ['MEMMRD0191A', 'Assemble & disassemble scaffolding to enable access to the work area', 'Elective'],
+      ['BSBSBM0012A', 'Craft personal entrepreneurial strategy', 'Elective'],
+      ['MEMMAH0042A', 'Order materials', 'Elective'],
+      ['MEMINS0122A', 'Install below ground communication cables', 'Elective'],
+      ['MEMCOR0132A', 'Use Industrial Instrumentation measuring devices', 'Elective'],
+      ['MEMCOR0063A', 'Attend to breakdown in hazardous area', 'Elective'],
+      ['MEMCOR0013A', 'Assist in the provision of on the job training', 'Elective'],
+      ['MEMMRD0703A', 'Coordinate the installation of substation plant and apparatus', 'Elective'],
+      ['MEMMRD0443A', 'Diagnose & repair faults in electrical equipment', 'Elective'],
+      ['BSBFLM0053A', 'Support operational plan', 'Elective'],
+      ['BSBFLM0093A', 'Support continuous improvement systems and processes', 'Elective'],
+      ['MEMPLN0034A', 'Coordinate and manage commissioning processes', 'Elective'],
+      ['MEMPLN0094A', 'Determine and plan for electrical installation requirements', 'Elective'],
+      ['MEMPLN0104A', 'Interpret and carry out electrical design', 'Elective'],
+      ['MEMPLN0114A', 'Evaluate electrical installation', 'Elective'],
+      ['MEMPLN0124A', 'Perform testing on complex electrical installation', 'Elective']
+    ];
+
+    // HOSPITALITY VILLA/PROPERTIES SERVICES LEVEL 2 - NVQ-J THH22522 - transcribed from the institution's qualification plan.
+    var HVP_L2_UNITS = [
+      ['THHHOK1211D', 'Clean public areas'],
+      ['THHHOK0911D', 'Clean floors, walls, furniture and furnishings'],
+      ['THHHOK1181D', 'Clean and maintain soft floor and furnishings'],
+      ['THHHOK0921D', 'Prepare guests rooms'],
+      ['THHHOK1151D', 'Prepare offices'],
+      ['THHHOK0931D', 'Provide laundry service'],
+      ['THHGAD0141D', 'Receive and store stock'],
+      ['THHFAB0151D', 'Prepare and serve non-alcoholic beverages'],
+      ['THHFRO0101D', 'Develop and apply conversational skills in a foreign language'],
+      ['THHFRO0141D', 'Carry out rooming procedures'],
+      ['THHFRO0091C', 'Provide bell services'],
+      ['THHHOK0901C', 'Respond to guest related complaints and requests'],
+      ['THHCFP0261E', 'Prepare dishes using basic methods of cookery'],
+      ['THHCFP0281D', 'Prepare and present sandwiches'],
+      ['THHCFP0321D', 'Prepare and cook poultry dishes'],
+      ['THHCFP0331D', 'Prepare and cook meat and seafood'],
+      ['THHCFP0651D', 'Prepare vegetables, fruits, eggs and farinaceous dishes'],
+      ['THHCFP0271D', 'Prepare and present appetizers and salads'],
+      ['THHCFP0251D', 'Clean kitchen premises and equipment'],
+      ['THHCFP1031B', 'Use knives for basic task in the kitchen environment'],
+      ['THHCFP0671C', 'Prepare stocks, sauces and soups'],
+      ['THHCFP0231D', 'Organize, prepare and present simple dishes'],
+      ['THHFAB0101D', 'Provide food and beverage service'],
+      ['THHHOK1411B', 'Develop and apply principles of professional codes of conduct & ethics'],
+      ['THHCOR0011C', 'Work with colleagues and customers'],
+      ['THHCOR0031D', 'Develop and update hospitality industry/job knowledge'],
+      ['THTTEJ0011D', 'Apply knowledge of Team Jamaica requirements in the workplace'],
+      ['CRIDIV0021A', 'Operate in a culturally diverse work environment'],
+      ['CRIWHS0061A', 'Apply environmentally sustainable work practices'],
+      ['ITCMOB0111B', 'Use mobile IT devices'],
+      ['ITICOR0011E', 'Perform basic computer applications'],
+      ['ITCWEB0161B', 'Participate in online networks and social media'],
+      ['THHFRO0112C', 'Facilitate access to external services'],
+      ['THHFRO0152C', 'Provide customized guests services'],
+      ['THHHOK1192C', 'Provide linen room services'],
+      ['THHFRO0132C', 'Maintain guests\' accounts'],
+      ['THHFRO0012C', 'Receive and process reservations'],
+      ['THHFRO0022D', 'Provide accommodation reception services'],
+      ['THHGFA0042D', 'Process cash and non-cash transactions'],
+      ['THHHOK1142D', 'Repair and recycle linen'],
+      ['THHFRO0162C', 'Prepare customer accounts and deal with departures'],
+      ['THHGCS0222D', 'Promote and up-sell products and services'],
+      ['THHPAT0542C', 'Prepare and produce cakes and puddings products'],
+      ['THHPAT0532C', 'Prepare and produce pastries'],
+      ['THHPAT0552C', 'Prepare and produce yeast goods'],
+      ['THHPAT0772D', 'Prepare and present desserts'],
+      ['CRIOHS0012A', 'Comply with the occupational health and safety, security and hygiene practices'],
+      ['THHCFP1262A', 'Comply with the relevant legislative and regulatory requirements in hospitality'],
+      ['BSBSBM0012E', 'Craft personal entrepreneurial strategy'],
+      ['CSEJOB0692A', 'Develop an understanding of business operations'],
+      ['CSEJOB0362A', 'Use strategies to identify job opportunities'],
+      ['CRICOM0012B', 'Apply language and communication skills'],
+      ['CRIMAT0022B', 'Perform mathematical computation'],
+      ['BSBBAD0362E', 'Manage personal stress in the workplace'],
+      ['CSEJOB0382A', 'Respond to familiar workplace problems'],
+      ['CSEJOB0682A', 'Apply the principles of customer service'],
+      ['BSBWKR0012A', 'Plan and apply time management strategies'],
+      ['CSEJOB0372A', 'Enhance self-management skills for work'],
+      ['THHHOK1322B', 'Maintain housekeeping supplies', 'Elective'],
+      ['THHHOK1342B', 'Administer the current records systems', 'Elective'],
+      ['THHHOK1352B', 'Maintain store security and cleanliness', 'Elective']
+    ];
+
+    // WELDING LEVEL 2 - NVQ-J MEM22423 - transcribed from the institution's qualification plan.
+    var WEL_L2_UNITS = [
+      ['MEMCOR0141D', 'Follow principles of Occupational Health and Safety (OH&S) in work environment'],
+      ['MEMCOR0171D', 'Use and maintain graduated measuring devices'],
+      ['BCGCOR0051D', 'Use hand and power tools'],
+      ['MEMMPO0081C', 'Use workshop machines for basic operations'],
+      ['MEMCOR0091D', 'Draw and interpret sketches and simple drawings'],
+      ['MEMFAB0141C', 'Develop basic geometric shapes'],
+      ['MEMCOR0101C', 'Prepare basic engineering drawing'],
+      ['MEMFAB0051D', 'Perform brazing and/or silver soldering'],
+      ['MEMFAB0111C', 'Perform basic welding using manual metal arc welding process (MMAW)'],
+      ['MEMFAB0121C', 'Perform basic welding using oxyacetylene welding process (OAW) - fuel gas welding'],
+      ['MEMFAB0151C', 'Prepare for oxyacetylene/metal arc welding processes'],
+      ['MEMFAB0041C', 'Carry out mechanical cutting operations – (basic)'],
+      ['MEMCOR0081E', 'Use marking out tools'],
+      ['MEMCOR0121D', 'Classify engineering materials (basic)'],
+      ['MEMFAB0081C', 'Assemble fabricated components'],
+      ['MEMFAB0061C', 'Perform manual heating, and thermal cutting'],
+      ['MEMFAB0071C', 'Undertake fabrication, forming, bending and shaping'],
+      ['ITCMOB0111B', 'Use mobile IT devices'],
+      ['ITICOR0011E', 'Perform basic computer applications'],
+      ['ITCWEB0161B', 'Participate in online networks and social media'],
+      ['MEMDDD0042C', 'Prepare basic mechanical drawings'],
+      ['EEMCAD0012A', 'Operate computer aided design (CAD) to produce basic drawing elements'],
+      ['MEMFAB0042C', 'Perform weld in the flat and horizontal positions using manual metal arc welding process (MMAW)'],
+      ['MEMFAB0072C', 'Perform advanced welding using oxyacetylene welding process (OAW)'],
+      ['MEMCOR0092C', 'Mark off/out structural fabrication and shapes'],
+      ['MEMFAB0022C', 'Perform advanced manual thermal cutting, gouging and shaping'],
+      ['CSAPQA0012A', 'Apply quality standards and procedures'],
+      ['MEMFAB0052C', 'Weld using gas metal arc welding process (GMAW) – metal inert gas (MIG)'],
+      ['MEMCOR0012D', 'Plan a complete work activity'],
+      ['MEMFAB0142C', 'Perform weld in flat and horizontal positions using flux cored arc welding process (FCAW)'],
+      ['MEMFAB0062C', 'Perform weld in flat and horizontal positions using gas tungsten metal arc welding process (GTAW) - (Tungsten inert gas - TIG)'],
+      ['CRICOM0012B', 'Apply language and communication skills'],
+      ['MEMCOR0122D', 'Write basic technical reports'],
+      ['THTCOR0082C', 'Provide quality customer service'],
+      ['BMFCUL0072B', 'Exercise professionalism and ethical behaviour'],
+      ['BSBSBM0012E', 'Craft personal entrepreneurial strategy'],
+      ['BSBMKP0342D', 'Prepare quotations'],
+      ['MEMMAH0042D', 'Order materials'],
+      ['CRIMAT0012B', 'Perform mathematical computations'],
+      ['BSBCOR0382D', 'Display human relations skills'],
+      ['BSBBAD0362F', 'Manage personal stress in the workplace'],
+      ['BSBWKR0012A', 'Plan and apply time management strategies'],
+      ['MEMCOR0042C', 'Interpret standard specifications and manuals'],
+      ['MEMPRG0012A', 'Apply introductory machine programming techniques', 'Elective'],
+      ['MEMMRD0062C', 'Perform levelling and alignment of machines and engineering components', 'Elective'],
+      ['MEMMPO0072B', 'Perform machining operations using horizontal and/or vertical boring machines', 'Elective']
+    ];
+
+    // WELDING LEVEL 3 - NVQ MEM30215 - transcribed from the institution's qualification plan.
+    var WEL_L3_UNITS = [
+      ['MEMCOR0131B', 'Undertake interactive workplace communication'],
+      ['MEMCOR0141B', 'Follow principles of Occupational Health and Safety (OH&S) in work environment'],
+      ['ITICOR0011B', 'Carry out data entry and retrieval procedures'],
+      ['MEMCOR0161B', 'Plan to undertake a routine task'],
+      ['MEMCOR0171B', 'Use and maintain graduated measuring devices'],
+      ['MEMCOR0191B', 'Use hand tools'],
+      ['MEMCOR0051B', 'Perform related computations – (basic)'],
+      ['MEMCOR0081B', 'Mark off/out (general engineering)'],
+      ['MEMCOR0091B', 'Draw and interpret sketch and simple drawing'],
+      ['MEMCOR0111B', 'Use and care power tools'],
+      ['MEMCOR0121B', 'Classify engineering materials – (basic)'],
+      ['MEMFAB0041B', 'Carry out mechanical cutting operations - (basic)'],
+      ['MEMFAB0141B', 'Develop geometric shapes (basic)'],
+      ['MEMFAB0151B', 'Prepare for oxyacetylene/metal arc welding processes'],
+      ['MEMFAB0051B', 'Perform brazing and/or silver soldering'],
+      ['MEMFAB0061B', 'Perform manual heating and thermal cutting'],
+      ['MEMFAB0071B', 'Undertake fabrication, forming, bending and shaping – (basic)'],
+      ['MEMFAB0081B', 'Assemble fabricated components-(basic)'],
+      ['MEMFAB0111B', 'Perform basic welding using manual metal arc welding process (MMAW)'],
+      ['MEMFAB0121B', 'Perform basic welding using oxyacetylene welding process (OAW) - Fuel Gas Welding'],
+      ['MEMMAH0071B', 'Perform manual handling and lifting'],
+      ['MEMMAH0081B', 'Perform housekeeping duties'],
+      ['MEMCOR0012B', 'Plan a complete activity'],
+      ['MEMCOR0022B', 'Perform related computations'],
+      ['MEMCOR0042B', 'Interpret standard specifications and manuals'],
+      ['MEMCOR0052B', 'Operate in an autonomous team environment'],
+      ['MEMCOR0122C', 'Write technical reports (basic)'],
+      ['MEMFAB0022B', 'Perform advanced manual thermal cutting, gouging and shaping'],
+      ['MEMFAB0042B', 'Perform advanced welding using manual metal arc welding process (MMAW)'],
+      ['MEMFAB0052B', 'Weld using gas metal arc welding process GMAW - (Metal inert gas MIG)'],
+      ['MEMFAB0062B', 'Weld using gas tungsten metal arc welding process GTAW - (Tungsten inert gas -TIG)'],
+      ['MEMFAB0072B', 'Perform advanced welding using oxyacetylene welding process (OAW)'],
+      ['MEMCOR0023C', 'Write technical reports (advanced)'],
+      ['MEMCOR0093B', 'Plan and organise work'],
+      ['MEMCOR0103C', 'Maintain quality systems within a team'],
+      ['MEMCOR0113B', 'Coordinate team activities'],
+      ['MEMFAB0023B', 'Perform advanced welding using gas metal arc welding process GMAW -(Metal inert gas MIG)'],
+      ['MEMFAB0033B', 'Perform advanced welding using gas tungsten arc welding process (GTAW) –Tungsten inert Gas (TIG)'],
+      ['MEMFAB0113B', 'Perform manual metal arc welding process to AWS specification (Alloy steel pipe)'],
+      ['MEMCOR0083B', 'Estimate projects'],
+      ['BSBFLM0053B', 'Support operational plan'],
+      ['MEMCOR0101B', 'Prepare basic engineering drawing', 'Elective'],
+      ['MEMSUF0061B', 'Prepare for the application of protective coating', 'Elective'],
+      ['MEMMRD0191B', 'Assemble & disassemble scaffolding to enable access to the work area', 'Elective'],
+      ['MEMFAB0131B', 'Repair/replace/modify fabrications (basic)', 'Elective'],
+      ['MEMQUA0012B', 'Perform inspection - (basic)', 'Elective'],
+      ['MEMMAH0042B', 'Order materials', 'Elective'],
+      ['MEMCOR0062B', 'Attend to breakdown', 'Elective'],
+      ['MEMCOR0092B', 'Mark off/out structural fabrications and shapes', 'Elective'],
+      ['BSBSBM0012C', 'Craft personal entrepreneurial strategy', 'Elective'],
+      ['MEMFAB0102B', 'Perform manual metal arc welding process to AWS specification (Low carbon steel sheet)', 'Elective'],
+      ['MEMFAB0112B', 'Perform manual metal arc welding process to AWS specification (Low carbon steel pipe)', 'Elective'],
+      ['MEMFAB0122B', 'Perform oxyacetylene welding process (fuel gas) to AWS specification', 'Elective'],
+      ['MEMFAB0142B', 'Weld using flux cored arc welding process to FCAW', 'Elective'],
+      ['MEMFAB0013B', 'Monitor quality of production welding/fabrication', 'Elective'],
+      ['MEMFAB0043B', 'Weld using submerged arc welding process', 'Elective'],
+      ['MEMFAB0053B', 'Perform welding supervision', 'Elective'],
+      ['MEMFAB0063B', 'Perform welding/ fabrication inspection', 'Elective'],
+      ['MEMFAB0103B', 'Perform manual metal arc welding to weld to AWS specification (Alloy steel plate)', 'Elective'],
+      ['MEMFAB0123B', 'Perform gas tungsten arc welding process to AWS specification.(Plate)', 'Elective'],
+      ['MEMFAB0133B', 'Perform gas tungsten arc welding process to AWS specification (Pipe)', 'Elective'],
+      ['MEMFAB0143B', 'Perform gas metal arc welding process to AWS specification (Pipe and plate)', 'Elective'],
+      ['MEMFAB0153B', 'Perform submerged arc welding to AWS specification', 'Elective'],
+      ['MEMFAB0193B', 'Perform advanced welding using flux cored arc welding process - FCAW', 'Elective'],
+      ['MEMMAH0073B', 'Purchase materials', 'Elective'],
+      ['MEMCOR0013B', 'Assist in the provision of on the job training', 'Elective'],
+      ['MEMCOM0023B', 'Perform internal and external customer service', 'Elective'],
+      ['MEMPLN0063B', 'Coordinate and manage basic installation projects', 'Elective'],
+      ['MEMMAH0093B', 'Coordinate materials', 'Elective'],
+      ['MEMCOR0063B', 'Attend to break downs in hazardous areas', 'Elective'],
+      ['BSBFLM0093B', 'Support continuous improvement systems and processes', 'Elective']
+    ];
+
+    function seedQual(id, title, skillArea, level, nvqCode, units) {
+      return {
+        id: id, title: title, skillArea: skillArea, level: level,
+        nvqCode: nvqCode || '',
+        centre: T.INSTITUTION.centre,
+        units: (units || []).map(function (u) { return { code: u[0], name: u[1], coreElective: u[2] || 'Core' }; }),
+        seeded: true
+      };
+    }
+
+    T.seedCatalogs = function () {
+      return [
+        seedQual('QUAL-BAM-L5', 'BUSINESS ADMINISTRATION (MANAGEMENT) LEVEL 5', 'Business Administration', 5, '', BAM_L5_UNITS),
+        seedQual('QUAL-BT-L2',  'GENERAL BEAUTY THERAPY LEVEL 2', 'Beauty Therapy', 2, 'CSB21424', BT_L2_UNITS),
+        seedQual('QUAL-COS-L2', 'COSMETOLOGY LEVEL 2', 'Cosmetology', 2, 'CSB21323', COS_L2_UNITS),
+        seedQual('QUAL-EIM-L2', 'ELECTRICAL INSTALLATION AND MAINTENANCE LEVEL 2', 'Electrical Installation', 2, 'EEM20723', EIM_L2_UNITS),
+        seedQual('QUAL-EIM-L3', 'ELECTRICAL INSTALLATION AND MAINTENANCE LEVEL 3', 'Electrical Installation', 3, 'MEM32507', EIM_L3_UNITS),
+        seedQual('QUAL-HVP-L2', 'HOSPITALITY VILLA/PROPERTIES SERVICES LEVEL 2', 'Hospitality & Tourism', 2, 'THH22522', HVP_L2_UNITS),
+        seedQual('QUAL-WEL-L2', 'WELDING LEVEL 2', 'Welding & Fabrication', 2, 'MEM22423', WEL_L2_UNITS),
+        seedQual('QUAL-WEL-L3', 'WELDING LEVEL 3', 'Welding & Fabrication', 3, 'MEM30215', WEL_L3_UNITS)
+      ];
+    };
+
+    // Merge freshly-seeded catalogues into a stored list without disturbing
+    // admin edits. Two cases, both idempotent:
+    //   1. A qual id absent from the store is appended.
+    //   2. A stored scaffold that is still PRISTINE (seeded, never edited,
+    //      zero units) is replaced by the current seed — this is how stores
+    //      that persisted an empty placeholder receive the real unit list
+    //      when a qualification plan is later transcribed into the seeds.
+    // The moment an admin saves a catalogue (updatedAt set), their version
+    // wins forever.
+    T.ensureSeeded = function (catalogs) {
+      var list = Array.isArray(catalogs) ? catalogs.slice() : [];
+      var idxById = {};
+      list.forEach(function (q, i) { if (q && q.id) idxById[q.id] = i; });
+      T.seedCatalogs().forEach(function (seed) {
+        var i = idxById[seed.id];
+        if (i === undefined) { list.push(seed); return; }
+        var cur = list[i];
+        if (cur && cur.seeded && !cur.updatedAt && (!cur.units || !cur.units.length) && seed.units.length) {
+          list[i] = seed;
+        }
+      });
+      return list;
+    };
+
+    /* --- Normalisation / formatting ---------------------------------------- */
+    T.normText = function (s) {
+      return String(s == null ? '' : s).toLowerCase().replace(/[^a-z0-9]+/g, ' ').trim();
+    };
+
+    // "90.5" / 90.5 / "90.50" -> "90.5%"; 90 -> "90%"; non-numeric passes through.
+    T.formatGrade = function (v) {
+      if (v == null || v === '') return '';
+      var n = Number(v);
+      if (isNaN(n)) return String(v);
+      var s = String(Math.round(n * 10) / 10);
+      return s + '%';
+    };
+
+    // ISO / Date-parseable string -> DD/MM/YYYY (the transcript's date format).
+    T.formatDateDMY = function (iso) {
+      if (!iso) return '';
+      if (/^\d{1,2}\/\d{1,2}\/\d{4}$/.test(String(iso))) return String(iso);
+      var d = new Date(iso);
+      if (isNaN(d.getTime())) return String(iso);
+      var da = String(d.getDate()), mo = String(d.getMonth() + 1);
+      return (da.length < 2 ? '0' + da : da) + '/' + (mo.length < 2 ? '0' + mo : mo) + '/' + d.getFullYear();
+    };
+
+    /* --- Live-exam matching -------------------------------------------------
+       An exam counts towards a unit when its title carries the unit code, or
+       its title is (or contains / is contained by) the unit name. Length
+       guards stop trivially-short names from matching everything. */
+    T.examMatchesUnit = function (exam, unit) {
+      if (!exam || !unit) return false;
+      var title = T.normText(exam.title);
+      if (!title) return false;
+      var code = T.normText(unit.code);
+      if (code && title.indexOf(code) !== -1) return true;
+      var name = T.normText(unit.name);
+      if (!name) return false;
+      if (title === name) return true;
+      if (name.length >= 12 && title.indexOf(name) !== -1) return true;
+      if (title.length >= 12 && name.indexOf(title) !== -1) return true;
+      return false;
+    };
+
+    // Latest submitted exam result for one student+unit. exams/examResults are
+    // the app's canonical arrays. Returns null when the unit has no live score.
+    T.latestExamResultForUnit = function (unit, studentId, exams, examResults) {
+      if (!unit || !studentId) return null;
+      var examsById = {};
+      (exams || []).forEach(function (e) { if (e && e.id) examsById[e.id] = e; });
+      var best = null, bestTime = -1;
+      (examResults || []).forEach(function (r) {
+        if (!r || r.studentId !== studentId) return;
+        var exam = examsById[r.examId];
+        if (!exam || !T.examMatchesUnit(exam, unit)) return;
+        var t = r.submittedAt ? new Date(r.submittedAt).getTime() : 0;
+        if (isNaN(t)) t = 0;
+        if (t >= bestTime) { bestTime = t; best = r; }
+      });
+      return best;
+    };
+
+    /* --- THE RESOLUTION ALGORITHM -------------------------------------------
+       One row per catalogue unit: manual grade wins, else latest live exam
+       score, else ungraded. Every page renders from this so admin, trainee
+       and instructor always see the same grades. */
+    T.effectiveGrades = function (opts) {
+      opts = opts || {};
+      var qual = opts.qual, studentId = opts.studentId;
+      if (!qual || !Array.isArray(qual.units)) return [];
+      var manual = {};
+      (opts.manualGrades || []).forEach(function (g) {
+        if (g && g.studentId === studentId && g.qualId === qual.id && g.unitCode) {
+          manual[g.unitCode] = g;
+        }
+      });
+      return qual.units.map(function (u) {
+        var row = {
+          code: u.code, name: u.name, coreElective: u.coreElective || 'Core',
+          grade: null, date: '', source: 'none', examResultId: null, examTitle: ''
+        };
+        var m = manual[u.code];
+        if (m && m.grade !== '' && m.grade != null) {
+          row.grade = m.grade;
+          row.date = m.date || '';
+          row.source = 'manual';
+          row.examResultId = m.examResultId || null;
+          return row;
+        }
+        var res = T.latestExamResultForUnit(u, studentId, opts.exams, opts.examResults);
+        if (res) {
+          row.grade = res.score;
+          row.date = T.formatDateDMY(res.submittedAt);
+          row.source = 'exam';
+          row.examResultId = res.id;
+          var exam = (opts.exams || []).filter(function (e) { return e && e.id === res.examId; })[0];
+          row.examTitle = exam ? exam.title : '';
+        }
+        return row;
+      });
+    };
+
+    T.gradeStats = function (rows) {
+      var graded = (rows || []).filter(function (r) { return r && r.grade != null && r.grade !== ''; });
+      var sum = 0;
+      graded.forEach(function (r) { var n = Number(r.grade); if (!isNaN(n)) sum += n; });
+      return {
+        total: (rows || []).length,
+        graded: graded.length,
+        average: graded.length ? Math.round((sum / graded.length) * 10) / 10 : null
+      };
+    };
+
+    /* --- Manual grade upsert (pure) -----------------------------------------
+       Deterministic id from (studentId|qualId|unitCode) so the SAME unit grade
+       resolves to the SAME record on every device — the property the snapshot
+       reconcile's id-union relies on to avoid duplicates. */
+    T.manualGradeId = function (studentId, qualId, unitCode) {
+      return 'TG-' + Core.hashString(String(studentId) + '|' + String(qualId) + '|' + String(unitCode));
+    };
+
+    T.upsertManualGrade = function (grades, rec) {
+      var list = Array.isArray(grades) ? grades.slice() : [];
+      if (!rec || !rec.studentId || !rec.qualId || !rec.unitCode) return list;
+      var id = T.manualGradeId(rec.studentId, rec.qualId, rec.unitCode);
+      var stored = {
+        id: id, studentId: rec.studentId, qualId: rec.qualId, unitCode: rec.unitCode,
+        grade: rec.grade, date: rec.date || '', source: 'manual',
+        examResultId: rec.examResultId || null,
+        updatedBy: rec.updatedBy || '', updatedAt: rec.updatedAt || new Date().toISOString()
+      };
+      var idx = -1;
+      list.forEach(function (g, i) { if (g && g.id === id) idx = i; });
+      if (idx === -1) list.push(stored); else list[idx] = stored;
+      return list;
+    };
+
+    T.removeManualGrade = function (grades, studentId, qualId, unitCode) {
+      var id = T.manualGradeId(studentId, qualId, unitCode);
+      return (Array.isArray(grades) ? grades : []).filter(function (g) { return !g || g.id !== id; });
+    };
+
+    /* --- Qualification lookup for a trainee's course ----------------------- */
+    T.qualForCourse = function (catalogs, course) {
+      var list = Array.isArray(catalogs) ? catalogs : [];
+      var c = T.normText(course);
+      if (!c) return null;
+      var exact = list.filter(function (q) { return q && T.normText(q.skillArea) === c; })[0];
+      if (exact) return exact;
+      var contains = list.filter(function (q) {
+        if (!q) return false;
+        var sa = T.normText(q.skillArea), ti = T.normText(q.title);
+        return (sa && (c.indexOf(sa) !== -1 || sa.indexOf(c) !== -1)) ||
+               (ti && (ti.indexOf(c) !== -1 || c.indexOf(ti) !== -1));
+      })[0];
+      return contains || null;
+    };
+
+    /* --- Certificate / Transcript requests --------------------------------- */
+    T.newRequest = function (opts) {
+      opts = opts || {};
+      return {
+        id: 'CTR-' + Core.hashString(String(opts.studentId) + '|' + String(opts.type) + '|' + String(opts.requestedAt || new Date().toISOString())),
+        studentId: opts.studentId || '',
+        studentName: opts.studentName || '',
+        course: opts.course || '',
+        type: opts.type === 'certificate' || opts.type === 'both' ? opts.type : 'transcript',
+        note: opts.note || '',
+        status: 'pending',
+        requestedAt: opts.requestedAt || new Date().toISOString(),
+        handledBy: '', handledAt: '', adminNote: ''
+      };
+    };
+
+    // A trainee may have at most one OPEN (pending/processing/ready) request
+    // per document type; further clicks are ignored instead of piling up.
+    T.hasOpenRequest = function (requests, studentId, type) {
+      return (requests || []).some(function (r) {
+        return r && r.studentId === studentId &&
+          (r.type === type || r.type === 'both' || type === 'both') &&
+          (r.status === 'pending' || r.status === 'processing' || r.status === 'ready');
+      });
+    };
+
+    T.pendingRequestCount = function (requests) {
+      return (requests || []).filter(function (r) { return r && (r.status === 'pending' || r.status === 'processing') ; }).length;
+    };
+
+    return T;
   })();
 
   root.CESTISCore = Core;
