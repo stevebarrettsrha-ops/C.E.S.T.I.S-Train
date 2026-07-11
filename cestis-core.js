@@ -48,11 +48,30 @@
     try { if (LS) { for (var i = 0; i < LS.length; i++) { var k = LS.key(i); cache[k] = LS.getItem(k); } } } catch (e) {}
 
     var db = null, ready = false, wq = [];
+    // Durable-write failure tracking: quota errors on the IndexedDB transaction
+    // fire asynchronously (transaction onerror/onabort), so a plain try/catch
+    // never sees them. Record the failure and notify the app so it can warn the
+    // user instead of silently losing every write from that point on.
+    var writeFailCount = 0;
+    function reportWriteFailure(k, err) {
+      writeFailCount++;
+      try { root._cestisStoreWriteFailures = writeFailCount; } catch (_) {}
+      try { console.error('[CESTISStore] Durable write FAILED for key "' + k + '":', err); } catch (_) {}
+      try { root.dispatchEvent(new CustomEvent('cestis-store-write-error', { detail: { key: k, count: writeFailCount } })); } catch (_) {}
+    }
     function drainQueue() { var q = wq; wq = []; for (var i = 0; i < q.length; i++) { writeIDB(q[i].k, q[i].v, q[i].del); } }
     function writeIDB(k, v, del) {
       if (!db) { if (!ready) { wq.push({ k: k, v: v, del: del }); } return; }
-      try { var os = db.transaction(STORE, 'readwrite').objectStore(STORE); if (del) { os.delete(k); } else { os.put(v, k); } } catch (e) {}
+      try {
+        var tx = db.transaction(STORE, 'readwrite');
+        tx.onerror = function (e) { reportWriteFailure(k, e && e.target && e.target.error); };
+        tx.onabort = function (e) { reportWriteFailure(k, (e && e.target && e.target.error) || 'transaction aborted'); };
+        var os = tx.objectStore(STORE); if (del) { os.delete(k); } else { os.put(v, k); }
+      } catch (e) { reportWriteFailure(k, e); }
     }
+    // Ask the browser to protect this origin's storage from automatic eviction —
+    // essential for a system whose primary datastore is IndexedDB for years.
+    try { if (root.navigator && root.navigator.storage && root.navigator.storage.persist) { root.navigator.storage.persist(); } } catch (e) {}
     try {
       var req = indexedDB.open(DB_NAME, 1);
       req.onupgradeneeded = function (e) { var d = e.target.result; if (!d.objectStoreNames.contains(STORE)) { d.createObjectStore(STORE); } };
