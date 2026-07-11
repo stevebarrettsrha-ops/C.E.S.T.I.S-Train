@@ -42,6 +42,56 @@ test('ensureSeeded adds missing quals but never disturbs admin edits', function 
   assert.strictEqual(T.ensureSeeded(out).length, out.length);
 });
 
+test('every qualification plan is seeded with its transcribed units', function () {
+  var counts = {
+    'QUAL-BAM-L5': 70,  // approved paper transcript
+    'QUAL-BT-L2': 31,   // NVQ-J CSB21424
+    'QUAL-COS-L2': 50,  // NVQ-J CSB21323
+    'QUAL-EIM-L2': 43,  // NVQ-J EEM20723
+    'QUAL-EIM-L3': 67,  // NVQ MEM32507
+    'QUAL-HVP-L2': 61,  // NVQ-J THH22522
+    'QUAL-WEL-L2': 46,  // NVQ-J MEM22423 (incl. MEMCOR0042C from the clustering schedule)
+    'QUAL-WEL-L3': 71   // NVQ MEM30215
+  };
+  var cats = T.seedCatalogs();
+  assert.strictEqual(cats.length, Object.keys(counts).length);
+  cats.forEach(function (q) {
+    assert.strictEqual(q.units.length, counts[q.id], q.id + ' unit count');
+    q.units.forEach(function (u) {
+      assert.ok(u.code && u.name, q.id + ' has a unit missing code/name');
+      assert.ok(u.coreElective === 'Core' || u.coreElective === 'Elective', q.id + ' bad coreElective');
+    });
+    var codes = {};
+    q.units.forEach(function (u) {
+      assert.ok(!codes[u.code], q.id + ' duplicate unit code ' + u.code);
+      codes[u.code] = true;
+    });
+  });
+  // Spot-check electives transcribed from the plans
+  var wl3 = cats.filter(function (q) { return q.id === 'QUAL-WEL-L3'; })[0];
+  assert.strictEqual(wl3.units.filter(function (u) { return u.coreElective === 'Elective'; }).length, 30);
+  assert.strictEqual(wl3.nvqCode, 'MEM30215');
+  var el2 = cats.filter(function (q) { return q.id === 'QUAL-EIM-L2'; })[0];
+  assert.strictEqual(el2.units[0].code, 'MEMCOR0141D');
+  assert.strictEqual(el2.units[el2.units.length - 1].code, 'EETOPT0152A');
+  assert.strictEqual(el2.units[el2.units.length - 1].coreElective, 'Elective');
+});
+
+test('ensureSeeded upgrades a pristine empty scaffold to the transcribed units', function () {
+  // Simulates a store that persisted the old empty placeholder before the
+  // qualification plan was transcribed into the seeds.
+  var stored = [
+    { id: 'QUAL-WEL-L2', title: 'WELDING LEVEL 2', skillArea: 'Welding & Fabrication', level: 2, units: [], seeded: true },
+    { id: 'QUAL-BT-L2', title: 'MY EDITED BT', skillArea: 'Beauty Therapy', level: 2, units: [], seeded: true, updatedAt: '2026-07-01T00:00:00Z' }
+  ];
+  var out = T.ensureSeeded(stored);
+  var wel = out.filter(function (q) { return q.id === 'QUAL-WEL-L2'; })[0];
+  assert.strictEqual(wel.units.length, 46, 'pristine scaffold not upgraded');
+  var bt = out.filter(function (q) { return q.id === 'QUAL-BT-L2'; })[0];
+  assert.strictEqual(bt.title, 'MY EDITED BT', 'edited scaffold was overwritten');
+  assert.strictEqual(bt.units.length, 0, 'edited (updatedAt) scaffold must be left alone');
+});
+
 /* ---- formatting --------------------------------------------------------- */
 test('formatGrade renders like the paper transcript', function () {
   assert.strictEqual(T.formatGrade(90.5), '90.5%');
