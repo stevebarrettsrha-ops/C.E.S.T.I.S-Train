@@ -6,12 +6,24 @@
 <title>PDF Workshop — Complete PDF Toolkit</title>
 
 <!-- ===== LIBRARIES ===== -->
-<script src="https://cdnjs.cloudflare.com/ajax/libs/pdf-lib/1.17.1/pdf-lib.min.js"></script>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/tesseract.js/5.1.1/tesseract.min.js"></script>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/mammoth/1.6.0/mammoth.browser.min.js"></script>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<script src="vendor/pdf-lib-1.17.1.min.js"></script>
+<script>window.PDFLib||(document.write('<script src="https://cdnjs.cloudflare.com/ajax/libs/pdf-lib/1.17.1/pdf-lib.min.js">\x3C/script>'))</script>
+<script>window.PDFLib||(document.write('<script src="https://cdn.jsdelivr.net/npm/pdf-lib@1.17.1/dist/pdf-lib.min.js">\x3C/script>'))</script>
+<script src="vendor/pdf-3.11.174.min.js"></script>
+<script>window.pdfjsLib||(window.__cestisPdfjsCdnjs=1,document.write('<script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js">\x3C/script>'))</script>
+<script>window.pdfjsLib||(window.__cestisPdfjsFallback=1,document.write('<script src="https://cdn.jsdelivr.net/npm/pdfjs-dist@3.11.174/build/pdf.min.js">\x3C/script>'))</script>
+<script src="vendor/tesseract-5.1.1.min.js"></script>
+<script>window.Tesseract||(window.__cestisTessCdn=1,document.write('<script src="https://cdnjs.cloudflare.com/ajax/libs/tesseract.js/5.1.1/tesseract.min.js">\x3C/script>'))</script>
+<script>window.Tesseract||(document.write('<script src="https://cdn.jsdelivr.net/npm/tesseract.js@5.1.1/dist/tesseract.min.js">\x3C/script>'))</script>
+<script src="vendor/jszip-3.10.1.min.js"></script>
+<script>window.JSZip||(document.write('<script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js">\x3C/script>'))</script>
+<script>window.JSZip||(document.write('<script src="https://cdn.jsdelivr.net/npm/jszip@3.10.1/dist/jszip.min.js">\x3C/script>'))</script>
+<script src="vendor/mammoth-1.6.0.browser.min.js"></script>
+<script>window.mammoth||(document.write('<script src="https://cdnjs.cloudflare.com/ajax/libs/mammoth/1.6.0/mammoth.browser.min.js">\x3C/script>'))</script>
+<script>window.mammoth||(document.write('<script src="https://cdn.jsdelivr.net/npm/mammoth@1.6.0/mammoth.browser.min.js">\x3C/script>'))</script>
+<script src="vendor/xlsx-0.18.5.full.min.js"></script>
+<script>window.XLSX||(document.write('<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js">\x3C/script>'))</script>
+<script>window.XLSX||(document.write('<script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js">\x3C/script>'))</script>
 
 <link href="https://fonts.googleapis.com/css2?family=Anybody:wght@400;600;800&family=Nunito+Sans:ital,opsz,wght@0,6..12,300;0,6..12,400;0,6..12,600;0,6..12,700;1,6..12,400&display=swap" rel="stylesheet">
 
@@ -331,7 +343,7 @@ canvas.ve-draw.active{display:block;pointer-events:all;cursor:crosshair}
 // ====================================================================
 // SETUP
 // ====================================================================
-if(typeof pdfjsLib!=='undefined') pdfjsLib.GlobalWorkerOptions.workerSrc='https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
+if(typeof pdfjsLib!=='undefined') pdfjsLib.GlobalWorkerOptions.workerSrc=window.__cestisPdfjsFallback?'https://cdn.jsdelivr.net/npm/pdfjs-dist@3.11.174/build/pdf.worker.min.js':(window.__cestisPdfjsCdnjs?'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js':'vendor/pdf.worker-3.11.174.min.js');
 const{PDFDocument,rgb,degrees,StandardFonts,PageSizes}=PDFLib;
 
 // ====================================================================
@@ -1354,9 +1366,16 @@ async function doOCR(){
   const pageNums=ps?parsePages(ps,total):Array.from({length:total},(_,i)=>i+1);
   setProgress(8,`Initializing Tesseract (${lang})…`);
   let curP=1;
-  const worker=await Tesseract.createWorker(lang,1,{logger:m=>{
+  const tessOpts={logger:m=>{
     if(m.status==='recognizing text'){const base=10;const pp=85/pageNums.length;const ci=pageNums.indexOf(curP);
-      setProgress(base+pp*ci+pp*m.progress,`OCR page ${curP} — ${Math.round(m.progress*100)}%`)}}});
+      setProgress(base+pp*ci+pp*m.progress,`OCR page ${curP} — ${Math.round(m.progress*100)}%`)}}};
+  if(!window.__cestisTessCdn){
+    const vb=new URL('vendor/tesseract/',location.href).href;
+    tessOpts.workerPath=vb+'worker.min.js';
+    tessOpts.corePath=vb+'core';
+    if(lang==='eng')tessOpts.langPath=vb+'lang';
+  }
+  const worker=await Tesseract.createWorker(lang,1,tessOpts);
   let allText='';
   const ocrData=[];
   for(const pn of pageNums){curP=pn;

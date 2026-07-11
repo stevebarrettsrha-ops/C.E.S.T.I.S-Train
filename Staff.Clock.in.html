@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-<script src="cestis-core.js?v=20260531q"></script>
+<script src="cestis-core.js?v=20260711a"></script>
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>CESTIS - Staff Time Tracking System</title>
     <style>
@@ -1734,6 +1734,9 @@
     if(!db){ if(!ready){ wq.push({k:k,v:v,del:del}); } return; }
     try { var os=db.transaction(STORE,'readwrite').objectStore(STORE); if(del){ os.delete(k); } else { os.put(v,k); } } catch(e){}
   }
+  // Ask the browser to protect this origin's storage from automatic eviction —
+  // essential for a system whose primary datastore is IndexedDB for years.
+  try { if(navigator.storage && navigator.storage.persist) navigator.storage.persist(); } catch(e){}
   try {
     var req = indexedDB.open(DB_NAME,1);
     req.onupgradeneeded = function(e){ var d=e.target.result; if(!d.objectStoreNames.contains(STORE)){ d.createObjectStore(STORE); } };
@@ -1777,7 +1780,9 @@
 
 <script src="https://accounts.google.com/gsi/client" async defer></script>
     <!-- EmailJS SDK for OTP Email -->
-    <script type="text/javascript" src="https://cdn.jsdelivr.net/npm/@emailjs/browser@4/dist/email.min.js"></script>
+    <script type="text/javascript" src="vendor/emailjs-4.min.js"></script>
+<script>window.emailjs||(document.write('<script src="https://cdn.jsdelivr.net/npm/@emailjs/browser@4/dist/email.min.js">\x3C/script>'))</script>
+<script>window.emailjs||(document.write('<script src="https://unpkg.com/@emailjs/browser@4/dist/email.min.js">\x3C/script>'))</script>
     <script type="text/javascript">
         // EmailJS Configuration
         window.EMAILJS_PUBLIC_KEY = 'z_6Ya8J_WGJjRIGuX';

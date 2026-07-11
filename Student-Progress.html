@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8">
-<script src="cestis-core.js?v=20260531q"></script>
+<script src="cestis-core.js?v=20260711a"></script>
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>CESTIS - Student Progress</title>
 
@@ -20,6 +20,9 @@
     if(!db){ if(!ready){ wq.push({k:k,v:v,del:del}); } return; }
     try { var os=db.transaction(STORE,'readwrite').objectStore(STORE); if(del){ os.delete(k); } else { os.put(v,k); } } catch(e){}
   }
+  // Ask the browser to protect this origin's storage from automatic eviction —
+  // essential for a system whose primary datastore is IndexedDB for years.
+  try { if(navigator.storage && navigator.storage.persist) navigator.storage.persist(); } catch(e){}
   try {
     var req = indexedDB.open(DB_NAME,1);
     req.onupgradeneeded = function(e){ var d=e.target.result; if(!d.objectStoreNames.contains(STORE)){ d.createObjectStore(STORE); } };

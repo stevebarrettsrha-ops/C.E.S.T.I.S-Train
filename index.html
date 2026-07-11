@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8">
-<script src="cestis-core.js?v=20260531q"></script>
+<script src="cestis-core.js?v=20260711a"></script>
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <meta name="google-site-verification" content="h1kcrSWbOfqMdqcEuN9crbU73K84WTBd7Qy1lcbcFC4" />
 <title>VocTrain LMS — Vocational Training Management System</title>
@@ -94,9 +94,22 @@
 })();
 </script>
 
-<script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/mammoth/1.6.0/mammoth.browser.min.js"></script>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+<script src="vendor/pdf-3.11.174.min.js"></script>
+<script>window.pdfjsLib||(window.__cestisPdfjsCdnjs=1,document.write('<script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js">\x3C/script>'))</script>
+<script>window.pdfjsLib||(window.__cestisPdfjsFallback=1,document.write('<script src="https://cdn.jsdelivr.net/npm/pdfjs-dist@3.11.174/build/pdf.min.js">\x3C/script>'))</script>
+<script src="vendor/mammoth-1.6.0.browser.min.js"></script>
+<script>window.mammoth||(document.write('<script src="https://cdnjs.cloudflare.com/ajax/libs/mammoth/1.6.0/mammoth.browser.min.js">\x3C/script>'))</script>
+<script>window.mammoth||(document.write('<script src="https://cdn.jsdelivr.net/npm/mammoth@1.6.0/mammoth.browser.min.js">\x3C/script>'))</script>
+<script src="vendor/chart-4.4.1.umd.min.js"></script>
+<script>window.Chart||(document.write('<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js">\x3C/script>'))</script>
+<script>window.Chart||(document.write('<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js">\x3C/script>'))</script>
+<!-- TOTP two-step verification libraries (ported from School.Fee.html) -->
+<script src="vendor/otpauth-9.2.2.umd.min.js"></script>
+<script>window.OTPAuth||(document.write('<script src="https://cdnjs.cloudflare.com/ajax/libs/otpauth/9.2.2/otpauth.umd.min.js">\x3C/script>'))</script>
+<script>window.OTPAuth||(document.write('<script src="https://cdn.jsdelivr.net/npm/otpauth@9.2.2/dist/otpauth.umd.min.js">\x3C/script>'))</script>
+<script src="vendor/qrcode-1.0.0.min.js"></script>
+<script>window.QRCode||(document.write('<script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js">\x3C/script>'))</script>
+<script>window.QRCode||(document.write('<script src="https://cdn.jsdelivr.net/npm/qrcodejs@1.0.0/qrcode.min.js">\x3C/script>'))</script>
 <meta http-equiv="X-Content-Type-Options" content="nosniff">
 <meta http-equiv="X-Frame-Options" content="SAMEORIGIN">
 <meta name="referrer" content="strict-origin-when-cross-origin">
@@ -3711,11 +3724,15 @@ body.vc-fullscreen-mode.vc-host-only-mode .video-grid .video-tile:not(.vc-hoston
 @keyframes notifyCountdown{from{width:100%}to{width:0%}}
 .cloud-notify-timer{height:3px;background:var(--text-muted);opacity:.3;border-radius:0 0 14px 14px}
 </style>
-<script src="https://unpkg.com/peerjs@1.5.4/dist/peerjs.min.js"></script>
+<script src="vendor/peerjs-1.5.4.min.js"></script>
+<script>window.Peer||(document.write('<script src="https://unpkg.com/peerjs@1.5.4/dist/peerjs.min.js">\x3C/script>'))</script>
+<script>window.Peer||(document.write('<script src="https://cdn.jsdelivr.net/npm/peerjs@1.5.4/dist/peerjs.min.js">\x3C/script>'))</script>
 <!-- Google Identity Services for OAuth -->
 <script src="https://accounts.google.com/gsi/client" async defer></script>
 <!-- jsPDF for certificate PDF generation -->
-<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+<script src="vendor/jspdf-2.5.1.umd.min.js"></script>
+<script>window.jspdf||(document.write('<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js">\x3C/script>'))</script>
+<script>window.jspdf||(document.write('<script src="https://cdn.jsdelivr.net/npm/jspdf@2.5.1/dist/jspdf.umd.min.js">\x3C/script>'))</script>
 </head>
 <body>
 
@@ -4089,6 +4106,9 @@ body.vc-fullscreen-mode.vc-host-only-mode .video-grid .video-tile:not(.vc-hoston
         </button>
         <div class="notification-dropdown" id="notifDropdown"></div>
       </div>
+      <button class="topbar-btn" title="Two-Step Verification" onclick="tfaOpenManage()" aria-label="Two-Step Verification">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/><path d="M9 12l2 2 4-4"/></svg>
+      </button>
       <button class="logout-btn" onclick="logout()">
         <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg>
         Sign Out
@@ -4246,6 +4266,72 @@ body.vc-fullscreen-mode.vc-host-only-mode .video-grid .video-tile:not(.vc-hoston
     <div style="display:flex;gap:10px;justify-content:flex-end;margin-top:20px;">
       <button class="btn btn-secondary" onclick="closeModal('resetPasswordModal')">Cancel</button>
       <button class="btn btn-primary" onclick="confirmResetPassword()">Reset Password</button>
+    </div>
+  </div>
+</div>
+
+<!-- TWO-STEP VERIFICATION (TOTP) MODALS -->
+<style>
+#tfaVerifyModal{z-index:300;}
+.tfa-code-input{text-align:center;font-size:24px;letter-spacing:8px;font-family:monospace;}
+.tfa-secret{background:var(--bg-primary);border:1px solid var(--border-light);padding:10px 14px;border-radius:8px;font-family:monospace;font-size:15px;letter-spacing:2px;text-align:center;word-break:break-all;user-select:all;margin:10px 0;}
+.tfa-qr{display:flex;justify-content:center;margin:14px 0;padding:12px;background:#ffffff;border-radius:12px;}
+.tfa-backup-grid{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin:14px 0;}
+.tfa-backup-code{background:var(--bg-primary);border:1px solid var(--border-light);padding:8px 10px;border-radius:8px;font-family:monospace;font-size:14px;text-align:center;letter-spacing:1px;}
+.tfa-backup-code.used{opacity:.45;text-decoration:line-through;}
+.tfa-error{background:#fee2e2;color:#dc2626;padding:8px 12px;border-radius:8px;font-size:13px;margin-top:10px;display:none;}
+.tfa-status-on{background:rgba(16,185,129,0.12);color:var(--text-primary);border:1px solid rgba(16,185,129,0.4);padding:12px 14px;border-radius:10px;font-size:13px;margin-bottom:14px;line-height:1.6;}
+.tfa-status-off{background:var(--bg-primary);border:1px solid var(--border-light);color:var(--text-secondary);padding:12px 14px;border-radius:10px;font-size:13px;margin-bottom:14px;line-height:1.6;}
+</style>
+
+<div class="modal-overlay" id="tfaVerifyModal">
+  <div class="modal" style="max-width:400px;">
+    <div class="modal-header"><h3 id="tfaVerifyTitle">Two-Step Verification</h3><button class="modal-close" onclick="tfaCancelVerify()">✕</button></div>
+    <p id="tfaVerifySubtitle" style="font-size:13px;color:var(--text-secondary);margin-bottom:16px;">Enter the 6-digit code from your authenticator app.</p>
+    <div class="form-group"><input type="text" maxlength="6" inputmode="numeric" autocomplete="one-time-code" class="form-control tfa-code-input" id="tfaVerifyCode" placeholder="••••••" onkeydown="if(event.key==='Enter')tfaSubmitVerify()"></div>
+    <div id="tfaBackupSection" style="display:none;">
+      <div class="form-group"><label>Backup code</label><input type="text" class="form-control" id="tfaVerifyBackup" placeholder="XXXXXXXX" onkeydown="if(event.key==='Enter')tfaSubmitVerify()"></div>
+    </div>
+    <div id="tfaVerifyError" class="tfa-error"></div>
+    <p id="tfaBackupLink" style="font-size:12px;margin-top:10px;"><a href="#" onclick="tfaShowBackupInput();return false;" style="color:var(--accent);">Lost your device? Use a backup code</a></p>
+    <div style="display:flex;gap:10px;justify-content:flex-end;margin-top:16px;">
+      <button class="btn btn-secondary" onclick="tfaCancelVerify()">Cancel</button>
+      <button class="btn btn-primary" onclick="tfaSubmitVerify()">Verify</button>
+    </div>
+  </div>
+</div>
+
+<div class="modal-overlay" id="tfaManageModal">
+  <div class="modal" style="max-width:480px;">
+    <div class="modal-header"><h3>🔐 Two-Step Verification</h3><button class="modal-close" onclick="closeModal('tfaManageModal')">✕</button></div>
+    <div id="tfaManageBody"></div>
+  </div>
+</div>
+
+<div class="modal-overlay" id="tfaSetupModal">
+  <div class="modal" style="max-width:440px;">
+    <div class="modal-header"><h3>Set Up Two-Step Verification</h3><button class="modal-close" onclick="tfaCancelSetup()">✕</button></div>
+    <p style="font-size:13px;color:var(--text-secondary);">1. Scan this QR code with Google Authenticator (or any TOTP app):</p>
+    <div class="tfa-qr" id="tfaQRCode"></div>
+    <p style="font-size:12px;color:var(--text-muted);text-align:center;">Or enter this key manually:</p>
+    <div class="tfa-secret" id="tfaSecretKey"></div>
+    <p style="font-size:13px;color:var(--text-secondary);margin-top:14px;">2. Enter the 6-digit code shown in the app:</p>
+    <div class="form-group"><input type="text" maxlength="6" inputmode="numeric" autocomplete="one-time-code" class="form-control tfa-code-input" id="tfaSetupCode" placeholder="••••••" onkeydown="if(event.key==='Enter')tfaConfirmSetup()"></div>
+    <div style="display:flex;gap:10px;justify-content:flex-end;margin-top:16px;">
+      <button class="btn btn-secondary" onclick="tfaCancelSetup()">Cancel</button>
+      <button class="btn btn-primary" onclick="tfaConfirmSetup()">Verify &amp; Turn On</button>
+    </div>
+  </div>
+</div>
+
+<div class="modal-overlay" id="tfaBackupModal">
+  <div class="modal" style="max-width:440px;">
+    <div class="modal-header"><h3>Backup Codes</h3><button class="modal-close" onclick="tfaCloseBackupModal()">✕</button></div>
+    <p style="font-size:13px;color:var(--text-secondary);">If you lose access to your authenticator app, each of these one-time codes can be used to sign in. Store them somewhere safe.</p>
+    <div class="tfa-backup-grid" id="tfaBackupGrid"></div>
+    <div style="display:flex;gap:10px;justify-content:flex-end;margin-top:16px;">
+      <button class="btn btn-secondary" onclick="tfaCopyBackupCodes()">Copy Codes</button>
+      <button class="btn btn-primary" onclick="tfaCloseBackupModal()">Done</button>
     </div>
   </div>
 </div>
@@ -6904,7 +6990,17 @@ function openResetPassword(userId) {
   openModal('resetPasswordModal');
 }
 
-async function confirmResetPassword() {
+function confirmResetPassword() {
+  // Password resets are a sensitive action: when the signed-in user has
+  // two-step verification on, require a fresh code before proceeding.
+  var actor = tfaAccountRecord(currentLoggedInUser);
+  if(tfaEnabled(actor)) {
+    tfaOpenVerify(actor, { title: 'Authorize Password Reset', subtitle: 'Enter your 6-digit code to authorize resetting this user\'s password.', allowBackup: false }, confirmResetPasswordVerified);
+    return;
+  }
+  confirmResetPasswordVerified();
+}
+async function confirmResetPasswordVerified() {
   var userId = document.getElementById('resetPwUserId').value;
   var newPw = document.getElementById('resetPwNew').value;
   var confirmPw = document.getElementById('resetPwConfirm').value;
@@ -7312,8 +7408,7 @@ async function handleAdminClick() {
     try { console.log('[Login][admin] pwMatch=' + pwMatch); } catch(_) {}
     if(!pwMatch) { recordLoginFailure(uname); alert('Password incorrect for "' + uname + '".'); return; }
     clearLoginFailures(uname);
-    currentLoggedInUser = adminUser;
-    enterApp('admin');
+    tfaGateLogin(adminUser, function(){ currentLoggedInUser = adminUser; enterApp('admin'); });
   } catch(err) { console.error('handleAdminClick error:', err); alert('Error: ' + err.message); }
 }
 async function handleStudentClick() {
@@ -7371,8 +7466,7 @@ async function handleStudentClick() {
     if(savedStuProfile) {
       if(savedStuProfile.name) { studentMatch.name = savedStuProfile.name; userAccount.name = savedStuProfile.name; }
     }
-    currentLoggedInUser = userAccount;
-    enterApp('student');
+    tfaGateLogin(userAccount, function(){ currentLoggedInUser = userAccount; enterApp('student'); });
   } catch(err) { console.error('handleStudentClick error:', err); alert('Error: ' + err.message); }
 }
 async function handleInstructorClick() {
@@ -7417,8 +7511,7 @@ async function handleInstructorClick() {
       if(savedInsProfile.phone) insMatch.phone = savedInsProfile.phone;
       if(savedInsProfile.specialization) insMatch.specialization = savedInsProfile.specialization;
     }
-    currentLoggedInUser = userAccount;
-    enterApp('instructor');
+    tfaGateLogin(userAccount, function(){ currentLoggedInUser = userAccount; enterApp('instructor'); });
   } catch(err) { console.error('handleInstructorClick error:', err); alert('Error: ' + err.message); }
 }
 async function handleAdminStaffClick() {
@@ -7449,8 +7542,7 @@ async function handleAdminStaffClick() {
     var pwMatch = await checkPasswordWithCloud(pw, userAccount);
     if(!pwMatch) { recordLoginFailure(uname); alert('Invalid username or password.'); return; }
     clearLoginFailures(uname);
-    currentLoggedInUser = userAccount;
-    enterApp('adminstaff');
+    tfaGateLogin(userAccount, function(){ currentLoggedInUser = userAccount; enterApp('adminstaff'); });
   } catch(err) { console.error('handleAdminStaffClick error:', err); alert('Error: ' + err.message); }
 }
 
@@ -7482,9 +7574,227 @@ async function handleCmcClick() {
     var pwMatch = await checkPasswordWithCloud(pw, userAccount);
     if(!pwMatch) { recordLoginFailure(uname); alert('Invalid username or password.'); return; }
     clearLoginFailures(uname);
-    currentLoggedInUser = userAccount;
-    enterApp('cmc');
+    tfaGateLogin(userAccount, function(){ currentLoggedInUser = userAccount; enterApp('cmc'); });
   } catch(err) { console.error('handleCmcClick error:', err); alert('Error: ' + err.message); }
+}
+
+// ============================================================
+// Two-Step Verification (TOTP) — ported from School.Fee.html.
+// Secrets/backup codes live on the userAccounts records, so they
+// persist through CESTISStore (IndexedDB) and Google Drive sync.
+// ============================================================
+var tfaPendingSecret = null;
+var tfaPendingBackupCodes = null;
+var tfaVerifyAccount = null;
+var tfaVerifyCallback = null;
+
+function tfaEnabled(acct){ return !!(acct && acct.twoFactorEnabled && acct.twoFactorSecret); }
+
+function tfaRandomChars(chars, len){
+  var out = '';
+  try {
+    var buf = new Uint32Array(len);
+    crypto.getRandomValues(buf);
+    for (var i = 0; i < len; i++) out += chars.charAt(buf[i] % chars.length);
+  } catch(e) {
+    for (var j = 0; j < len; j++) out += chars.charAt(Math.floor(Math.random() * chars.length));
+  }
+  return out;
+}
+function tfaGenerateSecret(){ return tfaRandomChars('ABCDEFGHIJKLMNOPQRSTUVWXYZ234567', 32); }
+function tfaGenerateBackupCodes(){
+  var codes = [];
+  for (var i = 0; i < 8; i++) codes.push({ code: tfaRandomChars('ABCDEFGHJKLMNPQRSTUVWXYZ23456789', 8), used: false });
+  return codes;
+}
+function tfaVerifyTotp(secret, code){
+  try {
+    var totp = new OTPAuth.TOTP({ issuer: 'VocTrain LMS', label: 'User', algorithm: 'SHA1', digits: 6, period: 30, secret: secret });
+    return totp.validate({ token: code, window: 1 }) !== null; // ±30s tolerance
+  } catch(e) { console.error('TOTP verify error:', e); return false; }
+}
+function tfaUri(secret, username){
+  var issuer = 'VocTrain%20LMS';
+  return 'otpauth://totp/' + issuer + ':' + encodeURIComponent(username || 'user') + '?secret=' + secret + '&issuer=' + issuer + '&algorithm=SHA1&digits=6&period=30';
+}
+// Always mutate the canonical record in userAccounts so saveUserAccounts() persists it.
+function tfaAccountRecord(acct){
+  if(!acct) return null;
+  return userAccounts.find(function(u){ return u.id === acct.id; }) || acct;
+}
+function tfaShowError(msg){
+  var el = document.getElementById('tfaVerifyError');
+  el.textContent = msg; el.style.display = 'block';
+  setTimeout(function(){ el.style.display = 'none'; }, 3000);
+}
+
+// ---- Shared verify modal: login second step + sensitive-action authorization ----
+function tfaOpenVerify(account, opts, onSuccess){
+  opts = opts || {};
+  tfaVerifyAccount = account; tfaVerifyCallback = onSuccess;
+  document.getElementById('tfaVerifyTitle').textContent = opts.title || 'Two-Step Verification';
+  document.getElementById('tfaVerifySubtitle').textContent = opts.subtitle || 'Enter the 6-digit code from your authenticator app.';
+  document.getElementById('tfaVerifyCode').value = '';
+  document.getElementById('tfaVerifyBackup').value = '';
+  document.getElementById('tfaBackupSection').style.display = 'none';
+  document.getElementById('tfaBackupLink').style.display = opts.allowBackup === false ? 'none' : 'block';
+  openModal('tfaVerifyModal');
+  setTimeout(function(){ document.getElementById('tfaVerifyCode').focus(); }, 50);
+}
+function tfaShowBackupInput(){
+  document.getElementById('tfaBackupSection').style.display = 'block';
+  document.getElementById('tfaVerifyBackup').focus();
+}
+function tfaCancelVerify(){
+  tfaVerifyAccount = null; tfaVerifyCallback = null;
+  closeModal('tfaVerifyModal');
+}
+function tfaSubmitVerify(){
+  var acct = tfaVerifyAccount;
+  if(!acct){ tfaCancelVerify(); return; }
+  var backup = (document.getElementById('tfaVerifyBackup').value || '').trim().toUpperCase();
+  if(document.getElementById('tfaBackupSection').style.display !== 'none' && backup){
+    var rec = tfaAccountRecord(acct);
+    var idx = (rec.backupCodes || []).findIndex(function(bc){ return bc.code === backup && !bc.used; });
+    if(idx === -1){
+      tfaShowError('Invalid or already used backup code.');
+      document.getElementById('tfaVerifyBackup').value = '';
+      return;
+    }
+    rec.backupCodes[idx].used = true; // one-time use
+    saveUserAccounts();
+  } else {
+    var code = (document.getElementById('tfaVerifyCode').value || '').trim();
+    if(code.length !== 6){ tfaShowError('Please enter the 6-digit code.'); return; }
+    if(!tfaVerifyTotp(acct.twoFactorSecret, code)){
+      tfaShowError('Invalid code. Please try again.');
+      document.getElementById('tfaVerifyCode').value = '';
+      document.getElementById('tfaVerifyCode').focus();
+      return;
+    }
+  }
+  var cb = tfaVerifyCallback;
+  tfaVerifyAccount = null; tfaVerifyCallback = null;
+  closeModal('tfaVerifyModal');
+  if(cb) cb();
+}
+// Gate used by every sign-in path (password and Google).
+function tfaGateLogin(account, proceed){
+  if(!tfaEnabled(account)){ proceed(); return; }
+  if(typeof OTPAuth === 'undefined'){
+    alert('Two-step verification is enabled on this account but the authenticator library failed to load. Please reload the page.');
+    return;
+  }
+  tfaOpenVerify(account, {
+    title: 'Two-Step Verification',
+    subtitle: 'Enter the 6-digit code from your authenticator app to finish signing in as ' + (account.username || account.email || 'user') + '.',
+    allowBackup: true
+  }, proceed);
+}
+
+// ---- Manage modal (topbar shield button): enable / codes / disable ----
+function tfaOpenManage(){
+  if(!currentLoggedInUser){ showToast('Sign in first to manage two-step verification.', 'warning'); return; }
+  tfaRenderManage();
+  openModal('tfaManageModal');
+}
+function tfaRenderManage(){
+  var acct = tfaAccountRecord(currentLoggedInUser);
+  var body = document.getElementById('tfaManageBody');
+  if(!acct || !body) return;
+  if(tfaEnabled(acct)){
+    var unused = (acct.backupCodes || []).filter(function(b){ return !b.used; }).length;
+    body.innerHTML = '<div class="tfa-status-on"><strong>Two-step verification is ON</strong><br>Signing in and password resets require a 6-digit code from your authenticator app.<br>Backup codes remaining: ' + unused + '/8</div>'
+      + '<div style="display:flex;gap:10px;flex-wrap:wrap;">'
+      + '<button class="btn btn-secondary" onclick="tfaShowBackupCodes()">View Backup Codes</button>'
+      + '<button class="btn btn-secondary" onclick="tfaRegenerateBackupCodes()">Regenerate Codes</button>'
+      + '<button class="btn btn-danger" onclick="tfaBeginDisable()">Turn Off</button>'
+      + '</div>';
+  } else {
+    body.innerHTML = '<div class="tfa-status-off"><strong>Two-step verification is OFF</strong><br>Protect your account with Google Authenticator or any TOTP-compatible app. Once on, you will be asked for a 6-digit code when signing in, and password resets will require re-verification.</div>'
+      + '<button class="btn btn-primary" onclick="tfaOpenSetup()">Turn On Two-Step Verification</button>';
+  }
+}
+function tfaOpenSetup(){
+  var acct = tfaAccountRecord(currentLoggedInUser);
+  if(!acct) return;
+  if(typeof OTPAuth === 'undefined'){ showToast('Authenticator library not loaded — reload the page and try again.', 'error'); return; }
+  tfaPendingSecret = tfaGenerateSecret();
+  document.getElementById('tfaSecretKey').textContent = tfaPendingSecret.match(/.{1,4}/g).join(' ');
+  var qc = document.getElementById('tfaQRCode');
+  qc.innerHTML = '';
+  try {
+    new QRCode(qc, { text: tfaUri(tfaPendingSecret, acct.username || acct.email || acct.name), width: 180, height: 180, colorDark: '#1e293b', colorLight: '#ffffff', correctLevel: QRCode.CorrectLevel.M });
+  } catch(e) {
+    qc.innerHTML = '<em style="font-size:12px;">QR code unavailable — enter the key below manually.</em>';
+  }
+  document.getElementById('tfaSetupCode').value = '';
+  openModal('tfaSetupModal');
+}
+function tfaCancelSetup(){ tfaPendingSecret = null; closeModal('tfaSetupModal'); }
+function tfaConfirmSetup(){
+  var code = (document.getElementById('tfaSetupCode').value || '').trim();
+  if(code.length !== 6){ alert('Enter the 6-digit code shown in your authenticator app.'); return; }
+  if(!tfaPendingSecret){ alert('Setup session expired — please start again.'); tfaCancelSetup(); return; }
+  if(!tfaVerifyTotp(tfaPendingSecret, code)){
+    alert('Invalid code. Check your authenticator app and try again.');
+    document.getElementById('tfaSetupCode').value = '';
+    return;
+  }
+  var acct = tfaAccountRecord(currentLoggedInUser);
+  tfaPendingBackupCodes = tfaGenerateBackupCodes();
+  acct.twoFactorEnabled = true;
+  acct.twoFactorSecret = tfaPendingSecret;
+  acct.backupCodes = tfaPendingBackupCodes;
+  if(currentLoggedInUser && currentLoggedInUser.id === acct.id) currentLoggedInUser = acct;
+  saveUserAccounts();
+  tfaPendingSecret = null;
+  closeModal('tfaSetupModal');
+  tfaShowBackupCodesModal();
+  tfaRenderManage();
+  showToast('Two-step verification enabled.');
+}
+function tfaShowBackupCodesModal(){
+  var acct = tfaAccountRecord(currentLoggedInUser);
+  var codes = tfaPendingBackupCodes || (acct && acct.backupCodes) || [];
+  document.getElementById('tfaBackupGrid').innerHTML = codes.map(function(bc){
+    return '<div class="tfa-backup-code' + (bc.used ? ' used' : '') + '">' + bc.code + '</div>';
+  }).join('');
+  openModal('tfaBackupModal');
+}
+function tfaShowBackupCodes(){ tfaPendingBackupCodes = null; tfaShowBackupCodesModal(); }
+function tfaCloseBackupModal(){ tfaPendingBackupCodes = null; closeModal('tfaBackupModal'); }
+function tfaCopyBackupCodes(){
+  var acct = tfaAccountRecord(currentLoggedInUser);
+  var codes = tfaPendingBackupCodes || (acct && acct.backupCodes) || [];
+  var text = 'VocTrain LMS — backup codes for ' + (acct ? (acct.username || acct.email || acct.name) : 'user') + '\nGenerated: ' + new Date().toLocaleString() + '\n\n'
+    + codes.map(function(bc, i){ return (i + 1) + '. ' + bc.code + (bc.used ? ' (USED)' : ''); }).join('\n')
+    + '\n\nKeep these somewhere safe. Each code can only be used once.';
+  navigator.clipboard.writeText(text).then(function(){ showToast('Backup codes copied to clipboard.'); }, function(){ alert('Copy failed — please select and copy the codes manually.'); });
+}
+function tfaRegenerateBackupCodes(){
+  var acct = tfaAccountRecord(currentLoggedInUser);
+  if(!tfaEnabled(acct)) return;
+  tfaOpenVerify(acct, { title: 'Confirm Code Regeneration', subtitle: 'Enter your current 6-digit code to replace all backup codes. Existing codes will stop working.', allowBackup: false }, function(){
+    tfaPendingBackupCodes = tfaGenerateBackupCodes();
+    acct.backupCodes = tfaPendingBackupCodes;
+    saveUserAccounts();
+    tfaShowBackupCodesModal();
+    tfaRenderManage();
+  });
+}
+function tfaBeginDisable(){
+  var acct = tfaAccountRecord(currentLoggedInUser);
+  if(!tfaEnabled(acct)) return;
+  tfaOpenVerify(acct, { title: 'Turn Off Two-Step Verification', subtitle: 'Enter your 6-digit code (or a backup code) to turn off two-step verification.', allowBackup: true }, function(){
+    acct.twoFactorEnabled = false;
+    acct.twoFactorSecret = null;
+    acct.backupCodes = null;
+    if(currentLoggedInUser && currentLoggedInUser.id === acct.id) currentLoggedInUser = acct;
+    saveUserAccounts();
+    tfaRenderManage();
+    showToast('Two-step verification disabled.');
+  });
 }
 
 function enterApp(role) {
@@ -7666,8 +7976,7 @@ function handleGmailProfile(profile, role) {
       }
       var savedSP = studentProfiles[studentMatch.id];
       if(savedSP && savedSP.name) { studentMatch.name = savedSP.name; existing.name = savedSP.name; }
-      currentLoggedInUser = existing;
-      enterApp('student');
+      tfaGateLogin(existing, function(){ currentLoggedInUser = existing; enterApp('student'); });
     } else if(existing.role === 'instructor') {
       var insMatch = instructorData.find(function(ins) { return ins.name === existing.name || ins.email === existing.email; });
       if(!insMatch) insMatch = createInstructorDataForAccount(existing);
@@ -7678,17 +7987,13 @@ function handleGmailProfile(profile, role) {
         if(savedInsProfile.phone) insMatch.phone = savedInsProfile.phone;
         if(savedInsProfile.specialization) insMatch.specialization = savedInsProfile.specialization;
       }
-      currentLoggedInUser = existing;
-      enterApp('instructor');
+      tfaGateLogin(existing, function(){ currentLoggedInUser = existing; enterApp('instructor'); });
     } else if(existing.role === 'admin') {
-      currentLoggedInUser = existing;
-      enterApp('admin');
+      tfaGateLogin(existing, function(){ currentLoggedInUser = existing; enterApp('admin'); });
     } else if(existing.role === 'adminstaff') {
-      currentLoggedInUser = existing;
-      enterApp('adminstaff');
+      tfaGateLogin(existing, function(){ currentLoggedInUser = existing; enterApp('adminstaff'); });
     } else if(existing.role === 'cmc') {
-      currentLoggedInUser = existing;
-      enterApp('cmc');
+      tfaGateLogin(existing, function(){ currentLoggedInUser = existing; enterApp('cmc'); });
     }
     return;
   }
@@ -11908,7 +12213,7 @@ function vcChatStorageKey() {
 function vcLoadChatHistory() {
   var key = vcChatStorageKey();
   if(!key) return [];
-  try { return JSON.parse(localStorage.getItem(key) || '[]'); } catch(e) { return []; }
+  try { return JSON.parse((window.CESTISStore || localStorage).getItem(key) || '[]'); } catch(e) { return []; }
 }
 
 function vcSaveChatMessage(sender, text, isLocal) {
@@ -11919,7 +12224,7 @@ function vcSaveChatMessage(sender, text, isLocal) {
     history.push({sender:sender, text:text, isLocal:isLocal, ts:Date.now()});
     // Cap stored history to avoid unbounded growth
     if(history.length > 500) history = history.slice(history.length - 500);
-    localStorage.setItem(key, JSON.stringify(history));
+    (window.CESTISStore || localStorage).setItem(key, JSON.stringify(history));
   } catch(e) { /* storage full or unavailable — ignore */ }
 }
 
@@ -19566,7 +19871,11 @@ var importSelectedFile = null;
 
 // Initialize PDF.js worker
 if(typeof pdfjsLib !== 'undefined') {
-  pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
+  pdfjsLib.GlobalWorkerOptions.workerSrc = window.__cestisPdfjsFallback
+    ? 'https://cdn.jsdelivr.net/npm/pdfjs-dist@3.11.174/build/pdf.worker.min.js'
+    : (window.__cestisPdfjsCdnjs
+        ? 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js'
+        : 'vendor/pdf.worker-3.11.174.min.js');
 }
 
 // Drag & drop setup

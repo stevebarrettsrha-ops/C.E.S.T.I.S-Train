@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-<script src="cestis-core.js?v=20260531q"></script>
+<script src="cestis-core.js?v=20260711a"></script>
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>CESTIS - School Fee Management System</title>
     
@@ -30,6 +30,9 @@
     if(!db){ if(!ready){ wq.push({k:k,v:v,del:del}); } return; }
     try { var os=db.transaction(STORE,'readwrite').objectStore(STORE); if(del){ os.delete(k); } else { os.put(v,k); } } catch(e){}
   }
+  // Ask the browser to protect this origin's storage from automatic eviction —
+  // essential for a system whose primary datastore is IndexedDB for years.
+  try { if(navigator.storage && navigator.storage.persist) navigator.storage.persist(); } catch(e){}
   try {
     var req = indexedDB.open(DB_NAME,1);
     req.onupgradeneeded = function(e){ var d=e.target.result; if(!d.objectStoreNames.contains(STORE)){ d.createObjectStore(STORE); } };
@@ -71,21 +74,35 @@
 })();
 </script>
 
-<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
-    <script src="https://cdn.jsdelivr.net/npm/chart.js@3.9.1/dist/chart.min.js"></script>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.5.31/jspdf.plugin.autotable.min.js"></script>
+<script src="vendor/xlsx-0.18.5.full.min.js"></script>
+<script>window.XLSX||(document.write('<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js">\x3C/script>'))</script>
+<script>window.XLSX||(document.write('<script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js">\x3C/script>'))</script>
+    <script src="vendor/chart-3.9.1.min.js"></script>
+<script>window.Chart||(document.write('<script src="https://cdn.jsdelivr.net/npm/chart.js@3.9.1/dist/chart.min.js">\x3C/script>'))</script>
+<script>window.Chart||(document.write('<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/3.9.1/chart.min.js">\x3C/script>'))</script>
+    <script src="vendor/jspdf-2.5.1.umd.min.js"></script>
+<script>window.jspdf||(document.write('<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js">\x3C/script>'))</script>
+<script>window.jspdf||(document.write('<script src="https://cdn.jsdelivr.net/npm/jspdf@2.5.1/dist/jspdf.umd.min.js">\x3C/script>'))</script>
+    <script src="vendor/jspdf.plugin.autotable-3.5.31.min.js"></script>
+<script>(window.jspdf&&window.jspdf.jsPDF&&window.jspdf.jsPDF.API&&window.jspdf.jsPDF.API.autoTable)||(document.write('<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.5.31/jspdf.plugin.autotable.min.js">\x3C/script>'))</script>
+<script>(window.jspdf&&window.jspdf.jsPDF&&window.jspdf.jsPDF.API&&window.jspdf.jsPDF.API.autoTable)||(document.write('<script src="https://cdn.jsdelivr.net/npm/jspdf-autotable@3.5.31/dist/jspdf.plugin.autotable.min.js">\x3C/script>'))</script>
 
     <!-- Google API for Drive Integration -->
     <script src="https://apis.google.com/js/api.js"></script>
     <script src="https://accounts.google.com/gsi/client"></script>
 
     <!-- TOTP/2FA Libraries for Google Authenticator -->
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/otpauth/9.2.2/otpauth.umd.min.js"></script>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
+    <script src="vendor/otpauth-9.2.2.umd.min.js"></script>
+<script>window.OTPAuth||(document.write('<script src="https://cdnjs.cloudflare.com/ajax/libs/otpauth/9.2.2/otpauth.umd.min.js">\x3C/script>'))</script>
+<script>window.OTPAuth||(document.write('<script src="https://cdn.jsdelivr.net/npm/otpauth@9.2.2/dist/otpauth.umd.min.js">\x3C/script>'))</script>
+    <script src="vendor/qrcode-1.0.0.min.js"></script>
+<script>window.QRCode||(document.write('<script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js">\x3C/script>'))</script>
+<script>window.QRCode||(document.write('<script src="https://cdn.jsdelivr.net/npm/qrcodejs@1.0.0/qrcode.min.js">\x3C/script>'))</script>
 
     <!-- EmailJS for Password Reset OTP -->
-    <script type="text/javascript" src="https://cdn.jsdelivr.net/npm/@emailjs/browser@3/dist/email.min.js"></script>
+    <script type="text/javascript" src="vendor/emailjs-3.min.js"></script>
+<script>window.emailjs||(document.write('<script src="https://cdn.jsdelivr.net/npm/@emailjs/browser@3/dist/email.min.js">\x3C/script>'))</script>
+<script>window.emailjs||(document.write('<script src="https://unpkg.com/@emailjs/browser@3/dist/email.min.js">\x3C/script>'))</script>
 
     <style>
         * {
