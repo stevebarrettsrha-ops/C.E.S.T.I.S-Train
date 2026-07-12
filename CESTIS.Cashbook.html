@@ -4200,6 +4200,20 @@ function getQuarterMeta(q) { return QUARTER_META.find(m => m.q === q); }
 function getQuarterKey(fy, q) { return 'cestis_quarter_' + fy + '_Q' + q; }
 function getCurrentQuarterKey() { return getQuarterKey(activeFY, activeQ); }
 
+// Determine which fiscal quarter a YYYY-MM-DD date belongs to.
+// The FY runs Apr–Mar: Apr–Jun=Q1, Jul–Sep=Q2, Oct–Dec=Q3, Jan–Mar=Q4.
+function getQuarterForDate(dateStr) {
+    if (!dateStr) return null;
+    var parts = dateStr.split('-');
+    var year = parseInt(parts[0]);
+    var month = parseInt(parts[1]);
+    if (isNaN(year) || isNaN(month) || month < 1 || month > 12) return null;
+    var meta = QUARTER_META.find(function(m) { return m.monthNums.indexOf(month) !== -1; });
+    if (!meta) return null;
+    var startYear = month >= 4 ? year : year - 1;
+    return { fy: startYear + '/' + (startYear + 1), q: meta.q };
+}
+
 // One-time cleanup: sanitize ALL quarterly transaction data in localStorage
 // to remove cross-quarter contamination from prior sync bugs.
 function sanitizeAllQuarterlyStorage() {
@@ -4964,6 +4978,32 @@ function editTxn(id) {
     document.getElementById('addModal').classList.add('show');
 }
 
+// Persist a transaction into a (possibly inactive) quarter's storage,
+// allocating an id from that quarter's own id space so it can't collide
+// with existing or deleted ids there.
+function saveTxnToQuarter(fy, q, data) {
+    var key = getQuarterKey(fy, q);
+    var qd = null;
+    try { var raw = CESTISStore.getItem(key); qd = raw ? JSON.parse(raw) : null; } catch(e) { qd = null; }
+    if (!qd || typeof qd !== 'object') {
+        // Mirror loadQuarterData(): Q3 FY 2025/2026 seeds default data on first
+        // load, so pre-seed it here or the seed would be skipped later.
+        if (fy === '2025/2026' && q === 3) {
+            qd = { openingBalance: 237948.69, transactions: JSON.parse(JSON.stringify(DEFAULT_TRANSACTIONS_Q3)), deletedTxnIds: [] };
+        } else {
+            qd = { openingBalance: 0, transactions: [], deletedTxnIds: [] };
+        }
+    }
+    if (!Array.isArray(qd.transactions)) qd.transactions = [];
+    if (!Array.isArray(qd.deletedTxnIds)) qd.deletedTxnIds = [];
+    var tid = qd.transactions.reduce(function(max, t) { return Math.max(max, (t.id || 0) + 1); }, 100);
+    while (qd.deletedTxnIds.indexOf(tid) !== -1) tid++;
+    data.id = tid;
+    qd.transactions.push(data);
+    try { CESTISStore.setItem(key, JSON.stringify(qd)); } catch(e) {}
+    return data;
+}
+
 function saveTransaction() {
     const data = {
         date: document.getElementById('m-date').value,
@@ -4974,6 +5014,42 @@ function saveTransaction() {
         category: document.getElementById('m-category').value
     };
     if (!data.details) { alert('Please enter details'); return; }
+
+    // Dates outside the active quarter must be routed to their own quarter —
+    // stored here they would be invisible in this view and permanently removed
+    // by the quarter sanitizer on the next page load.
+    const target = getQuarterForDate(data.date);
+    if (target && (target.fy !== activeFY || target.q !== activeQ)) {
+        const targetLabel = getQuarterMeta(target.q).label + ' · FY ' + target.fy;
+        const activeLabel = getQuarterMeta(activeQ).label + ' · FY ' + activeFY;
+        const ok = confirm('The date ' + data.date + ' falls in ' + targetLabel +
+            ', but you are currently viewing ' + activeLabel + '.\n\n' +
+            'OK — save the transaction to ' + targetLabel + ' and switch to that quarter.\n' +
+            'Cancel — go back and change the date.');
+        if (!ok) return; // keep the modal open so the date can be corrected
+
+        let moved = null;
+        if (editingTxnId !== null) {
+            const idx = transactions.findIndex(t => t.id === editingTxnId);
+            if (idx !== -1) {
+                const old = transactions[idx];
+                // Remove from this quarter and record the id so cloud sync
+                // doesn't resurrect the stale copy here.
+                unsyncSalaryFromPayslip(old);
+                transactions.splice(idx, 1);
+                if (deletedTxnIds.indexOf(old.id) === -1) deletedTxnIds.push(old.id);
+                moved = saveTxnToQuarter(target.fy, target.q, Object.assign({}, old, data));
+            }
+        } else {
+            moved = saveTxnToQuarter(target.fy, target.q, data);
+        }
+        closeModal();
+        if (moved) syncSalaryToPayslip(moved);
+        // Persists the current quarter (including any removal above), then
+        // loads and renders the target quarter with the new entry visible.
+        saveQuarterAndSwitch(target.fy, target.q);
+        return;
+    }
 
     let savedTxn;
     if (editingTxnId !== null) {
@@ -6607,6 +6683,9 @@ function saveQuarterAndSwitch(newFY, newQ) {
     // Switch
     activeFY = newFY;
     activeQ = newQ;
+    // Persist the new selection — saveToStorage() above stored the OLD quarter
+    // as the preference, which would snap the view back on the next page load.
+    try { CESTISStore.setItem('cestis_active_quarter', JSON.stringify({ fy: activeFY, q: activeQ })); } catch(e) {}
     // Load new quarter
     loadQuarterData();
     loadQuarterBudget();
@@ -6745,6 +6824,15 @@ function updateSubvention() {
         return;
     }
 
+    // A subvention dated outside the active quarter would be hidden and then
+    // removed by the quarter sanitizer on the next load — reject it up front.
+    const subTarget = getQuarterForDate(date);
+    if (subTarget && (subTarget.fy !== activeFY || subTarget.q !== activeQ)) {
+        alert('The subvention date ' + date + ' falls outside the current quarter (' +
+            quarterPeriodLabel(activeFY, activeQ) + '). Please use a date within this quarter.');
+        return;
+    }
+
     const existing = getSubventionTransaction();
     if (existing) {
         // Update existing subvention transaction
@@ -6752,8 +6840,17 @@ function updateSubvention() {
         existing.deposit = amount;
         existing.details = 'SUBVENTION';
     } else {
-        // Create new subvention transaction
-        const subDate = date || new Date().toISOString().slice(0, 10);
+        // Create new subvention transaction. When no date is given, default to
+        // today only if today is inside the active quarter; otherwise use the
+        // quarter's first day so the entry survives the quarter sanitizer.
+        let subDate = date || new Date().toISOString().slice(0, 10);
+        const defTarget = getQuarterForDate(subDate);
+        if (defTarget && (defTarget.fy !== activeFY || defTarget.q !== activeQ)) {
+            const qm2 = getQuarterMeta(activeQ);
+            const mm = String(qm2.monthNums[0]).padStart(2, '0');
+            subDate = getQuarterCalendarYear(activeFY, activeQ) + '-' + mm + '-01';
+        }
+        while (deletedTxnIds.indexOf(nextId) !== -1) { nextId++; }
         transactions.push({
             id: nextId++,
             date: subDate,
