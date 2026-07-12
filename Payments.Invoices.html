@@ -1,0 +1,109 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<script src="cestis-core.js?v=20260712a"></script>
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>C.E.S.T.I.S — Payments / Invoices</title>
+<link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=Playfair+Display:wght@700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="finance-docs.css?v=20260712a">
+<style>
+.hub-hero { text-align:center; margin:26px 0 34px; }
+.hub-hero h1 { font-family:'Playfair Display', serif; font-size:2.1rem; color:var(--gold); }
+.hub-hero p { color:var(--text-dim); font-size:.9rem; margin-top:6px; max-width:640px; margin-left:auto; margin-right:auto; }
+.hub-grid { display:grid; grid-template-columns:repeat(auto-fit, minmax(240px, 1fr)); gap:18px; max-width:1100px; margin:0 auto; }
+.hub-card {
+  background:var(--card); border:1px solid var(--border); border-radius:14px; padding:26px 24px;
+  cursor:pointer; text-align:left; transition:transform .15s ease, border-color .15s ease; position:relative; overflow:hidden;
+  display:block; text-decoration:none; color:var(--text);
+}
+.hub-card:hover { transform:translateY(-3px); border-color:var(--gold); }
+.hub-card::before { content:''; position:absolute; inset:0 0 auto 0; height:3px; background:linear-gradient(90deg, var(--gold), transparent); }
+.hub-card .icon { font-size:2rem; margin-bottom:12px; }
+.hub-card h2 { font-size:1.05rem; color:var(--gold-bright); margin-bottom:6px; }
+.hub-card p { font-size:.78rem; color:var(--text-dim); line-height:1.5; min-height:56px; }
+.hub-card .count { margin-top:14px; font-size:.75rem; color:var(--text-dim); }
+.hub-card .count b { color:var(--gold-bright); font-size:1.05rem; margin-right:4px; }
+.hub-card .go { position:absolute; top:22px; right:20px; color:var(--gold); font-size:1.1rem; }
+.hub-note { max-width:1100px; margin:26px auto 0; }
+</style>
+</head>
+<body>
+
+<div class="hub-hero">
+  <h1>💳 Payments / Invoices</h1>
+  <p>The financial documents centre for CESTIS – Hazard STC: generate payment vouchers straight from the Cashbook, and prepare invoices, quotes and purchase orders for the school.</p>
+</div>
+
+<div class="hub-grid">
+  <a class="hub-card" href="Finance.Invoice.html">
+    <span class="go">→</span>
+    <div class="icon">🧾</div>
+    <h2>Invoice</h2>
+    <p>Bill clients for jobs (May Pen Hospital, Health Department…) or prepare the School/RBF invoice for HEART-NSTA — with materials lines, discount, tax and deposit.</p>
+    <div class="count" id="cInvoices"><b>0</b> saved</div>
+  </a>
+  <a class="hub-card" href="Finance.Payment.Voucher.html">
+    <span class="go">→</span>
+    <div class="icon">📑</div>
+    <h2>Payment Voucher</h2>
+    <p>Auto-generated from Cashbook transactions: cheque payments get the HEART/NSTA Cheque Payment Voucher, transfers get the CESTIS Bank Transfer Voucher.</p>
+    <div class="count" id="cVouchers"><b>0</b> this quarter</div>
+  </a>
+  <a class="hub-card" href="Finance.Quote.html">
+    <span class="go">→</span>
+    <div class="icon">📋</div>
+    <h2>Quotes</h2>
+    <p>Prepare job quotations with expiration dates and deposit requirements, then convert an accepted quote to an invoice with one click.</p>
+    <div class="count" id="cQuotes"><b>0</b> saved</div>
+  </a>
+  <a class="hub-card" href="Finance.Purchase.Order.html">
+    <span class="go">→</span>
+    <div class="icon">🛒</div>
+    <h2>Purchase Order</h2>
+    <p>Issue purchase orders to suppliers. Saved POs stay fully editable so corrections can be made at any time, with a revision history on every change.</p>
+    <div class="count" id="cPOs"><b>0</b> saved</div>
+  </a>
+</div>
+
+<div class="card hub-note">
+  <h2>How the documents connect</h2>
+  <div style="font-size:.83rem;color:var(--text-dim);line-height:1.7;">
+    <b style="color:var(--text);">Cashbook → Payment Vouchers.</b> Enter transactions on the Cashbook page as usual; every payment automatically gets a voucher here. A transaction <i>with</i> a cheque number produces a <b>Cheque Payment Voucher</b>; one <i>without</i> a cheque number is treated as a bank transfer and produces a <b>Bank Transfer Voucher</b>. Deposits and cancelled cheques are skipped.<br>
+    <b style="color:var(--text);">Quote → Invoice.</b> When a client accepts a quote, open it and press “Convert to Invoice”.<br>
+    All documents are numbered automatically, saved on this device (and included in cloud backups of browser data), and print on letter/A4 paper ready for signatures and the office stamp.
+  </div>
+</div>
+
+<script>
+(function () {
+  var store = window.CESTISStore || window.localStorage;
+  var F = window.CESTISCore.Finance;
+  function count(key) {
+    try { var a = JSON.parse(store.getItem(key)); return Array.isArray(a) ? a.length : 0; } catch (e) { return 0; }
+  }
+  function latestQuarterVouchers() {
+    var latest = null;
+    var keys = store.keys ? store.keys() : Object.keys(localStorage);
+    keys.forEach(function (k) {
+      var m = /^cestis_quarter_(.+)_Q([1-4])$/.exec(k);
+      if (m && (!latest || k.localeCompare(latest.k) > 0)) latest = { k: k };
+    });
+    if (!latest) return 0;
+    try {
+      var d = JSON.parse(store.getItem(latest.k));
+      return F.vouchersFromTransactions(d && d.transactions).length;
+    } catch (e) { return 0; }
+  }
+  function refresh() {
+    document.getElementById('cInvoices').innerHTML = '<b>' + count('cestis_finance_invoices') + '</b> saved';
+    document.getElementById('cQuotes').innerHTML = '<b>' + count('cestis_finance_quotes') + '</b> saved';
+    document.getElementById('cPOs').innerHTML = '<b>' + count('cestis_finance_pos') + '</b> saved';
+    document.getElementById('cVouchers').innerHTML = '<b>' + latestQuarterVouchers() + '</b> this quarter';
+  }
+  refresh();
+  if (store.whenReady) store.whenReady(refresh);
+})();
+</script>
+</body>
+</html>

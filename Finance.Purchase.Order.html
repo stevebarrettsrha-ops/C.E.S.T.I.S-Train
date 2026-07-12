@@ -1,0 +1,56 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<script src="cestis-core.js?v=20260712a"></script>
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>C.E.S.T.I.S — Purchase Order</title>
+<link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=Playfair+Display:wght@700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="finance-docs.css?v=20260712a">
+</head>
+<body>
+
+<div class="app-ui">
+  <div class="fd-header">
+    <div>
+      <div class="crumbs"><a href="Payments.Invoices.html">← Payments / Invoices</a></div>
+      <h1>🛒 Purchase Order</h1>
+      <div class="sub">Issue purchase orders to suppliers — every saved PO stays fully editable so corrections can be made, with a revision history</div>
+    </div>
+    <div class="fd-actions">
+      <button class="btn ghost" onclick="FinanceDoc.newDoc()">+ New PO</button>
+      <button class="btn green" onclick="FinanceDoc.saveDoc()">💾 Save</button>
+      <button class="btn" onclick="FinanceDoc.printDoc()">🖨 Print / PDF</button>
+    </div>
+  </div>
+
+  <div class="card">
+    <h2>Purchase Order Details</h2>
+    <div id="fdEditor"></div>
+  </div>
+
+  <div class="card">
+    <h2>Saved Purchase Orders</h2>
+    <div id="fdSavedList"></div>
+  </div>
+</div>
+
+<div class="fd-paper-wrap" id="fdPaper"></div>
+
+<div id="fdToast"></div>
+
+<script src="finance-docs.js?v=20260712a"></script>
+<script>
+FinanceDoc.init({
+  docType: 'po',
+  storageKey: 'cestis_finance_pos',
+  numberSeed: 1001,
+  dueDays: 14,
+  hasTemplates: false,
+  hasStatus: true,
+  canConvert: false,
+  labels: { title: 'PURCHASE ORDER', docWord: 'purchase order', noLabel: 'PO NO', dateLabel: 'PO DATE', dueLabel: 'DELIVERY DATE' }
+});
+</script>
+</body>
+</html>

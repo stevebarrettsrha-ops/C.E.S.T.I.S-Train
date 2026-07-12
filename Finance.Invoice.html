@@ -1,0 +1,56 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<script src="cestis-core.js?v=20260712a"></script>
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>C.E.S.T.I.S — Invoice</title>
+<link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=Playfair+Display:wght@700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="finance-docs.css?v=20260712a">
+</head>
+<body>
+
+<div class="app-ui">
+  <div class="fd-header">
+    <div>
+      <div class="crumbs"><a href="Payments.Invoices.html">← Payments / Invoices</a></div>
+      <h1>🧾 Invoice</h1>
+      <div class="sub">Standard commercial invoices and the School / RBF (HEART-NSTA) subvention invoice</div>
+    </div>
+    <div class="fd-actions">
+      <button class="btn ghost" onclick="FinanceDoc.newDoc()">+ New Invoice</button>
+      <button class="btn green" onclick="FinanceDoc.saveDoc()">💾 Save</button>
+      <button class="btn" onclick="FinanceDoc.printDoc()">🖨 Print / PDF</button>
+    </div>
+  </div>
+
+  <div class="card">
+    <h2>Invoice Details</h2>
+    <div id="fdEditor"></div>
+  </div>
+
+  <div class="card">
+    <h2>Saved Invoices</h2>
+    <div id="fdSavedList"></div>
+  </div>
+</div>
+
+<div class="fd-paper-wrap" id="fdPaper"></div>
+
+<div id="fdToast"></div>
+
+<script src="finance-docs.js?v=20260712a"></script>
+<script>
+FinanceDoc.init({
+  docType: 'invoice',
+  storageKey: 'cestis_finance_invoices',
+  numberSeed: 12551, /* the office's real numbering had reached 12550 */
+  dueDays: 15,
+  hasTemplates: true,
+  hasStatus: false,
+  canConvert: false,
+  labels: { title: 'INVOICE', docWord: 'invoice', noLabel: 'INVOICE NO', dateLabel: 'INVOICE DATE', dueLabel: 'DUE DATE' }
+});
+</script>
+</body>
+</html>
