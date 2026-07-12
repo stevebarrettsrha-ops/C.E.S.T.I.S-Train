@@ -199,6 +199,19 @@ test('qualForCourse resolves a trainee course to its catalogue', function () {
   assert.strictEqual(T.qualForCourse(cats, ''), null);
 });
 
+test('qualForCourse handles hand-typed course names (level + typo tolerant)', function () {
+  var cats = T.seedCatalogs();
+  // "L2"/"L3" course suffixes pick the catalogue at the right level.
+  assert.strictEqual(T.qualForCourse(cats, 'BEAUTY THERAPY L2').id, 'QUAL-BT-L2');
+  assert.strictEqual(T.qualForCourse(cats, 'WELDING L3').id, 'QUAL-WEL-L3');
+  assert.strictEqual(T.qualForCourse(cats, 'ELECTRICAL INSTALLATION AND MAINTENANCE L2').id, 'QUAL-EIM-L2');
+  // One-character misspelling still resolves ("cosmOtology").
+  assert.strictEqual(T.qualForCourse(cats, 'COSMOTOLOGY L2').id, 'QUAL-COS-L2');
+  // A course with no catalogue resolves to null so the Transcript page can
+  // clear the previous trainee's skill area instead of keeping it selected.
+  assert.strictEqual(T.qualForCourse(cats, 'COMMI CHEF L2'), null);
+});
+
 /* ---- transcript relink on student-id remap -------------------------------- */
 test('relinkDependentData remaps transcript grades and requests', function () {
   var data = {
