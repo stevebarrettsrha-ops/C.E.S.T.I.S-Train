@@ -1,0 +1,388 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<script src="cestis-core.js?v=20260712a"></script>
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>C.E.S.T.I.S — Payment Vouchers</title>
+<link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=Playfair+Display:wght@700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="finance-docs.css?v=20260712a">
+<style>
+/* page-specific bits on top of the shared finance stylesheet */
+.pv-controls { display:flex; gap:14px; flex-wrap:wrap; align-items:end; }
+.pv-controls .fd-field { min-width:150px; }
+.quarter-tabs { display:flex; gap:6px; flex-wrap:wrap; }
+.quarter-tab {
+  padding:7px 14px; border:1px solid var(--border); border-radius:8px; cursor:pointer;
+  font-size:.78rem; color:var(--text-dim); background:var(--navy-mid);
+}
+.quarter-tab.active { background:var(--gold); color:#0a1628; font-weight:700; border-color:var(--gold); }
+.pv-summary { display:flex; gap:12px; flex-wrap:wrap; margin-top:14px; }
+.pv-pill { font-size:.75rem; padding:5px 13px; border-radius:20px; border:1px solid var(--border); color:var(--text-dim); }
+.pv-pill b { color:var(--gold-bright); }
+.pv-pill.cheque b { color:var(--sky); }
+.pv-pill.transfer b { color:var(--emerald); }
+.pv-table { width:100%; border-collapse:collapse; font-size:.82rem; }
+.pv-table th { text-align:left; color:var(--text-dim); font-size:.68rem; letter-spacing:.5px; padding:6px 8px; border-bottom:1px solid var(--border); }
+.pv-table td { padding:7px 8px; border-bottom:1px solid rgba(148,163,184,.08); }
+.pv-table td.num { text-align:right; font-family:'Courier New', monospace; color:var(--gold-bright); white-space:nowrap; }
+.pv-table tr { cursor:pointer; }
+.pv-table tr:hover td { background:rgba(212,168,67,.06); }
+.type-badge { font-size:.66rem; font-weight:700; padding:3px 9px; border-radius:20px; white-space:nowrap; }
+.type-badge.cheque { background:rgba(56,189,248,.15); color:var(--sky); }
+.type-badge.transfer { background:rgba(16,185,129,.15); color:var(--emerald); }
+.edited-dot { color:var(--gold); font-size:.9rem; }
+.v-toolbar { max-width:820px; margin:0 auto; display:flex; justify-content:space-between; align-items:center; padding:6px 2px; }
+.v-toolbar .who { font-size:.78rem; color:var(--text-dim); }
+body.print-solo .v-wrap:not(.solo) { display:none; }
+@media print { .v-toolbar { display:none !important; } }
+</style>
+</head>
+<body>
+
+<div class="app-ui">
+  <div class="fd-header">
+    <div>
+      <div class="crumbs"><a href="Payments.Invoices.html">← Payments / Invoices</a></div>
+      <h1>🧾 Payment Vouchers</h1>
+      <div class="sub">Vouchers are generated automatically from the Cashbook — cheque payments get a HEART/NSTA <b>Cheque Payment Voucher</b>, payments without a cheque number are transfers and get a CESTIS <b>Bank Transfer Voucher</b></div>
+    </div>
+    <div class="fd-actions">
+      <button class="btn ghost" onclick="PV.printFiltered('cheque')">🖨 Print Cheque Vouchers</button>
+      <button class="btn ghost" onclick="PV.printFiltered('transfer')">🖨 Print Transfer Vouchers</button>
+      <button class="btn" onclick="PV.printFiltered('')">🖨 Print All Shown</button>
+    </div>
+  </div>
+
+  <div class="card">
+    <h2>Cashbook Quarter</h2>
+    <div class="pv-controls">
+      <label class="fd-field"><span>Fiscal Year</span><select id="fySelect" onchange="PV.pickFY(this.value)"></select></label>
+      <div class="quarter-tabs" id="quarterTabs"></div>
+      <label class="fd-field"><span>Show</span>
+        <select id="typeFilter" onchange="PV.setFilter(this.value)">
+          <option value="">All vouchers</option>
+          <option value="cheque">Cheque vouchers only</option>
+          <option value="transfer">Bank transfers only</option>
+        </select>
+      </label>
+    </div>
+    <div class="pv-summary" id="pvSummary"></div>
+  </div>
+
+  <div class="card">
+    <h2>Transactions → Vouchers <span style="font-weight:400;color:var(--text-dim);font-size:.75rem;">(click a row to jump to its voucher; every field on the voucher is editable and your edits are saved)</span></h2>
+    <div id="pvList"></div>
+  </div>
+</div>
+
+<div id="pvSheets"></div>
+
+<div id="fdToast"></div>
+
+<script>
+(function () {
+'use strict';
+var Core = window.CESTISCore, F = Core.Finance;
+var store = window.CESTISStore || window.localStorage;
+var OVERRIDES_KEY = 'cestis_finance_voucher_overrides';
+var BANK_ACCOUNT = '561722854';
+var ROWS = 4; // editable detail rows per voucher
+
+var quarters = [];       // [{fy, q}] discovered from cashbook storage
+var activeFY = '', activeQ = 0;
+var vouchers = [];       // generated for the active quarter
+var overrides = {};      // user edits, keyed `${fy}|Q${q}|${txnId}`
+var typeFilter = '';
+
+function esc(s) {
+  return String(s == null ? '' : s).replace(/[&<>"']/g, function (c) {
+    return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c];
+  });
+}
+function money(n) { return F.formatMoney(n); }
+function fmtDate(iso) {
+  var m = /^(\d{4})-(\d{2})-(\d{2})/.exec(String(iso || ''));
+  return m ? m[3] + '/' + m[2] + '/' + m[1] : String(iso || '');
+}
+function toast(msg) {
+  var t = document.getElementById('fdToast');
+  t.textContent = msg; t.classList.add('show');
+  clearTimeout(toast._t); toast._t = setTimeout(function () { t.classList.remove('show'); }, 2200);
+}
+var QUARTER_LABELS = { 1: 'Q1 · Apr–Jun', 2: 'Q2 · Jul–Sep', 3: 'Q3 · Oct–Dec', 4: 'Q4 · Jan–Mar' };
+
+/* ------------------------------------------------- discovery + generation */
+function discoverQuarters() {
+  quarters = [];
+  var keys = store.keys ? store.keys() : Object.keys(localStorage);
+  keys.forEach(function (k) {
+    var m = /^cestis_quarter_(.+)_Q([1-4])$/.exec(k);
+    if (m) quarters.push({ fy: m[1], q: +m[2] });
+  });
+  quarters.sort(function (a, b) { return a.fy === b.fy ? a.q - b.q : a.fy.localeCompare(b.fy); });
+  if (!quarters.length) quarters.push({ fy: '2025/2026', q: 3 }); // cashbook's starting quarter
+}
+
+function loadOverrides() {
+  try { overrides = JSON.parse(store.getItem(OVERRIDES_KEY)) || {}; } catch (e) { overrides = {}; }
+}
+function persistOverrides() { store.setItem(OVERRIDES_KEY, JSON.stringify(overrides)); }
+function ovKey(v) { return activeFY + '|Q' + activeQ + '|' + v.txnId; }
+
+function guessPayee(details) {
+  var m = /^([^(]+)\(/.exec(String(details || ''));
+  return (m ? m[1] : String(details || '')).trim();
+}
+
+/* Tolerant amount parser: accepts "125,000.00", "$125000", "125000" alike. */
+function parseAmt(x) {
+  var n = Number(String(x == null ? '' : x).replace(/[^0-9.\-]/g, ''));
+  return isFinite(n) ? n : 0;
+}
+
+/* Merge the cashbook-generated voucher with any saved user edits into the
+   full set of printable fields. */
+function voucherFields(v) {
+  var o = overrides[ovKey(v)] || {};
+  var rows = [];
+  for (var i = 0; i < ROWS; i++) {
+    var or = (o.rows && o.rows[i]) || {};
+    rows.push({
+      detail: or.detail != null ? or.detail : (i === 0 ? v.detail : ''),
+      account: or.account != null ? or.account : (i === 0 ? v.accountCharged : ''),
+      amount: or.amount != null ? or.amount : (i === 0 ? money(v.amount) : '')
+    });
+  }
+  var total = rows.reduce(function (s, r) { return s + (String(r.amount).trim() ? parseAmt(r.amount) : 0); }, 0);
+  return {
+    dateRequested: o.dateRequested != null ? o.dateRequested : fmtDate(v.date),
+    payee: o.payee != null ? o.payee : guessPayee(v.payee),
+    refNo: o.refNo != null ? o.refNo : v.chequeNo,
+    refDate: o.refDate != null ? o.refDate : fmtDate(v.date),
+    rows: rows,
+    totalDeductions: o.totalDeductions != null ? o.totalDeductions : '',
+    total: total,
+    sumWords: o.sumWords != null ? o.sumWords : F.amountToWords(total),
+    preparedBy: o.preparedBy != null ? o.preparedBy : 'Steve Barrett',
+    certifiedBy: o.certifiedBy != null ? o.certifiedBy : ''
+  };
+}
+
+function generate() {
+  var raw = store.getItem('cestis_quarter_' + activeFY + '_Q' + activeQ);
+  var txns = [];
+  try { var d = raw ? JSON.parse(raw) : null; txns = (d && Array.isArray(d.transactions)) ? d.transactions : []; } catch (e) {}
+  txns = txns.slice().sort(function (a, b) {
+    return String(a.date).localeCompare(String(b.date)) || ((a.id || 0) - (b.id || 0));
+  });
+  vouchers = F.vouchersFromTransactions(txns);
+}
+
+/* --------------------------------------------------------------- rendering */
+function shown() {
+  return typeFilter ? vouchers.filter(function (v) { return v.type === typeFilter; }) : vouchers;
+}
+
+function renderControls() {
+  var fys = [];
+  quarters.forEach(function (x) { if (fys.indexOf(x.fy) === -1) fys.push(x.fy); });
+  document.getElementById('fySelect').innerHTML = fys.map(function (fy) {
+    return '<option' + (fy === activeFY ? ' selected' : '') + '>' + esc(fy) + '</option>';
+  }).join('');
+  document.getElementById('quarterTabs').innerHTML = [1, 2, 3, 4].map(function (q) {
+    var has = quarters.some(function (x) { return x.fy === activeFY && x.q === q; });
+    return '<div class="quarter-tab' + (q === activeQ ? ' active' : '') + '" style="' + (has ? '' : 'opacity:.45;') + '" onclick="PV.pickQ(' + q + ')">' + QUARTER_LABELS[q] + (has ? '' : ' ·—') + '</div>';
+  }).join('');
+
+  var nCheque = vouchers.filter(function (v) { return v.type === 'cheque'; }).length;
+  var nTransfer = vouchers.length - nCheque;
+  var totalAmt = vouchers.reduce(function (s, v) { return s + v.amount; }, 0);
+  document.getElementById('pvSummary').innerHTML =
+    '<div class="pv-pill cheque"><b>' + nCheque + '</b> Cheque Payment Voucher' + (nCheque === 1 ? '' : 's') + '</div>' +
+    '<div class="pv-pill transfer"><b>' + nTransfer + '</b> Bank Transfer Voucher' + (nTransfer === 1 ? '' : 's') + '</div>' +
+    '<div class="pv-pill">Total payments: <b>$' + money(totalAmt) + '</b></div>';
+}
+
+function renderList() {
+  var list = shown();
+  if (!list.length) {
+    document.getElementById('pvList').innerHTML =
+      '<div class="fd-empty">No voucher-eligible payments found for ' + esc(activeFY) + ' ' + QUARTER_LABELS[activeQ] +
+      '. Transactions are entered on the <b>Cashbook</b> page — once saved there, their vouchers appear here automatically. ' +
+      '(Deposits and cancelled cheques never get vouchers.)</div>';
+    return;
+  }
+  var rows = list.map(function (v) {
+    var edited = !!overrides[ovKey(v)];
+    return '<tr onclick="PV.jumpTo(' + v.txnId + ')"><td>' + esc(fmtDate(v.date)) + '</td>' +
+      '<td><span class="type-badge ' + v.type + '">' + (v.type === 'cheque' ? 'CHEQUE #' + esc(v.chequeNo) : 'BANK TRANSFER') + '</span></td>' +
+      '<td>' + esc(v.payee) + (edited ? ' <span class="edited-dot" title="This voucher has saved edits">●</span>' : '') + '</td>' +
+      '<td>' + esc(v.accountCharged) + '</td><td class="num">$' + money(v.amount) + '</td></tr>';
+  }).join('');
+  document.getElementById('pvList').innerHTML =
+    '<table class="pv-table"><thead><tr><th>Date</th><th>Type</th><th>Payee / Details</th><th>A/C Charged</th><th>Amount</th></tr></thead><tbody>' + rows + '</tbody></table>';
+}
+
+function fill(v, field, value, extra) {
+  return '<input class="v-fill' + (extra ? ' ' + extra : '') + '" data-txn="' + v.txnId + '" data-field="' + field + '" value="' + esc(value) + '" oninput="PV.edit(this)">';
+}
+
+function renderSheets() {
+  var html = shown().map(function (v) {
+    var f = voucherFields(v);
+    var isChq = v.type === 'cheque';
+    var h = '<div class="v-wrap" id="voucher-' + v.txnId + '">';
+    h += '<div class="v-toolbar"><span class="who">' + (isChq ? 'Cheque #' + esc(v.chequeNo) : 'Bank Transfer') + ' — ' + esc(f.payee) + '</span>' +
+         '<span><button class="mini" onclick="PV.printOne(' + v.txnId + ')">🖨 Print only this voucher</button>' +
+         '<button class="mini danger" onclick="PV.resetOne(' + v.txnId + ')">↺ Reset edits</button></span></div>';
+    h += '<div class="v-sheet">';
+    if (isChq) {
+      h += '<div class="v-head"><div class="l1">HEART/NSTA TRUST</div><div class="l2">COMMUNITY TRAINING INTERVENTIONS</div><div class="l3">CHEQUE PAYMENT VOUCHER</div></div>';
+    } else {
+      h += '<div class="v-head"><div class="l1">COMMUNITY EDUCATIONAL AND SKILLS TRAINING INSTITUTE AND SERVICES LTD</div><div class="l2">(CESTIS - HAZARD STC)</div><div class="l3">BANK TRANSFER - PAYMENT VOUCHER</div></div>';
+    }
+    h += '<div class="v-row"><span class="lbl">Date Requested:</span>' + fill(v, 'dateRequested', f.dateRequested) + '</div>';
+    h += '<div class="v-row"><span class="lbl">Payee:</span>' + fill(v, 'payee', f.payee, 'grow') + '</div>';
+    h += '<div class="v-row"><span class="lbl">Bank Account: <u>' + BANK_ACCOUNT + '</u></span>' +
+         '<span class="lbl">' + (isChq ? 'Cheque#:' : 'Transfer#:') + '</span>' + fill(v, 'refNo', f.refNo) +
+         '<span class="lbl">' + (isChq ? 'Cheque Date:' : 'Transfer Date:') + '</span>' + fill(v, 'refDate', f.refDate) + '</div>';
+
+    h += '<table class="v-table"><thead><tr><th style="width:52%;">DETAIL OF PAYMENT</th><th style="width:26%;">A/C CHARGED</th><th style="width:22%;">AMOUNT</th></tr></thead><tbody>';
+    f.rows.forEach(function (r, i) {
+      h += '<tr><td><input data-txn="' + v.txnId + '" data-field="row.detail.' + i + '" value="' + esc(r.detail) + '" oninput="PV.edit(this)"></td>' +
+           '<td><input data-txn="' + v.txnId + '" data-field="row.account.' + i + '" value="' + esc(r.account) + '" oninput="PV.edit(this)"></td>' +
+           '<td class="amt"><input data-txn="' + v.txnId + '" data-field="row.amount.' + i + '" value="' + esc(r.amount) + '" oninput="PV.edit(this)"></td></tr>';
+    });
+    if (isChq) {
+      h += '<tr class="v-dedu"><td>Total Deductions</td><td></td><td class="amt"><input data-txn="' + v.txnId + '" data-field="totalDeductions" value="' + esc(f.totalDeductions) + '" oninput="PV.edit(this)"></td></tr>';
+    }
+    h += '</tbody></table>';
+    h += '<div class="v-total-row"><span class="lbl">TOTAL:</span><span class="v-total-box" id="total-' + v.txnId + '">$ ' + money(f.total) + '</span></div>';
+
+    h += '<div class="v-sig-block">';
+    h += '<div class="v-row"><span class="lbl">Prepared By:</span>' + fill(v, 'preparedBy', f.preparedBy) + '</div>';
+    h += '<div class="v-row"><span class="lbl">Certified By:</span>' + fill(v, 'certifiedBy', f.certifiedBy) + '</div>';
+    h += '</div>';
+
+    h += '<div class="v-sums">';
+    if (isChq) h += '<div class="v-row"><span class="lbl">Received From:</span><span><u>Hazard Skills Training Centre</u> HEART/NSTA Skills Training Project</span></div>';
+    h += '<div class="v-row"><span class="lbl">' + (isChq ? 'the sum of:' : 'The sum of') + '</span>' + fill(v, 'sumWords', f.sumWords, 'grow') + '</div>';
+    h += '<div class="v-cap">(amount in words)</div>';
+    h += '<div class="v-row" style="justify-content:center;"><span class="v-fill" style="min-width:180px;text-align:center;display:inline-block;" id="figures-' + v.txnId + '">$ ' + money(f.total) + '</span></div>';
+    h += '<div class="v-cap">(amount in figures)</div>';
+    h += '</div>';
+
+    if (isChq) {
+      h += '<div class="v-claimant"><div class="box"><div class="line"></div><div class="cap">Signature of Claimant</div></div>' +
+           '<div class="box"><div class="line"></div><div class="cap">Date</div></div></div>';
+      h += '<div class="v-version">CTI/Cheque Payment Voucher/Version 2.0:12/03/2020</div>';
+    } else {
+      h += '<div class="v-claimant"><div class="box"><div class="line"></div><div class="cap">Authorised Signature</div></div>' +
+           '<div class="box"><div class="line"></div><div class="cap">Date</div></div></div>';
+    }
+    h += '</div></div>';
+    return h;
+  }).join('');
+  document.getElementById('pvSheets').innerHTML = html ||
+    '<div class="fd-empty" style="text-align:center;">Nothing to print for this quarter yet.</div>';
+}
+
+function renderAll() { renderControls(); renderList(); renderSheets(); }
+
+/* ----------------------------------------------------------------- actions */
+var PV = {};
+
+PV.pickFY = function (fy) {
+  activeFY = fy;
+  var qs = quarters.filter(function (x) { return x.fy === fy; });
+  if (qs.length && !qs.some(function (x) { return x.q === activeQ; })) activeQ = qs[qs.length - 1].q;
+  generate(); renderAll();
+};
+PV.pickQ = function (q) { activeQ = q; generate(); renderAll(); };
+PV.setFilter = function (v) { typeFilter = v; renderList(); renderSheets(); };
+PV.jumpTo = function (txnId) {
+  var el = document.getElementById('voucher-' + txnId);
+  if (el) el.scrollIntoView({ behavior: 'smooth', block: 'start' });
+};
+
+PV.edit = function (input) {
+  var txnId = +input.getAttribute('data-txn');
+  var field = input.getAttribute('data-field');
+  var v = vouchers.find(function (x) { return x.txnId === txnId; });
+  if (!v) return;
+  var key = ovKey(v);
+  var o = overrides[key] || (overrides[key] = {});
+  var m = /^row\.(detail|account|amount)\.(\d+)$/.exec(field);
+  if (m) {
+    if (!o.rows) {
+      /* first row edit: snapshot the defaults so untouched cells keep their value */
+      o.rows = voucherFields(v).rows.map(function (r) { return { detail: r.detail, account: r.account, amount: r.amount }; });
+    }
+    o.rows[+m[2]][m[1]] = input.value;
+    if (m[1] === 'amount') {
+      /* amounts drive the total, figures and words */
+      delete o.sumWords; /* recompute the words from the new total */
+      var f = voucherFields(v);
+      document.getElementById('total-' + txnId).textContent = '$ ' + money(f.total);
+      document.getElementById('figures-' + txnId).textContent = '$ ' + money(f.total);
+      var wordsInput = document.querySelector('input[data-txn="' + txnId + '"][data-field="sumWords"]');
+      if (wordsInput) wordsInput.value = f.sumWords;
+    }
+  } else {
+    o[field] = input.value;
+  }
+  persistOverrides();
+  renderList(); /* refresh the edited-dot without touching the sheets */
+};
+
+PV.resetOne = function (txnId) {
+  var v = vouchers.find(function (x) { return x.txnId === txnId; });
+  if (!v) return;
+  if (!confirm('Reset this voucher back to the cashbook values? Your edits will be lost.')) return;
+  delete overrides[ovKey(v)];
+  persistOverrides();
+  renderList(); renderSheets();
+  PV.jumpTo(txnId);
+};
+
+PV.printOne = function (txnId) {
+  var el = document.getElementById('voucher-' + txnId);
+  if (!el) return;
+  el.classList.add('solo');
+  document.body.classList.add('print-solo');
+  var cleanup = function () {
+    el.classList.remove('solo');
+    document.body.classList.remove('print-solo');
+    window.removeEventListener('afterprint', cleanup);
+  };
+  window.addEventListener('afterprint', cleanup);
+  window.print();
+};
+
+PV.printFiltered = function (type) {
+  if (type !== typeFilter) {
+    typeFilter = type;
+    document.getElementById('typeFilter').value = type;
+    renderList(); renderSheets();
+  }
+  if (!shown().length) { toast('Nothing to print for this selection.'); return; }
+  window.print();
+};
+
+/* ------------------------------------------------------------------- boot */
+function boot() {
+  discoverQuarters();
+  loadOverrides();
+  var last = quarters[quarters.length - 1];
+  activeFY = last.fy; activeQ = last.q;
+  generate(); renderAll();
+}
+boot();
+if (store.whenReady) store.whenReady(function () { boot(); });
+
+window.PV = PV;
+})();
+</script>
+</body>
+</html>

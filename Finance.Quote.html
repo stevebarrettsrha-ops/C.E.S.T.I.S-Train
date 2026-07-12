@@ -1,0 +1,57 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<script src="cestis-core.js?v=20260712a"></script>
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>C.E.S.T.I.S — Quote</title>
+<link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=Playfair+Display:wght@700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="finance-docs.css?v=20260712a">
+</head>
+<body>
+
+<div class="app-ui">
+  <div class="fd-header">
+    <div>
+      <div class="crumbs"><a href="Payments.Invoices.html">← Payments / Invoices</a></div>
+      <h1>📋 Quote</h1>
+      <div class="sub">Prepare job quotations — set a deposit requirement, then convert an accepted quote straight to an invoice</div>
+    </div>
+    <div class="fd-actions">
+      <button class="btn ghost" onclick="FinanceDoc.newDoc()">+ New Quote</button>
+      <button class="btn green" onclick="FinanceDoc.saveDoc()">💾 Save</button>
+      <button class="btn ghost" onclick="FinanceDoc.convertToInvoice()">→ Convert to Invoice</button>
+      <button class="btn" onclick="FinanceDoc.printDoc()">🖨 Print / PDF</button>
+    </div>
+  </div>
+
+  <div class="card">
+    <h2>Quote Details</h2>
+    <div id="fdEditor"></div>
+  </div>
+
+  <div class="card">
+    <h2>Saved Quotes</h2>
+    <div id="fdSavedList"></div>
+  </div>
+</div>
+
+<div class="fd-paper-wrap" id="fdPaper"></div>
+
+<div id="fdToast"></div>
+
+<script src="finance-docs.js?v=20260712a"></script>
+<script>
+FinanceDoc.init({
+  docType: 'quote',
+  storageKey: 'cestis_finance_quotes',
+  numberSeed: 1561, /* the office's real quote numbering had reached 1560 */
+  dueDays: 15,
+  hasTemplates: false,
+  hasStatus: false,
+  canConvert: true,
+  labels: { title: 'QUOTE', docWord: 'quote', noLabel: 'QUOTE NO', dateLabel: 'QUOTE DATE', dueLabel: 'EXPIRATION DATE' }
+});
+</script>
+</body>
+</html>

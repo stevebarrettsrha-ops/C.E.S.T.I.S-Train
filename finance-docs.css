@@ -1,0 +1,216 @@
+/* ============================================================================
+   finance-docs.css — shared look for the Payments/Invoices module pages
+   (Payments.Invoices.html, Finance.Invoice.html, Finance.Quote.html,
+   Finance.Purchase.Order.html, Finance.Payment.Voucher.html).
+
+   Two worlds live here:
+   1) The app UI (navy/gold, same family as the Virement dashboard).
+   2) The "paper" — white A4 sheets that mirror the office's real documents
+      and are the only thing that prints.
+   ============================================================================ */
+:root {
+  --navy: #0a1628;
+  --navy-mid: #132240;
+  --navy-light: #1a3058;
+  --gold: #d4a843;
+  --gold-bright: #f0c75e;
+  --emerald: #10b981;
+  --rose: #f43f5e;
+  --sky: #38bdf8;
+  --slate: #94a3b8;
+  --surface: #0f1d35;
+  --card: #162544;
+  --border: rgba(212,168,67,0.14);
+  --text: #e2e8f0;
+  --text-dim: #94a3b8;
+  --radius: 10px;
+}
+* { margin:0; padding:0; box-sizing:border-box; }
+body {
+  font-family:'DM Sans', sans-serif;
+  background: radial-gradient(1200px 600px at 80% -10%, #16294d 0%, var(--navy) 55%);
+  color:var(--text);
+  min-height:100vh;
+  padding:24px 28px 60px;
+}
+
+/* ---------------------------------------------------------------- app shell */
+.fd-header { display:flex; align-items:center; justify-content:space-between; gap:16px; flex-wrap:wrap; margin-bottom:22px; }
+.fd-header .crumbs a { color:var(--gold); text-decoration:none; font-size:.85rem; }
+.fd-header .crumbs a:hover { color:var(--gold-bright); text-decoration:underline; }
+.fd-header h1 { font-family:'Playfair Display', serif; font-size:1.7rem; color:var(--gold); margin-top:4px; }
+.fd-header .sub { color:var(--text-dim); font-size:.85rem; margin-top:2px; }
+.fd-actions { display:flex; gap:10px; flex-wrap:wrap; }
+
+.card {
+  background:var(--card); border:1px solid var(--border); border-radius:var(--radius);
+  padding:18px 20px; margin-bottom:20px;
+}
+.card > h2 { font-size:1rem; color:var(--gold); margin-bottom:14px; letter-spacing:.4px; }
+
+.btn {
+  background:linear-gradient(135deg, var(--gold), #b8923a); color:#0a1628; border:none;
+  font:600 .85rem 'DM Sans', sans-serif; padding:9px 18px; border-radius:8px; cursor:pointer;
+}
+.btn:hover { background:linear-gradient(135deg, var(--gold-bright), var(--gold)); }
+.btn.ghost { background:transparent; color:var(--gold); border:1px solid var(--gold); }
+.btn.ghost:hover { background:rgba(212,168,67,.12); }
+.btn.small { padding:6px 12px; font-size:.78rem; }
+.btn.green { background:linear-gradient(135deg, #34d399, #059669); color:#04281c; }
+button.mini {
+  background:var(--navy-light); color:var(--text); border:1px solid var(--border); border-radius:6px;
+  font:500 .72rem 'DM Sans', sans-serif; padding:4px 8px; margin:1px 2px; cursor:pointer; white-space:nowrap;
+}
+button.mini:hover { border-color:var(--gold); color:var(--gold-bright); }
+button.mini.danger:hover { border-color:var(--rose); color:var(--rose); }
+button.mini.gold { border-color:var(--gold); color:var(--gold); }
+
+/* ------------------------------------------------------------------- forms */
+.fd-form-grid { display:grid; grid-template-columns:repeat(auto-fit, minmax(170px, 1fr)); gap:12px 14px; margin-bottom:12px; }
+.fd-form-grid.two { grid-template-columns:1fr 1fr; }
+@media (max-width:760px){ .fd-form-grid.two { grid-template-columns:1fr; } }
+.fd-field { display:flex; flex-direction:column; gap:5px; font-size:.72rem; color:var(--text-dim); letter-spacing:.3px; }
+.fd-field input, .fd-field select, .fd-field textarea,
+.fd-items-table input {
+  background:var(--navy-mid); border:1px solid var(--border); border-radius:7px; color:var(--text);
+  font:500 .85rem 'DM Sans', sans-serif; padding:8px 10px; width:100%;
+}
+.fd-field input:focus, .fd-field select:focus, .fd-field textarea:focus, .fd-items-table input:focus {
+  outline:none; border-color:var(--gold);
+}
+.fd-items-head { display:flex; align-items:center; justify-content:space-between; gap:10px; flex-wrap:wrap; margin:14px 0 8px; }
+.fd-items-head h3 { font-size:.85rem; color:var(--gold); }
+.fd-items-table { width:100%; border-collapse:collapse; }
+.fd-items-table th { text-align:left; font-size:.68rem; color:var(--text-dim); padding:4px 6px; letter-spacing:.4px; }
+.fd-items-table td { padding:3px 4px; vertical-align:middle; }
+.fd-items-table tr.note-row td { padding-top:0; }
+.fd-items-table tr.note-row input { font-style:italic; color:var(--sky); }
+.fd-items-table .fd-line-total { font-family:'Courier New', monospace; font-size:.82rem; text-align:right; color:var(--gold-bright); white-space:nowrap; }
+.fd-items-table .row-actions { white-space:nowrap; text-align:right; }
+
+/* -------------------------------------------------------------- saved list */
+.fd-saved-table { width:100%; border-collapse:collapse; font-size:.83rem; }
+.fd-saved-table th { text-align:left; color:var(--text-dim); font-size:.68rem; letter-spacing:.5px; padding:6px 8px; border-bottom:1px solid var(--border); }
+.fd-saved-table td { padding:8px; border-bottom:1px solid rgba(148,163,184,.08); }
+.fd-saved-table td.num { text-align:right; font-family:'Courier New', monospace; color:var(--gold-bright); white-space:nowrap; }
+.fd-saved-table td.mono { font-family:'Courier New', monospace; }
+.fd-saved-table td.actions { text-align:right; white-space:nowrap; }
+.fd-empty { color:var(--text-dim); font-size:.85rem; padding:14px 4px; }
+.status-chip { font-size:.68rem; font-weight:700; padding:3px 10px; border-radius:20px; }
+.status-chip.draft { background:rgba(245,158,11,.15); color:#f59e0b; }
+.status-chip.issued { background:rgba(16,185,129,.15); color:var(--emerald); }
+
+/* ------------------------------------------------------------------- toast */
+#fdToast {
+  position:fixed; bottom:26px; left:50%; transform:translate(-50%, 20px); opacity:0; pointer-events:none;
+  background:var(--gold); color:#0a1628; font:600 .85rem 'DM Sans', sans-serif;
+  padding:10px 22px; border-radius:30px; transition:all .25s ease; z-index:60;
+}
+#fdToast.show { opacity:1; transform:translate(-50%, 0); }
+
+/* ================================================================== PAPER */
+.fd-paper-wrap { display:flex; justify-content:center; }
+.sheet {
+  background:#fff; color:#111; width:100%; max-width:820px; min-height:1000px;
+  padding:48px 54px; box-shadow:0 8px 40px rgba(0,0,0,.5); border-radius:3px;
+  font:400 13px/1.45 'DM Sans', Arial, sans-serif; position:relative;
+}
+.sheet + .sheet { margin-top:26px; }
+
+.p-top { display:flex; justify-content:space-between; align-items:flex-start; margin-bottom:26px; }
+.p-title { font:700 34px 'Playfair Display', Georgia, serif; letter-spacing:2px; color:#111; }
+.p-meta td { font-size:12px; padding:1px 4px; }
+.p-meta td:first-child { font-weight:700; text-align:right; }
+.p-draft { color:#b91c1c; font-weight:800; letter-spacing:4px; text-align:right; font-size:14px; }
+
+.p-blocks { display:flex; justify-content:space-between; gap:30px; margin-bottom:22px; }
+.p-co { font-size:12px; }
+.p-co-name { font-weight:700; font-size:13px; margin-bottom:2px; }
+.p-billed { font-size:12px; min-width:220px; }
+.p-billed-title { font-weight:700; letter-spacing:.5px; margin-bottom:3px; }
+.p-po { margin-top:6px; font-weight:600; }
+
+.p-items { width:100%; border-collapse:collapse; margin-bottom:18px; }
+.p-items th { background:#1f2937; color:#fff; font-size:10.5px; letter-spacing:.5px; padding:7px 8px; text-align:left; }
+.p-items td { border:1px solid #cbd5e1; padding:6px 8px; font-size:12px; }
+.p-items td.num { text-align:right; font-variant-numeric:tabular-nums; }
+.p-items tr.p-note td { border-top:none; font-style:italic; font-size:11px; color:#334155; }
+.p-items tr.p-pad td { border-color:#e2e8f0; color:#fff; }
+
+.p-bottom { display:flex; justify-content:space-between; gap:30px; align-items:flex-start; }
+.p-footer-notes { font-size:10.5px; color:#334155; max-width:55%; display:flex; flex-direction:column; gap:8px; }
+.p-payable b { font-size:10.5px; color:#111; }
+.p-usernotes { font-style:italic; }
+.p-totals { border-collapse:collapse; min-width:250px; }
+.p-totals td { padding:5px 10px; font-size:12.5px; }
+.p-totals td:first-child { font-weight:700; text-align:right; }
+.p-totals td:last-child { text-align:right; min-width:110px; font-variant-numeric:tabular-nums; border-bottom:1px solid #cbd5e1; }
+.p-totals tr.p-due td { font-weight:800; font-size:14px; border-top:2px solid #111; }
+.p-deposit { margin-top:14px; font-size:13px; }
+
+.p-signatories { margin-top:30px; }
+.p-sig-title { font-weight:800; letter-spacing:1px; margin-bottom:8px; }
+.p-sig-table { width:100%; border-collapse:separate; border-spacing:0 4px; }
+.p-sig-table th { text-align:left; font-size:10.5px; padding:2px 6px; }
+.p-sig-table td { padding:14px 6px 2px; width:50%; }
+.p-sig-line { border-bottom:1px solid #111; height:20px; }
+.p-sig-role { font-size:10px; font-weight:700; margin-top:3px; letter-spacing:.5px; }
+.p-authorize { display:flex; gap:60px; margin-top:44px; font-size:11px; }
+.p-authorize > div { flex:1; }
+.p-thanks { margin-top:34px; text-align:center; font-weight:700; letter-spacing:1.5px; font-size:12.5px; }
+
+/* ============================================================== VOUCHERS */
+.v-sheet {
+  background:#fff; color:#111; width:100%; max-width:820px; margin:0 auto 26px;
+  padding:46px 58px; box-shadow:0 8px 40px rgba(0,0,0,.5); border-radius:3px;
+  font:400 13.5px/1.5 'Times New Roman', Georgia, serif;
+}
+.v-head { text-align:center; font-weight:700; margin-bottom:22px; }
+.v-head .l1 { font-size:15px; }
+.v-head .l2 { font-size:14px; }
+.v-head .l3 { font-size:14px; text-decoration:underline; letter-spacing:.5px; }
+.v-row { margin:10px 0; display:flex; align-items:baseline; gap:6px; flex-wrap:wrap; }
+.v-row .lbl { font-weight:600; white-space:nowrap; }
+.v-fill {
+  border:none; border-bottom:1px solid #111; background:transparent; color:#111;
+  font:inherit; padding:0 4px 1px; min-width:60px;
+}
+.v-fill:focus { outline:none; background:#fdf6e3; }
+.v-fill.grow { flex:1; }
+.v-table { width:100%; border-collapse:collapse; margin:16px 0 10px; }
+.v-table th { border:1px solid #111; padding:5px 8px; font-size:12px; letter-spacing:.5px; }
+.v-table td { border:1px solid #111; padding:2px 6px; height:26px; }
+.v-table td input { width:100%; border:none; background:transparent; font:inherit; color:#111; }
+.v-table td input:focus { outline:none; background:#fdf6e3; }
+.v-table td.amt input { text-align:right; font-variant-numeric:tabular-nums; }
+.v-table tr.v-dedu td:first-child { font-weight:700; border-right:none; text-align:right; }
+.v-total-row { display:flex; justify-content:space-between; align-items:center; margin:14px 0 4px; }
+.v-total-row .lbl { font-weight:800; font-size:14px; }
+.v-total-box { border:1.5px solid #111; padding:4px 10px; min-width:170px; text-align:right; font-weight:700; font-variant-numeric:tabular-nums; }
+.v-sig-block { margin-top:20px; }
+.v-sums { margin-top:16px; }
+.v-cap { font-size:10.5px; text-align:center; }
+.v-claimant { display:flex; gap:40px; margin-top:30px; align-items:flex-end; }
+.v-claimant .box { flex:1; }
+.v-claimant .line { border-bottom:1px solid #111; height:22px; }
+.v-claimant .cap { font-size:11px; margin-top:2px; }
+.v-version { margin-top:26px; font-size:9px; color:#555; }
+
+/* ================================================================== PRINT */
+@media print {
+  body { background:#fff !important; padding:0 !important; }
+  .app-ui, .fd-header, #fdToast { display:none !important; }
+  .fd-paper-wrap { display:block; }
+  .sheet, .v-sheet {
+    box-shadow:none !important; border-radius:0 !important; max-width:none !important;
+    width:auto !important; min-height:0 !important; margin:0 !important;
+    padding:10mm 12mm !important;
+  }
+  /* One document per page. Vouchers are wrapped in .v-wrap (sheet + toolbar),
+     so the break must live on the wrapper — putting it on .v-sheet would make
+     every sheet match :last-child inside its own wrapper. */
+  .sheet, .v-wrap { page-break-after:always; }
+  .sheet:last-child, .v-wrap:last-child { page-break-after:auto; }
+  .v-fill, .v-table td input { border-color:#111; }
+  .p-items th { -webkit-print-color-adjust:exact; print-color-adjust:exact; }
+}

@@ -1801,6 +1801,145 @@
     return T;
   })();
 
+  /* --------------------------------------------------------------------------
+     Core.Finance — pure helpers for the Payments/Invoices module.
+
+     Payment vouchers are generated straight from the cashbook's quarterly
+     transaction records ({id, date, cheque, details, deposit, payment,
+     category}). The classification rule mirrors office practice: a payment
+     WITH a cheque number gets a HEART/NSTA Cheque Payment Voucher; a payment
+     WITHOUT one is a bank transfer and gets a CESTIS Bank Transfer voucher.
+     Deposits and cancelled/voided cheques get no voucher at all.
+     -------------------------------------------------------------------------- */
+  Core.Finance = (function () {
+    var F = {};
+
+    var ONES = ['', 'One', 'Two', 'Three', 'Four', 'Five', 'Six', 'Seven', 'Eight', 'Nine',
+                'Ten', 'Eleven', 'Twelve', 'Thirteen', 'Fourteen', 'Fifteen', 'Sixteen',
+                'Seventeen', 'Eighteen', 'Nineteen'];
+    var TENS = ['', '', 'Twenty', 'Thirty', 'Forty', 'Fifty', 'Sixty', 'Seventy', 'Eighty', 'Ninety'];
+    var SCALES = [
+      { value: 1e9, name: 'Billion' },
+      { value: 1e6, name: 'Million' },
+      { value: 1e3, name: 'Thousand' }
+    ];
+
+    function threeDigitsToWords(n) { // 0..999 -> 'Nine Hundred and Ninety-Nine'
+      var parts = [];
+      var hundreds = Math.floor(n / 100), rest = n % 100;
+      if (hundreds) parts.push(ONES[hundreds] + ' Hundred');
+      if (rest) {
+        var restWords = rest < 20 ? ONES[rest]
+          : TENS[Math.floor(rest / 10)] + (rest % 10 ? '-' + ONES[rest % 10] : '');
+        parts.push(hundreds ? 'and ' + restWords : restWords);
+      }
+      return parts.join(' ');
+    }
+
+    /* Whole number to words: 130565 -> 'One Hundred and Thirty Thousand, Five
+       Hundred and Sixty-Five'. Handles 0 .. 999,999,999,999. */
+    F.numberToWords = function (n) {
+      n = Math.floor(Math.abs(Number(n) || 0));
+      if (n === 0) return 'Zero';
+      var parts = [];
+      for (var i = 0; i < SCALES.length; i++) {
+        var count = Math.floor(n / SCALES[i].value);
+        if (count) { parts.push(threeDigitsToWords(count) + ' ' + SCALES[i].name); n %= SCALES[i].value; }
+      }
+      if (n) parts.push(threeDigitsToWords(n));
+      return parts.join(', ');
+    };
+
+    /* Voucher-style money in words, matching how the office writes it:
+       130565.96 -> 'One Hundred and Thirty Thousand, Five Hundred and
+       Sixty-Five Dollars and 96/100'. */
+    F.amountToWords = function (amount) {
+      var n = Math.abs(Number(amount) || 0);
+      var dollars = Math.floor(n);
+      var cents = Math.round((n - dollars) * 100);
+      if (cents === 100) { dollars += 1; cents = 0; } // 12.999 rounds up to 13.00
+      var words = F.numberToWords(dollars) + (dollars === 1 ? ' Dollar' : ' Dollars');
+      return words + (cents ? ' and ' + (cents < 10 ? '0' + cents : cents) + '/100' : '');
+    };
+
+    F.formatMoney = function (n) {
+      n = Number(n) || 0;
+      return n.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+    };
+
+    /* Classify a cashbook transaction: 'cheque' | 'transfer' | null (no voucher).
+       Only actual payments qualify — deposits, zero rows and cancelled/voided
+       cheques (the cashbook marks both with category 'Cancelled') are skipped. */
+    F.voucherTypeFor = function (txn) {
+      if (!txn) return null;
+      if (String(txn.category || '') === 'Cancelled') return null;
+      if (!(Number(txn.payment) > 0)) return null;
+      return String(txn.cheque == null ? '' : txn.cheque).trim() ? 'cheque' : 'transfer';
+    };
+
+    /* Expand a quarter's transactions into printable voucher records. */
+    F.vouchersFromTransactions = function (transactions) {
+      return (Array.isArray(transactions) ? transactions : []).reduce(function (out, t) {
+        var type = F.voucherTypeFor(t);
+        if (!type) return out;
+        out.push({
+          txnId: t.id,
+          type: type,                                   // 'cheque' | 'transfer'
+          date: t.date || '',
+          payee: t.details || '',
+          detail: t.details || '',
+          accountCharged: t.category || '',
+          chequeNo: type === 'cheque' ? String(t.cheque).trim() : '',
+          amount: Number(t.payment) || 0
+        });
+        return out;
+      }, []);
+    };
+
+    /* Next document number: max numeric value found + 1, or the seed when the
+       list is empty / non-numeric. Accepts numbers or strings ('12550'). */
+    F.nextDocNumber = function (existingNumbers, seed) {
+      var max = 0;
+      (Array.isArray(existingNumbers) ? existingNumbers : []).forEach(function (n) {
+        var v = parseInt(String(n).replace(/[^0-9]/g, ''), 10);
+        if (isFinite(v) && v > max) max = v;
+      });
+      return max ? max + 1 : (Number(seed) || 1);
+    };
+
+    /* Line-item total that understands both document styles:
+       - standard rows: qty × unit price
+       - school/RBF rows: percentage% × budget amount */
+    F.lineTotal = function (item, schoolStyle) {
+      if (!item) return 0;
+      var a = Number(item.qty) || 0, b = Number(item.unitPrice) || 0;
+      return schoolStyle ? (a / 100) * b : a * b;
+    };
+
+    /* Document totals: subtotal over item rows (description-only rows carry no
+       amounts), discount as a percentage, tax as a percentage of the discounted
+       balance. Returns every figure the paper layout prints. */
+    F.docTotals = function (doc) {
+      doc = doc || {};
+      var school = doc.template === 'school';
+      var subtotal = (Array.isArray(doc.items) ? doc.items : []).reduce(function (s, it) {
+        return s + (it && !it.isNote ? F.lineTotal(it, school) : 0);
+      }, 0);
+      var discountPct = Number(doc.discountPct) || 0;
+      var discount = subtotal * discountPct / 100;
+      var taxPct = Number(doc.taxPct) || 0;
+      var tax = (subtotal - discount) * taxPct / 100;
+      var amountDue = subtotal - discount + tax;
+      var depositPct = Number(doc.depositPct) || 0;
+      return {
+        subtotal: subtotal, discount: discount, tax: tax, amountDue: amountDue,
+        deposit: depositPct ? amountDue * depositPct / 100 : 0
+      };
+    };
+
+    return F;
+  })();
+
   root.CESTISCore = Core;
 
   if (typeof module !== 'undefined' && module.exports) {
