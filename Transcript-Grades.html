@@ -359,7 +359,7 @@ function paginateTranscript(info, qualTitle, rows) {
   var PAGE_INNER = 1344 - 46 - 42;   /* content top/bottom offsets (.tr-content) */
   measure.innerHTML =
     '<div class="tr-page" style="height:auto;box-shadow:none;"><div class="tr-content" style="position:static;padding:0 0;width:624px;margin:0;">' +
-      '<div id="trmHead">' + trHeaderHTML(info) + '<div class="tr-dots" id="trmDots">' + Array(120).join('.') + '</div><div class="tr-qual" id="trmQual">' + esc(qualTitle) + '</div></div>' +
+      '<div id="trmHead">' + trHeaderHTML(info) + '<div class="tr-dots" id="trmDots">' + Array(400).join('.') + '</div><div class="tr-qual" id="trmQual">' + esc(qualTitle) + '</div></div>' +
       trTableOpen() + rows.map(trUnitRowHTML).join('') + '</table>' +
     '</div></div>';
   var headEl = measure.querySelector('#trmHead');
@@ -397,7 +397,7 @@ function renderTranscriptPreviewHTML(student, qual) {
       '<div class="tr-border"><span class="v1"></span><span class="v2"></span></div>' +
       '<div class="tr-content">' +
         trHeaderHTML(info) +
-        (pi === 0 ? '<div class="tr-dots">' + Array(120).join('.') + '</div><div class="tr-qual">' + esc(qual.title) + '</div>' : '<div style="height:14px;"></div>') +
+        (pi === 0 ? '<div class="tr-dots">' + Array(400).join('.') + '</div><div class="tr-qual">' + esc(qual.title) + '</div>' : '<div style="height:14px;"></div>') +
         trTableOpen() + pageRows.map(trUnitRowHTML).join('') + '</table>' +
       '</div>' +
     '</div>';
@@ -498,9 +498,11 @@ function generateTranscriptPDF(student, qual) {
   var rows = rowsFor(student.id, qual);
   var y = trPdfHeader(doc, info);
 
-  /* page-1 dotted rule + qualification title */
+  /* page-1 dotted rule (margin to margin) + qualification title */
   setSerif(doc, 'normal', 8.5);
-  doc.text(Array(150).join('.'), TR_PAGE_W / 2, y + 8, { align: 'center', maxWidth: TR_PAGE_W - 2 * TR_MARGIN_X });
+  var dotW = doc.getTextWidth('.') || 2;
+  var dotCount = Math.max(1, Math.floor((TR_PAGE_W - 2 * TR_MARGIN_X) / dotW));
+  doc.text(new Array(dotCount + 1).join('.'), TR_MARGIN_X, y + 8);
   y += 20;
   setSerif(doc, 'bold', 10.5);
   doc.text(qual.title, TR_PAGE_W / 2, y, { align: 'center' });
