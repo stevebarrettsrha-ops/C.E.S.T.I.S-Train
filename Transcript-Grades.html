@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8">
-<script src="cestis-core.js?v=20260711d"></script>
+<script src="cestis-core.js?v=20260712a"></script>
 <script src="transcript-assets.js?v=20260711b"></script>
 <script src="vendor/jspdf-2.5.1.umd.min.js"></script>
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -157,7 +157,9 @@
   .tr-border .v2 { top:0; bottom:0; right:0; width:1.4px;
     background: repeating-linear-gradient(180deg,#0070C0 0 2px,transparent 2px 5px,#0070C0 5px 7px,transparent 7px 10px,#0070C0 10px 18px,transparent 18px 21px); }
 
-  .tr-content { position:absolute; left:96px; right:96px; top:26px; bottom:42px; }
+  /* Content sits fully inside the 32px page border (top 46px = border + 14px)
+     so the institution name never clips through the border line. */
+  .tr-content { position:absolute; left:96px; right:96px; top:46px; bottom:42px; }
   .tr-head { position:relative; }
   .tr-crest { position:absolute; left:0; top:6px; width:150px; height:150px; }
   .tr-inst { text-align:right; font-size:13.5px; line-height:1.32; padding-top:2px; }
@@ -354,7 +356,7 @@ function trTableOpen() {
    how the paper document flows onto continuation pages. */
 function paginateTranscript(info, qualTitle, rows) {
   var measure = document.getElementById('trMeasure');
-  var PAGE_INNER = 1344 - 26 - 42;   /* content top/bottom offsets */
+  var PAGE_INNER = 1344 - 46 - 42;   /* content top/bottom offsets (.tr-content) */
   measure.innerHTML =
     '<div class="tr-page" style="height:auto;box-shadow:none;"><div class="tr-content" style="position:static;padding:0 0;width:624px;margin:0;">' +
       '<div id="trmHead">' + trHeaderHTML(info) + '<div class="tr-dots" id="trmDots">' + Array(120).join('.') + '</div><div class="tr-qual" id="trmQual">' + esc(qualTitle) + '</div></div>' +
@@ -423,7 +425,10 @@ function setSerif(doc, style, size) {
 }
 
 /* ---- Official Transcript PDF (8.5in × 14in, exact replica) ---- */
-var TR_PAGE_W = 612, TR_PAGE_H = 1008, TR_MARGIN_X = 72, TR_TOP = 20, TR_BOTTOM = 32;
+/* TR_TOP keeps the header clear of the dashed page border drawn at 24pt —
+   with an 11pt heading the first baseline lands at TR_TOP+12, so anything
+   below ~30 puts the institution name through the border line. */
+var TR_PAGE_W = 612, TR_PAGE_H = 1008, TR_MARGIN_X = 72, TR_TOP = 36, TR_BOTTOM = 32;
 var TR_COLW = [0.1986, 0.4651, 0.1943, 0.142].map(function (f) { return f * (TR_PAGE_W - 2 * TR_MARGIN_X); });
 
 function trPdfBorder(doc) {
@@ -750,14 +755,12 @@ function fillQualSelect() {
 
 function onPickStudent(id) {
   sel.studentId = id;
+  /* Re-sync the qualification to the newly picked trainee's skill area.
+     When no catalogue matches their course, clear the selection — never
+     leave the previous trainee's skill area showing. */
   var s = studentById(id);
-  if (s && !sel.qualId) {
-    var q = T.qualForCourse(db.catalogs, s.course);
-    if (q) sel.qualId = q.id;
-  } else if (s) {
-    var q2 = T.qualForCourse(db.catalogs, s.course);
-    if (q2) sel.qualId = q2.id;
-  }
+  var q = s ? T.qualForCourse(db.catalogs, s.course) : null;
+  sel.qualId = q ? q.id : '';
   renderAdmin();
 }
 function onPickQual(id) { sel.qualId = id; renderAdmin(); }

@@ -1711,19 +1711,61 @@
     };
 
     /* --- Qualification lookup for a trainee's course ----------------------- */
+
+    // "beauty therapy l2" / "welding lvl 3" / "cosmetology level 2" -> 2 / 3 / 2.
+    function courseLevel(norm) {
+      var m = /(?:^|\s)l(?:vl|evel)?\s*(\d+)(?:\s|$)/.exec(norm);
+      return m ? Number(m[1]) : null;
+    }
+    var LEVEL_TOKEN = /^(?:l|lvl|level)\d*$|^\d+$/;
+
+    // Course names are typed by hand on the enrolment side, so a token still
+    // counts as matching on a shared prefix ("cosmetol…") or a one-character
+    // typo ("cosmotology" vs "cosmetology").
+    function tokenMatches(a, b) {
+      if (a === b) return true;
+      if (a.length >= 4 && b.length >= 4 && (a.indexOf(b) === 0 || b.indexOf(a) === 0)) return true;
+      if (a.length < 5 || b.length < 5 || Math.abs(a.length - b.length) > 1) return false;
+      var i = 0;
+      while (i < a.length && i < b.length && a.charAt(i) === b.charAt(i)) i++;
+      if (a.length === b.length) return a.slice(i + 1) === b.slice(i + 1);
+      var s = a.length > b.length ? a : b, t = a.length > b.length ? b : a;
+      return s.slice(i + 1) === t.slice(i);
+    }
+
     T.qualForCourse = function (catalogs, course) {
       var list = Array.isArray(catalogs) ? catalogs : [];
       var c = T.normText(course);
       if (!c) return null;
+      var lvl = courseLevel(c);
+      function levelOk(q) { return lvl == null || q.level == null || Number(q.level) === lvl; }
       var exact = list.filter(function (q) { return q && T.normText(q.skillArea) === c; })[0];
       if (exact) return exact;
       var contains = list.filter(function (q) {
-        if (!q) return false;
+        if (!q || !levelOk(q)) return false;
         var sa = T.normText(q.skillArea), ti = T.normText(q.title);
         return (sa && (c.indexOf(sa) !== -1 || sa.indexOf(c) !== -1)) ||
                (ti && (ti.indexOf(c) !== -1 || c.indexOf(ti) !== -1));
       })[0];
-      return contains || null;
+      if (contains) return contains;
+      // Fuzzy fallback: score each catalogue by how many of the course's
+      // significant words appear in its skill area / title. A course that
+      // shares no words with any catalogue resolves to null so callers can
+      // clear a stale selection instead of keeping the previous skill area.
+      var words = c.split(' ').filter(function (w) { return w && !LEVEL_TOKEN.test(w); });
+      if (!words.length) return null;
+      var best = null, bestScore = 0;
+      list.forEach(function (q) {
+        if (!q || !levelOk(q)) return;
+        var qWords = (T.normText(q.skillArea) + ' ' + T.normText(q.title)).split(' ');
+        var hits = 0;
+        words.forEach(function (w) {
+          if (qWords.some(function (u) { return tokenMatches(w, u); })) hits++;
+        });
+        var score = hits / words.length;
+        if (hits && score >= 0.5 && score > bestScore) { best = q; bestScore = score; }
+      });
+      return best;
     };
 
     /* --- Certificate / Transcript requests --------------------------------- */
