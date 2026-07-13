@@ -15,86 +15,105 @@
 (function (root) {
   'use strict';
 
+  var GREEN = '#0e8a3e', GREEN_DK = '#0a7233', BLUE = '#1f5fbf';
+
   /* ---------------------------------------------------------- CESTIS crest */
-  /* Green laurel wreath around a blue-edged shield split into four quadrants
-     (book & pens, bed, chef's hat & cutlery, power saw) over a scrolled
-     banner reading EMPOWERING COMMUNITIES · YHWH. */
+  /* Dense green laurel wreath encircling a blue-edged shield split by dotted
+     blue lines into four quadrants (book & pencils, bed, chef's hat with
+     spoon & fork, angle grinder) over a scrolled banner reading
+     EMPOWERING COMMUNITIES - YHWH. */
   function laurel(side) {
-    // a sprig of leaves following a circular arc down one side of the crest,
-    // from near the top (12 o'clock) round to the banner. side = 1 right / -1 left.
-    var cx = 250, cy = 262, r = 172, leaves = '';
-    var a0 = 16, a1 = 158, steps = 13;                     // degrees, measured from top
-    for (var i = 0; i <= steps; i++) {
-      var phi = a0 + (a1 - a0) * i / steps;
+    // side = 1 right / -1 left. Leaves follow a circular arc from near the
+    // top of the crest down to the banner; each node carries an outer and an
+    // inner leaf so the wreath reads as a dense braid.
+    var cx = 250, cy = 258, leaves = '';
+    for (var i = 0; i < 15; i++) {
+      var phi = 22 + i * 9.2;                       // degrees from 12 o'clock
       var rad = phi * Math.PI / 180;
-      var x = cx + side * r * Math.sin(rad);
-      var y = cy - r * Math.cos(rad);
-      var lean = side * phi;                               // leaf lies along the arc
-      leaves += '<g transform="translate(' + x.toFixed(1) + ',' + y.toFixed(1) + ') rotate(' + lean.toFixed(1) + ')">'
-              + '<ellipse cx="0" cy="0" rx="6.5" ry="13" fill="#2f9e44"/>'
-              + '<ellipse cx="' + (side * 9) + '" cy="4" rx="5" ry="10" fill="#38b24a"/></g>';
+      var rot = side * (phi - 90);                  // tangent to the arc
+      var xo = cx + side * 186 * Math.sin(rad), yo = cy - 186 * Math.cos(rad);
+      var xi = cx + side * 164 * Math.sin(rad), yi = cy - 164 * Math.cos(rad);
+      leaves += '<g transform="translate(' + xo.toFixed(1) + ',' + yo.toFixed(1) + ') rotate(' + (rot + side * 28).toFixed(1) + ')">'
+              + '<path d="M0 -16 Q7 0 0 16 Q-7 0 0 -16 Z" fill="' + GREEN + '"/></g>'
+              + '<g transform="translate(' + xi.toFixed(1) + ',' + yi.toFixed(1) + ') rotate(' + (rot - side * 14).toFixed(1) + ')">'
+              + '<path d="M0 -13 Q6 0 0 13 Q-6 0 0 -13 Z" fill="' + GREEN_DK + '"/></g>';
     }
     return '<g>' + leaves + '</g>';
   }
 
-  var CREST = '<svg viewBox="0 0 500 500" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Community Educational and Skills Training Institute and Services Ltd">'
+  var SHIELD_PATH = 'M250 128 C303 156 358 161 388 159 C388 292 350 362 250 414 C150 362 112 292 112 159 C142 161 197 156 250 128 Z';
+
+  var CREST = '<svg viewBox="0 0 500 505" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Community Educational and Skills Training Institute and Services Ltd">'
     + laurel(-1) + laurel(1)
-    // shield
-    + '<path d="M250 118 C310 150 372 154 402 152 C402 300 360 372 250 424 C140 372 98 300 98 152 C128 154 190 150 250 118 Z" fill="#ffffff" stroke="#1f5fbf" stroke-width="9"/>'
-    + '<path d="M250 118 C310 150 372 154 402 152 C402 300 360 372 250 424 C140 372 98 300 98 152 C128 154 190 150 250 118 Z" fill="none" stroke="#2f9e44" stroke-width="3" transform="scale(0.955) translate(11.5 11.5)"/>'
-    // quartering lines (dotted)
-    + '<line x1="250" y1="128" x2="250" y2="416" stroke="#1f5fbf" stroke-width="3" stroke-dasharray="4 6"/>'
-    + '<line x1="105" y1="262" x2="395" y2="262" stroke="#1f5fbf" stroke-width="3" stroke-dasharray="4 6"/>'
-    // TL — book & pens
-    + '<g stroke="#2f9e44" stroke-width="6" fill="none" stroke-linejoin="round" stroke-linecap="round">'
-    +   '<rect x="150" y="170" width="52" height="62" rx="3"/><line x1="176" y1="172" x2="176" y2="230"/>'
-    +   '<line x1="214" y1="166" x2="214" y2="236"/><line x1="228" y1="166" x2="228" y2="236"/>'
-    +   '<path d="M214 166 l7 -12 l7 12"/></g>'
-    // TR — bed
-    + '<g stroke="#2f9e44" stroke-width="6" fill="none" stroke-linejoin="round" stroke-linecap="round">'
-    +   '<path d="M286 226 v-46 a6 6 0 0 1 6 -6 h20 a6 6 0 0 1 6 6 v18"/>'
-    +   '<path d="M324 192 h34 a6 6 0 0 1 6 6 v28"/><line x1="286" y1="210" x2="364" y2="210"/>'
-    +   '<line x1="286" y1="226" x2="286" y2="240"/><line x1="364" y1="226" x2="364" y2="240"/></g>'
-    // BL — chef hat + fork & spoon
-    + '<g stroke="#2f9e44" stroke-width="6" fill="none" stroke-linejoin="round" stroke-linecap="round">'
-    +   '<path d="M165 320 a20 20 0 1 1 40 0 a15 15 0 1 1 -8 -27 a17 17 0 0 1 -24 0 a15 15 0 1 1 -8 27 Z"/>'
-    +   '<line x1="168" y1="320" x2="202" y2="320"/>'
-    +   '<line x1="150" y1="352" x2="150" y2="380"/><path d="M144 352 v-14 M150 352 v-14 M156 352 v-14"/>'
-    +   '<path d="M178 352 v28 M172 338 a6 10 0 0 1 12 0 v6 a6 8 0 0 1 -12 0 Z"/></g>'
-    // BR — power / circular saw
-    + '<g stroke="#2f9e44" stroke-width="6" fill="none" stroke-linejoin="round" stroke-linecap="round">'
-    +   '<circle cx="322" cy="338" r="24"/><circle cx="322" cy="338" r="5" fill="#2f9e44"/>'
-    +   '<path d="M346 322 h22 a6 6 0 0 1 6 6 v20 a6 6 0 0 1 -6 6 h-20"/>'
-    +   '<path d="M298 356 l-16 10"/></g>'
-    // banner
+    /* shield: blue outer edge with a green inner line */
+    + '<path d="' + SHIELD_PATH + '" fill="#ffffff" stroke="' + BLUE + '" stroke-width="10"/>'
+    + '<path d="' + SHIELD_PATH + '" fill="none" stroke="' + GREEN + '" stroke-width="4" transform="translate(15 16.2) scale(0.94)"/>'
+    /* dotted quartering lines */
+    + '<line x1="250" y1="140" x2="250" y2="404" stroke="' + BLUE + '" stroke-width="3.5" stroke-dasharray="3 7" stroke-linecap="round"/>'
+    + '<line x1="122" y1="264" x2="378" y2="264" stroke="' + BLUE + '" stroke-width="3.5" stroke-dasharray="3 7" stroke-linecap="round"/>'
+    /* TL — book & pencils */
+    + '<g stroke="' + GREEN + '" stroke-width="7" fill="none" stroke-linejoin="round" stroke-linecap="round">'
+    +   '<path d="M152 182 h44 a8 8 0 0 1 8 8 v46 a8 8 0 0 1 -8 8 h-44 Z"/>'
+    +   '<path d="M152 182 v62 a8 8 0 0 0 8 8 h44" stroke-width="5"/>'
+    +   '<line x1="222" y1="188" x2="222" y2="244"/><path d="M216 188 l6 -12 l6 12"/>'
+    +   '<line x1="238" y1="196" x2="238" y2="244"/><path d="M233 196 l5 -10 l5 10"/></g>'
+    /* TR — bed */
+    + '<g stroke="' + GREEN + '" stroke-width="7" fill="none" stroke-linejoin="round" stroke-linecap="round">'
+    +   '<line x1="274" y1="178" x2="274" y2="242"/><line x1="352" y1="178" x2="352" y2="242"/>'
+    +   '<circle cx="274" cy="172" r="5" fill="' + GREEN + '" stroke="none"/><circle cx="352" cy="172" r="5" fill="' + GREEN + '" stroke="none"/>'
+    +   '<path d="M274 196 q39 -20 78 0" stroke-width="5"/>'
+    +   '<line x1="268" y1="226" x2="358" y2="226"/>'
+    +   '<line x1="274" y1="226" x2="274" y2="244"/><line x1="352" y1="226" x2="352" y2="244"/></g>'
+    /* BL — chef's hat, spoon & fork */
+    + '<g stroke="' + GREEN + '" stroke-width="6" fill="none" stroke-linejoin="round" stroke-linecap="round">'
+    +   '<path d="M166 322 v-9 q-20 -3 -16 -23 q3 -15 18 -15 q6 -14 24 -6 q18 -8 24 6 q15 0 18 15 q4 20 -16 23 v9 Z"/>'
+    +   '<line x1="166" y1="312" x2="220" y2="312" stroke-width="4"/>'
+    +   '<line x1="158" y1="376" x2="176" y2="352"/>'
+    +   '<path d="M176 352 l10 -13 m-16 5 l8 -10 m-1 16 l9 -11" stroke-width="4.5"/>'
+    +   '<line x1="228" y1="376" x2="212" y2="354"/>'
+    +   '<ellipse cx="205" cy="345" rx="8" ry="12" transform="rotate(-38 205 345)"/></g>'
+    /* BR — angle grinder (green body, blue disc) */
+    + '<g fill="none" stroke-linejoin="round" stroke-linecap="round">'
+    +   '<circle cx="298" cy="356" r="17" stroke="' + BLUE + '" stroke-width="6"/>'
+    +   '<path d="M281 344 a21 21 0 0 1 34 -4" stroke="' + BLUE + '" stroke-width="7"/>'
+    +   '<path d="M306 334 h48 a10 10 0 0 1 10 10 v10 a10 10 0 0 1 -10 10 h-42" stroke="' + GREEN + '" stroke-width="7"/>'
+    +   '<line x1="364" y1="344" x2="378" y2="344" stroke="' + GREEN + '" stroke-width="9"/>'
+    +   '<circle cx="298" cy="356" r="4" fill="' + BLUE + '" stroke="none"/></g>'
+    /* banner: notched arrow tails + curved band with the motto */
     + '<g>'
-    +   '<path d="M92 430 l-30 -14 l12 20 l-12 8 l150 20 Z" fill="#2f9e44"/>'
-    +   '<path d="M408 430 l30 -14 l-12 20 l12 8 l-150 20 Z" fill="#2f9e44"/>'
-    +   '<path d="M150 440 q100 -22 200 0 l-6 30 q-94 -20 -188 0 Z" fill="#2f9e44"/>'
-    +   '<text x="250" y="463" text-anchor="middle" font-family="Georgia, serif" font-size="13" font-style="italic" fill="#ffffff" textLength="184" lengthAdjust="spacingAndGlyphs">EMPOWERING COMMUNITIES · YHWH</text>'
+    +   '<path d="M120 420 L48 436 L64 448 L52 468 L124 452 Z" fill="' + GREEN + '"/>'
+    +   '<path d="M380 420 L452 436 L436 448 L448 468 L376 452 Z" fill="' + GREEN + '"/>'
+    +   '<path d="M116 440 Q250 402 384 440 L378 478 Q250 442 122 478 Z" fill="' + GREEN + '"/>'
+    +   '<defs><path id="crestMotto" d="M118 472 Q250 428 382 472"/></defs>'
+    +   '<text font-family="Georgia, serif" font-size="13.5" font-style="italic" fill="#ffffff">'
+    +     '<textPath href="#crestMotto" startOffset="50%" text-anchor="middle">EMPOWERING COMMUNITIES - YHWH</textPath>'
+    +   '</text>'
     + '</g>'
     + '</svg>';
 
   /* ----------------------------------------------- CESTIS Technical Services */
+  /* Red square (black CES) overlapping a blue rectangle (white TIS), with
+     TECHNICAL SERVICES LTD across the bottom. */
   var TECHNICAL = '<svg viewBox="0 0 700 400" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="CESTIS Technical Services Ltd">'
+    + '<rect x="322" y="92" width="334" height="176" fill="#1e50a0"/>'
     + '<rect x="34" y="20" width="300" height="300" fill="#e5342b"/>'
-    + '<rect x="356" y="92" width="300" height="176" fill="#1e50a0"/>'
-    + '<text x="184" y="238" font-family="Arial Black, Arial, sans-serif" font-weight="900" font-size="168" fill="#111111" text-anchor="middle" textLength="300" lengthAdjust="spacingAndGlyphs">CES</text>'
-    + '<text x="506" y="232" font-family="Arial Black, Arial, sans-serif" font-weight="900" font-size="150" fill="#ffffff" text-anchor="middle" textLength="290" lengthAdjust="spacingAndGlyphs">TIS</text>'
+    + '<text x="184" y="238" font-family="Arial Black, Arial, sans-serif" font-weight="900" font-size="168" fill="#111111" text-anchor="middle" textLength="292" lengthAdjust="spacingAndGlyphs">CES</text>'
+    + '<text x="490" y="232" font-family="Arial Black, Arial, sans-serif" font-weight="900" font-size="150" fill="#ffffff" text-anchor="middle" textLength="288" lengthAdjust="spacingAndGlyphs">TIS</text>'
     + '<text x="350" y="382" font-family="Arial, sans-serif" font-weight="700" font-size="52" fill="#111111" text-anchor="middle" textLength="640" lengthAdjust="spacingAndGlyphs">TECHNICAL SERVICES  LTD</text>'
     + '</svg>';
 
   /* --------------------------------------------------------- HEART / NSTA */
-  function figure(x, fill) {
-    return '<circle cx="' + x + '" cy="18" r="9" fill="' + fill + '"/>'
-         + '<path d="M' + (x - 13) + ' 46 a13 15 0 0 1 26 0 Z" fill="' + fill + '"/>';
-  }
-  var HEART = '<svg viewBox="0 0 220 150" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="HEART/NSTA Trust">'
-    + '<g>' + figure(40, '#1f7fd0') + figure(80, '#1f7fd0') + figure(120, '#1f7fd0') + figure(160, '#1f7fd0') + '</g>'
-    + '<rect x="26" y="60" width="168" height="46" rx="7" fill="#1f7fd0"/>'
-    + '<text x="110" y="94" font-family="Arial Black, Arial, sans-serif" font-weight="900" font-size="34" fill="#ffffff" text-anchor="middle" letter-spacing="1">HEART</text>'
-    + '<text x="110" y="132" font-family="Arial Black, Arial, sans-serif" font-weight="900" font-size="30" fill="#1f7fd0" text-anchor="middle" letter-spacing="3">NSTA</text>'
-    + '<text x="110" y="148" font-family="Arial, sans-serif" font-weight="700" font-size="11" fill="#1f7fd0" text-anchor="middle" letter-spacing="4">TRUST</text>'
+  /* Three dots over a rounded blue box reading HEART, with NSTA in bold
+     italics and TRUST letter-spaced beneath. */
+  var HB = '#1b7fc4';
+  var HEART = '<svg viewBox="0 0 200 170" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="HEART/NSTA Trust">'
+    + '<circle cx="56" cy="16" r="10" fill="' + HB + '"/>'
+    + '<circle cx="100" cy="16" r="10" fill="' + HB + '"/>'
+    + '<circle cx="144" cy="16" r="10" fill="' + HB + '"/>'
+    + '<rect x="28" y="36" width="144" height="48" rx="14" fill="' + HB + '"/>'
+    + '<text x="100" y="72" font-family="Arial Black, Arial, sans-serif" font-weight="900" font-size="34" fill="#ffffff" text-anchor="middle" textLength="120" lengthAdjust="spacingAndGlyphs">HEART</text>'
+    + '<text x="100" y="128" font-family="Arial Black, Arial, sans-serif" font-weight="900" font-style="italic" font-size="42" fill="' + HB + '" text-anchor="middle" textLength="128" lengthAdjust="spacingAndGlyphs">NSTA</text>'
+    + '<text x="100" y="148" font-family="Arial, sans-serif" font-weight="700" font-size="13" fill="' + HB + '" text-anchor="middle" letter-spacing="7">TRUST</text>'
     + '</svg>';
 
   root.FINANCE_LOGOS = { shield: CREST, technical: TECHNICAL, heart: HEART };
