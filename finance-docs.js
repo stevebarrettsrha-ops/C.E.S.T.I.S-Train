@@ -214,7 +214,9 @@
          slate — purchase order                                              */
     var theme = school ? 'green' : (isPO ? 'slate' : 'blue');
     var LOGOS = root.FINANCE_LOGOS || {};
-    var logo = isPO ? '' : (school ? LOGOS.shield : LOGOS.technical);
+    /* the crest fronts the RBF invoice and the purchase order; the commercial
+       invoice and quote carry the Technical Services mark. */
+    var logo = (isPO || school) ? LOGOS.shield : LOGOS.technical;
 
     /* the office writes DUE DATE on the RBF invoice but EXPIRATION DATE on the
        commercial invoice — both quotes read EXPIRATION DATE. */
