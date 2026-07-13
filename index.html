@@ -7712,20 +7712,57 @@ function tfaOpenManage(){
   tfaRenderManage();
   openModal('tfaManageModal');
 }
+// Recovery email section — lets any signed-in user add/update the email on
+// their own account. Email is what password-reset codes (OTP) are sent to,
+// so an account with no email can't complete email-based verification.
+function tfaEmailSectionHtml(acct){
+  var email = (acct && acct.email) ? String(acct.email) : '';
+  var hasEmail = !!email;
+  var safeEmail = email.replace(/&/g,'&amp;').replace(/"/g,'&quot;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+  return '<div class="tfa-email-section" style="border:1px solid var(--border);border-radius:10px;padding:14px 16px;margin-bottom:16px;">'
+    + '<strong style="display:block;margin-bottom:4px;">📧 Recovery email address</strong>'
+    + '<p style="font-size:12px;color:var(--text-secondary);margin:0 0 10px;">'
+    + (hasEmail
+        ? 'Password-reset and verification codes are sent to this address. Keep it current.'
+        : '⚠️ No email is set on your account. Add one so you can receive password-reset and verification codes.')
+    + '</p>'
+    + '<div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;">'
+    + '<input type="email" id="tfaEmailInput" class="form-control" style="flex:1;min-width:200px;" placeholder="you@example.com" value="' + safeEmail + '" onkeydown="if(event.key===\'Enter\')tfaSaveEmail()">'
+    + '<button class="btn btn-primary" onclick="tfaSaveEmail()">Save email</button>'
+    + '</div></div>';
+}
+function tfaSaveEmail(){
+  var acct = tfaAccountRecord(currentLoggedInUser);
+  if(!acct){ showToast('Sign in first to update your email.', 'warning'); return; }
+  var input = document.getElementById('tfaEmailInput');
+  if(!input) return;
+  var email = (input.value || '').trim();
+  if(!email){ showToast('Please enter an email address.', 'warning'); return; }
+  var emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+  if(!emailRegex.test(email)){ showToast('Please enter a valid email address.', 'error'); return; }
+  acct.email = email;
+  if(currentLoggedInUser && currentLoggedInUser.id === acct.id) currentLoggedInUser.email = email;
+  saveUserAccounts();
+  showToast('Recovery email address saved.');
+  tfaRenderManage();
+}
 function tfaRenderManage(){
   var acct = tfaAccountRecord(currentLoggedInUser);
   var body = document.getElementById('tfaManageBody');
   if(!acct || !body) return;
+  var emailSection = tfaEmailSectionHtml(acct);
   if(tfaEnabled(acct)){
     var unused = (acct.backupCodes || []).filter(function(b){ return !b.used; }).length;
-    body.innerHTML = '<div class="tfa-status-on"><strong>Two-step verification is ON</strong><br>Signing in and password resets require a 6-digit code from your authenticator app.<br>Backup codes remaining: ' + unused + '/8</div>'
+    body.innerHTML = emailSection
+      + '<div class="tfa-status-on"><strong>Two-step verification is ON</strong><br>Signing in and password resets require a 6-digit code from your authenticator app.<br>Backup codes remaining: ' + unused + '/8</div>'
       + '<div style="display:flex;gap:10px;flex-wrap:wrap;">'
       + '<button class="btn btn-secondary" onclick="tfaShowBackupCodes()">View Backup Codes</button>'
       + '<button class="btn btn-secondary" onclick="tfaRegenerateBackupCodes()">Regenerate Codes</button>'
       + '<button class="btn btn-danger" onclick="tfaBeginDisable()">Turn Off</button>'
       + '</div>';
   } else {
-    body.innerHTML = '<div class="tfa-status-off"><strong>Two-step verification is OFF</strong><br>Protect your account with Google Authenticator or any TOTP-compatible app. Once on, you will be asked for a 6-digit code when signing in, and password resets will require re-verification.</div>'
+    body.innerHTML = emailSection
+      + '<div class="tfa-status-off"><strong>Two-step verification is OFF</strong><br>Protect your account with Google Authenticator or any TOTP-compatible app. Once on, you will be asked for a 6-digit code when signing in, and password resets will require re-verification.</div>'
       + '<button class="btn btn-primary" onclick="tfaOpenSetup()">Turn On Two-Step Verification</button>';
   }
 }
