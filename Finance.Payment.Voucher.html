@@ -276,9 +276,9 @@ function renderSheets() {
     h += '<div class="v-cap">(amount in figures)</div>';
     h += '</div>';
 
+    h += '<div class="v-claimant"><div class="box"><div class="line"></div><div class="cap">Signature of Claimant</div></div>' +
+         '<div class="box"><div class="line"></div><div class="cap">Date</div></div></div>';
     if (isChq) {
-      h += '<div class="v-claimant"><div class="box"><div class="line"></div><div class="cap">Signature of Claimant</div></div>' +
-           '<div class="box"><div class="line"></div><div class="cap">Date</div></div></div>';
       h += '<div class="v-version">CTI/Cheque Payment Voucher/Version 2.0:12/03/2020</div>';
     }
     h += '</div></div>';
