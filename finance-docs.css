@@ -138,8 +138,8 @@ button.mini.gold { border-color:var(--gold); color:var(--gold); }
 .theme-green .p-doc-body { background:#eaf0f6; }
 
 .p-logo { margin:2px 0 20px; }
-.p-logo svg { height:96px; width:auto; display:block; margin:0 auto; }   /* centred (blue/slate) */
-.theme-green .p-logo svg { height:118px; margin:0; }                      /* left-aligned crest   */
+.p-logo img, .p-logo svg { height:104px; width:auto; display:block; margin:0 auto; }  /* centred (blue/slate) */
+.theme-green .p-logo img, .theme-green .p-logo svg { height:150px; margin:0; }         /* left-aligned crest   */
 
 .p-blocks { display:flex; justify-content:space-between; gap:30px; margin-bottom:20px; }
 .p-co { font-size:12px; line-height:1.5; }
@@ -218,7 +218,7 @@ button.mini.gold { border-color:var(--gold); color:var(--gold); }
 .v-head-cheque { min-height:66px; }
 .v-head-cheque .l1 { padding-top:6px; }
 .v-logo { position:absolute; left:0; top:0; }
-.v-logo svg { height:62px; width:auto; display:block; }
+.v-logo img, .v-logo svg { height:62px; width:auto; display:block; }
 /* transfer: company name left-aligned, the form title centred beneath it */
 .v-head-transfer { text-align:left; }
 .v-head-transfer .l3 { text-align:center; margin-top:16px; letter-spacing:1px; }
