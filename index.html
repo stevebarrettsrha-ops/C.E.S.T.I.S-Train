@@ -679,6 +679,18 @@ body::-webkit-scrollbar { width:0; display:none; }
   margin-left:auto; background:var(--red); color:#fff;
   font-size:10px; font-weight:700; padding:2px 7px; border-radius:10px;
 }
+.nav-section-toggle {
+  display:flex; align-items:center; justify-content:space-between;
+  cursor:pointer; user-select:none; border-radius:var(--radius-sm);
+  transition:color var(--transition), background var(--transition);
+}
+.nav-section-toggle:hover { color:var(--text-secondary); background:rgba(255,255,255,0.04); }
+.nav-section-toggle .nav-chevron {
+  width:14px; height:14px; flex-shrink:0; opacity:0.7;
+  transition:transform var(--transition);
+}
+.nav-section-toggle.collapsed .nav-chevron { transform:rotate(-90deg); }
+.nav-section-group.collapsed { display:none; }
 .sidebar-footer {
   padding:16px;
   border-top:1px solid var(--border);
@@ -8397,6 +8409,14 @@ function logout() {
   }
 }
 
+function toggleNavSection(labelEl) {
+  var collapsed = labelEl.classList.toggle('collapsed');
+  var group = labelEl.nextElementSibling;
+  if (group && group.classList.contains('nav-section-group')) {
+    group.classList.toggle('collapsed', collapsed);
+  }
+}
+
 function buildAdminSidebar() {
   document.getElementById('sidebarNav').innerHTML = `
     <div class="nav-section-label">Main</div>
@@ -8408,7 +8428,12 @@ function buildAdminSidebar() {
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="23 7 16 12 23 17 23 7"/><rect x="1" y="5" width="15" height="14" rx="2"/></svg>Video Conference<span class="nav-badge">LIVE</span></div>
     <div class="nav-item" data-page="students" onclick="showPage('students')">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>Student Progress</div>
-    <div class="nav-section-label">Learning</div>
+    <div class="nav-item" data-page="announcements" onclick="showPage('announcements')">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 17H2a3 3 0 0 0 3-3V9a7 7 0 0 1 14 0v5a3 3 0 0 0 3 3zm-8.27 4a2 2 0 0 1-3.46 0"/></svg>Announcements</div>
+    <div class="nav-item" data-page="calendar" onclick="showPage('calendar')">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>Calendar</div>
+    <div class="nav-section-label nav-section-toggle" onclick="toggleNavSection(this)">Learning<svg class="nav-chevron" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="6 9 12 15 18 9"/></svg></div>
+    <div class="nav-section-group">
     <div class="nav-item" data-page="training" onclick="showPage('training')">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/></svg>Training Centres</div>
     <div class="nav-item" data-page="course-duration" onclick="showPage('course-duration')">
@@ -8427,14 +8452,11 @@ function buildAdminSidebar() {
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>Import Exam</div>
     <div class="nav-item" data-page="pdf-workshop" onclick="showPage('pdf-workshop')">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><path d="M12 18v-6"/><path d="M9 15l3-3 3 3"/></svg>PDF Workshop</div>
-    <div class="nav-section-label">Management</div>
     <div class="nav-item" data-page="attendance" onclick="showPage('attendance')">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M16 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="8.5" cy="7" r="4"/><polyline points="17 11 19 13 23 9"/></svg>Attendance</div>
-    <div class="nav-item" data-page="announcements" onclick="showPage('announcements')">
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 17H2a3 3 0 0 0 3-3V9a7 7 0 0 1 14 0v5a3 3 0 0 0 3 3zm-8.27 4a2 2 0 0 1-3.46 0"/></svg>Announcements</div>
-    <div class="nav-item" data-page="calendar" onclick="showPage('calendar')">
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>Calendar</div>
-    <div class="nav-section-label">Administration</div>
+    </div>
+    <div class="nav-section-label nav-section-toggle" onclick="toggleNavSection(this)">Management<svg class="nav-chevron" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="6 9 12 15 18 9"/></svg></div>
+    <div class="nav-section-group">
     <div class="nav-item" data-page="admin-duty-register" onclick="showPage('admin-duty-register')">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 5H7a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V7a2 2 0 0 0-2-2h-2"/><rect x="9" y="3" width="6" height="4" rx="1"/><path d="M9 14l2 2 4-4"/></svg>Admin Duty Register<span class="nav-badge" id="dutyTasksBadge" style="display:none;background:var(--accent);">0</span></div>
     <div class="nav-item" data-page="verify-users" onclick="showPage('verify-users')">
@@ -8445,6 +8467,9 @@ function buildAdminSidebar() {
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/><line x1="10" y1="9" x2="8" y2="9"/></svg>Transcript/Grades<span class="nav-badge" style="background:var(--green);">NEW</span></div>
     <div class="nav-item" data-page="cert-transcript-requests" onclick="showPage('cert-transcript-requests')">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 12h-6l-2 3h-4l-2-3H2"/><path d="M5.45 5.11 2 12v6a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2v-6l-3.45-6.89A2 2 0 0 0 16.76 4H7.24a2 2 0 0 0-1.79 1.11z"/></svg>Cert/Transcript Requests<span class="nav-badge" id="ctrRequestsBadge" style="display:none;background:var(--red);">0</span></div>
+    </div>
+    <div class="nav-section-label nav-section-toggle" onclick="toggleNavSection(this)">Administration<svg class="nav-chevron" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="6 9 12 15 18 9"/></svg></div>
+    <div class="nav-section-group">
     <div class="nav-item" data-page="cert-downloads" onclick="showPage('cert-downloads')">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>Cert Downloads</div>
     <div class="nav-item" data-page="reports" onclick="showPage('reports')">
@@ -8463,6 +8488,7 @@ function buildAdminSidebar() {
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><path d="M12 18v-6"/><path d="M9 15l3 3 3-3"/></svg>Document Hub</div>
     <div class="nav-item" data-page="settings" onclick="showPage('settings')">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>Settings</div>
+    </div>
   `;
   setTimeout(updateCtrRequestsBadge, 200);
 }
@@ -8929,7 +8955,15 @@ function showPage(pageId) {
   if(pg) pg.classList.add('active');
   document.querySelectorAll('.nav-item').forEach(n => n.classList.remove('active'));
   const navItem = document.querySelector('.nav-item[data-page="'+pageId+'"]');
-  if(navItem) navItem.classList.add('active');
+  if(navItem) {
+    navItem.classList.add('active');
+    const grp = navItem.closest('.nav-section-group');
+    if(grp && grp.classList.contains('collapsed')) {
+      grp.classList.remove('collapsed');
+      const lbl = grp.previousElementSibling;
+      if(lbl && lbl.classList.contains('nav-section-toggle')) lbl.classList.remove('collapsed');
+    }
+  }
   const titles = {
     dashboard:'Dashboard',video:'Video Conference',students:'Student Progress',
     training:'Training Centres','course-duration':'Course / Training Centre Duration','enrolment-registers':'Enrolment Registers','a-resources':'Resource Manager',exams:'Online Exams','import-exam':'Import Exam',certificates:'Certificate Tracking','cert-downloads':'Certificate Downloads',
