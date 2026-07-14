@@ -243,6 +243,9 @@ var qpIsStaff = (qpRole === 'admin' || qpRole === 'adminstaff');
 var qpFileCache = {};       // folderId -> array of items (folders + files), or Error
 var qpNav = {};             // programme rootFolderId -> breadcrumb [{id,name}]
 var qpNoticeShown = false;
+var qpAnyFailed = false;     // did the last render have any folder that failed to list?
+var qpLastToken = undefined; // last Drive token seen (to detect reconnect / rotation)
+var qpHadAccess = false;     // did we have Drive access (token or API key) last check?
 var QP_FOLDER_MIME = 'application/vnd.google-apps.folder';
 var QP_SHORTCUT_MIME = 'application/vnd.google-apps.shortcut';
 
@@ -435,6 +438,9 @@ function qpRenderListing(prog, result) {
   var host = document.getElementById('qpFiles-' + prog.folderId);
   if (!host) return;
   if (result instanceof Error) {
+    // Remember that a listing failed so we can auto-retry once Drive access is
+    // (re)connected — e.g. an expired token that the admin reconnects.
+    qpAnyFailed = true;
     if (result.message === 'no-auth') {
       host.innerHTML = '<div class="qp-files-msg">Documents can\'t be listed yet — sign in to Google Drive (admin) or add a Drive API key.</div>';
       qpMaybeShowAuthNotice();
@@ -490,6 +496,53 @@ function qpLoadCard(prog) {
   });
 }
 
+// Auto-recover when Google Drive access is (re)connected. This page reads the
+// host LMS's token live (window.parent.googleAccessToken); when a token expires
+// the listings fail, and when the admin reconnects the parent gets a fresh
+// token but this frame has no way to know — so nothing refreshed and the qual
+// plans stayed gone until a manual reload. We watch for the token appearing or
+// changing and re-render the folders that failed.
+//   - force = true  → an explicit "drive connected" signal from the parent;
+//                     re-render if we currently have access.
+//   - force = false → a poll / focus tick; only re-render on a real edge
+//                     (token gained or rotated) AND only if something had failed,
+//                     so routine hourly token rotation doesn't cause churn.
+function qpRefreshListings(force) {
+  var tok = qpToken();
+  var hasAccess = !!(tok || QP_API_KEY);
+  var edge = (tok !== qpLastToken) || (hasAccess && !qpHadAccess);
+  qpLastToken = tok;
+  qpHadAccess = hasAccess;
+  if (!hasAccess) return;
+  if (!(force || (edge && qpAnyFailed))) return;
+  // Access is back — drop the "needs Drive access" notice and reload. Failed
+  // folders were never cached, so successful folders reload instantly from cache
+  // while the previously-broken ones re-fetch with the fresh token.
+  qpAnyFailed = false;
+  qpNoticeShown = false;
+  var nh = document.getElementById('qpNoticeHost');
+  if (nh) nh.innerHTML = '';
+  qpRender();
+}
+
+// Start watching for a Drive (re)connection: a low-frequency poll plus the
+// prompt signals (parent postMessage, tab regaining focus).
+function qpWatchReconnect() {
+  qpLastToken = qpToken();
+  qpHadAccess = !!(qpLastToken || QP_API_KEY);
+  setInterval(function(){ qpRefreshListings(false); }, 2500);
+  window.addEventListener('message', function(e){
+    var d = e && e.data;
+    if (d && (d.type === 'cestis-drive-connected' || d.type === 'cestis-drive-token')) {
+      qpRefreshListings(true);
+    }
+  });
+  window.addEventListener('focus', function(){ qpRefreshListings(false); });
+  document.addEventListener('visibilitychange', function(){
+    if (!document.hidden) qpRefreshListings(false);
+  });
+}
+
 function qpMaybeShowAuthNotice() {
   if (qpNoticeShown || qpToken() || QP_API_KEY) return;
   qpNoticeShown = true;
@@ -522,6 +575,7 @@ function qpCard(prog) {
 }
 
 function qpRender() {
+  qpAnyFailed = false; // recomputed as each card's listing resolves
   var grid = document.getElementById('qpGrid');
   var search = (document.getElementById('qpSearch').value || '').toLowerCase().trim();
   var filter = document.getElementById('qpFilter').value;
@@ -579,6 +633,7 @@ function qpInit() {
   }
 
   qpRender();
+  qpWatchReconnect();
 }
 
 document.addEventListener('DOMContentLoaded', qpInit);

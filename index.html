@@ -21424,6 +21424,7 @@ async function submitGoogleToken() {
     isCloudConnected = true;
     _cloudAuthExpiredNotified = false;
     dismissCloudNotification();
+    notifyFramesDriveConnected();
 
     const expiry = new Date();
     expiry.setHours(expiry.getHours() + 1);
@@ -21460,11 +21461,24 @@ async function submitGoogleToken() {
   }
 }
 
+// Nudge embedded iframes that read the Drive token (e.g. Qual Plan / Curriculum)
+// to re-fetch immediately when we connect or refresh the token, instead of
+// waiting for their own poll. Best-effort; the frames also poll as a fallback.
+function notifyFramesDriveConnected() {
+  try {
+    var frames = document.querySelectorAll('iframe');
+    for (var i = 0; i < frames.length; i++) {
+      try { frames[i].contentWindow.postMessage({ type: 'cestis-drive-connected' }, '*'); } catch(e) {}
+    }
+  } catch(e) {}
+}
+
 async function handleGoogleAuthCallback(tokenResponse) {
   googleAccessToken = tokenResponse.access_token;
   isCloudConnected = true;
   _cloudAuthExpiredNotified = false;
   dismissCloudNotification();
+  notifyFramesDriveConnected();
 
   const expiry = new Date();
   expiry.setSeconds(expiry.getSeconds() + (tokenResponse.expires_in || 3600));
