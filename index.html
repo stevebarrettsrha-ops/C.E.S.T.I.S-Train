@@ -3825,6 +3825,7 @@ body.vc-fullscreen-mode.vc-host-only-mode .video-grid .video-tile:not(.vc-hoston
             <label>Password</label>
             <input type="password" placeholder="••••••••" id="adminPass">
           </div>
+          <span class="register-link" onclick="openForgotPassword('admin')">Forgot password?</span>
         </div>
         <button class="role-enter-btn" onclick="handleAdminClick()">Enter as Admin →</button>
       </div>
@@ -3843,6 +3844,7 @@ body.vc-fullscreen-mode.vc-host-only-mode .video-grid .video-tile:not(.vc-hoston
             <label>Password</label>
             <input type="password" placeholder="••••••••" id="studentPass">
           </div>
+          <span class="register-link" onclick="openForgotPassword('student')">Forgot password?</span>
           <div class="gmail-divider">or</div>
           <button class="gmail-btn" type="button" onclick="gmailSignIn('student')">
             <svg viewBox="0 0 24 24"><path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92a5.06 5.06 0 0 1-2.2 3.32v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.1z"/><path fill="#34A853" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"/><path fill="#FBBC05" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z"/><path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z"/></svg>
@@ -3867,6 +3869,7 @@ body.vc-fullscreen-mode.vc-host-only-mode .video-grid .video-tile:not(.vc-hoston
             <label>Password</label>
             <input type="password" placeholder="••••••••" id="instructorPass">
           </div>
+          <span class="register-link" onclick="openForgotPassword('instructor')">Forgot password?</span>
           <div class="gmail-divider">or</div>
           <button class="gmail-btn" type="button" onclick="gmailSignIn('instructor')">
             <svg viewBox="0 0 24 24"><path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92a5.06 5.06 0 0 1-2.2 3.32v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.1z"/><path fill="#34A853" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"/><path fill="#FBBC05" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z"/><path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z"/></svg>
@@ -3891,6 +3894,7 @@ body.vc-fullscreen-mode.vc-host-only-mode .video-grid .video-tile:not(.vc-hoston
             <label>Password</label>
             <input type="password" placeholder="••••••••" id="adminStaffPass">
           </div>
+          <span class="register-link" onclick="openForgotPassword('adminstaff')">Forgot password?</span>
         </div>
         <button class="role-enter-btn" onclick="handleAdminStaffClick()">Enter as Admin Staff →</button>
       </div>
@@ -4279,6 +4283,44 @@ body.vc-fullscreen-mode.vc-host-only-mode .video-grid .video-tile:not(.vc-hoston
     <div style="display:flex;gap:10px;justify-content:flex-end;margin-top:20px;">
       <button class="btn btn-secondary" onclick="closeModal('resetPasswordModal')">Cancel</button>
       <button class="btn btn-primary" onclick="confirmResetPassword()">Reset Password</button>
+    </div>
+  </div>
+</div>
+
+<!-- FORGOT PASSWORD (SELF-SERVICE) MODAL -->
+<div class="modal-overlay" id="forgotPasswordModal" style="z-index:1100;">
+  <div class="modal" style="max-width:420px;">
+    <div class="modal-header"><h3>Reset Your Password</h3><button class="modal-close" onclick="closeModal('forgotPasswordModal')">✕</button></div>
+
+    <!-- Step 1: identify the account -->
+    <div id="forgotPwStep1">
+      <p style="font-size:13px;color:var(--text-secondary);margin-bottom:16px;">Enter the username or email on your account. We'll verify your identity with the recovery email on file.</p>
+      <div class="form-group"><label>Username or Email</label><input type="text" class="form-control" id="forgotPwUser" placeholder="e.g. cestisadmin or you@gmail.com" onkeydown="if(event.key==='Enter')forgotPwLookup()"></div>
+      <div style="display:flex;gap:10px;justify-content:flex-end;margin-top:20px;">
+        <button class="btn btn-secondary" onclick="closeModal('forgotPasswordModal')">Cancel</button>
+        <button class="btn btn-primary" onclick="forgotPwLookup()">Continue</button>
+      </div>
+    </div>
+
+    <!-- Step 2: verify the recovery email -->
+    <div id="forgotPwStep2" style="display:none;">
+      <p style="font-size:13px;color:var(--text-secondary);margin-bottom:16px;">For your security, confirm the recovery email on file for this account (<strong id="forgotPwEmailHint"></strong>).</p>
+      <div class="form-group"><label>Recovery Email</label><input type="text" class="form-control" id="forgotPwEmail" placeholder="Enter your recovery email" onkeydown="if(event.key==='Enter')forgotPwVerifyEmail()"></div>
+      <div style="display:flex;gap:10px;justify-content:flex-end;margin-top:20px;">
+        <button class="btn btn-secondary" onclick="forgotPwShowStep(1)">Back</button>
+        <button class="btn btn-primary" onclick="forgotPwVerifyEmail()">Verify</button>
+      </div>
+    </div>
+
+    <!-- Step 3: set a new password -->
+    <div id="forgotPwStep3" style="display:none;">
+      <p style="font-size:13px;color:var(--text-secondary);margin-bottom:16px;">Identity verified. Choose a new password.</p>
+      <div class="form-group"><label>New Password</label><input type="password" class="form-control" id="forgotPwNew" placeholder="Minimum 6 characters"></div>
+      <div class="form-group"><label>Confirm Password</label><input type="password" class="form-control" id="forgotPwConfirm" placeholder="Re-enter password" onkeydown="if(event.key==='Enter')forgotPwSubmit()"></div>
+      <div style="display:flex;gap:10px;justify-content:flex-end;margin-top:20px;">
+        <button class="btn btn-secondary" onclick="forgotPwShowStep(2)">Back</button>
+        <button class="btn btn-primary" onclick="forgotPwSubmit()">Reset Password</button>
+      </div>
     </div>
   </div>
 </div>
@@ -7027,6 +7069,109 @@ async function confirmResetPasswordVerified() {
   saveUserAccounts();
   closeModal('resetPasswordModal');
   showToast('Password reset successfully for ' + user.name);
+}
+
+// ============================================================
+// SELF-SERVICE PASSWORD RESET (login page "Forgot password?")
+// This is a client-only app with no email server, so identity is
+// verified against the recovery email stored on the account, plus a
+// two-step code when 2FA is enabled. The new password is hashed and
+// saved locally, then synced to Google Drive via saveUserAccounts().
+// ============================================================
+var forgotPwState = { account: null, role: null };
+
+function openForgotPassword(role) {
+  forgotPwState = { account: null, role: role || '' };
+  document.getElementById('forgotPwUser').value = forgotPwPrefill(role);
+  document.getElementById('forgotPwEmail').value = '';
+  document.getElementById('forgotPwNew').value = '';
+  document.getElementById('forgotPwConfirm').value = '';
+  document.getElementById('forgotPwEmailHint').textContent = '';
+  forgotPwShowStep(1);
+  openModal('forgotPasswordModal');
+  setTimeout(function(){ var el = document.getElementById('forgotPwUser'); if(el) el.focus(); }, 60);
+}
+
+// Carry over whatever the user already typed into the role's login box.
+function forgotPwPrefill(role) {
+  var map = { admin:'adminUser', student:'studentUser', instructor:'instructorUser', adminstaff:'adminStaffUser', cmc:'cmcUser' };
+  var el = map[role] && document.getElementById(map[role]);
+  return el ? (el.value || '').trim() : '';
+}
+
+function forgotPwShowStep(n) {
+  [1,2,3].forEach(function(i){
+    var s = document.getElementById('forgotPwStep'+i);
+    if(s) s.style.display = (i === n) ? 'block' : 'none';
+  });
+}
+
+// Masked recovery-email hint so the user knows which address to enter
+// without us disclosing the full address to a stranger.
+function forgotPwMaskEmail(email) {
+  var parts = String(email || '').split('@');
+  if(parts.length !== 2) return '••••';
+  var name = parts[0];
+  var shown = name.length <= 2 ? name.charAt(0) : name.slice(0, 2);
+  return shown + '•••@' + parts[1];
+}
+
+async function forgotPwLookup() {
+  var uname = (document.getElementById('forgotPwUser').value || '').trim();
+  if(!uname) { showToast('Enter your username or email.', 'warning'); return; }
+  var acct = null;
+  // Prefer the role the user launched this from, then fall back to any role.
+  if(forgotPwState.role) { try { acct = await findLoginAccount(forgotPwState.role, uname); } catch(_){} }
+  if(!acct) {
+    var findAny = function(){ return userAccounts.find(function(u){ return u.username === uname || u.email === uname; }); };
+    acct = findAny();
+    if(!acct) { try { if(await cloudFetchAccountData(false)) acct = findAny(); } catch(_){} }
+  }
+  if(!acct) { showToast('No account found for "' + uname + '". Use "Sync Now" first, or contact an administrator.', 'error'); return; }
+  if(acct.status === 'disabled') { showToast('This account has been disabled. Contact an administrator.', 'error'); return; }
+  var recovery = (acct.email || '').trim();
+  if(!recovery || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(recovery)) {
+    showToast('No recovery email is on file for this account. Please contact an administrator to reset your password.', 'error');
+    return;
+  }
+  forgotPwState.account = acct;
+  document.getElementById('forgotPwEmailHint').textContent = forgotPwMaskEmail(recovery);
+  forgotPwShowStep(2);
+  setTimeout(function(){ var el = document.getElementById('forgotPwEmail'); if(el) el.focus(); }, 60);
+}
+
+function forgotPwVerifyEmail() {
+  var acct = forgotPwState.account;
+  if(!acct) { forgotPwShowStep(1); return; }
+  var entered = (document.getElementById('forgotPwEmail').value || '').trim().toLowerCase();
+  var onFile = (acct.email || '').trim().toLowerCase();
+  if(!entered) { showToast('Enter your recovery email.', 'warning'); return; }
+  if(entered !== onFile) { showToast('That email does not match the recovery email on file.', 'error'); return; }
+  var toStep3 = function(){ forgotPwShowStep(3); setTimeout(function(){ var el = document.getElementById('forgotPwNew'); if(el) el.focus(); }, 60); };
+  // When 2FA is on, also require a code — a lost password shouldn't bypass it.
+  // Backup codes are allowed here as the intended recovery mechanism.
+  if(tfaEnabled(acct)) {
+    tfaOpenVerify(acct, { title: 'Verify It\'s You', subtitle: 'Enter your 6-digit code (or a backup code) to reset your password.', allowBackup: true }, toStep3);
+    return;
+  }
+  toStep3();
+}
+
+async function forgotPwSubmit() {
+  var acct = forgotPwState.account;
+  if(!acct) { forgotPwShowStep(1); return; }
+  var newPw = document.getElementById('forgotPwNew').value;
+  var confirmPw = document.getElementById('forgotPwConfirm').value;
+  if(!newPw || newPw.length < 6) { showToast('Password must be at least 6 characters.', 'warning'); return; }
+  if(newPw !== confirmPw) { showToast('Passwords do not match.', 'warning'); return; }
+  acct.password = await hashPassword(newPw);
+  cachePlaintextPw(acct, newPw);
+  // Clear any active lockout so the user can sign in right away.
+  try { if(acct.username) clearLoginFailures(acct.username); if(acct.email) clearLoginFailures(acct.email); } catch(_){}
+  saveUserAccounts(); // persists locally + syncs to Google Drive
+  closeModal('forgotPasswordModal');
+  forgotPwState = { account: null, role: null };
+  showToast('Password reset successfully. You can now log in with your new password.');
 }
 
 function toggleUserStatus(userId) {
