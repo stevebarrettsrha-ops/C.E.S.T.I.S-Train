@@ -104,6 +104,7 @@
       ],
       discountPct: 0, taxPct: 0, depositPct: 0,
       notes: '',
+      extraSignatories: [],
       revisions: [],
       createdAt: new Date().toISOString(),
       updatedAt: new Date().toISOString()
@@ -171,6 +172,28 @@
     html += fld('Tax %', '<input type="number" step="any" id="fTax" value="' + esc(d.taxPct) + '">');
     html += fld('Deposit Required % (0 = none)', '<input type="number" step="any" id="fDeposit" value="' + esc(d.depositPct) + '">');
     html += '</div>';
+
+    /* signatories — the School / RBF invoice/quote prints a signatories block.
+       Programme Coordinator, Treasurer and CMC Chairperson are always shown;
+       the administrator can append extra signature lines here. */
+    if (school && cfg.docType !== 'po') {
+      var extra = d.extraSignatories || [];
+      html += '<div class="fd-items-head" style="margin-top:14px;"><h3>Signatories</h3>'
+            + '<div><button class="btn small" onclick="FinanceDoc.addSignatory()">+ Signature Line</button></div></div>';
+      html += '<div style="font-size:.72rem;color:var(--text-dim);margin-bottom:8px;">Programme Coordinator, Treasurer and CMC Chairperson always appear. Add extra signature lines below (e.g. Principal, Auditor, Bursar).</div>';
+      if (extra.length) {
+        html += '<table class="fd-items-table"><thead><tr><th>Additional Signatory Title</th><th style="width:92px;"></th></tr></thead><tbody>';
+        extra.forEach(function (title, i) {
+          html += '<tr><td><input type="text" class="full" placeholder="e.g. PRINCIPAL" value="' + esc(title) + '" oninput="FinanceDoc.setSignatory(' + i + ',this.value)"></td>'
+                + '<td class="row-actions">'
+                + '<button class="mini" title="Move up" onclick="FinanceDoc.moveSignatory(' + i + ',-1)">↑</button>'
+                + '<button class="mini" title="Move down" onclick="FinanceDoc.moveSignatory(' + i + ',1)">↓</button>'
+                + '<button class="mini danger" title="Remove signatory" onclick="FinanceDoc.removeSignatory(' + i + ')">✕</button></td></tr>';
+        });
+        html += '</tbody></table>';
+      }
+    }
+
     if (cfg.hasStatus) {
       html += fld('Revision note (kept in the document history when you save changes)', '<input type="text" id="fRevNote" placeholder="e.g. Corrected qty on line 2">');
     }
@@ -291,10 +314,13 @@
 
     /* signature blocks */
     if (school && !isPO) {
+      var sigRoles = ['PROGRAMME COORDINATOR', 'TREASURER', 'CMC CHAIRPERSON'].concat(
+        (d.extraSignatories || []).map(function (s) { return String(s == null ? '' : s).trim().toUpperCase(); })
+                                  .filter(function (s) { return s; }));
       h += '<div class="p-signatories"><div class="p-sig-title">SIGNATORIES</div>'
          + '<table class="p-sig-table"><tr class="p-sig-head"><th>FULL NAME (IN BLOCK LETTERS)</th><th>SIGNATURES</th></tr>'
-         + ['PROGRAMME COORDINATOR', 'TREASURER', 'CMC CHAIRPERSON'].map(function (role) {
-             return '<tr><td><div class="p-sig-line">&nbsp;</div><div class="p-sig-role">' + role + '</div></td><td><div class="p-sig-line">&nbsp;</div></td></tr>';
+         + sigRoles.map(function (role) {
+             return '<tr><td><div class="p-sig-line">&nbsp;</div><div class="p-sig-role">' + esc(role) + '</div></td><td><div class="p-sig-line">&nbsp;</div></td></tr>';
            }).join('') + '</table></div>';
     }
     if (isPO) {
@@ -395,6 +421,32 @@
     var j = i + dir;
     if (j < 0 || j >= current.items.length) return;
     var tmp = current.items[i]; current.items[i] = current.items[j]; current.items[j] = tmp;
+    dirty = true; renderEditor(); renderPaper();
+  };
+
+  /* extra signatory lines (School / RBF documents) */
+  API.addSignatory = function () {
+    current.extraSignatories = current.extraSignatories || [];
+    current.extraSignatories.push('');
+    dirty = true; renderEditor(); renderPaper();
+  };
+  API.setSignatory = function (i, val) {
+    current.extraSignatories = current.extraSignatories || [];
+    current.extraSignatories[i] = val;
+    dirty = true;
+    /* paper-only refresh keeps focus in the field being typed into */
+    renderPaper();
+  };
+  API.removeSignatory = function (i) {
+    if (!current.extraSignatories) return;
+    current.extraSignatories.splice(i, 1);
+    dirty = true; renderEditor(); renderPaper();
+  };
+  API.moveSignatory = function (i, dir) {
+    var arr = current.extraSignatories || [];
+    var j = i + dir;
+    if (j < 0 || j >= arr.length) return;
+    var tmp = arr[i]; arr[i] = arr[j]; arr[j] = tmp;
     dirty = true; renderEditor(); renderPaper();
   };
 
