@@ -3820,7 +3820,7 @@ body.vc-fullscreen-mode.vc-host-only-mode .video-grid .video-tile:not(.vc-hoston
       <span class="sync-icon">☁️</span>
       <div class="sync-text">
         <strong>Sync from Cloud before logging in</strong>
-        Pull the latest data from Google Drive. <em>All users must sync before logging in.</em>
+        Pull the latest data from the Cloud. <em>All users must sync before logging in.</em>
         <div class="login-sync-status" id="loginSyncStatus"></div>
       </div>
       <button class="login-sync-btn" id="loginSyncBtn" onclick="loginPageSync()">Sync Now</button>
@@ -23324,9 +23324,9 @@ async function driveFindOrCreateFolder(name, parentId, token) {
 function userLoginFolderName(account) {
   if (!account) return null;
   var base = account.username || account.email || account.name || account.id || 'user';
-  base = String(base).replace(/[\/\\:*?"<>| -]/g, ' ').replace(/\s+/g, ' ').trim();
+  base = String(base).replace(/[\/\\:*?"<>|\s-]/g, ' ').replace(/\s+/g, ' ').trim();
   if (!base) base = 'user';
-  var idPart = String(account.id || '').replace(/[\/\\:*?"<>| -]/g, '');
+  var idPart = String(account.id || '').replace(/[\/\\:*?"<>|\s-]/g, '');
   return idPart ? (base + ' (' + idPart + ')') : base;
 }
 
@@ -24592,7 +24592,7 @@ async function loginPageSync() {
   isLoginPageSync = true;
   var isAdmin = adminLoginShown;
   setLoginSyncBtnState(true);
-  updateLoginSyncStatus(isAdmin ? 'Connecting to Google Drive...' : 'Syncing...', '');
+  updateLoginSyncStatus(isAdmin ? 'Connecting to Cloud...' : 'Syncing...', '');
 
   // Step 1: Ensure we have a Google access token
   if (!isCloudConnected || !googleAccessToken) {
@@ -24606,7 +24606,7 @@ async function loginPageSync() {
       dismissCloudNotification();
     } else {
       // Need to authenticate — use Google OAuth popup
-      updateLoginSyncStatus('Opening Google sign-in...', '');
+      updateLoginSyncStatus('Opening secure sign-in...', '');
       try {
         var token = await loginPageGoogleAuth();
         if (!token) {
@@ -24630,7 +24630,7 @@ async function loginPageSync() {
   }
 
   if (isAdmin) {
-    updateLoginSyncStatus('Connected. Syncing data from all Drive folders...', '');
+    updateLoginSyncStatus('Connected. Syncing data...', '');
   }
 
   try {
