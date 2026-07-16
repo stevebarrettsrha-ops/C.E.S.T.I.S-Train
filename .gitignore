@@ -1,1 +1,9 @@
 .claude/
+
+# User Login — this repository is PUBLIC, so real user credential exports must
+# never be committed here. Only the documented structure (README + template) is
+# tracked; any real per-user folder created by a local export stays local.
+/User Login/*
+!/User Login/README.md
+!/User Login/_TEMPLATE/
+!/User Login/_TEMPLATE/**

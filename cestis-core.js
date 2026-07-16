@@ -264,6 +264,31 @@
     return { students: deduped, removed: list.length - deduped.length, idMap: idMap };
   };
 
+  /* --- "Best record" scoring, used to collapse duplicate accounts/approvals ---
+     When two records end up keyed to the same student we keep exactly one. These
+     pure scorers decide which, so the choice never depends on array order. */
+  // Higher score = better login account. A record that can actually authenticate
+  // (has a password) and is active must always beat a password-less/disabled
+  // placeholder for the same student.
+  Core.accountLoginScore = function (u) {
+    if (!u) return -1;
+    var score = 0;
+    if (u.password) score += 8;                       // can actually sign in
+    if (u.status === 'active') score += 4;
+    else if (u.status !== 'disabled') score += 2;     // pending beats disabled
+    if (u.twoFactorSecret) score += 1;                // richer, real record
+    if (u.email) score += 1;
+    return score;
+  };
+  // Higher score = approval to keep. Approved always beats not-approved; ties
+  // break to the most recently touched record.
+  Core.approvalScore = function (c) {
+    if (!c) return -1;
+    var approved = c.approved ? 1 : 0;
+    var t = Date.parse(c.approvedDate || c.lastDownloaded || c.approvedAt || '') || 0;
+    return approved * 1e15 + t;                        // approved dominates; recency tie-breaks
+  };
+
   /* --- Relink dependent arrays after ids change (pure-ish; mutates input) -
      `data` is an object with any of: userAccounts, attendanceRecords,
      certDownloadApprovals, examResults. Every reference to a remapped student
@@ -277,19 +302,19 @@
       data.userAccounts.forEach(function (u) {
         if (u && u.studentDataId && idMap[u.studentDataId]) u.studentDataId = idMap[u.studentDataId];
       });
-      var seenAcct = {};
+      // Collapse duplicate accounts that now point at the same student, keeping
+      // the single BEST record per student (a real password + active status win)
+      // so a thin/disabled placeholder can never shadow a usable login. Two-pass
+      // "pick best" so the outcome can't depend on array order.
+      var bestAcct = {};
+      data.userAccounts.forEach(function (u) {
+        if (!u || !u.studentDataId) return;
+        var cur = bestAcct[u.studentDataId];
+        if (!cur || Core.accountLoginScore(u) > Core.accountLoginScore(cur)) bestAcct[u.studentDataId] = u;
+      });
       data.userAccounts = data.userAccounts.filter(function (u) {
-        if (!u || !u.studentDataId) return true;
-        if (seenAcct[u.studentDataId]) {
-          var prev = seenAcct[u.studentDataId];
-          if ((u.password && !prev.password) || (u.status === 'active' && prev.status !== 'active')) {
-            seenAcct[u.studentDataId] = u;
-            return true;
-          }
-          return false;
-        }
-        seenAcct[u.studentDataId] = u;
-        return true;
+        if (!u || !u.studentDataId) return true;   // never touch system/staff accounts
+        return bestAcct[u.studentDataId] === u;    // keep only the winner for each student
       });
     }
 
@@ -303,12 +328,19 @@
       data.certDownloadApprovals.forEach(function (c) {
         if (c && c.studentId && idMap[c.studentId]) c.studentId = idMap[c.studentId];
       });
-      var seenCert = {};
+      // Keep the BEST approval per student: an approved record always beats an
+      // unapproved one, then most-recent wins. First-wins would let an older
+      // "not approved yet" row suppress a real approval and darken the download
+      // button after a sync.
+      var bestCert = {};
+      data.certDownloadApprovals.forEach(function (c) {
+        if (!c || !c.studentId) return;
+        var cur = bestCert[c.studentId];
+        if (!cur || Core.approvalScore(c) > Core.approvalScore(cur)) bestCert[c.studentId] = c;
+      });
       data.certDownloadApprovals = data.certDownloadApprovals.filter(function (c) {
         if (!c || !c.studentId) return true;
-        if (seenCert[c.studentId]) return false;
-        seenCert[c.studentId] = true;
-        return true;
+        return bestCert[c.studentId] === c;
       });
     }
 
@@ -606,6 +638,7 @@
     Core._parseArr(snapStore['voctrain_deletedStudentIds']).forEach(function (id) { if (id) deletedStudents[id] = true; });
 
     // 2) id-keyed array collections: union (add-missing), keep local on id clash.
+    var studentIdMap = {};   // oldStudentId -> keptStudentId, from the dedupe below
     Core.SNAPSHOT_COUNT_KEYS.forEach(function (key) {
       var isStudents = (key === 'voctrain_students');
       var snapArr = Core._parseArr(snapStore[key]);
@@ -627,6 +660,11 @@
         var dr = Core.dedupeStudents(merged);
         if (dr.removed > 0) changedHere = true;
         merged = dr.students;
+        // Capture which student ids were collapsed so we can re-point the accounts
+        // and cert approvals that reference them (below). Losing this map is what
+        // left some users unable to log in / download after a sync — their account
+        // still pointed at a student id the dedupe had just removed.
+        if (dr.idMap) { for (var _im in dr.idMap) { if (Object.prototype.hasOwnProperty.call(dr.idMap, _im)) studentIdMap[_im] = dr.idMap[_im]; } }
         result.recoveredStudents += added;
       }
       if (changedHere) {
@@ -635,6 +673,31 @@
         result.changed = true;
       }
     });
+
+    // 2b) Re-link every dependent collection through the student-id remap the
+    //     dedupe produced, so an account/approval/record that pointed at a
+    //     now-collapsed student id follows it to the surviving id instead of
+    //     dangling. This is the primary repair for "some users can't log in or
+    //     download certificates after syncing from the cloud".
+    if (Object.keys(studentIdMap).length) {
+      var dep = {
+        userAccounts: Core._parseArr(out['voctrain_users']),
+        certDownloadApprovals: Core._parseArr(out['voctrain_certDownloadApprovals']),
+        attendanceRecords: Core._parseArr(out['voctrain_attendance']),
+        examResults: Core._parseArr(out['voctrain_examResults']),
+        transcriptGrades: Core._parseArr(out['voctrain_transcriptGrades']),
+        certTranscriptRequests: Core._parseArr(out['voctrain_certTranscriptRequests'])
+      };
+      Core.relinkDependentData(studentIdMap, dep);
+      out['voctrain_users'] = JSON.stringify(dep.userAccounts);
+      out['voctrain_certDownloadApprovals'] = JSON.stringify(dep.certDownloadApprovals);
+      out['voctrain_attendance'] = JSON.stringify(dep.attendanceRecords);
+      out['voctrain_examResults'] = JSON.stringify(dep.examResults);
+      out['voctrain_transcriptGrades'] = JSON.stringify(dep.transcriptGrades);
+      out['voctrain_certTranscriptRequests'] = JSON.stringify(dep.certTranscriptRequests);
+      if (result.restoredKeys.indexOf('voctrain_users') === -1) result.restoredKeys.push('voctrain_users');
+      result.changed = true;
+    }
 
     // 3) Any other snapshot key absent or empty locally: restore (fill-only),
     //    excluding the count keys and tombstone keys already handled above.

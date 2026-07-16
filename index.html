@@ -4104,6 +4104,9 @@ body.vc-fullscreen-mode.vc-host-only-mode .video-grid .video-tile:not(.vc-hoston
             <div class="cloud-dropdown-item" onclick="restoreFromMasterBackup()">
               <span>🛟</span><span>Restore from Master Backup</span>
             </div>
+            <div class="cloud-dropdown-item" onclick="syncAllUserLoginFoldersToDrive()">
+              <span>👤</span><span>Build User Login Folders</span>
+            </div>
             <div class="cloud-dropdown-divider"></div>
             <div class="last-sync-info" id="lastSyncInfo">Last sync: Never</div>
             <div class="last-sync-info" id="lastSavedByInfo" style="color:var(--text-muted);font-size:0.7rem;">Last saved by: --</div>
@@ -6279,6 +6282,9 @@ function loadState() {
     if(idData) instructorData = idData;
     var cda = safeJsonParse(CESTISStore.getItem('voctrain_certDownloadApprovals'), null);
     if(cda) certDownloadApprovals = cda;
+    // Backfill a stable id on any legacy approval that lacks one, so it can
+    // propagate through the master-snapshot sync (which skips id-less records).
+    if(Array.isArray(certDownloadApprovals)) certDownloadApprovals.forEach(function(c){ if(c && c.studentId && !c.id) c.id = 'CDA-' + c.studentId; });
     var ct = safeJsonParse(CESTISStore.getItem('voctrain_certTemplates'), null);
     if(ct) certTemplates = ct;
     var sa = safeJsonParse(CESTISStore.getItem('voctrain_skillAreas'), null);
@@ -6417,28 +6423,27 @@ function relinkDependentData(idMap) {
     return;
   }
 
-  // userAccounts: re-link studentDataId, then dedup accounts for same student
-  var keptAccountByStudentId = {};
+  // Local scorers (mirror cestis-core.js) so the fallback collapses duplicates
+  // the same way: a real, active login always beats a disabled placeholder, and
+  // an approved certificate record always beats an unapproved one.
+  function _acctScore(u){ if(!u) return -1; var s=0; if(u.password) s+=8; if(u.status==='active') s+=4; else if(u.status!=='disabled') s+=2; if(u.twoFactorSecret) s+=1; if(u.email) s+=1; return s; }
+  function _apprScore(c){ if(!c) return -1; var a=c.approved?1:0; var t=Date.parse(c.approvedDate||c.lastDownloaded||c.approvedAt||'')||0; return a*1e15+t; }
+
+  // userAccounts: re-link studentDataId, then keep the single best account per student
   userAccounts.forEach(function(u) {
     if (u.studentDataId && idMap[u.studentDataId]) {
       u.studentDataId = idMap[u.studentDataId];
     }
   });
-  // Remove duplicate accounts for the same studentDataId (keep the one with most data)
-  var seenAcct = {};
+  var bestAcct = {};
+  userAccounts.forEach(function(u) {
+    if (!u || !u.studentDataId) return;
+    var cur = bestAcct[u.studentDataId];
+    if (!cur || _acctScore(u) > _acctScore(cur)) bestAcct[u.studentDataId] = u;
+  });
   userAccounts = userAccounts.filter(function(u) {
-    if (!u.studentDataId) return true;
-    if (seenAcct[u.studentDataId]) {
-      // Keep the one with a non-empty password/status, discard the thinner one
-      var prev = seenAcct[u.studentDataId];
-      if ((u.password && !prev.password) || (u.status === 'active' && prev.status !== 'active')) {
-        seenAcct[u.studentDataId] = u;
-        return true; // keep this, remove prev — but we can't remove prev retroactively
-      }
-      return false; // discard this duplicate
-    }
-    seenAcct[u.studentDataId] = u;
-    return true;
+    if (!u || !u.studentDataId) return true;
+    return bestAcct[u.studentDataId] === u;
   });
 
   // attendanceRecords: re-link studentId
@@ -6446,16 +6451,19 @@ function relinkDependentData(idMap) {
     if (r && r.studentId && idMap[r.studentId]) r.studentId = idMap[r.studentId];
   });
 
-  // certDownloadApprovals: re-link studentId, then dedup by studentId
+  // certDownloadApprovals: re-link studentId, then keep the best approval per student
   certDownloadApprovals.forEach(function(c) {
     if (c && c.studentId && idMap[c.studentId]) c.studentId = idMap[c.studentId];
   });
-  var seenCert = {};
+  var bestCert = {};
+  certDownloadApprovals.forEach(function(c) {
+    if (!c || !c.studentId) return;
+    var cur = bestCert[c.studentId];
+    if (!cur || _apprScore(c) > _apprScore(cur)) bestCert[c.studentId] = c;
+  });
   certDownloadApprovals = certDownloadApprovals.filter(function(c) {
     if (!c || !c.studentId) return true;
-    if (seenCert[c.studentId]) return false;
-    seenCert[c.studentId] = true;
-    return true;
+    return bestCert[c.studentId] === c;
   });
 
   // examResults: re-link studentId
@@ -7749,6 +7757,43 @@ var tfaVerifyCallback = null;
 
 function tfaEnabled(acct){ return !!(acct && acct.twoFactorEnabled && acct.twoFactorSecret); }
 
+// Merge two-step-verification state from another device's copy of an account
+// (cloudAcct) into the local copy. The incremental sync merges only a whitelist
+// of fields, and 2FA was never on it — so enabling 2FA on one device never
+// reached other devices and appeared "not to work". This copies the whole 2FA
+// block, newest-write wins (via twoFactorUpdatedAt), and UNIONS the backup codes
+// so a code spent on any device can't be reused on another. Returns true if the
+// local record changed. Pure enough to unit test.
+function mergeTwoFactorState(localAcct, cloudAcct){
+  if(!localAcct || !cloudAcct) return false;
+  var changed = false;
+  var lt = Date.parse(localAcct.twoFactorUpdatedAt || '') || 0;
+  var ct = Date.parse(cloudAcct.twoFactorUpdatedAt || '') || 0;
+  var cloudHas2fa = !!cloudAcct.twoFactorSecret || cloudAcct.twoFactorEnabled === true;
+  var localHas2fa = !!localAcct.twoFactorSecret || localAcct.twoFactorEnabled === true;
+  // Adopt the cloud enabled/secret when its 2FA state is strictly newer, or when
+  // this device has no 2FA state at all yet (first time it sees the account).
+  if((cloudHas2fa || cloudAcct.twoFactorUpdatedAt) && (ct > lt || (!localHas2fa && cloudHas2fa))){
+    if(localAcct.twoFactorEnabled !== !!cloudAcct.twoFactorEnabled){ localAcct.twoFactorEnabled = !!cloudAcct.twoFactorEnabled; changed = true; }
+    if((cloudAcct.twoFactorSecret || null) !== (localAcct.twoFactorSecret || null)){ localAcct.twoFactorSecret = cloudAcct.twoFactorSecret || null; changed = true; }
+    if(cloudAcct.twoFactorUpdatedAt && cloudAcct.twoFactorUpdatedAt !== localAcct.twoFactorUpdatedAt){ localAcct.twoFactorUpdatedAt = cloudAcct.twoFactorUpdatedAt; changed = true; }
+  }
+  // Union backup codes regardless of direction, OR-ing the "used" flag so a
+  // one-time code consumed anywhere is burned everywhere.
+  if(Array.isArray(cloudAcct.backupCodes)){
+    if(!Array.isArray(localAcct.backupCodes)){ localAcct.backupCodes = []; changed = true; }
+    var byCode = {};
+    localAcct.backupCodes.forEach(function(bc){ if(bc && bc.code) byCode[bc.code] = bc; });
+    cloudAcct.backupCodes.forEach(function(cbc){
+      if(!cbc || !cbc.code) return;
+      var ex = byCode[cbc.code];
+      if(!ex){ localAcct.backupCodes.push({ code: cbc.code, used: !!cbc.used }); byCode[cbc.code] = localAcct.backupCodes[localAcct.backupCodes.length-1]; changed = true; }
+      else if(cbc.used && !ex.used){ ex.used = true; changed = true; }
+    });
+  }
+  return changed;
+}
+
 function tfaRandomChars(chars, len){
   var out = '';
   try {
@@ -7821,6 +7866,7 @@ function tfaSubmitVerify(){
       return;
     }
     rec.backupCodes[idx].used = true; // one-time use
+    rec.twoFactorUpdatedAt = new Date().toISOString(); // burn this code everywhere on next sync
     saveUserAccounts();
   } else {
     var code = (document.getElementById('tfaVerifyCode').value || '').trim();
@@ -7952,6 +7998,7 @@ function tfaConfirmSetup(){
   acct.twoFactorEnabled = true;
   acct.twoFactorSecret = tfaPendingSecret;
   acct.backupCodes = tfaPendingBackupCodes;
+  acct.twoFactorUpdatedAt = new Date().toISOString(); // let cross-device sync resolve newest-wins
   if(currentLoggedInUser && currentLoggedInUser.id === acct.id) currentLoggedInUser = acct;
   saveUserAccounts();
   tfaPendingSecret = null;
@@ -7984,6 +8031,7 @@ function tfaRegenerateBackupCodes(){
   tfaOpenVerify(acct, { title: 'Confirm Code Regeneration', subtitle: 'Enter your current 6-digit code to replace all backup codes. Existing codes will stop working.', allowBackup: false }, function(){
     tfaPendingBackupCodes = tfaGenerateBackupCodes();
     acct.backupCodes = tfaPendingBackupCodes;
+    acct.twoFactorUpdatedAt = new Date().toISOString();
     saveUserAccounts();
     tfaShowBackupCodesModal();
     tfaRenderManage();
@@ -7996,6 +8044,7 @@ function tfaBeginDisable(){
     acct.twoFactorEnabled = false;
     acct.twoFactorSecret = null;
     acct.backupCodes = null;
+    acct.twoFactorUpdatedAt = new Date().toISOString(); // propagate the disable across devices
     if(currentLoggedInUser && currentLoggedInUser.id === acct.id) currentLoggedInUser = acct;
     saveUserAccounts();
     tfaRenderManage();
@@ -22946,6 +22995,129 @@ async function loadPerUserBackup() {
   }
 }
 
+// ============================================================================
+// "USER LOGIN" DRIVE FOLDER — one named sub-folder per user account, nested
+// under the main backup folder (the folder from GOOGLE_DRIVE_CONFIG.FOLDER_ID),
+// so every user's data lives in a clearly labelled folder that survives to a
+// future local/self-hosted deployment. Contents are the SAME hashed account
+// record already kept in the main backup (never a plaintext password — the
+// serializer strips the in-memory _plaintextPw cache). This is the Google Drive
+// half of the "User Login" structure; the repo half is documented in the
+// repository's own "User Login/README.md".
+// ============================================================================
+var USER_LOGIN_FOLDER_NAME = 'User Login';
+var _userLoginRootFolderId = null;                 // cached id of the "User Login" folder
+var _userLoginSubfolderIds = {};                   // accountId -> cached per-user subfolder id
+
+// Find (or create) a Drive folder by name under a given parent; returns its id.
+async function driveFindOrCreateFolder(name, parentId, token) {
+  if (!name || !parentId || !token) return null;
+  var safe = String(name).replace(/'/g, "\\'");
+  var query = encodeURIComponent("name='" + safe + "' and '" + parentId + "' in parents and mimeType='application/vnd.google-apps.folder' and trashed=false");
+  var searchResp = await fetch('https://www.googleapis.com/drive/v3/files?q=' + query + '&fields=files(id,name)', {
+    headers: { 'Authorization': 'Bearer ' + token }
+  });
+  if (searchResp.ok) {
+    var data = await searchResp.json();
+    if (data.files && data.files.length > 0) return data.files[0].id;
+  }
+  var createResp = await fetch('https://www.googleapis.com/drive/v3/files?fields=id', {
+    method: 'POST',
+    headers: { 'Authorization': 'Bearer ' + token, 'Content-Type': 'application/json' },
+    body: JSON.stringify({ name: String(name), mimeType: 'application/vnd.google-apps.folder', parents: [parentId] })
+  });
+  if (createResp.ok) { var r = await createResp.json(); return r.id; }
+  return null;
+}
+
+// A stable, human-readable, filesystem-safe folder name for an account. Uses the
+// login handle (username or email) and appends the account id so two users who
+// share a display name never collide.
+function userLoginFolderName(account) {
+  if (!account) return null;
+  var base = account.username || account.email || account.name || account.id || 'user';
+  base = String(base).replace(/[\/\\:*?"<>| -]/g, ' ').replace(/\s+/g, ' ').trim();
+  if (!base) base = 'user';
+  var idPart = String(account.id || '').replace(/[\/\\:*?"<>| -]/g, '');
+  return idPart ? (base + ' (' + idPart + ')') : base;
+}
+
+// The account record we store — the SAME shape as in the main backup, run through
+// stripSecretFields so the transient plaintext cache can never be written. The
+// stored password is the SHA-256 hash, exactly as it already lives in the backup.
+function buildUserLoginRecord(account) {
+  var clean = JSON.parse(JSON.stringify(account, stripSecretFields));
+  return {
+    version: '1.0',
+    kind: 'cestis-user-login',
+    savedAt: new Date().toISOString(),
+    note: 'Hashed credentials only. No plaintext password is ever stored here.',
+    account: clean
+  };
+}
+
+async function driveUploadJsonToFolder(fileName, obj, folderId, token) {
+  var blob = new Blob([JSON.stringify(obj, null, 2)], { type: 'application/json' });
+  var q = encodeURIComponent("name='" + String(fileName).replace(/'/g, "\\'") + "' and '" + folderId + "' in parents and trashed=false");
+  var sResp = await fetch('https://www.googleapis.com/drive/v3/files?q=' + q + '&fields=files(id)', { headers: { 'Authorization': 'Bearer ' + token } });
+  var existingId = null;
+  if (sResp.ok) { var sd = await sResp.json(); if (sd.files && sd.files.length) existingId = sd.files[0].id; }
+  if (existingId) {
+    await fetch('https://www.googleapis.com/upload/drive/v3/files/' + existingId + '?uploadType=media', {
+      method: 'PATCH', headers: { 'Authorization': 'Bearer ' + token, 'Content-Type': 'application/json' }, body: blob
+    });
+  } else {
+    var metadata = { name: fileName, parents: [folderId], mimeType: 'application/json' };
+    var form = new FormData();
+    form.append('metadata', new Blob([JSON.stringify(metadata)], { type: 'application/json' }));
+    form.append('file', blob);
+    await fetch('https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart&fields=id', {
+      method: 'POST', headers: { 'Authorization': 'Bearer ' + token }, body: form
+    });
+  }
+}
+
+// Ensure a single account has its named sub-folder under "User Login" and its
+// hashed record written into it. Safe to call opportunistically — returns
+// quietly when offline / not signed in.
+async function syncUserLoginFolderToDrive(account) {
+  if (!account || !isCloudConnected || !googleAccessToken) return false;
+  try {
+    if (!_userLoginRootFolderId) {
+      _userLoginRootFolderId = await driveFindOrCreateFolder(USER_LOGIN_FOLDER_NAME, GOOGLE_DRIVE_CONFIG.FOLDER_ID, googleAccessToken);
+    }
+    if (!_userLoginRootFolderId) return false;
+    var subId = _userLoginSubfolderIds[account.id];
+    if (!subId) {
+      subId = await driveFindOrCreateFolder(userLoginFolderName(account), _userLoginRootFolderId, googleAccessToken);
+      if (subId) _userLoginSubfolderIds[account.id] = subId;
+    }
+    if (!subId) return false;
+    await driveUploadJsonToFolder('account.json', buildUserLoginRecord(account), subId, googleAccessToken);
+    return true;
+  } catch (e) {
+    console.warn('[UserLogin] Could not sync folder for account ' + (account && account.id) + ':', e);
+    return false;
+  }
+}
+
+// Backfill a named sub-folder for EVERY account (admin action). Sequential to
+// stay well under Drive rate limits.
+async function syncAllUserLoginFoldersToDrive() {
+  if (!isCloudConnected || !googleAccessToken) {
+    if (typeof showToast === 'function') showToast('Connect Google Drive first to build the User Login folders.', 'warning');
+    return { ok: 0, fail: 0 };
+  }
+  var ok = 0, fail = 0;
+  for (var i = 0; i < userAccounts.length; i++) {
+    var done = await syncUserLoginFolderToDrive(userAccounts[i]);
+    if (done) ok++; else fail++;
+  }
+  console.log('[UserLogin] Backfilled ' + ok + ' user folders (' + fail + ' skipped/failed).');
+  if (typeof showToast === 'function') showToast('User Login folders synced: ' + ok + ' updated.' + (fail ? ' ' + fail + ' skipped.' : ''));
+  return { ok: ok, fail: fail };
+}
+
 // Silent merge from a backup file (no confirmations, no alerts, no page reload)
 async function silentMergeFromBackup(fileId) {
   try {
@@ -22998,6 +23170,10 @@ async function silentMergeFromBackup(fileId) {
           if (cloudUser.role && cloudUser.role !== localMatch.role) { localMatch.role = cloudUser.role; userAccountsChanged = true; }
           if (cloudUser.studentDataId && !localMatch.studentDataId) { localMatch.studentDataId = cloudUser.studentDataId; userAccountsChanged = true; }
           if (cloudUser.registeredVia && !localMatch.registeredVia) { localMatch.registeredVia = cloudUser.registeredVia; userAccountsChanged = true; }
+          // Two-step-verification state (secret, enabled flag, backup codes) —
+          // WITHOUT this, enabling 2FA on one device never reached devices that
+          // already had the account row, so 2FA "didn't work" across devices.
+          if (mergeTwoFactorState(localMatch, cloudUser)) userAccountsChanged = true;
         } else {
           // New account — add it (dropping any plaintext cache an old backup leaked)
           delete cloudUser._plaintextPw;
@@ -23050,15 +23226,25 @@ async function silentMergeFromBackup(fileId) {
       // Create disabled user accounts for any orphaned students (no linked user account)
       students.forEach(function(s) {
         if (_ds[s.id]) return;
+        var derivedUsername = (s.name || '').toLowerCase().replace(/\s+/g, '.');
         var hasAccount = userAccounts.find(function(u) {
-          return u.studentDataId === s.id || (u.role === 'student' && u.name === s.name);
+          // Also skip when the derived username is already taken, so this
+          // placeholder can never shadow a real account at login (findLoginAccount
+          // returns the first username/email match).
+          return u.studentDataId === s.id
+            || (u.role === 'student' && u.name === s.name)
+            || (derivedUsername && u.username && u.username.toLowerCase() === derivedUsername);
         });
         if (!hasAccount) {
           userAccounts.push({
-            id: 'USR-SYNC-' + Date.now() + '-' + Math.floor(Math.random() * 1000),
+            // Deterministic id keyed to the student, so the same placeholder is
+            // never re-minted with a fresh random id on each device (which would
+            // never dedupe across the id-union sync and could pile up disabled
+            // rows that block the real login).
+            id: 'USR-SYNC-' + s.id,
             name: s.name,
             role: 'student',
-            username: s.name.toLowerCase().replace(/\s+/g, '.'),
+            username: derivedUsername,
             password: '',
             email: '',
             programme: s.course || '',
@@ -23943,6 +24129,14 @@ async function autoSaveToAllFolders() {
       console.warn('[AutoSave] Per-user backup error:', e);
     }
 
+    // Keep this user's named "User Login" sub-folder (in the main Drive backup
+    // folder) up to date with their current hashed account record.
+    try {
+      if (currentLoggedInUser) await syncUserLoginFolderToDrive(currentLoggedInUser);
+    } catch (e) {
+      console.warn('[AutoSave] User Login folder sync error:', e);
+    }
+
     // Save assignments to dedicated Assignments Drive folder
     try {
       await saveAssignmentsToDrive();
@@ -24500,6 +24694,8 @@ function cloudFetchAccountData(interactive) {
         if (ca.role && ca.role !== local.role) local.role = ca.role;
         if (ca.programme !== undefined && ca.programme !== local.programme) local.programme = ca.programme;
         if (ca.studentDataId && !local.studentDataId) local.studentDataId = ca.studentDataId;
+        // Carry two-step-verification state across devices (see mergeTwoFactorState).
+        mergeTwoFactorState(local, ca);
       } else {
         // Drop any plaintext cache an old backup leaked before adding
         delete ca._plaintextPw;
@@ -33704,6 +33900,7 @@ function approveCertDownload(studentId) {
     existing.approvedBy = 'Admin';
   } else {
     certDownloadApprovals.push({
+      id: 'CDA-' + student.id, // stable id so the approval can ride the master snapshot sync
       studentId: student.id, name: student.name, course: student.course,
       certNo: student.certNo, certDate: student.certDate,
       approved: true, approvedDate: new Date().toISOString(), approvedBy: 'Admin',

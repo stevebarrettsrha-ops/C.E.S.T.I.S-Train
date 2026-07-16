@@ -1,0 +1,13 @@
+{
+  "version": "1.0",
+  "kind": "cestis-user-profile",
+  "note": "PLACEHOLDER ONLY — not real user data. Real profile.json files are never committed to this public repo.",
+  "profile": {
+    "studentDataId": "STU-XXXXXXXX",
+    "name": "Example User",
+    "course": "Welding & Fabrication",
+    "phone": "",
+    "address": "",
+    "notes": ""
+  }
+}

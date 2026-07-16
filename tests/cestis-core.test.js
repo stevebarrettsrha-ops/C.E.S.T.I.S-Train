@@ -505,4 +505,73 @@ test('courseDuration.prunePermissions drops expired grants only', function () {
   assert.deepStrictEqual(pruned.map(function (p) { return p.expiresAtMs; }), [1500, 2000]);
 });
 
+/* ---- login/cert survival across sync (regression) --------------------- */
+console.log('\ncestis-core account & approval survival');
+
+test('accountLoginScore: a real active login always beats a disabled placeholder', function () {
+  var real = { password: 'hash', status: 'active', email: 'a@b.com' };
+  var placeholder = { password: '', status: 'disabled' };
+  assert.ok(Core.accountLoginScore(real) > Core.accountLoginScore(placeholder));
+  // pending beats disabled; both password-less
+  assert.ok(Core.accountLoginScore({ password: '', status: 'pending' }) > Core.accountLoginScore(placeholder));
+});
+
+test('approvalScore: approved always beats not-approved, then recency wins', function () {
+  var approved = { approved: true, approvedDate: '2026-01-01T00:00:00Z' };
+  var notApproved = { approved: false, approvedDate: '2026-09-01T00:00:00Z' };
+  assert.ok(Core.approvalScore(approved) > Core.approvalScore(notApproved), 'approved beats newer-but-unapproved');
+  var older = { approved: true, approvedDate: '2026-01-01T00:00:00Z' };
+  var newer = { approved: true, approvedDate: '2026-06-01T00:00:00Z' };
+  assert.ok(Core.approvalScore(newer) > Core.approvalScore(older), 'newer approval wins the tie');
+});
+
+test('relinkDependentData: keeps the best account per student regardless of order', function () {
+  var real = { id: 'USR-REAL', role: 'student', username: 'jsmith', password: 'hash', status: 'active', studentDataId: 'STU-1' };
+  var placeholder = { id: 'USR-SYNC-STU-1', role: 'student', username: 'john.smith', password: '', status: 'disabled', studentDataId: 'STU-1' };
+  // placeholder FIRST — old first-wins logic would have kept it and blocked login
+  var d1 = { userAccounts: [placeholder, real] };
+  Core.relinkDependentData({ 'ignore': 'x' }, d1);
+  assert.strictEqual(d1.userAccounts.length, 1);
+  assert.strictEqual(d1.userAccounts[0].id, 'USR-REAL');
+  // real FIRST — same outcome, proving order independence
+  var d2 = { userAccounts: [Object.assign({}, real), Object.assign({}, placeholder)] };
+  Core.relinkDependentData({ 'ignore': 'x' }, d2);
+  assert.strictEqual(d2.userAccounts.length, 1);
+  assert.strictEqual(d2.userAccounts[0].id, 'USR-REAL');
+});
+
+test('relinkDependentData: keeps the approved certificate approval, not the first', function () {
+  var unapproved = { studentId: 'STU-1', approved: false, approvedDate: '2026-01-01T00:00:00Z' };
+  var approved = { studentId: 'STU-1', approved: true, approvedDate: '2026-02-01T00:00:00Z' };
+  var d = { certDownloadApprovals: [unapproved, approved] };
+  Core.relinkDependentData({ 'ignore': 'x' }, d);
+  assert.strictEqual(d.certDownloadApprovals.length, 1);
+  assert.strictEqual(d.certDownloadApprovals[0].approved, true);
+});
+
+test('reconcileSnapshot: re-links accounts & approvals through collapsed student ids', function () {
+  // Local device: student STU-OLD, plus an account and an approval pointing at it.
+  // Another device's snapshot has the SAME person under STU-NEW with a newer
+  // lastModified, so the dedupe keeps STU-NEW and drops STU-OLD.
+  var local = {
+    voctrain_students: JSON.stringify([{ id: 'STU-OLD', name: 'John Smith', course: 'Welding & Fabrication', lastModified: '2026-01-01T00:00:00Z' }]),
+    voctrain_users: JSON.stringify([{ id: 'USR-1', role: 'student', username: 'jsmith', password: 'hash', status: 'active', studentDataId: 'STU-OLD' }]),
+    voctrain_certDownloadApprovals: JSON.stringify([{ id: 'CDA-STU-OLD', studentId: 'STU-OLD', approved: true }])
+  };
+  var snapshot = { store: {
+    voctrain_students: JSON.stringify([{ id: 'STU-NEW', name: 'John Smith', course: 'Welding & Fabrication', lastModified: '2026-06-01T00:00:00Z' }])
+  } };
+  var res = Core.reconcileSnapshot(snapshot, local);
+  var students = JSON.parse(res.store.voctrain_students);
+  var accounts = JSON.parse(res.store.voctrain_users);
+  var approvals = JSON.parse(res.store.voctrain_certDownloadApprovals);
+  assert.strictEqual(students.length, 1, 'the two duplicate students collapse to one');
+  var survivingId = students[0].id;
+  assert.strictEqual(accounts[0].studentDataId, survivingId, 'account follows the surviving student id (not left dangling)');
+  assert.strictEqual(approvals[0].studentId, survivingId, 'approval follows the surviving student id');
+  // The account must still resolve to a real student — the reported login/cert bug
+  // was exactly this link going stale after a sync.
+  assert.ok(students.some(function (s) { return s.id === accounts[0].studentDataId; }), 'no dangling account link');
+});
+
 console.log('\nAll ' + passed + ' tests passed.');

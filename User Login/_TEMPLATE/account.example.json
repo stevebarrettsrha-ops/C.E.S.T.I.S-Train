@@ -1,0 +1,20 @@
+{
+  "version": "1.0",
+  "kind": "cestis-user-login",
+  "note": "PLACEHOLDER ONLY — not a real account. Real account.json files are never committed to this public repo. The stored password is always a SHA-256 hash, never plaintext.",
+  "account": {
+    "id": "USR-XXXX",
+    "name": "Example User",
+    "role": "student",
+    "username": "example.user",
+    "email": "recovery@example.com",
+    "password": "<sha-256-hash-of-password>",
+    "programme": "Welding & Fabrication",
+    "status": "active",
+    "studentDataId": "STU-XXXXXXXX",
+    "twoFactorEnabled": false,
+    "twoFactorSecret": null,
+    "backupCodes": [],
+    "createdAt": "2026-01-01"
+  }
+}
