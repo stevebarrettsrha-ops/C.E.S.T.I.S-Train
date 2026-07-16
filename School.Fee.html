@@ -3096,16 +3096,42 @@
             CESTISStore.setItem('cestiUsers', JSON.stringify(users));
         }
 
+        // ---- Password hashing (PBKDF2 + per-user salt), ported from the main LMS ----
+        // These pages historically stored PLAINTEXT passwords. New/reset passwords are
+        // now PBKDF2-hashed; existing plaintext still verifies and is transparently
+        // upgraded on the next successful login. No bulk migration on load — that keeps
+        // a rollout window from locking out a not-yet-updated device that still does a
+        // plaintext compare.
+        var PBKDF2_ITERATIONS = 210000;
+        function _bufToHex(buf){ var b=new Uint8Array(buf),s=''; for(var i=0;i<b.length;i++) s+=b[i].toString(16).padStart(2,'0'); return s; }
+        function _hexToBuf(hex){ var n=Math.floor(hex.length/2),o=new Uint8Array(n); for(var i=0;i<n;i++) o[i]=parseInt(hex.substr(i*2,2),16); return o; }
+        async function _pbkdf2Hex(pw,salt,iter){ var k=await crypto.subtle.importKey('raw',new TextEncoder().encode(String(pw)),{name:'PBKDF2'},false,['deriveBits']); var bits=await crypto.subtle.deriveBits({name:'PBKDF2',salt:salt,iterations:iter,hash:'SHA-256'},k,256); return _bufToHex(bits); }
+        async function hashPassword(pw){ try{ var salt=crypto.getRandomValues(new Uint8Array(16)); return 'pbkdf2$'+PBKDF2_ITERATIONS+'$'+_bufToHex(salt)+'$'+(await _pbkdf2Hex(pw,salt,PBKDF2_ITERATIONS)); }catch(e){ return String(pw); } }
+        function isHashedPassword(pw){ return typeof pw==='string' && pw.indexOf('pbkdf2$')===0; }
+        async function verifyPassword(pw,stored){
+            if(typeof stored!=='string') return false;
+            if(stored.indexOf('pbkdf2$')===0){
+                var p=stored.split('$'); if(p.length!==4) return false;
+                var iter=parseInt(p[1],10)||PBKDF2_ITERATIONS;
+                var c=await _pbkdf2Hex(pw,_hexToBuf(p[2]),iter);
+                if(c.length!==p[3].length) return false;
+                var d=0; for(var i=0;i<c.length;i++) d|=c.charCodeAt(i)^p[3].charCodeAt(i); return d===0;
+            }
+            return String(pw)===stored; // plaintext (legacy)
+        }
+        async function maybeUpgradePassword(user,plaintext){ try{ if(!user||isHashedPassword(user.password)) return; user.password=await hashPassword(plaintext); saveUsers(); }catch(e){} }
+
         // Handle login
-        function handleLogin(event) {
+        async function handleLogin(event) {
             event.preventDefault();
 
             const username = document.getElementById('loginUsername').value.trim();
             const password = document.getElementById('loginPassword').value;
 
-            const user = users.find(u => u.username === username && u.password === password);
-
+            const candidate = users.find(u => u.username === username);
+            const user = (candidate && await verifyPassword(password, candidate.password)) ? candidate : null;
             if (user) {
+                await maybeUpgradePassword(user, password);
                 // Check if user has 2FA enabled
                 if (user.twoFactorEnabled && user.twoFactorSecret) {
                     // Store user temporarily and show 2FA step
@@ -3530,7 +3556,7 @@
         }
 
         // Reset password
-        function resetPassword() {
+        async function resetPassword() {
             const newPassword = document.getElementById('newPasswordInput').value;
             const confirmPassword = document.getElementById('confirmPasswordInput').value;
 
@@ -3558,7 +3584,7 @@
             // Update user password
             const userIndex = users.findIndex(u => u.id === pendingResetUser.id);
             if (userIndex !== -1) {
-                users[userIndex].password = newPassword;
+                users[userIndex].password = await hashPassword(newPassword);
                 saveUsers();
 
                 alert('Password reset successful! You can now login with your new password.');
@@ -3604,7 +3630,7 @@
         }
 
         // Add new user
-        function addNewUser() {
+        async function addNewUser() {
             if (currentUser.role !== 'Admin') {
                 alert('⚠️ Only administrators can add new users');
                 return;
@@ -3638,7 +3664,7 @@
                 id: 'USER' + Date.now(),
                 fullName: fullName,
                 username: username,
-                password: password,
+                password: await hashPassword(password),
                 role: role,
                 email: email,
                 department: department,
@@ -3732,7 +3758,7 @@
         }
 
         // Save user edits
-        function saveUserEdit() {
+        async function saveUserEdit() {
             if (currentUser.role !== 'Admin') {
                 alert('⚠️ Only administrators can edit users');
                 return;
@@ -3785,7 +3811,7 @@
             user.fullName = fullName;
             user.username = username;
             if (password) {
-                user.password = password;
+                user.password = await hashPassword(password);
             }
             user.role = role;
             user.email = email;
@@ -3850,7 +3876,9 @@
             passwordVisible = !passwordVisible;
             
             if (passwordVisible) {
-                passwordElement.textContent = actualPassword;
+                // Hashed passwords are one-way — there's nothing to reveal (and we
+                // must never display the hash as if it were the password).
+                passwordElement.textContent = isHashedPassword(actualPassword) ? '🔒 Protected (encrypted — not recoverable)' : actualPassword;
                 document.getElementById('togglePasswordIcon').textContent = '🙈';
                 document.getElementById('togglePasswordText').textContent = 'Hide Password';
             } else {
