@@ -4977,7 +4977,7 @@ function addNotification(text, type, icon, forRoles) {
   type = type || 'info';
   var icons = {success:'\u2705',warning:'\u26A0\uFE0F',info:'\uD83D\uDD14',exam:'\uD83D\uDCDD',student:'\uD83D\uDC64',cert:'\uD83C\uDF93',announce:'\uD83D\uDCE2',calendar:'\uD83D\uDCC5',attendance:'\uD83D\uDCCB',resource:'\uD83D\uDCC1',grade:'\uD83C\uDF1F'};
   var notif = {
-    id: Date.now() + Math.random(),
+    id: cestisGenId('NOTIF-'),
     text: text,
     timestamp: Date.now(),
     time: 'Just now',
@@ -5017,7 +5017,7 @@ function addNotificationForUser(text, type, icon, userId, role) {
   type = type || 'info';
   var icons = {success:'\u2705',warning:'\u26A0\uFE0F',info:'\uD83D\uDD14',dm:'\uD83D\uDCAC',follow:'\uD83D\uDC65'};
   var notif = {
-    id: Date.now() + Math.random(),
+    id: cestisGenId('NOTIF-'),
     text: text,
     timestamp: Date.now(),
     time: 'Just now',
@@ -7125,12 +7125,11 @@ initLmsChatData();
 lmsChatEnsureMembership();
 
 function getNextUserId() {
-  var maxNum = 0;
-  userAccounts.forEach(function(u) {
-    var n = parseInt(u.id.replace('USR-',''));
-    if(n > maxNum) maxNum = n;
-  });
-  return 'USR-' + String(maxNum + 1).padStart(3,'0');
+  // Collision-resistant across devices. The old sequential "USR-<max+1>" scheme
+  // meant two admins adding a user offline both got the same id, and the sync
+  // merge then collapsed the two accounts into one (a user silently lost their
+  // login). A crypto-random id can't collide that way.
+  return cestisGenId('USR-');
 }
 
 function toggleUserFormFields() {
@@ -8752,7 +8751,7 @@ async function submitRegistration() {
 
   // Create the user account with pending status
   var newUser = {
-    id: 'USR-' + Date.now(),
+    id: cestisGenId('USR-'),
     name: name,
     role: role,
     username: email.split('@')[0],
@@ -8815,7 +8814,7 @@ function createStudentDataForAccount(userAccount) {
   var matchedInstructor = instructorData.find(function(ins){ return ins.course && instructorCourseMatch(prog, ins.course); });
   var assignedInstructor = matchedInstructor ? matchedInstructor.name : (instructorData.length > 0 ? instructorData[0].name : '');
   var newStudent = {
-    id: 'STU-' + Date.now(),
+    id: cestisGenId('STU-'),
     name: userAccount.name,
     stage: 'training',
     course: prog,
@@ -8844,7 +8843,7 @@ function createStudentDataForAccount(userAccount) {
 
 function createInstructorDataForAccount(userAccount) {
   var newInstructor = {
-    id: 'INS-' + Date.now(),
+    id: cestisGenId('INS-'),
     name: userAccount.name,
     course: userAccount.programme || 'Welding',
     email: userAccount.email,
@@ -11329,7 +11328,7 @@ function createInstructorAnnouncement() {
   if(document.getElementById('iAnnRoleAdminStaff')?.checked) targetRoles.push('adminstaff');
   if(targetRoles.length === 0) { alert('Please select at least one target audience'); return; }
   announcements.unshift({
-    id: Date.now(), title, body, priority, date: localDateStr(), author: currentInstructor.name, forRoles: targetRoles
+    id: cestisGenId('ANN-'), title, body, priority, date: localDateStr(), author: currentInstructor.name, forRoles: targetRoles
   });
   document.getElementById('iAnnTitle').value = '';
   document.getElementById('iAnnBody').value = '';
@@ -11366,7 +11365,7 @@ function renderInstructorAnnouncements() {
       <div class="ann-footer">
         <span style="font-size:11px;color:var(--text-muted);">By ${a.author}</span>
         <span style="display:flex;gap:4px;align-items:center;margin-left:8px;">${audienceBadges}</span>
-        ${a.author === (currentInstructor ? currentInstructor.name : '') ? '<button class="btn btn-sm btn-danger" style="margin-left:auto;" onclick="deleteAnnouncement(' + a.id + ');renderInstructorAnnouncements();">Delete</button>' : ''}
+        ${a.author === (currentInstructor ? currentInstructor.name : '') ? '<button class="btn btn-sm btn-danger" style="margin-left:auto;" onclick="deleteAnnouncement(\'' + a.id + '\');renderInstructorAnnouncements();">Delete</button>' : ''}
       </div>
     </div>
   `}).join('');
@@ -13408,7 +13407,7 @@ function createClassSession() {
   if(!time) { showToast('Please select a start time'); return; }
 
   const session = {
-    id: 'CS-' + Date.now(),
+    id: cestisGenId('CS-'),
     name: name,
     course: course,
     date: date,
@@ -13645,7 +13644,7 @@ function createAdminMeeting() {
   if(!time) { showToast('Please select a start time'); return; }
 
   var meeting = {
-    id: 'AM-' + Date.now(),
+    id: cestisGenId('AM-'),
     title: title,
     description: description,
     date: date,
@@ -13873,7 +13872,7 @@ function createAssignment() {
 
   Promise.all(filePromises).then(function(attachments) {
     const assignment = {
-      id: 'ASN-' + Date.now(),
+      id: cestisGenId('ASN-'),
       title: title,
       type: type,
       course: assignCourse,
@@ -14342,7 +14341,7 @@ function submitStudentAssignment() {
     }
 
     var submission = {
-      id: 'SUB-' + Date.now(),
+      id: cestisGenId('SUB-'),
       assignmentId: assignmentId,
       studentId: s.id,
       studentName: s.name,
@@ -14787,7 +14786,7 @@ function uploadResource() {
 
   const ins = currentInstructor;
   const resource = {
-    id: 'RES-' + Date.now(),
+    id: cestisGenId('RES-'),
     name: name,
     category: cat,
     type: type,
@@ -14821,7 +14820,7 @@ function createResourceFolder() {
 
   const ins = currentInstructor;
   const folder = {
-    id: 'FLD-' + Date.now(),
+    id: cestisGenId('FLD-'),
     name: name,
     category: cat,
     type: 'Folder',
@@ -15190,7 +15189,7 @@ async function scanDriveFolderForResources(courseName) {
       var viewLink = file.webViewLink || ('https://drive.google.com/file/d/' + file.id + '/view');
 
       driveResources.push({
-        id: 'DRES-' + Date.now() + '-' + imported,
+        id: cestisGenId('DRES-') + '-' + imported,
         resourceId: resourceId,
         name: displayName,
         course: courseName,
@@ -15460,7 +15459,7 @@ async function uploadResourceToDrive() {
     barEl.style.width = '90%';
 
     const resource = {
-      id: 'DRES-' + Date.now(),
+      id: cestisGenId('DRES-'),
       resourceId: resourceId,
       name: name,
       course: course,
@@ -17064,7 +17063,7 @@ async function addStudent() {
   if (!dupAccount) {
     var defaultPw = await hashPassword(name.split(' ')[0].toLowerCase() + '123');
     var newAccount = {
-      id: 'USR-' + Date.now(),
+      id: cestisGenId('USR-'),
       name: name,
       role: 'student',
       username: username,
@@ -18646,7 +18645,7 @@ function goToExamStep2() {
 }
 
 function addExamQuestion(type) {
-  var q = { id:'Q-'+Date.now()+'-'+Math.random().toString(36).substr(2,4), type:type, text:'', points:1 };
+  var q = { id: cestisGenId('Q-')+'-'+Math.random().toString(36).substr(2,4), type:type, text:'', points:1 };
   if(type==='mcq') { q.options=['Option A','Option B','Option C','Option D']; q.correctAnswer=0; }
   else if(type==='tf') { q.correctAnswer=true; }
   else if(type==='fill') { q.correctAnswer=''; }
@@ -19583,7 +19582,7 @@ function submitExam() {
   var exam = exams[s.examIdx];
 
   var result = {
-    id: 'RES-'+Date.now(),
+    id: cestisGenId('RES-'),
     examId: s.examId,
     studentId: currentStudent.id,
     studentName: currentStudent.name,
@@ -20144,7 +20143,7 @@ function createAnnouncement() {
   if(document.getElementById('annRoleAdminStaff')?.checked) targetRoles.push('adminstaff');
   if(targetRoles.length === 0) { alert('Please select at least one target audience'); return; }
   announcements.unshift({
-    id: Date.now(), title, body, priority, date: localDateStr(), author, forRoles: targetRoles
+    id: cestisGenId('ANN-'), title, body, priority, date: localDateStr(), author, forRoles: targetRoles
   });
   document.getElementById('annTitle').value = '';
   document.getElementById('annBody').value = '';
@@ -20185,7 +20184,7 @@ function renderAnnouncements() {
       <div class="ann-footer">
         <span style="font-size:11px;color:var(--text-muted);">By ${a.author}</span>
         <span style="display:flex;gap:4px;align-items:center;margin-left:8px;">${audienceBadges}</span>
-        <button class="btn btn-sm btn-danger" style="margin-left:auto;" onclick="deleteAnnouncement(${a.id})">Delete</button>
+        <button class="btn btn-sm btn-danger" style="margin-left:auto;" onclick="deleteAnnouncement('${a.id}')">Delete</button>
       </div>
     </div>
   `}).join('');
@@ -20538,7 +20537,7 @@ function submitSupportMessage() {
 
   loadSupportMessages();
   var msg = {
-    id: 'SUP-' + Date.now(),
+    id: cestisGenId('SUP-'),
     name: name,
     email: email,
     phone: phone,
@@ -21023,7 +21022,7 @@ function detectQuestionsFromText() {
     if(!fullText) continue;
 
     var q = {
-      id: 'IQ-' + Date.now() + '-' + Math.random().toString(36).substr(2, 4),
+      id: cestisGenId('IQ-') + '-' + Math.random().toString(36).substr(2, 4),
       text: fullText,
       points: 1,
       type: 'mcq',
@@ -21213,7 +21212,7 @@ function moveImportQuestion(idx, dir) {
 
 function addImportQuestion() {
   importedQuestions.push({
-    id: 'IQ-' + Date.now() + '-' + Math.random().toString(36).substr(2, 4),
+    id: cestisGenId('IQ-') + '-' + Math.random().toString(36).substr(2, 4),
     text: '', type: 'mcq', points: 1,
     options: ['Option A','Option B','Option C','Option D'],
     correctAnswer: 0
@@ -21326,6 +21325,22 @@ var _consecutiveCloudSaveFailures = 0;
 // cloud version against this; a mismatch means another device wrote since we
 // last looked, so we pull+merge their changes first and never clobber them.
 var _lastCloudVersion = {}; // folderId -> last-seen Drive file version (string)
+
+// Collision-resistant unique id for records created independently on multiple
+// devices and later merged by id across Google Drive. Timestamp (keeps records
+// sortable) + a crypto-random suffix, so two devices minting a record in the
+// same millisecond can't produce the same id (which the merge would then collapse,
+// silently dropping one record). Returns a STRING.
+function cestisGenId(prefix) {
+  var rand;
+  try {
+    var b = new Uint32Array(2); crypto.getRandomValues(b);
+    rand = b[0].toString(36) + b[1].toString(36);
+  } catch(e) {
+    rand = Math.floor(Math.random()*2176782336).toString(36) + Math.floor(Math.random()*2176782336).toString(36);
+  }
+  return (prefix || '') + Date.now().toString(36) + '-' + rand;
+}
 
 // Fast, non-cryptographic 53-bit string hash (cyrb53) used to detect whether the
 // backup payload actually changed since the last cloud save, so an idle app does
@@ -28924,7 +28939,7 @@ function adrSubmitTask() {
   var deadline = deadlineDate + 'T' + (deadlineTime || '17:00') + ':00';
 
   var task = {
-    id: 'ADR-' + Date.now(),
+    id: cestisGenId('ADR-'),
     title: title,
     description: desc,
     taskType: taskType,
@@ -29068,7 +29083,7 @@ function adrRejectCompletion(taskId) {
   // Add a comment explaining the rejection
   if(!task.comments) task.comments = [];
   task.comments.push({
-    id: 'CMT-' + Date.now(),
+    id: cestisGenId('CMT-'),
     author: adrGetCurrentUserName(),
     authorId: adrGetCurrentUserId(),
     text: '\u274C Task completion rejected by Administrator.' + (reason ? ' Reason: ' + reason : '') + ' Please review and resubmit.',
@@ -29238,7 +29253,7 @@ function adrAddComment(taskId) {
 
   if(!task.comments) task.comments = [];
   var comment = {
-    id: 'CMT-' + Date.now(),
+    id: cestisGenId('CMT-'),
     author: adrGetCurrentUserName(),
     authorId: adrGetCurrentUserId(),
     text: text,
@@ -29968,7 +29983,7 @@ function docHubUploadFile(prefix) {
     if(currentLoggedInUser) uploaderName = currentLoggedInUser.name;
 
     var doc = {
-      id: 'DOC-' + Date.now(),
+      id: cestisGenId('DOC-'),
       title: title,
       category: category,
       audience: audience,
