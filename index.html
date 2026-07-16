@@ -21697,15 +21697,73 @@ function checkCloudAndNotify(reason) {
   }
 }
 
-// Real-time monitor: every 30s, check whether the saved token has expired
-// while the user is connected, and notify immediately if it has.
+// Silent Google-token refresh so long, unattended sessions keep backing up
+// instead of stopping when the ~1h token expires. A DEDICATED token client with
+// a lightweight callback (no "Connected!" alert, no re-sync) requests a fresh
+// token with prompt:'' — Google returns one with no UI when the user still has
+// an active, previously-granted session. If interaction is genuinely required it
+// fails quietly and the normal expiry banner takes over.
+var _silentRefreshClient = null;
+var _silentRefreshInFlight = false;
+var _lastSilentRefreshAt = 0;
+function ensureSilentRefreshClient() {
+  if (_silentRefreshClient) return _silentRefreshClient;
+  if (typeof google === 'undefined' || !google.accounts || !google.accounts.oauth2) return null;
+  _silentRefreshClient = google.accounts.oauth2.initTokenClient({
+    client_id: GOOGLE_DRIVE_CONFIG.CLIENT_ID,
+    scope: GOOGLE_DRIVE_CONFIG.SCOPES,
+    callback: function(resp) {
+      _silentRefreshInFlight = false;
+      if (resp && resp.access_token && !resp.error) {
+        googleAccessToken = resp.access_token;
+        isCloudConnected = true;
+        _cloudAuthExpiredNotified = false;
+        var expiry = new Date();
+        expiry.setSeconds(expiry.getSeconds() + (resp.expires_in || 3600));
+        CESTISStore.setItem('schoolDashboardGoogleAccessToken', googleAccessToken);
+        CESTISStore.setItem('schoolDashboardGoogleTokenExpiry', expiry.toISOString());
+        try { dismissCloudNotification(); } catch(e) {}
+        console.log('[Auth] Google token refreshed silently — backup continues.');
+      }
+    },
+    error_callback: function(err) {
+      _silentRefreshInFlight = false;
+      console.warn('[Auth] Silent token refresh needs interaction:', err && err.type);
+      // Don't nag here — handleCloudAuthExpired()'s banner is the fallback once
+      // the token actually expires.
+    }
+  });
+  return _silentRefreshClient;
+}
+function attemptSilentTokenRefresh() {
+  if (_silentRefreshInFlight) return;
+  if (Date.now() - _lastSilentRefreshAt < 120000) return; // at most once every 2 min
+  var client = ensureSilentRefreshClient();
+  if (!client) return;
+  try {
+    _silentRefreshInFlight = true;
+    _lastSilentRefreshAt = Date.now();
+    client.requestAccessToken({ prompt: '' }); // '' = no consent UI when already granted
+  } catch (e) {
+    _silentRefreshInFlight = false;
+    console.warn('[Auth] Silent refresh call failed:', e && e.message);
+  }
+}
+
+// Real-time monitor: every 30s, while connected, proactively refresh the token
+// before it expires; if it has already expired, notify.
 function startCloudMonitor() {
   if (_cloudCheckInterval) clearInterval(_cloudCheckInterval);
   _cloudCheckInterval = setInterval(function() {
     if (isCloudConnected && googleAccessToken) {
       var savedExpiry = CESTISStore.getItem('schoolDashboardGoogleTokenExpiry');
-      if (savedExpiry && new Date(savedExpiry) <= new Date()) {
+      if (!savedExpiry) return;
+      var msLeft = new Date(savedExpiry).getTime() - Date.now();
+      if (msLeft <= 0) {
         handleCloudAuthExpired();
+      } else if (msLeft < 5 * 60 * 1000) {
+        // Within 5 minutes of expiry — try to renew silently so backup never stops.
+        attemptSilentTokenRefresh();
       }
     }
   }, 30000);
