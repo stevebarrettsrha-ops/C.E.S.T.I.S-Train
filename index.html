@@ -21321,6 +21321,11 @@ var AUTO_SAVE_INTERVAL_MS = 5000; // 5 seconds
 var _debouncedCloudSaveTimer = null;
 var _lastAutoSaveHash = null; // hash of last data successfully pushed to the cloud (dirty-check)
 var _consecutiveCloudSaveFailures = 0;
+// Conflict-safe sync: the Drive `version` (monotonic per-file counter) we last
+// saw for each folder's backup file. Before overwriting, we compare the current
+// cloud version against this; a mismatch means another device wrote since we
+// last looked, so we pull+merge their changes first and never clobber them.
+var _lastCloudVersion = {}; // folderId -> last-seen Drive file version (string)
 
 // Fast, non-cryptographic 53-bit string hash (cyrb53) used to detect whether the
 // backup payload actually changed since the last cloud save, so an idle app does
@@ -22013,6 +22018,7 @@ function disconnectFromGoogleDrive() {
     isCloudConnected = false;
     cloudFileId = null;
     _autoSaveFileIds = {};
+    _lastCloudVersion = {}; // re-establish the conflict-safety baseline on reconnect
 
     CESTISStore.removeItem('schoolDashboardGoogleAccessToken');
     CESTISStore.removeItem('schoolDashboardGoogleTokenExpiry');
@@ -22226,7 +22232,7 @@ async function saveToCloud() {
     if (cloudFileId) {
       // Update existing file
       response = await fetch(
-        `https://www.googleapis.com/upload/drive/v3/files/${cloudFileId}?uploadType=media`,
+        `https://www.googleapis.com/upload/drive/v3/files/${cloudFileId}?uploadType=media&fields=id,version`,
         {
           method: 'PATCH',
           headers: {
@@ -22236,6 +22242,10 @@ async function saveToCloud() {
           body: blob
         }
       );
+      if (response.ok) {
+        const pRes = await response.json().catch(() => ({}));
+        if (pRes && pRes.version != null) _lastCloudVersion[GOOGLE_DRIVE_CONFIG.FOLDER_ID] = String(pRes.version);
+      }
     } else {
       // Create new file with metadata
       const metadata = {
@@ -22249,7 +22259,7 @@ async function saveToCloud() {
       formData.append('file', blob);
 
       response = await fetch(
-        'https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart&fields=id,name',
+        'https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart&fields=id,name,version',
         {
           method: 'POST',
           headers: { 'Authorization': `Bearer ${googleAccessToken}` },
@@ -22261,6 +22271,7 @@ async function saveToCloud() {
         const result = await response.json();
         cloudFileId = result.id;
         CESTISStore.setItem('schoolDashboardCloudFileId', cloudFileId);
+        if (result.version != null) _lastCloudVersion[GOOGLE_DRIVE_CONFIG.FOLDER_ID] = String(result.version);
       }
     }
 
@@ -24426,9 +24437,10 @@ async function silentSaveToFolder(folderId, folderLabel, blob) {
 
     let response;
     if (fileId) {
-      // Update existing file
+      // Update existing file (ask for the new `version` back so we can record our
+      // own write and not treat it as someone else's change on the next pull).
       response = await fetch(
-        `https://www.googleapis.com/upload/drive/v3/files/${fileId}?uploadType=media`,
+        `https://www.googleapis.com/upload/drive/v3/files/${fileId}?uploadType=media&fields=id,version`,
         {
           method: 'PATCH',
           headers: {
@@ -24438,6 +24450,10 @@ async function silentSaveToFolder(folderId, folderLabel, blob) {
           body: blob
         }
       );
+      if (response.ok) {
+        const pResult = await response.json().catch(() => ({}));
+        if (pResult && pResult.version != null) _lastCloudVersion[folderId] = String(pResult.version);
+      }
     } else {
       // Create new file in this folder
       const metadata = {
@@ -24450,7 +24466,7 @@ async function silentSaveToFolder(folderId, folderLabel, blob) {
       formData.append('file', blob);
 
       response = await fetch(
-        'https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart&fields=id,name',
+        'https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart&fields=id,name,version',
         {
           method: 'POST',
           headers: { 'Authorization': `Bearer ${googleAccessToken}` },
@@ -24461,6 +24477,7 @@ async function silentSaveToFolder(folderId, folderLabel, blob) {
       if (response.ok) {
         const result = await response.json();
         _autoSaveFileIds[folderId] = result.id;
+        if (result.version != null) _lastCloudVersion[folderId] = String(result.version);
         // Keep main cloudFileId in sync for the main folder
         if (folderId === GOOGLE_DRIVE_CONFIG.FOLDER_ID) {
           cloudFileId = result.id;
@@ -24485,6 +24502,51 @@ async function silentSaveToFolder(folderId, folderLabel, blob) {
   }
 }
 
+// Conflict-safety + periodic convergence: check the MAIN backup file's Drive
+// `version`; if another device has written since we last saw it, pull+merge that
+// file into local state BEFORE we build our own save payload. This (a) stops a
+// stale device silently overwriting newer cloud data (the lost-update window),
+// and (b) doubles as the cross-device pull that was previously missing between
+// logins — it runs on every autosave tick, but only downloads the file when the
+// version actually changed, so idle devices stay cheap.
+async function pullMainIfRemoteNewer() {
+  try {
+    if (!isCloudConnected || !googleAccessToken) return false;
+    var folderId = GOOGLE_DRIVE_CONFIG.FOLDER_ID;
+    var fileId = _autoSaveFileIds[folderId];
+    if (!fileId) {
+      fileId = await findBackupFileInFolder(folderId);
+      if (!fileId || fileId === 'LOOKUP_FAILED') return false;
+    }
+    var metaResp = await fetch('https://www.googleapis.com/drive/v3/files/' + fileId + '?fields=version', {
+      headers: { 'Authorization': 'Bearer ' + googleAccessToken }
+    });
+    if (!metaResp.ok) {
+      if (metaResp.status === 401 || metaResp.status === 403) handleCloudAuthExpired();
+      return false;
+    }
+    var meta = await metaResp.json();
+    var ver = String(meta.version || '');
+    if (!ver) return false;
+    var baseline = _lastCloudVersion[folderId];
+    if (baseline === undefined) {
+      // First sight this session — login sync already merged, so just record the
+      // baseline; don't re-download.
+      _lastCloudVersion[folderId] = ver;
+      return false;
+    }
+    if (ver === baseline) return false; // nobody else has written since we last saw it
+    // Another device wrote: merge their changes into local before we save ours.
+    var merged = await silentMergeFromBackup(fileId);
+    _lastCloudVersion[folderId] = ver;
+    if (merged) console.log('[Sync] Merged newer cloud data (v' + ver + ') before saving.');
+    return merged;
+  } catch (e) {
+    console.warn('[Sync] pre-save version check failed:', e && e.message);
+    return false;
+  }
+}
+
 // Auto-save all dashboard data to ALL Google Drive folders (silent, every 5s)
 async function autoSaveToAllFolders() {
   if (!isCloudConnected || !googleAccessToken || _isAutoSaving) return;
@@ -24492,6 +24554,10 @@ async function autoSaveToAllFolders() {
   _isAutoSaving = true;
 
   try {
+    // Ingest any newer cloud state first so our save writes the union, never a
+    // stale overwrite. Also serves as the periodic cross-device pull.
+    await pullMainIfRemoteNewer();
+
     const cloudUser = getCurrentCloudUser();
 
     // Prepare the full backup data
