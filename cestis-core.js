@@ -532,8 +532,8 @@
   Core.stableStringify = function (storeObj) {
     storeObj = storeObj || {};
     return Object.keys(storeObj).sort().map(function (k) {
-      return k + ' ' + String(storeObj[k]);
-    }).join('');
+      return k + '\u0000' + String(storeObj[k]);
+    }).join('\u0001');
   };
 
   Core.snapshotCounts = function (store) {

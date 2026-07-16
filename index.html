@@ -4345,6 +4345,21 @@ body.vc-fullscreen-mode.vc-host-only-mode .video-grid .video-tile:not(.vc-hoston
   </div>
 </div>
 
+<!-- FORCED PASSWORD CHANGE (default/seeded credentials) -->
+<div class="modal-overlay" id="forceChangePwModal" style="z-index:1200;">
+  <div class="modal" style="max-width:420px;">
+    <div class="modal-header"><h3>Set a New Password</h3></div>
+    <p style="font-size:13px;color:var(--text-secondary);margin-bottom:16px;">This account is still using the default password. For security you must set a new one before continuing.</p>
+    <div class="form-group"><label>New Password</label><input type="password" class="form-control" id="forceChangePwNew" placeholder="Minimum 8 characters"></div>
+    <div class="form-group"><label>Confirm Password</label><input type="password" class="form-control" id="forceChangePwConfirm" placeholder="Re-enter password" onkeydown="if(event.key==='Enter')forceChangePwSubmit()"></div>
+    <div id="forceChangePwError" class="tfa-error" style="display:none;"></div>
+    <div style="display:flex;gap:10px;justify-content:flex-end;margin-top:20px;">
+      <button class="btn btn-secondary" onclick="forceChangePwCancel()">Cancel</button>
+      <button class="btn btn-primary" onclick="forceChangePwSubmit()">Set Password &amp; Continue</button>
+    </div>
+  </div>
+</div>
+
 <!-- TWO-STEP VERIFICATION (TOTP) MODALS -->
 <style>
 #tfaVerifyModal{z-index:300;}
@@ -5126,6 +5141,32 @@ async function hashPassword(password) {
   }
 }
 
+// Passwords published in this (public) repo. Any account still using one must be
+// forced to change it before it can access the app (see enterApp / mustChangePassword).
+var KNOWN_DEFAULT_PASSWORDS = ['cestisadmin123$', 'admin123'];
+
+// One-time async sweep: flag accounts whose ALREADY-HASHED password still verifies
+// against a known default (covers deployments that hashed the default before the
+// force-change guard existed). Bounded to privileged roles so it's cheap.
+var _defaultPwSweepDone = false;
+async function flagDefaultPasswordAccounts() {
+  if(_defaultPwSweepDone) return;
+  _defaultPwSweepDone = true;
+  var changed = false;
+  for(var i = 0; i < userAccounts.length; i++) {
+    var a = userAccounts[i];
+    if(!a || !a.password || a.mustChangePassword) continue;
+    if(a.role !== 'admin' && a.role !== 'adminstaff' && a.role !== 'cmc') continue;
+    if(!isHashedPassword(a.password)) continue; // plaintext defaults handled synchronously
+    for(var d = 0; d < KNOWN_DEFAULT_PASSWORDS.length; d++) {
+      try {
+        if(await verifyPassword(KNOWN_DEFAULT_PASSWORDS[d], a.password)) { a.mustChangePassword = true; changed = true; break; }
+      } catch(e) {}
+    }
+  }
+  if(changed) { try { saveUserAccounts(); } catch(e) {} }
+}
+
 // True for both the new PBKDF2 format and the legacy 64-hex SHA-256 hash.
 function isHashedPassword(pw) {
   return typeof pw === 'string' && (pw.indexOf('pbkdf2$') === 0 || /^[a-f0-9]{64}$/.test(pw));
@@ -5200,6 +5241,7 @@ async function maybeUpgradePasswordHash(account, plaintext, storedPassword) {
     canonical.password = await hashPassword(plaintext);
     if (account !== canonical) account.password = canonical.password;
     cachePlaintextPw(canonical, plaintext);
+    if (typeof touchAccount === 'function') touchAccount(canonical);
     if (typeof saveUserAccounts === 'function') saveUserAccounts();
     console.log('[Security] Upgraded account ' + (canonical.id || '') + ' password hash to PBKDF2');
   } catch (e) { console.warn('[Security] Password hash upgrade skipped:', e); }
@@ -5568,7 +5610,7 @@ function batchDOMUpdate(callback) {
 }
 
 // ---------- Run password migration on load ----------
-setTimeout(function() { migratePasswordsToHash(); }, 100);
+setTimeout(function() { migratePasswordsToHash(); flagDefaultPasswordAccounts(); }, 100);
 
 // ============================== SESSION EXPIRY CONFIG ==============================
 var SESSION_EXPIRY_MS = 8 * 60 * 60 * 1000; // 8 hours default session duration
@@ -6906,6 +6948,13 @@ function saveUserAccounts() {
   // Push changes to Google Drive immediately (debounced)
   scheduleDebouncedCloudSave();
 }
+// Stamp an account as edited NOW. The cloud merges compare this stamp so a stale
+// device's copy can no longer overwrite a newer local edit (password reset,
+// status/role change, email update) — without it, edits silently reverted when
+// an out-of-date device auto-saved first.
+function touchAccount(acct) {
+  if (acct) acct.updatedAt = new Date().toISOString();
+}
 function loadUserAccounts() {
   try {
     var u = CESTISStore.getItem('voctrain_users');
@@ -6916,41 +6965,74 @@ function loadUserAccounts() {
     // default on every load silently undid admin password changes and left a
     // permanent default-credentials backdoor that synced to every device.
     // The default password is only seeded when the account has no password.
-    var defAdmin = {id:'USR-001',name:'Administrator',role:'admin',username:'cestisadmin',password:'cestisadmin123$',email:'admin@heartlms.edu.jm',programme:'',status:'active',createdAt:'2026-01-01'};
+    // The seeded password below is PUBLISHED in this (public) repo, so any account
+    // still carrying it is a known-credentials backdoor. Mark such seeds with
+    // mustChangePassword so the app forces a new password before granting access
+    // (enforced in enterApp). A real, admin-set password never gets this flag.
+    var DEFAULT_SEED_PW = 'cestisadmin123$';
+    var defAdmin = {id:'USR-001',name:'Administrator',role:'admin',username:'cestisadmin',password:DEFAULT_SEED_PW,mustChangePassword:true,email:'admin@heartlms.edu.jm',programme:'',status:'active',createdAt:'2026-01-01'};
     var adminAcct = userAccounts.find(function(a){ return a.id === 'USR-001' && a.role === 'admin'; });
     if(adminAcct) {
       adminAcct.username = 'cestisadmin';
-      if(!adminAcct.password) adminAcct.password = 'cestisadmin123$';
+      if(!adminAcct.password) { adminAcct.password = DEFAULT_SEED_PW; adminAcct.mustChangePassword = true; }
       adminAcct.status = 'active';
     } else {
       userAccounts.push(defAdmin);
     }
     // Migrate: ensure default admin staff account exists (password seeded only if missing)
-    var defAS = {id:'USR-011',name:'Admin Staff',role:'adminstaff',username:'adminstaff',password:'cestisadmin123$',email:'adminstaff@heartlms.edu.jm',programme:'',status:'active',createdAt:'2026-01-15'};
+    var defAS = {id:'USR-011',name:'Admin Staff',role:'adminstaff',username:'adminstaff',password:DEFAULT_SEED_PW,mustChangePassword:true,email:'adminstaff@heartlms.edu.jm',programme:'',status:'active',createdAt:'2026-01-15'};
     var existingAS = userAccounts.find(function(u){ return u.id === 'USR-011'; });
     if(!existingAS) {
       userAccounts.push(defAS);
     } else {
       existingAS.username = 'adminstaff';
-      if(!existingAS.password) existingAS.password = 'cestisadmin123$';
+      if(!existingAS.password) { existingAS.password = DEFAULT_SEED_PW; existingAS.mustChangePassword = true; }
       existingAS.role = 'adminstaff';
     }
     // Migrate: ensure default CMC board member account exists (password seeded only if missing)
-    var defCMC = {id:'USR-021',name:'Board Chair',role:'cmc',username:'cmcadmin',password:'cestisadmin123$',email:'cmc@heartlms.edu.jm',programme:'',status:'active',createdAt:'2026-01-01'};
+    var defCMC = {id:'USR-021',name:'Board Chair',role:'cmc',username:'cmcadmin',password:DEFAULT_SEED_PW,mustChangePassword:true,email:'cmc@heartlms.edu.jm',programme:'',status:'active',createdAt:'2026-01-01'};
     var existingCMC = userAccounts.find(function(u){ return u.id === 'USR-021'; });
     if(!existingCMC) {
       userAccounts.push(defCMC);
     } else {
       existingCMC.username = 'cmcadmin';
-      if(!existingCMC.password) existingCMC.password = 'cestisadmin123$';
+      if(!existingCMC.password) { existingCMC.password = DEFAULT_SEED_PW; existingCMC.mustChangePassword = true; }
       existingCMC.role = 'cmc';
     }
+    // Flag ANY account still carrying a known published default password (the
+    // literal seeds above start plaintext, before hashing runs) so enterApp forces
+    // a change. This is the primary guard for fresh devices / public repo clones.
+    userAccounts.forEach(function(a){
+      if(a && a.password && KNOWN_DEFAULT_PASSWORDS.indexOf(a.password) !== -1) a.mustChangePassword = true;
+    });
     // Purge any plaintext password caches that older versions persisted to
     // storage/backups — they are transient, in-memory-only session caches.
     userAccounts.forEach(function(a){ delete a._plaintextPw; });
   } catch(e) {}
 }
 loadUserAccounts();
+// Re-read accounts once IndexedDB hydration completes. The synchronous load above
+// can only see the localStorage mirror; if that mirror was evicted/cleared while
+// IndexedDB survived (the exact case the durable store exists for), userAccounts
+// would otherwise stay stuck on the 3 seed defaults — disabling offline login and
+// making every real account "not found" until a cloud sync. This also re-runs the
+// login-button gate so locally-stored accounts unlock login without any network.
+try {
+  CESTISStore.whenReady(function(){
+    try {
+      loadUserAccounts();
+      if(typeof migratePasswordsToHash === 'function'){ _passwordMigrationDone = false; migratePasswordsToHash(); }
+      if(typeof flagDefaultPasswordAccounts === 'function'){ flagDefaultPasswordAccounts(); }
+      var hasLocalAccounts = userAccounts.length > 3 || userAccounts.some(function(u) {
+        return u.id !== 'USR-001' && u.id !== 'USR-011' && u.id !== 'USR-021';
+      });
+      if(hasLocalAccounts && !loginSyncCompleted) {
+        loginSyncCompleted = true;
+        if(typeof enableLoginButtons === 'function') enableLoginButtons();
+      }
+    } catch(e) { console.warn('[Accounts] post-IndexedDB account reload failed:', e && e.message); }
+  });
+} catch(e) {}
 // Attendance quarter separation runs AFTER critical auth/account loading so it can
 // never block login, and is itself fully guarded against errors.
 initAttendanceQuarters();
@@ -7123,6 +7205,7 @@ function saveUserEdit() {
   var oldRole = user.role;
   user.name = name; user.role = role; user.username = username; user.email = email;
   user.programme = (role === 'admin' || role === 'adminstaff' || role === 'cmc') ? '' : programme;
+  touchAccount(user);
   // Create linked instructor/student data when role changes
   if(role === 'instructor' && oldRole !== 'instructor') {
     var existingIns = instructorData.find(function(ins){ return ins.name === user.name || ins.email === user.email; });
@@ -7169,6 +7252,7 @@ async function confirmResetPasswordVerified() {
   if(!user) return;
   user.password = await hashPassword(newPw);
   cachePlaintextPw(user, newPw);
+  touchAccount(user);
   saveUserAccounts();
   closeModal('resetPasswordModal');
   showToast('Password reset successfully for ' + user.name);
@@ -7289,6 +7373,7 @@ async function forgotPwSubmit() {
   if(newPw !== confirmPw) { showToast('Passwords do not match.', 'warning'); return; }
   acct.password = await hashPassword(newPw);
   cachePlaintextPw(acct, newPw);
+  touchAccount(acct);
   // Clear any active lockout so the user can sign in right away.
   try { if(acct.username) clearLoginFailures(acct.username); if(acct.email) clearLoginFailures(acct.email); } catch(_){}
   saveUserAccounts(); // persists locally + syncs to Google Drive
@@ -7301,6 +7386,7 @@ function toggleUserStatus(userId) {
   var user = userAccounts.find(function(u){ return u.id === userId; });
   if(!user) return;
   user.status = user.status === 'active' ? 'disabled' : 'active';
+  touchAccount(user);
   saveUserAccounts();
   renderUserAccountsTable();
   showToast(user.name + ' account ' + (user.status === 'active' ? 'enabled' : 'disabled'));
@@ -8195,6 +8281,7 @@ function tfaSaveEmail(){
   if(!emailRegex.test(email)){ showToast('Please enter a valid email address.', 'error'); return; }
   acct.email = email;
   if(currentLoggedInUser && currentLoggedInUser.id === acct.id) currentLoggedInUser.email = email;
+  touchAccount(acct);
   saveUserAccounts();
   showToast('Recovery email address saved.');
   tfaRenderManage();
@@ -8340,8 +8427,56 @@ function tfaBeginDisable(){
   });
 }
 
+var _forceChangePwRole = null;
+function openForceChangePw(role) {
+  _forceChangePwRole = role;
+  var n = document.getElementById('forceChangePwNew');
+  var c = document.getElementById('forceChangePwConfirm');
+  var e = document.getElementById('forceChangePwError');
+  if(n) n.value = ''; if(c) c.value = ''; if(e) e.style.display = 'none';
+  openModal('forceChangePwModal');
+  setTimeout(function(){ if(n) n.focus(); }, 60);
+}
+function forceChangePwCancel() {
+  // Refuse access rather than let a default-password account in.
+  closeModal('forceChangePwModal');
+  currentLoggedInUser = null;
+  _forceChangePwRole = null;
+}
+async function forceChangePwSubmit() {
+  var err = document.getElementById('forceChangePwError');
+  function fail(msg){ if(err){ err.textContent = msg; err.style.display = 'block'; } }
+  var acct = currentLoggedInUser;
+  if(!acct){ closeModal('forceChangePwModal'); return; }
+  var np = document.getElementById('forceChangePwNew').value;
+  var cp = document.getElementById('forceChangePwConfirm').value;
+  if(!np || np.length < 8){ fail('Password must be at least 8 characters.'); return; }
+  if(np !== cp){ fail('Passwords do not match.'); return; }
+  // Must not keep any known default password.
+  if(np === 'cestisadmin123$' || np === 'admin123' || np.toLowerCase() === 'password'){ fail('Choose a password that is not the default.'); return; }
+  var canonical = userAccounts.find(function(u){ return u.id === acct.id; }) || acct;
+  canonical.password = await hashPassword(np);
+  canonical.mustChangePassword = false;
+  cachePlaintextPw(canonical, np);
+  touchAccount(canonical);
+  if(acct !== canonical){ acct.password = canonical.password; acct.mustChangePassword = false; }
+  try { if(canonical.username) clearLoginFailures(canonical.username); if(canonical.email) clearLoginFailures(canonical.email); } catch(_){}
+  saveUserAccounts();
+  closeModal('forceChangePwModal');
+  showToast('Password updated. Welcome.');
+  var role = _forceChangePwRole; _forceChangePwRole = null;
+  enterApp(role);
+}
 function enterApp(role) {
   try {
+    // Force a password change before granting access to any account still using a
+    // seeded/default password (published in this public repo). Closes the
+    // default-credentials backdoor without locking out first-run setup: the
+    // legitimate first admin signs in with the default, then must set a new one.
+    if(currentLoggedInUser && currentLoggedInUser.mustChangePassword) {
+      openForceChangePw(role);
+      return;
+    }
     // Maintenance mode check — block all non-admin users
     if(systemSettings.maintenanceMode === true && role !== 'admin') {
       alert('The site is currently under maintenance. Only administrators can access the system at this time. Please try again later.');
@@ -8792,6 +8927,7 @@ function approveUser(userId) {
   user.status = 'active';
   user.approvedAt = localDateStr();
   user.approvedBy = 'admin';
+  touchAccount(user);
   // Ensure student data is created and linked when approving a student account
   if (user.role === 'student' && !user.studentDataId) {
     var existingStudent = students.find(function(s) { return s.name === user.name; });
@@ -8822,6 +8958,7 @@ function rejectUser(userId) {
   user.status = 'rejected';
   user.approvedAt = localDateStr();
   user.approvedBy = 'admin';
+  touchAccount(user);
   saveState();
   renderVerifyUsersPage();
   showToast('Account rejected: ' + user.name);
@@ -8837,6 +8974,7 @@ function approveAllPending() {
     u.status = 'active';
     u.approvedAt = dateStr;
     u.approvedBy = 'admin';
+    touchAccount(u);
     // Create linked student/instructor data on approval
     if (u.role === 'student' && !u.studentDataId) {
       var existingStudent = students.find(function(s) { return s.name === u.name; });
@@ -23449,18 +23587,31 @@ async function silentMergeFromBackup(fileId) {
           return false;
         });
         if (localMatch) {
-          // Update existing account with cloud data (password, status, name, etc.)
-          if (cloudUser.password && cloudUser.password !== localMatch.password) { localMatch.password = cloudUser.password; userAccountsChanged = true; }
-          if (cloudUser.status && cloudUser.status !== localMatch.status) { localMatch.status = cloudUser.status; userAccountsChanged = true; }
-          if (cloudUser.name && cloudUser.name !== localMatch.name) { localMatch.name = cloudUser.name; userAccountsChanged = true; }
-          if (cloudUser.email && cloudUser.email !== localMatch.email) { localMatch.email = cloudUser.email; userAccountsChanged = true; }
-          if (cloudUser.programme !== undefined && cloudUser.programme !== localMatch.programme) { localMatch.programme = cloudUser.programme; userAccountsChanged = true; }
-          if (cloudUser.role && cloudUser.role !== localMatch.role) { localMatch.role = cloudUser.role; userAccountsChanged = true; }
+          // Newest-edit-wins guard: if THIS device's copy was edited more recently
+          // than the cloud copy (see touchAccount), do NOT let the stale cloud
+          // record overwrite it — that was silently reverting password resets,
+          // status changes and role edits whenever an out-of-date device had
+          // auto-saved first. Legacy records without updatedAt keep the old
+          // cloud-wins behaviour so existing deployments still converge.
+          var _cu = Date.parse(cloudUser.updatedAt || '') || 0;
+          var _lu = Date.parse(localMatch.updatedAt || '') || 0;
+          if (_cu >= _lu) {
+            // Update existing account with cloud data (password, status, name, etc.)
+            if (cloudUser.password && cloudUser.password !== localMatch.password) { localMatch.password = cloudUser.password; userAccountsChanged = true; }
+            if (cloudUser.status && cloudUser.status !== localMatch.status) { localMatch.status = cloudUser.status; userAccountsChanged = true; }
+            if (cloudUser.name && cloudUser.name !== localMatch.name) { localMatch.name = cloudUser.name; userAccountsChanged = true; }
+            if (cloudUser.email && cloudUser.email !== localMatch.email) { localMatch.email = cloudUser.email; userAccountsChanged = true; }
+            if (cloudUser.programme !== undefined && cloudUser.programme !== localMatch.programme) { localMatch.programme = cloudUser.programme; userAccountsChanged = true; }
+            if (cloudUser.role && cloudUser.role !== localMatch.role) { localMatch.role = cloudUser.role; userAccountsChanged = true; }
+            if (!!cloudUser.mustChangePassword !== !!localMatch.mustChangePassword) { localMatch.mustChangePassword = !!cloudUser.mustChangePassword; userAccountsChanged = true; }
+            if (_cu > _lu && cloudUser.updatedAt !== localMatch.updatedAt) { localMatch.updatedAt = cloudUser.updatedAt; userAccountsChanged = true; }
+          }
           if (cloudUser.studentDataId && !localMatch.studentDataId) { localMatch.studentDataId = cloudUser.studentDataId; userAccountsChanged = true; }
           if (cloudUser.registeredVia && !localMatch.registeredVia) { localMatch.registeredVia = cloudUser.registeredVia; userAccountsChanged = true; }
           // Two-step-verification state (secret, enabled flag, backup codes) —
           // WITHOUT this, enabling 2FA on one device never reached devices that
           // already had the account row, so 2FA "didn't work" across devices.
+          // (Has its own newest-wins stamp, so it sits outside the guard above.)
           if (mergeTwoFactorState(localMatch, cloudUser)) userAccountsChanged = true;
         } else {
           // New account — add it (dropping any plaintext cache an old backup leaked)
@@ -24971,16 +25122,25 @@ function cloudFetchAccountData(interactive) {
         return false;
       });
       if (local) {
-        if (ca.password && ca.password !== local.password) {
-          local.password = ca.password;
-          // Drop any stale plaintext cache so an old password no longer validates
-          delete local._plaintextPw;
+        // Newest-edit-wins (see touchAccount): a stale cloud copy must not
+        // overwrite a fresher local edit. Legacy records without updatedAt
+        // keep the original cloud-wins behaviour.
+        var _cu2 = Date.parse(ca.updatedAt || '') || 0;
+        var _lu2 = Date.parse(local.updatedAt || '') || 0;
+        if (_cu2 >= _lu2) {
+          if (ca.password && ca.password !== local.password) {
+            local.password = ca.password;
+            // Drop any stale plaintext cache so an old password no longer validates
+            delete local._plaintextPw;
+          }
+          if (ca.status && ca.status !== local.status) local.status = ca.status;
+          if (ca.name && ca.name !== local.name) local.name = ca.name;
+          if (ca.email && ca.email !== local.email) local.email = ca.email;
+          if (ca.role && ca.role !== local.role) local.role = ca.role;
+          if (ca.programme !== undefined && ca.programme !== local.programme) local.programme = ca.programme;
+          if (!!ca.mustChangePassword !== !!local.mustChangePassword) local.mustChangePassword = !!ca.mustChangePassword;
+          if (_cu2 > _lu2 && ca.updatedAt !== local.updatedAt) local.updatedAt = ca.updatedAt;
         }
-        if (ca.status && ca.status !== local.status) local.status = ca.status;
-        if (ca.name && ca.name !== local.name) local.name = ca.name;
-        if (ca.email && ca.email !== local.email) local.email = ca.email;
-        if (ca.role && ca.role !== local.role) local.role = ca.role;
-        if (ca.programme !== undefined && ca.programme !== local.programme) local.programme = ca.programme;
         if (ca.studentDataId && !local.studentDataId) local.studentDataId = ca.studentDataId;
         // Carry two-step-verification state across devices (see mergeTwoFactorState).
         mergeTwoFactorState(local, ca);
