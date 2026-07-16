@@ -5061,17 +5061,76 @@ function localDateStr(d) {
 }
 
 // ---------- SECURITY: SHA-256 Password Hashing ----------
-async function hashPassword(password) {
-  var encoder = new TextEncoder();
-  var data = encoder.encode(password + '__CESTIS_SALT_2026__');
-  var hashBuffer = await crypto.subtle.digest('SHA-256', data);
-  var hashArray = Array.from(new Uint8Array(hashBuffer));
-  return hashArray.map(function(b){ return b.toString(16).padStart(2,'0'); }).join('');
+// ---------- SECURITY: Password hashing (PBKDF2 + per-user salt) ----------
+// New passwords are hashed with PBKDF2-HMAC-SHA256 and a random PER-USER salt,
+// stored self-describing as  pbkdf2$<iterations>$<saltHex>$<hashHex>  so any
+// device — and a future local/self-hosted deployment — can verify without a
+// shared secret. Legacy accounts (bare 64-hex SHA-256 with a single fixed app
+// salt, or still-plaintext) keep verifying and are transparently upgraded to
+// PBKDF2 on the next successful sign-in.
+var PBKDF2_ITERATIONS = 210000;
+
+function _bufToHex(buf) {
+  var b = new Uint8Array(buf), s = '';
+  for (var i = 0; i < b.length; i++) s += b[i].toString(16).padStart(2, '0');
+  return s;
+}
+function _hexToBuf(hex) {
+  var len = Math.floor(hex.length / 2), out = new Uint8Array(len);
+  for (var i = 0; i < len; i++) out[i] = parseInt(hex.substr(i * 2, 2), 16);
+  return out;
 }
 
-async function verifyPassword(password, hash) {
-  var computed = await hashPassword(password);
-  return computed === hash;
+// Legacy hash — kept ONLY so passwords stored before this upgrade still verify.
+async function hashPasswordLegacy(password) {
+  var data = new TextEncoder().encode(password + '__CESTIS_SALT_2026__');
+  var hashBuffer = await crypto.subtle.digest('SHA-256', data);
+  return _bufToHex(hashBuffer);
+}
+
+async function _pbkdf2Hex(password, saltBuf, iterations) {
+  var keyMaterial = await crypto.subtle.importKey('raw', new TextEncoder().encode(String(password)), { name: 'PBKDF2' }, false, ['deriveBits']);
+  var bits = await crypto.subtle.deriveBits({ name: 'PBKDF2', salt: saltBuf, iterations: iterations, hash: 'SHA-256' }, keyMaterial, 256);
+  return _bufToHex(bits);
+}
+
+// Produce a new PBKDF2 hash with a fresh random per-user salt.
+async function hashPassword(password) {
+  try {
+    var salt = crypto.getRandomValues(new Uint8Array(16));
+    var hashHex = await _pbkdf2Hex(password, salt, PBKDF2_ITERATIONS);
+    return 'pbkdf2$' + PBKDF2_ITERATIONS + '$' + _bufToHex(salt) + '$' + hashHex;
+  } catch (e) {
+    // Extremely defensive: if PBKDF2 is unavailable, use the legacy hash rather
+    // than ever storing plaintext.
+    console.warn('[Security] PBKDF2 unavailable, using legacy hash:', e);
+    return await hashPasswordLegacy(password);
+  }
+}
+
+// True for both the new PBKDF2 format and the legacy 64-hex SHA-256 hash.
+function isHashedPassword(pw) {
+  return typeof pw === 'string' && (pw.indexOf('pbkdf2$') === 0 || /^[a-f0-9]{64}$/.test(pw));
+}
+
+// Verify a plaintext against ANY stored format (PBKDF2, legacy SHA-256, or a
+// still-plaintext value during first migration).
+async function verifyPassword(password, stored) {
+  if (typeof stored !== 'string') return false;
+  if (stored.indexOf('pbkdf2$') === 0) {
+    var parts = stored.split('$'); // ['pbkdf2', iterations, saltHex, hashHex]
+    if (parts.length !== 4) return false;
+    var iters = parseInt(parts[1], 10) || PBKDF2_ITERATIONS;
+    var computed = await _pbkdf2Hex(password, _hexToBuf(parts[2]), iters);
+    if (computed.length !== parts[3].length) return false;
+    var diff = 0; // constant-time-ish compare
+    for (var i = 0; i < computed.length; i++) diff |= computed.charCodeAt(i) ^ parts[3].charCodeAt(i);
+    return diff === 0;
+  }
+  if (/^[a-f0-9]{64}$/.test(stored)) {
+    return (await hashPasswordLegacy(password)) === stored;
+  }
+  return password === stored; // plaintext (pre-migration)
 }
 
 // Cache the plaintext password on an account for the CURRENT SESSION ONLY.
@@ -5098,8 +5157,8 @@ async function migratePasswordsToHash() {
   var changed = false;
   for(var i = 0; i < userAccounts.length; i++) {
     var u = userAccounts[i];
-    // If password is not 64-char hex (SHA-256 hash), it's plaintext — migrate it
-    if(u.password && !/^[a-f0-9]{64}$/.test(u.password)) {
+    // Still-plaintext password (neither PBKDF2 nor a legacy hash) — hash it now.
+    if(u.password && !isHashedPassword(u.password)) {
       cachePlaintextPw(u, u.password); // keep temporarily for current session login (in memory only)
       u.password = await hashPassword(u.password);
       changed = true;
@@ -5107,20 +5166,38 @@ async function migratePasswordsToHash() {
   }
   if(changed) {
     saveUserAccounts();
-    console.log('[Security] Passwords migrated to SHA-256 hashes');
+    console.log('[Security] Plaintext passwords migrated to PBKDF2 hashes');
   }
 }
 
-// Secure password comparison that works with both hashed and plaintext (during migration)
+// Re-hash to PBKDF2 when the stored value is a legacy SHA-256 hash or plaintext,
+// so a correct sign-in transparently upgrades the account to the stronger,
+// per-user-salted scheme (we can only do this here because we have the plaintext).
+async function maybeUpgradePasswordHash(account, plaintext, storedPassword) {
+  try {
+    if (!account) return;
+    if (typeof storedPassword === 'string' && storedPassword.indexOf('pbkdf2$') === 0) return; // already strongest
+    var canonical = (typeof userAccounts !== 'undefined' && Array.isArray(userAccounts))
+      ? (userAccounts.find(function(u){ return u.id === account.id; }) || account) : account;
+    canonical.password = await hashPassword(plaintext);
+    if (account !== canonical) account.password = canonical.password;
+    cachePlaintextPw(canonical, plaintext);
+    if (typeof saveUserAccounts === 'function') saveUserAccounts();
+    console.log('[Security] Upgraded account ' + (canonical.id || '') + ' password hash to PBKDF2');
+  } catch (e) { console.warn('[Security] Password hash upgrade skipped:', e); }
+}
+
+// Secure password comparison across every stored format, upgrading to PBKDF2 on
+// a successful match.
 async function checkPassword(inputPassword, storedPassword, account) {
-  // If stored password is a 64-char hex hash, compare hashes
-  if(/^[a-f0-9]{64}$/.test(storedPassword)) {
-    // Also check temporary plaintext cache for current-session migration
-    if(account._plaintextPw && account._plaintextPw === inputPassword) return true;
-    return await verifyPassword(inputPassword, storedPassword);
+  // Session plaintext cache fast-path (covers the current-session migration window).
+  if(account && account._plaintextPw && account._plaintextPw === inputPassword) {
+    await maybeUpgradePasswordHash(account, inputPassword, storedPassword);
+    return true;
   }
-  // Plaintext fallback (pre-migration)
-  return inputPassword === storedPassword;
+  var ok = await verifyPassword(inputPassword, storedPassword);
+  if(ok) await maybeUpgradePasswordHash(account, inputPassword, storedPassword);
+  return ok;
 }
 
 // ---------- SECURITY: Enhanced XSS Prevention ----------
@@ -7567,7 +7644,7 @@ async function handleAdminClick() {
     try {
       console.log('[Login][admin] accountsLoaded=' + (Array.isArray(userAccounts)?userAccounts.length:'NONE')
         + ' adminUsernames=' + JSON.stringify(userAccounts.filter(function(u){return u.role==='admin';}).map(function(u){return u.username;}))
-        + ' matchedAccount=' + (adminUser?('yes(id='+adminUser.id+', pwFormat='+(/^[a-f0-9]{64}$/.test(adminUser.password||'')?'hash':'plaintext')+', hasPlainCache='+(!!adminUser._plaintextPw)+')'):'NO'));
+        + ' matchedAccount=' + (adminUser?('yes(id='+adminUser.id+', pwFormat='+((adminUser.password||'').indexOf('pbkdf2$')===0?'pbkdf2':(/^[a-f0-9]{64}$/.test(adminUser.password||'')?'legacy-sha256':'plaintext'))+', hasPlainCache='+(!!adminUser._plaintextPw)+')'):'NO'));
     } catch(_) {}
     if(!adminUser) { recordLoginFailure(uname); alert('No admin account found for "' + uname + '" on this device. Try username: cestisadmin — or use "Sync Now" first to pull accounts.'); return; }
     if(adminUser.status==='disabled') { alert('This account has been disabled. Contact a system administrator.'); return; }
@@ -7754,6 +7831,7 @@ var tfaPendingSecret = null;
 var tfaPendingBackupCodes = null;
 var tfaVerifyAccount = null;
 var tfaVerifyCallback = null;
+var tfaBackupOnly = false; // true when the authenticator lib is unavailable and only backup codes can be used
 
 function tfaEnabled(acct){ return !!(acct && acct.twoFactorEnabled && acct.twoFactorSecret); }
 
@@ -7836,14 +7914,26 @@ function tfaShowError(msg){
 function tfaOpenVerify(account, opts, onSuccess){
   opts = opts || {};
   tfaVerifyAccount = account; tfaVerifyCallback = onSuccess;
+  tfaBackupOnly = !!opts.backupOnly;
   document.getElementById('tfaVerifyTitle').textContent = opts.title || 'Two-Step Verification';
   document.getElementById('tfaVerifySubtitle').textContent = opts.subtitle || 'Enter the 6-digit code from your authenticator app.';
   document.getElementById('tfaVerifyCode').value = '';
   document.getElementById('tfaVerifyBackup').value = '';
-  document.getElementById('tfaBackupSection').style.display = 'none';
-  document.getElementById('tfaBackupLink').style.display = opts.allowBackup === false ? 'none' : 'block';
+  var codeInput = document.getElementById('tfaVerifyCode');
+  var codeGroup = codeInput && codeInput.closest ? codeInput.closest('.form-group') : null;
+  if(tfaBackupOnly){
+    // Authenticator library unavailable: the 6-digit code can't be checked, so
+    // drive the user straight to backup-code entry (a pure string check, no lib).
+    if(codeGroup) codeGroup.style.display = 'none';
+    document.getElementById('tfaBackupSection').style.display = 'block';
+    document.getElementById('tfaBackupLink').style.display = 'none';
+  } else {
+    if(codeGroup) codeGroup.style.display = '';
+    document.getElementById('tfaBackupSection').style.display = 'none';
+    document.getElementById('tfaBackupLink').style.display = opts.allowBackup === false ? 'none' : 'block';
+  }
   openModal('tfaVerifyModal');
-  setTimeout(function(){ document.getElementById('tfaVerifyCode').focus(); }, 50);
+  setTimeout(function(){ document.getElementById(tfaBackupOnly ? 'tfaVerifyBackup' : 'tfaVerifyCode').focus(); }, 50);
 }
 function tfaShowBackupInput(){
   document.getElementById('tfaBackupSection').style.display = 'block';
@@ -7857,6 +7947,7 @@ function tfaSubmitVerify(){
   var acct = tfaVerifyAccount;
   if(!acct){ tfaCancelVerify(); return; }
   var backup = (document.getElementById('tfaVerifyBackup').value || '').trim().toUpperCase();
+  if(tfaBackupOnly && !backup){ tfaShowError('Enter one of your backup codes to continue.'); return; }
   if(document.getElementById('tfaBackupSection').style.display !== 'none' && backup){
     var rec = tfaAccountRecord(acct);
     var idx = (rec.backupCodes || []).findIndex(function(bc){ return bc.code === backup && !bc.used; });
@@ -7886,14 +7977,18 @@ function tfaSubmitVerify(){
 // Gate used by every sign-in path (password and Google).
 function tfaGateLogin(account, proceed){
   if(!tfaEnabled(account)){ proceed(); return; }
-  if(typeof OTPAuth === 'undefined'){
-    alert('Two-step verification is enabled on this account but the authenticator library failed to load. Please reload the page.');
-    return;
-  }
+  var libMissing = (typeof OTPAuth === 'undefined');
+  var who = (account.username || account.email || 'user');
+  // When the authenticator library can't load, don't dead-end the user: backup
+  // codes are verified by a plain string match (no library needed), so fall back
+  // to backup-code entry instead of blocking sign-in entirely.
   tfaOpenVerify(account, {
     title: 'Two-Step Verification',
-    subtitle: 'Enter the 6-digit code from your authenticator app to finish signing in as ' + (account.username || account.email || 'user') + '.',
-    allowBackup: true
+    subtitle: libMissing
+      ? 'The authenticator library could not load on this device, so your 6-digit code can\'t be checked here. Enter one of your backup codes to sign in as ' + who + ', or reload the page to use your authenticator app.'
+      : 'Enter the 6-digit code from your authenticator app to finish signing in as ' + who + '.',
+    allowBackup: true,
+    backupOnly: libMissing
   }, proceed);
 }
 
