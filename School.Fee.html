@@ -3312,6 +3312,7 @@
         // OTP state variables
         let currentOTP = null;
         let otpExpiry = null;
+        let otpAttempts = 0; // brute-force guard for the emailed 6-digit code
         let pendingResetUser = null;
 
         // EmailJS configuration
@@ -3402,6 +3403,7 @@
             // Generate OTP
             currentOTP = generateOTP();
             otpExpiry = Date.now() + (10 * 60 * 1000); // OTP valid for 10 minutes
+            otpAttempts = 0;
             pendingResetUser = user;
 
             // Send email using EmailJS (if configured) or show demo message
@@ -3472,6 +3474,7 @@
             // Generate new OTP
             currentOTP = generateOTP();
             otpExpiry = Date.now() + (10 * 60 * 1000);
+            otpAttempts = 0;
 
             // Send email
             sendOTPViaEmail(pendingResetUser.email, currentOTP, pendingResetUser.fullName);
@@ -3497,13 +3500,22 @@
                 return;
             }
 
+            // Attempt cap — a 6-digit code must not be brute-forceable.
+            if (otpAttempts >= 6) {
+                currentOTP = null; otpExpiry = null;
+                showOTPError('Too many incorrect attempts. Please request a new code.');
+                return;
+            }
+
             // Verify OTP
             if (enteredOTP !== currentOTP) {
+                otpAttempts++;
                 showOTPError('Invalid code. Please try again.');
                 return;
             }
 
             // OTP verified - show new password step
+            otpAttempts = 0; currentOTP = null;
             showNewPasswordStep();
         }
 

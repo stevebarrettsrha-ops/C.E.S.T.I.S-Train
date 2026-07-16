@@ -4335,6 +4335,7 @@ async function mergeFromCloud() {
               existing.displayName=cloudUser.displayName;
               existing.role=cloudUser.role;
               if(!existing.password&&cloudUser.password)existing.password=cloudUser.password;
+              pyMergeUser2FA(existing,cloudUser);
             }
           });
           // Ensure default admin always exists
@@ -4765,6 +4766,7 @@ window.EMAILJS_TEMPLATE_ID='template_80h43gm';
 // Password Reset OTP variables
 let currentOTP=null;
 let otpExpiry=null;
+let otpAttempts=0; // brute-force guard for the emailed OTP
 let pendingResetUser=null;
 
 // Default admin user — matching CESTIS-MAIN-DASHBOARD
@@ -4821,6 +4823,24 @@ function loadUsers(){
 function saveUsers(usrs){
   if(usrs)users=usrs;
   CESTISStore.setItem(USERS_KEY,JSON.stringify(users));
+}
+// Carry two-step-verification state (secret, enabled flag, backup codes) from a
+// cloud copy of a user onto the local copy during sync. The field-by-field
+// merges below only copied displayName/role/password, so enabling or disabling
+// 2FA on one device never reached devices that already had the user row.
+function pyMergeUser2FA(existing, cloud){
+  if(!existing||!cloud)return;
+  if(cloud.twoFactorSecret!==undefined) existing.twoFactorSecret=cloud.twoFactorSecret;
+  if(cloud.twoFactorEnabled!==undefined) existing.twoFactorEnabled=cloud.twoFactorEnabled;
+  if(Array.isArray(cloud.backupCodes)){
+    if(!Array.isArray(existing.backupCodes)) existing.backupCodes=[];
+    var by={};existing.backupCodes.forEach(function(b){if(b&&b.code)by[b.code]=b;});
+    cloud.backupCodes.forEach(function(cb){
+      if(!cb||!cb.code)return;var ex=by[cb.code];
+      if(!ex){existing.backupCodes.push({code:cb.code,used:!!cb.used});by[cb.code]=existing.backupCodes[existing.backupCodes.length-1];}
+      else if(cb.used&&!ex.used){ex.used=true;}
+    });
+  }
 }
 
 function loadPermissions(){
@@ -5170,7 +5190,7 @@ async function performAutoSyncOnLogin(){
       backup.users.forEach(function(cu){
         var existing=localUsers.find(function(u){return u.username.toLowerCase()===cu.username.toLowerCase();});
         if(!existing)localUsers.push(cu);
-        else{existing.displayName=cu.displayName;existing.role=cu.role;if(cu.password)existing.password=cu.password;}
+        else{existing.displayName=cu.displayName;existing.role=cu.role;if(cu.password)existing.password=cu.password;pyMergeUser2FA(existing,cu);}
       });
       users=localUsers;
       saveUsers(localUsers);
@@ -5453,7 +5473,7 @@ async function firstTimeGoogleSync(){
       backupData.users.forEach(function(cu){
         var existing=localUsers.find(function(u){return u.username.toLowerCase()===cu.username.toLowerCase();});
         if(!existing){localUsers.push(cu);added++;}
-        else{existing.displayName=cu.displayName;existing.role=cu.role;if(cu.password)existing.password=cu.password;}
+        else{existing.displayName=cu.displayName;existing.role=cu.role;if(cu.password)existing.password=cu.password;pyMergeUser2FA(existing,cu);}
       });
       if(!localUsers.some(function(u){return u.username.toLowerCase()==='cestisadmin';}))localUsers.push(getDefaultUsers()[0]);
       saveUsers(localUsers);
@@ -5596,7 +5616,7 @@ async function autoSyncCredentialsOnLoad(){
       backupData.users.forEach(function(cu){
         var existing=localUsers.find(function(u){return u.username.toLowerCase()===cu.username.toLowerCase();});
         if(!existing){localUsers.push(cu);added++;}
-        else{existing.displayName=cu.displayName;existing.role=cu.role;if(cu.password)existing.password=cu.password;}
+        else{existing.displayName=cu.displayName;existing.role=cu.role;if(cu.password)existing.password=cu.password;pyMergeUser2FA(existing,cu);}
       });
       if(!localUsers.some(function(u){return u.username.toLowerCase()==='cestisadmin';}))localUsers.push(getDefaultUsers()[0]);
       saveUsers(localUsers);
@@ -6091,6 +6111,7 @@ function sendOTPEmail(){
   if(!user){showForgotPasswordError('No account found with this email address');return;}
   currentOTP=generateOTP();
   otpExpiry=Date.now()+(10*60*1000);
+  otpAttempts=0;
   pendingResetUser=user;
   sendOTPViaEmail(user.email,currentOTP,user.displayName);
 }
@@ -6137,6 +6158,7 @@ function resendOTP(){
   if(!pendingResetUser){cancelForgotPassword();return;}
   currentOTP=generateOTP();
   otpExpiry=Date.now()+(10*60*1000);
+  otpAttempts=0;
   sendOTPViaEmail(pendingResetUser.email,currentOTP,pendingResetUser.displayName);
 }
 
@@ -6146,9 +6168,12 @@ function verifyOTP(){
   if(!enteredOTP){showOTPError('Please enter the OTP code');return;}
   if(enteredOTP.length!==6){showOTPError('OTP must be 6 digits');return;}
   if(Date.now()>otpExpiry){showOTPError('OTP has expired. Please request a new one.');return;}
+  if(otpAttempts>=6){currentOTP=null;otpExpiry=null;showOTPError('Too many incorrect attempts. Please request a new code.');return;}
   if(enteredOTP===currentOTP){
+    otpAttempts=0;currentOTP=null;
     showNewPasswordStep();
   }else{
+    otpAttempts++;
     showOTPError('Invalid OTP. Please check and try again.');
     document.getElementById('otpCode').value='';
     document.getElementById('otpCode').focus();
