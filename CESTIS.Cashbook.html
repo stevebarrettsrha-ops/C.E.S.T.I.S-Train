@@ -828,7 +828,7 @@ tbody tr.bank-charge { color:var(--text3); font-style:italic; }
 /* Print */
 @media print {
     /* ---- Hide non-printable UI ---- */
-    .sidebar, .header-actions, .btn, .nav-item, .search-bar,
+    .sidebar, .cb-mobile-nav, .header-actions, .btn, .nav-item, .search-bar,
     .no-print, .modal-overlay, .login-overlay, .first-time-sync-prompt,
     .void-cheque-card, .quarter-nav, .month-tabs,
     .bl-quarter-nav, .section-filter-row, .budget-search-bar,
@@ -2042,10 +2042,42 @@ tbody tr.bank-charge { color:var(--text3); font-style:italic; }
     line-height: 1;
 }
 
+/* Mobile nav bar: hidden on desktop, replaces the sidebar on small screens */
+.cb-mobile-nav { display:none; }
+
 /* Responsive */
 @media (max-width:900px) {
     .app { grid-template-columns:1fr; }
+    .cb-mobile-nav {
+        display:block;
+        position:sticky; top:0; z-index:950;
+        background:var(--surface);
+        border-bottom:1px solid var(--border);
+        padding:.5rem .75rem;
+    }
+    .cb-mobile-nav-toggle {
+        display:flex; align-items:center; gap:.6rem; width:100%;
+        background:var(--surface2); color:var(--text);
+        border:1px solid var(--border); border-radius:8px;
+        padding:.6rem .75rem; font-size:.85rem; font-weight:600;
+        cursor:pointer; font-family:inherit; text-align:left;
+    }
+    .cb-mobile-nav-caret { margin-left:auto; font-size:.7rem; color:var(--text3); transition:transform .15s; }
+    .app.mobile-nav-open .cb-mobile-nav-caret { transform:rotate(180deg); }
+    /* Sidebar collapses into a dropdown panel under the mobile nav bar */
     .sidebar { display:none; }
+    .app.mobile-nav-open .sidebar {
+        display:flex;
+        position:fixed; top:56px; left:0; right:0;
+        height:auto; max-height:calc(100vh - 56px);
+        overflow-y:auto; z-index:940;
+        border-right:none; border-bottom:1px solid var(--border);
+        box-shadow:0 16px 32px rgba(0,0,0,.5);
+    }
+    .app.mobile-nav-open::after {
+        content:''; position:fixed; left:0; right:0; top:56px; bottom:0;
+        background:rgba(0,0,0,.45); z-index:930;
+    }
     .charts-grid { grid-template-columns:1fr; }
     .fin-summary { grid-template-columns:1fr; }
     .fin-connector { display:none; }
@@ -2337,8 +2369,16 @@ tbody tr.bank-charge { color:var(--text3); font-style:italic; }
 <!-- APP (hidden until authenticated)                              -->
 <!-- ============================================================ -->
 <div class="app app-hidden" id="appContainer">
+    <!-- Mobile nav bar: on small screens the sidebar collapses into this dropdown -->
+    <div class="cb-mobile-nav" id="mobileNavBar">
+        <button type="button" class="cb-mobile-nav-toggle" id="mobileNavToggle" aria-expanded="false" aria-controls="cashbookSidebar" onclick="toggleMobileNav()">
+            <span>&#9776;</span>
+            <span id="mobileNavCurrent">Dashboard</span>
+            <span class="cb-mobile-nav-caret">&#9662;</span>
+        </button>
+    </div>
     <!-- Sidebar -->
-    <aside class="sidebar">
+    <aside class="sidebar" id="cashbookSidebar">
         <div class="logo">
             <h1>💼 CESTIS</h1>
             <p>Cash Book Manager</p>
@@ -5501,6 +5541,8 @@ function showPage(page) {
     document.getElementById('page-'+page).classList.add('active');
     document.querySelectorAll('.nav-item').forEach(n=>n.classList.remove('active'));
     event.currentTarget.classList.add('active');
+    updateMobileNavLabel();
+    closeMobileNav();
     refreshAll();
 }
 
@@ -5510,8 +5552,46 @@ function navigateToPage(page) {
     document.querySelectorAll('.nav-item').forEach(n=>n.classList.remove('active'));
     var navItem = document.querySelector('.nav-item[onclick*="' + page + '"]');
     if (navItem) navItem.classList.add('active');
+    updateMobileNavLabel();
+    closeMobileNav();
     refreshAll();
 }
+
+// ============================================================
+// MOBILE NAV (sidebar collapses into a dropdown on small screens)
+// ============================================================
+
+function toggleMobileNav() {
+    var app = document.getElementById('appContainer');
+    if (!app) return;
+    var open = app.classList.toggle('mobile-nav-open');
+    var btn = document.getElementById('mobileNavToggle');
+    if (btn) btn.setAttribute('aria-expanded', open ? 'true' : 'false');
+}
+
+function closeMobileNav() {
+    var app = document.getElementById('appContainer');
+    if (app) app.classList.remove('mobile-nav-open');
+    var btn = document.getElementById('mobileNavToggle');
+    if (btn) btn.setAttribute('aria-expanded', 'false');
+}
+
+function updateMobileNavLabel() {
+    var label = document.getElementById('mobileNavCurrent');
+    if (!label) return;
+    var active = document.querySelector('.sidebar .nav-item.active');
+    label.textContent = active ? active.textContent.trim() : 'Menu';
+}
+
+// Tap outside the open dropdown (on the dimmed page area) closes it.
+document.addEventListener('click', function(e) {
+    var app = document.getElementById('appContainer');
+    if (!app || !app.classList.contains('mobile-nav-open')) return;
+    var bar = document.getElementById('mobileNavBar');
+    var sidebar = document.getElementById('cashbookSidebar');
+    if ((bar && bar.contains(e.target)) || (sidebar && sidebar.contains(e.target))) return;
+    closeMobileNav();
+});
 
 function openExternalLink(linkKey) {
     const url = EXTERNAL_LINKS[linkKey];
@@ -6911,6 +6991,8 @@ function showPageDirect(page) {
     document.querySelectorAll('.nav-item').forEach(n => {
         if (n.getAttribute('data-page') === page) n.classList.add('active');
     });
+    updateMobileNavLabel();
+    closeMobileNav();
     // Always save current state and refresh all sections first to ensure data consistency
     saveToStorage();
     saveQuarterBudget();
@@ -8038,6 +8120,7 @@ function handleLogout() {
     // Show login, hide app
     document.getElementById('loginOverlay').classList.remove('hidden');
     document.getElementById('appContainer').classList.add('app-hidden');
+    closeMobileNav();
 }
 
 function showApp() {
@@ -8049,6 +8132,7 @@ function showApp() {
     refreshAll();
     updateQuarterUI();
     updateBLQuarterUI();
+    updateMobileNavLabel();
     // Initialize cloud sync UI
     initCurrentUser();
     updateCloudUI();
