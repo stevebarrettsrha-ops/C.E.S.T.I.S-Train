@@ -7442,7 +7442,7 @@ function updateBulkBar() {
 function bulkActivate() {
   umSelectedIds.forEach(function(id) {
     var u = userAccounts.find(function(a){ return a.id === id; });
-    if(u) u.status = 'active';
+    if(u) { u.status = 'active'; touchAccount(u); }
   });
   saveUserAccounts();
   umSelectedIds = [];
@@ -7453,7 +7453,7 @@ function bulkActivate() {
 function bulkDeactivate() {
   umSelectedIds.forEach(function(id) {
     var u = userAccounts.find(function(a){ return a.id === id; });
-    if(u) u.status = 'disabled';
+    if(u) { u.status = 'disabled'; touchAccount(u); }
   });
   saveUserAccounts();
   umSelectedIds = [];
