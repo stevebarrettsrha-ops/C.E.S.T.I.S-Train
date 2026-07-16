@@ -1903,10 +1903,12 @@
                 <div class="stat-card">
                     <h3>Total Students</h3>
                     <div class="value" id="totalStudents">0</div>
+                    <div id="totalStudentsScope" style="font-size:12px;color:var(--text-muted,#5b6b80);margin-top:4px;font-weight:600;"></div>
                 </div>
                 <div class="stat-card">
                     <h3>Total Expected Fees</h3>
                     <div class="value" id="totalExpected">$0.00</div>
+                    <div id="totalExpectedScope" style="font-size:12px;color:var(--text-muted,#5b6b80);margin-top:4px;font-weight:600;"></div>
                 </div>
                 <div class="stat-card">
                     <h3>Total Collected</h3>
@@ -1916,7 +1918,7 @@
                 <div class="stat-card">
                     <h3>Total Outstanding</h3>
                     <div class="value" id="totalOutstanding">$0.00</div>
-                    <div style="font-size:12px;color:var(--text-muted,#5b6b80);margin-top:4px;font-weight:600;">All-time balance</div>
+                    <div id="totalOutstandingScope" style="font-size:12px;color:var(--text-muted,#5b6b80);margin-top:4px;font-weight:600;">All-time balance</div>
                 </div>
             </div>
 
@@ -5965,34 +5967,64 @@
             alert('Payment recorded successfully! Receipt has been generated and downloaded.');
         }
 
-        // ----- Quarterly fee filtering (like the Cashbook) ------------------
-        // Payments are bucketed by their payment date into the CESTIS financial
-        // quarter (Apr–Jun = Q1 … Jan–Mar = Q4). The register and the "Total
-        // Collected" figure can be viewed per quarter or as "All Payments". The
-        // selected quarter is the app-wide shared quarter (cestis_active_quarter),
-        // so it stays in sync with the Cashbook & Virement. Expected/Outstanding
-        // balances remain cumulative (all-time) — only payment-derived figures scope.
-        let feeShowAllPayments = true;   // default: show every payment (unfiltered)
+        // ----- Fiscal-year + quarterly fee filtering (like the Cashbook) ----
+        // Exactly as the Cashbook buckets every transaction into the financial
+        // quarter its date falls in, every record here is bucketed by its own
+        // date into the CESTIS financial year (Apr–Mar) and quarter (Apr–Jun =
+        // Q1 … Jan–Mar = Q4):
+        //   • payments  → the FY+quarter of their payment date,
+        //   • students  → the FY of their enrollment date (cohort),
+        // so the whole dashboard follows the FY selected in the filter bar.
+        // "All Quarters" shows the active FY's four quarters together; Q1–Q4
+        // narrow payments to one quarter of that FY. The selection is the
+        // app-wide shared quarter (cestis_active_quarter), so it stays in sync
+        // with the Cashbook & Virement.
+        let feeShowAllPayments = true;   // default: show the whole active FY (all four quarters)
         let _feeSuppressQuarterSub = false; // set while a LOCAL quarter change renders itself
 
-        // True when a payment is in the current view scope (All, or the active quarter).
+        // True when a payment is in the current view scope: the active FY when
+        // "All Quarters" is selected, otherwise the active FY+quarter.
         function paymentInActiveQuarter(p) {
-            if (feeShowAllPayments) return true;
             if (typeof CESTISCore === 'undefined' || !CESTISCore.getActiveQuarter) return true;
             // Undated/unparseable payments stay visible so they are never silently hidden.
-            if (!p || !CESTISCore.deriveQuarter(p.date)) return true;
+            const dq = p ? CESTISCore.deriveQuarter(p.date) : null;
+            if (!dq) return true;
             const cur = CESTISCore.getActiveQuarter();
-            return CESTISCore.recordInQuarter(p, cur.fy, cur.q, 'date');
+            if (feeShowAllPayments) return dq.fy === cur.fy;
+            return dq.fy === cur.fy && dq.q === cur.q;
+        }
+
+        // True when a student belongs to the active financial year's cohort —
+        // the FY their enrollment date falls in (createdAt as fallback).
+        // Students without a usable date stay visible in every FY so they are
+        // never silently hidden.
+        function studentInActiveFY(s) {
+            if (typeof CESTISCore === 'undefined' || !CESTISCore.getActiveQuarter) return true;
+            if (!s) return false;
+            const dq = CESTISCore.deriveQuarter(s.enrollmentDate) || CESTISCore.deriveQuarter(s.createdAt);
+            if (!dq) return true;
+            return dq.fy === CESTISCore.getActiveQuarter().fy;
         }
 
         // Payments currently in scope (used by the dashboard "Total Collected").
         function paymentsInScope() { return payments.filter(paymentInActiveQuarter); }
 
-        // A short label for the active scope, e.g. "All Payments" or "Q1 · Apr–Jun 2026".
+        // Students in the active FY's cohort (drives Expected/Outstanding).
+        function studentsInScope() { return students.filter(studentInActiveFY); }
+
+        // A short label for the active scope, e.g. "FY 2026/2027 · All quarters"
+        // or "Q1 · Apr–Jun 2026".
         function feeScopeLabel() {
-            if (feeShowAllPayments || typeof CESTISCore === 'undefined' || !CESTISCore.getActiveQuarter) return 'All Payments';
+            if (typeof CESTISCore === 'undefined' || !CESTISCore.getActiveQuarter) return 'All Payments';
             const cur = CESTISCore.getActiveQuarter();
+            if (feeShowAllPayments) return 'FY ' + cur.fy + ' · All quarters';
             return CESTISCore.quarterShortLabel(cur.fy, cur.q) + ' ' + CESTISCore.quarterCalendarYear(cur.fy, cur.q);
+        }
+
+        // Label for the FY the student-derived cards are scoped to.
+        function feeFYLabel() {
+            if (typeof CESTISCore === 'undefined' || !CESTISCore.getActiveQuarter) return 'All students';
+            return 'FY ' + CESTISCore.getActiveQuarter().fy;
         }
 
         // Inject the filter-bar styles once.
@@ -6034,7 +6066,7 @@
                     '<button class="fee-qbtn" onclick="feeShiftFY(1)" title="Next financial year">▶</button>' +
                 '</div>' +
                 '<div class="fee-qtabs">' +
-                    '<button class="fee-qtab fee-allpay' + (feeShowAllPayments ? ' active' : '') + '" onclick="feeSelectAll()">All Payments</button>' +
+                    '<button class="fee-qtab fee-allpay' + (feeShowAllPayments ? ' active' : '') + '" onclick="feeSelectAll()" title="Every quarter of the selected financial year">All Quarters</button>' +
                     quarters.map(function (m) {
                         return '<button class="fee-qtab' + ((!feeShowAllPayments && m.q === cur.q) ? ' active' : '') +
                             '" onclick="feeSelectQuarter(' + m.q + ')">' + m.label + '</button>';
@@ -6087,8 +6119,10 @@
             if (typeof CESTISCore !== 'undefined' && CESTISCore.onQuarterChange) {
                 CESTISCore.onQuarterChange(function () {
                     if (_feeSuppressQuarterSub) return; // a local click already re-rendered
-                    if (feeShowAllPayments) { _renderFeeFilters(); }
-                    else { feeApplyQuarterChange(); }
+                    // Every view is FY-scoped (even "All Quarters" = whole FY),
+                    // so any FY/quarter switch from another page must re-render
+                    // the data, not just the filter bars.
+                    feeApplyQuarterChange();
                 });
             }
         }
@@ -6889,13 +6923,16 @@
             // Recalculate student totals from actual payment records
             recalculateStudentTotals();
 
-            const totalStudents = students.length;
-            const totalExpected = students.reduce((sum, s) => sum + (parseFloat(s.tuitionFee) || 0), 0);
-            // Collected reflects the active scope (All Payments, or the selected quarter);
-            // Outstanding stays a cumulative all-time balance (Expected − all collected).
+            // Every figure follows the FY selected in the filter bar (like the
+            // Cashbook): Students/Expected count the active FY's cohort (by
+            // enrollment date); Collected reflects the active scope (whole FY,
+            // or the selected quarter within it); Outstanding is what the FY's
+            // cohort still owes (their expected minus everything they've paid).
+            const fyStudents = studentsInScope();
+            const totalStudents = fyStudents.length;
+            const totalExpected = fyStudents.reduce((sum, s) => sum + (parseFloat(s.tuitionFee) || 0), 0);
             const collectedInScope = paymentsInScope().reduce((sum, p) => sum + (parseFloat(p.amount) || 0), 0);
-            const collectedAllTime = payments.reduce((sum, p) => sum + (parseFloat(p.amount) || 0), 0);
-            const totalOutstanding = totalExpected - collectedAllTime;
+            const totalOutstanding = fyStudents.reduce((sum, s) => sum + (parseFloat(s.balance) || 0), 0);
 
             document.getElementById('totalStudents').textContent = totalStudents.toLocaleString();
             document.getElementById('totalExpected').textContent = formatCurrency(totalExpected);
@@ -6903,8 +6940,14 @@
             document.getElementById('totalOutstanding').textContent = formatCurrency(totalOutstanding);
             const _scopeEl = document.getElementById('totalCollectedScope');
             if (_scopeEl) _scopeEl.textContent = feeScopeLabel();
+            const _stuScopeEl = document.getElementById('totalStudentsScope');
+            if (_stuScopeEl) _stuScopeEl.textContent = feeFYLabel();
+            const _expScopeEl = document.getElementById('totalExpectedScope');
+            if (_expScopeEl) _expScopeEl.textContent = feeFYLabel();
+            const _outScopeEl = document.getElementById('totalOutstandingScope');
+            if (_outScopeEl) _outScopeEl.textContent = feeFYLabel() + ' cohort balance';
 
-            const recentPayments = [...payments].sort((a, b) => new Date(b.date) - new Date(a.date)).slice(0, 5);
+            const recentPayments = paymentsInScope().sort((a, b) => new Date(b.date) - new Date(a.date)).slice(0, 5);
             const activityDiv = document.getElementById('recentActivity');
 
             if (recentPayments.length > 0) {
@@ -6948,13 +6991,15 @@
                 
                 const skillAreas = Object.keys(feeStructure);
                 const _scopedPays = paymentsInScope();
+                const _scopedStudents = studentsInScope();
                 const _nrm = function(v){ return (v == null ? '' : String(v)).toLowerCase().trim(); };
                 const collectionData = skillAreas.map(area => {
-                    const areaStudents = students.filter(s => _nrm(s.skillArea) === _nrm(area));
+                    // Both sides of the rate follow the FY selected in the filter
+                    // bar: expected comes from the active FY's student cohort,
+                    // collected from payments in the active scope (whole FY, or
+                    // the selected quarter within it).
+                    const areaStudents = _scopedStudents.filter(s => _nrm(s.skillArea) === _nrm(area));
                     const expected = areaStudents.reduce((sum, s) => sum + (parseFloat(s.tuitionFee) || 0), 0);
-                    // Collected scopes to the active period (All Payments / selected
-                    // quarter); expected stays cumulative, so the chart reflects the
-                    // current FY/quarter selection instead of being all-time fixed.
                     const collected = _scopedPays.filter(p => _nrm(p.skillArea) === _nrm(area)).reduce((sum, p) => sum + (parseFloat(p.amount) || 0), 0);
                     return expected > 0 ? Math.min(100, (collected / expected * 100)).toFixed(1) : 0;
                 });
@@ -7017,8 +7062,8 @@
                 }
                 
                 // The trend window follows the active scope so the dashboard changes
-                // with the FY/quarter: a selected quarter shows its 3 months; All
-                // Payments shows the active financial year's 12 months (Apr–Mar);
+                // with the FY/quarter: a selected quarter shows its 3 months; "All
+                // Quarters" shows the active financial year's 12 months (Apr–Mar);
                 // with no quarter engine, fall back to the last 6 months from today.
                 const trendMonths = [];
                 const pushMonth = function(year, month0){
