@@ -4321,13 +4321,14 @@ body.vc-fullscreen-mode.vc-host-only-mode .video-grid .video-tile:not(.vc-hoston
       </div>
     </div>
 
-    <!-- Step 2: verify the recovery email -->
+    <!-- Step 2: verify the emailed one-time code -->
     <div id="forgotPwStep2" style="display:none;">
-      <p style="font-size:13px;color:var(--text-secondary);margin-bottom:16px;">For your security, confirm the recovery email on file for this account (<strong id="forgotPwEmailHint"></strong>).</p>
-      <div class="form-group"><label>Recovery Email</label><input type="text" class="form-control" id="forgotPwEmail" placeholder="Enter your recovery email" onkeydown="if(event.key==='Enter')forgotPwVerifyEmail()"></div>
+      <p style="font-size:13px;color:var(--text-secondary);margin-bottom:16px;">We emailed a 6-digit code to your recovery address (<strong id="forgotPwEmailHint"></strong>). Enter it below to confirm it's you. It expires in 10 minutes.</p>
+      <div class="form-group"><label>Verification code</label><input type="text" maxlength="6" inputmode="numeric" autocomplete="one-time-code" class="form-control tfa-code-input" id="forgotPwEmail" placeholder="••••••" onkeydown="if(event.key==='Enter')forgotPwVerifyCode()"></div>
+      <p style="font-size:12px;margin:4px 0 0;"><a href="#" onclick="forgotPwResend();return false;" style="color:var(--accent);">Didn't get it? Resend code</a></p>
       <div style="display:flex;gap:10px;justify-content:flex-end;margin-top:20px;">
         <button class="btn btn-secondary" onclick="forgotPwShowStep(1)">Back</button>
-        <button class="btn btn-primary" onclick="forgotPwVerifyEmail()">Verify</button>
+        <button class="btn btn-primary" onclick="forgotPwVerifyCode()">Verify</button>
       </div>
     </div>
 
@@ -4368,6 +4369,7 @@ body.vc-fullscreen-mode.vc-host-only-mode .video-grid .video-tile:not(.vc-hoston
     </div>
     <div id="tfaVerifyError" class="tfa-error"></div>
     <p id="tfaBackupLink" style="font-size:12px;margin-top:10px;"><a href="#" onclick="tfaShowBackupInput();return false;" style="color:var(--accent);">Lost your device? Use a backup code</a></p>
+    <p id="tfaEmailLink" style="font-size:12px;margin-top:6px;display:none;"><a href="#" onclick="tfaSendEmailCode();return false;" style="color:var(--accent);">Can't use your authenticator? Email me a code</a></p>
     <div style="display:flex;gap:10px;justify-content:flex-end;margin-top:16px;">
       <button class="btn btn-secondary" onclick="tfaCancelVerify()">Cancel</button>
       <button class="btn btn-primary" onclick="tfaSubmitVerify()">Verify</button>
@@ -7237,22 +7239,42 @@ async function forgotPwLookup() {
   }
   forgotPwState.account = acct;
   document.getElementById('forgotPwEmailHint').textContent = forgotPwMaskEmail(recovery);
+  document.getElementById('forgotPwEmail').value = '';
+  var sendRes = await sendEmailOtp(acct, 'reset');
+  if(!sendRes.ok) {
+    showToast(sendRes.reason === 'send-failed' ? 'Could not send the code by email — please try again.' : 'No recovery email is on file. Contact an administrator.', 'error');
+    return;
+  }
   forgotPwShowStep(2);
   setTimeout(function(){ var el = document.getElementById('forgotPwEmail'); if(el) el.focus(); }, 60);
 }
 
-function forgotPwVerifyEmail() {
+async function forgotPwResend() {
   var acct = forgotPwState.account;
   if(!acct) { forgotPwShowStep(1); return; }
-  var entered = (document.getElementById('forgotPwEmail').value || '').trim().toLowerCase();
-  var onFile = (acct.email || '').trim().toLowerCase();
-  if(!entered) { showToast('Enter your recovery email.', 'warning'); return; }
-  if(entered !== onFile) { showToast('That email does not match the recovery email on file.', 'error'); return; }
+  var res = await sendEmailOtp(acct, 'reset');
+  if(res.ok) showToast('A new code has been sent.');
+  else showToast('Could not resend the code — please try again.', 'error');
+}
+
+function forgotPwVerifyCode() {
+  var acct = forgotPwState.account;
+  if(!acct) { forgotPwShowStep(1); return; }
+  var code = (document.getElementById('forgotPwEmail').value || '').trim();
+  if(code.length !== 6) { showToast('Enter the 6-digit code from your email.', 'warning'); return; }
+  var vr = verifyEmailOtp(acct, code, 'reset');
+  if(!vr.ok) {
+    showToast(vr.reason === 'expired' ? 'That code expired — use "Resend code" to get a new one.'
+      : vr.reason === 'too-many' ? 'Too many attempts — use "Resend code" to get a new one.'
+      : 'Invalid code. Please try again.', 'error');
+    return;
+  }
   var toStep3 = function(){ forgotPwShowStep(3); setTimeout(function(){ var el = document.getElementById('forgotPwNew'); if(el) el.focus(); }, 60); };
-  // When 2FA is on, also require a code — a lost password shouldn't bypass it.
-  // Backup codes are allowed here as the intended recovery mechanism.
+  // When authenticator 2FA is on, also require its code — proving control of the
+  // email must not let someone bypass the authenticator second factor. Backup
+  // codes are allowed here as the intended recovery mechanism.
   if(tfaEnabled(acct)) {
-    tfaOpenVerify(acct, { title: 'Verify It\'s You', subtitle: 'Enter your 6-digit code (or a backup code) to reset your password.', allowBackup: true }, toStep3);
+    tfaOpenVerify(acct, { title: 'Verify It\'s You', subtitle: 'Enter your 6-digit authenticator code (or a backup code) to finish resetting your password.', allowBackup: true }, toStep3);
     return;
   }
   toStep3();
@@ -7848,6 +7870,60 @@ var tfaPendingBackupCodes = null;
 var tfaVerifyAccount = null;
 var tfaVerifyCallback = null;
 var tfaBackupOnly = false; // true when the authenticator lib is unavailable and only backup codes can be used
+var tfaEmailMode = false;  // true when the verify modal is checking an EMAILED one-time code instead of a TOTP
+
+// ---- Emailed one-time passcodes (main app: login 2FA option + password reset) ----
+// Client-side OTP (same trust model as the existing time-clock reset): the code
+// lives only in memory here, is single-use, expires, and is rate-limited. It is
+// delivered through the configured EmailJS service (service_v49btoq); if that
+// service isn't configured it falls back to a visible demo code.
+var _emailOtp = null; // { code, accountId, purpose, email, expiresAt, attempts }
+var EMAIL_OTP_TTL_MS = 10 * 60 * 1000;
+var EMAIL_OTP_MAX_ATTEMPTS = 6;
+
+function emailOtpConfigured(){
+  return typeof emailjs !== 'undefined' && !!window.EMAILJS_SERVICE_ID && !!window.EMAILJS_PUBLIC_KEY && !!window.EMAILJS_TEMPLATE_ID;
+}
+function generateEmailOtp(){
+  var n;
+  try { var b = new Uint32Array(1); crypto.getRandomValues(b); n = b[0] % 1000000; }
+  catch(e){ n = Math.floor(Math.random() * 1000000); }
+  return ('000000' + n).slice(-6);
+}
+function accountRecoveryEmail(account){
+  var e = (account && account.email || '').trim();
+  return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(e) ? e : '';
+}
+// Send an OTP to the account's recovery email. Resolves {ok:true} / {ok:false,reason}.
+async function sendEmailOtp(account, purpose){
+  var email = accountRecoveryEmail(account);
+  if(!email) return { ok:false, reason:'no-email' };
+  var code = generateEmailOtp();
+  _emailOtp = { code: code, accountId: account.id, purpose: purpose || '', email: email, expiresAt: Date.now() + EMAIL_OTP_TTL_MS, attempts: 0 };
+  if(!emailOtpConfigured()){
+    alert('DEMO MODE — verification code for ' + forgotPwMaskEmail(email) + ':\n\n' + code + '\n\n(This would normally be emailed. It expires in 10 minutes.)');
+    return { ok:true, demo:true };
+  }
+  try {
+    await emailjs.send(window.EMAILJS_SERVICE_ID, window.EMAILJS_TEMPLATE_ID, { email: email, passcode: code, time: '10 minutes' });
+    return { ok:true };
+  } catch(e){
+    console.error('[EmailOTP] send failed:', e);
+    return { ok:false, reason:'send-failed', error:e };
+  }
+}
+// Verify a submitted code. Resolves {ok:true} / {ok:false,reason}. One-time use.
+function verifyEmailOtp(account, code, purpose){
+  var o = _emailOtp;
+  if(!o || !account || o.accountId !== account.id || (purpose && o.purpose !== purpose)) return { ok:false, reason:'no-code' };
+  if(Date.now() > o.expiresAt){ _emailOtp = null; return { ok:false, reason:'expired' }; }
+  if(o.attempts >= EMAIL_OTP_MAX_ATTEMPTS){ _emailOtp = null; return { ok:false, reason:'too-many' }; }
+  o.attempts++;
+  var input = String(code || '').trim();
+  if(input.length !== 6 || input !== o.code) return { ok:false, reason:'mismatch' };
+  _emailOtp = null; // burn on success
+  return { ok:true };
+}
 
 function tfaEnabled(acct){ return !!(acct && acct.twoFactorEnabled && acct.twoFactorSecret); }
 
@@ -7871,6 +7947,11 @@ function mergeTwoFactorState(localAcct, cloudAcct){
     if(localAcct.twoFactorEnabled !== !!cloudAcct.twoFactorEnabled){ localAcct.twoFactorEnabled = !!cloudAcct.twoFactorEnabled; changed = true; }
     if((cloudAcct.twoFactorSecret || null) !== (localAcct.twoFactorSecret || null)){ localAcct.twoFactorSecret = cloudAcct.twoFactorSecret || null; changed = true; }
     if(cloudAcct.twoFactorUpdatedAt && cloudAcct.twoFactorUpdatedAt !== localAcct.twoFactorUpdatedAt){ localAcct.twoFactorUpdatedAt = cloudAcct.twoFactorUpdatedAt; changed = true; }
+  }
+  // Email-sign-in-code preference travels with the 2FA state (newest-wins by the
+  // same timestamp), so opting in/out on one device reaches the others.
+  if(cloudAcct.twoFactorUpdatedAt && (ct > lt || (localAcct.emailOtpLogin === undefined && cloudAcct.emailOtpLogin !== undefined))){
+    if(!!localAcct.emailOtpLogin !== !!cloudAcct.emailOtpLogin){ localAcct.emailOtpLogin = !!cloudAcct.emailOtpLogin; changed = true; }
   }
   // Union backup codes regardless of direction, OR-ing the "used" flag so a
   // one-time code consumed anywhere is burned everywhere.
@@ -7931,6 +8012,7 @@ function tfaOpenVerify(account, opts, onSuccess){
   opts = opts || {};
   tfaVerifyAccount = account; tfaVerifyCallback = onSuccess;
   tfaBackupOnly = !!opts.backupOnly;
+  tfaEmailMode = false;
   document.getElementById('tfaVerifyTitle').textContent = opts.title || 'Two-Step Verification';
   document.getElementById('tfaVerifySubtitle').textContent = opts.subtitle || 'Enter the 6-digit code from your authenticator app.';
   document.getElementById('tfaVerifyCode').value = '';
@@ -7948,6 +8030,11 @@ function tfaOpenVerify(account, opts, onSuccess){
     document.getElementById('tfaBackupSection').style.display = 'none';
     document.getElementById('tfaBackupLink').style.display = opts.allowBackup === false ? 'none' : 'block';
   }
+  // Offer "email me a code" whenever the caller allows it and a recovery email
+  // is on file — an escape hatch for a lost/absent authenticator (works even in
+  // backup-only mode, since it doesn't need the authenticator library).
+  var emailLink = document.getElementById('tfaEmailLink');
+  if(emailLink) emailLink.style.display = (opts.allowEmail && accountRecoveryEmail(account)) ? 'block' : 'none';
   openModal('tfaVerifyModal');
   setTimeout(function(){ document.getElementById(tfaBackupOnly ? 'tfaVerifyBackup' : 'tfaVerifyCode').focus(); }, 50);
 }
@@ -7955,16 +8042,53 @@ function tfaShowBackupInput(){
   document.getElementById('tfaBackupSection').style.display = 'block';
   document.getElementById('tfaVerifyBackup').focus();
 }
+// Send an emailed one-time code and switch the open verify modal into email mode.
+async function tfaSendEmailCode(){
+  var acct = tfaVerifyAccount;
+  if(!acct){ return; }
+  if(!accountRecoveryEmail(acct)){ tfaShowError('No recovery email is on file for this account.'); return; }
+  tfaShowError('Sending a code to your email…');
+  var res = await sendEmailOtp(acct, 'login');
+  if(!res.ok){
+    tfaShowError(res.reason === 'no-email' ? 'No recovery email is on file for this account.' : 'Could not send the email — please try again.');
+    return;
+  }
+  tfaEmailMode = true; tfaBackupOnly = false;
+  var codeInput = document.getElementById('tfaVerifyCode');
+  var codeGroup = codeInput && codeInput.closest ? codeInput.closest('.form-group') : null;
+  if(codeGroup) codeGroup.style.display = '';
+  document.getElementById('tfaBackupSection').style.display = 'none';
+  document.getElementById('tfaEmailLink').style.display = 'none';
+  document.getElementById('tfaBackupLink').style.display = 'none';
+  document.getElementById('tfaVerifyError').style.display = 'none';
+  document.getElementById('tfaVerifySubtitle').textContent = 'Enter the 6-digit code we emailed to ' + forgotPwMaskEmail(acct.email) + '. It expires in 10 minutes.';
+  codeInput.value = ''; codeInput.focus();
+}
 function tfaCancelVerify(){
   tfaVerifyAccount = null; tfaVerifyCallback = null;
+  tfaBackupOnly = false; tfaEmailMode = false;
   closeModal('tfaVerifyModal');
 }
 function tfaSubmitVerify(){
   var acct = tfaVerifyAccount;
   if(!acct){ tfaCancelVerify(); return; }
   var backup = (document.getElementById('tfaVerifyBackup').value || '').trim().toUpperCase();
-  if(tfaBackupOnly && !backup){ tfaShowError('Enter one of your backup codes to continue.'); return; }
-  if(document.getElementById('tfaBackupSection').style.display !== 'none' && backup){
+  if(tfaEmailMode){
+    // Verifying an EMAILED one-time code (no authenticator library involved).
+    var ecode = (document.getElementById('tfaVerifyCode').value || '').trim();
+    if(ecode.length !== 6){ tfaShowError('Enter the 6-digit code from your email.'); return; }
+    var vr = verifyEmailOtp(acct, ecode, 'login');
+    if(!vr.ok){
+      tfaShowError(vr.reason === 'expired' ? 'That code expired — request a new one.'
+        : vr.reason === 'too-many' ? 'Too many attempts — request a new code.'
+        : 'Invalid code. Please try again.');
+      document.getElementById('tfaVerifyCode').value = '';
+      document.getElementById('tfaVerifyCode').focus();
+      return;
+    }
+  } else if(tfaBackupOnly && !backup){
+    tfaShowError('Enter one of your backup codes to continue.'); return;
+  } else if(document.getElementById('tfaBackupSection').style.display !== 'none' && backup){
     var rec = tfaAccountRecord(acct);
     var idx = (rec.backupCodes || []).findIndex(function(bc){ return bc.code === backup && !bc.used; });
     if(idx === -1){
@@ -7987,25 +8111,52 @@ function tfaSubmitVerify(){
   }
   var cb = tfaVerifyCallback;
   tfaVerifyAccount = null; tfaVerifyCallback = null;
+  tfaBackupOnly = false; tfaEmailMode = false;
   closeModal('tfaVerifyModal');
   if(cb) cb();
 }
+// Email-only 2FA path (account opted in via emailOtpLogin, no authenticator):
+// open the modal and immediately send a code, then accept it.
+async function tfaBeginEmailLogin(account, proceed){
+  tfaOpenVerify(account, { title: 'Two-Step Verification', subtitle: 'Sending a verification code to your email…', allowBackup: false, allowEmail: false }, proceed);
+  tfaVerifyAccount = account; // ensure still set
+  var res = await sendEmailOtp(account, 'login');
+  if(!res.ok){
+    tfaShowError(res.reason === 'no-email' ? 'No recovery email is on file — contact an administrator.' : 'Could not email a code — please try again.');
+    return;
+  }
+  tfaEmailMode = true;
+  var codeInput = document.getElementById('tfaVerifyCode');
+  var codeGroup = codeInput && codeInput.closest ? codeInput.closest('.form-group') : null;
+  if(codeGroup) codeGroup.style.display = '';
+  document.getElementById('tfaVerifySubtitle').textContent = 'Enter the 6-digit code we emailed to ' + forgotPwMaskEmail(account.email) + '. It expires in 10 minutes.';
+  codeInput.value = ''; codeInput.focus();
+}
 // Gate used by every sign-in path (password and Google).
 function tfaGateLogin(account, proceed){
-  if(!tfaEnabled(account)){ proceed(); return; }
-  var libMissing = (typeof OTPAuth === 'undefined');
+  var totpOn = tfaEnabled(account);
+  // Email-code two-step is an opt-in for accounts without an authenticator.
+  var emailOn = !!(account && account.emailOtpLogin) && !!accountRecoveryEmail(account);
+  if(!totpOn && !emailOn){ proceed(); return; }
   var who = (account.username || account.email || 'user');
-  // When the authenticator library can't load, don't dead-end the user: backup
-  // codes are verified by a plain string match (no library needed), so fall back
-  // to backup-code entry instead of blocking sign-in entirely.
-  tfaOpenVerify(account, {
-    title: 'Two-Step Verification',
-    subtitle: libMissing
-      ? 'The authenticator library could not load on this device, so your 6-digit code can\'t be checked here. Enter one of your backup codes to sign in as ' + who + ', or reload the page to use your authenticator app.'
-      : 'Enter the 6-digit code from your authenticator app to finish signing in as ' + who + '.',
-    allowBackup: true,
-    backupOnly: libMissing
-  }, proceed);
+  if(totpOn){
+    var libMissing = (typeof OTPAuth === 'undefined');
+    // When the authenticator library can't load, don't dead-end the user: backup
+    // codes (and an emailed code) work without the library, so fall back to those
+    // instead of blocking sign-in entirely.
+    tfaOpenVerify(account, {
+      title: 'Two-Step Verification',
+      subtitle: libMissing
+        ? 'The authenticator library could not load on this device, so your 6-digit code can\'t be checked here. Enter a backup code or email yourself a code to sign in as ' + who + ', or reload to use your authenticator app.'
+        : 'Enter the 6-digit code from your authenticator app to finish signing in as ' + who + '.',
+      allowBackup: true,
+      backupOnly: libMissing,
+      allowEmail: true
+    }, proceed);
+    return;
+  }
+  // Email-only two-step: send a code and accept it.
+  tfaBeginEmailLogin(account, proceed);
 }
 
 // ---- Manage modal (topbar shield button): enable / codes / disable ----
@@ -8048,6 +8199,31 @@ function tfaSaveEmail(){
   showToast('Recovery email address saved.');
   tfaRenderManage();
 }
+// Opt-in toggle: emailed one-time code at sign-in, for users without an
+// authenticator app. Requires a recovery email on file.
+function tfaEmailLoginToggleHtml(acct){
+  var hasEmail = !!accountRecoveryEmail(acct);
+  var on = !!acct.emailOtpLogin;
+  return '<div style="border:1px solid var(--border);border-radius:10px;padding:14px 16px;margin:14px 0;">'
+    + '<strong style="display:block;margin-bottom:4px;">✉️ Email sign-in codes</strong>'
+    + '<p style="font-size:12px;color:var(--text-secondary);margin:0 0 10px;">Get a one-time code emailed to your recovery address each time you sign in — useful if you don\'t use an authenticator app.'
+    + (hasEmail ? '' : ' <span style="color:var(--red);">Add a recovery email above first.</span>') + '</p>'
+    + '<button class="btn ' + (on ? 'btn-danger' : 'btn-primary') + '" onclick="tfaToggleEmailLogin()"' + (hasEmail ? '' : ' disabled style="opacity:.55;cursor:not-allowed;"') + '>'
+    + (on ? 'Turn Off Email Sign-in Codes' : 'Turn On Email Sign-in Codes') + '</button>'
+    + (on ? '<span style="font-size:12px;color:var(--green);margin-left:10px;">Currently on</span>' : '')
+    + '</div>';
+}
+function tfaToggleEmailLogin(){
+  var acct = tfaAccountRecord(currentLoggedInUser);
+  if(!acct){ showToast('Sign in first.', 'warning'); return; }
+  if(!acct.emailOtpLogin && !accountRecoveryEmail(acct)){ showToast('Add a recovery email first so codes have somewhere to go.', 'warning'); return; }
+  acct.emailOtpLogin = !acct.emailOtpLogin;
+  acct.twoFactorUpdatedAt = new Date().toISOString(); // sync this preference newest-wins across devices
+  if(currentLoggedInUser && currentLoggedInUser.id === acct.id) currentLoggedInUser.emailOtpLogin = acct.emailOtpLogin;
+  saveUserAccounts();
+  showToast(acct.emailOtpLogin ? 'Email sign-in codes turned on.' : 'Email sign-in codes turned off.');
+  tfaRenderManage();
+}
 function tfaRenderManage(){
   var acct = tfaAccountRecord(currentLoggedInUser);
   var body = document.getElementById('tfaManageBody');
@@ -8067,7 +8243,8 @@ function tfaRenderManage(){
     body.innerHTML = emailSection
       + '<div class="tfa-status-off"><strong>Two-step verification is OFF</strong><br>Protect your account with Google Authenticator or any TOTP-compatible app. Once on, you will be asked for a 6-digit code when signing in, and password resets will require re-verification.</div>'
       + (hasValidEmail ? '' : '<p style="font-size:12px;color:var(--text-secondary);margin:0 0 10px;">Add a recovery email above before turning this on, so a lost authenticator can\'t lock you out.</p>')
-      + '<button class="btn btn-primary" onclick="tfaOpenSetup()"' + (hasValidEmail ? '' : ' disabled style="opacity:.55;cursor:not-allowed;"') + '>Turn On Two-Step Verification</button>';
+      + '<button class="btn btn-primary" onclick="tfaOpenSetup()"' + (hasValidEmail ? '' : ' disabled style="opacity:.55;cursor:not-allowed;"') + '>Turn On Two-Step Verification</button>'
+      + tfaEmailLoginToggleHtml(acct);
   }
 }
 function tfaOpenSetup(){
