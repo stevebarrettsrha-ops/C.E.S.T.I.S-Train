@@ -5875,30 +5875,47 @@ function lmsChatEnsureStudentAccounts() {
   students.forEach(function(s) {
     if (!s || !s.id || !s.name) return;
     if (byStudentId[s.id]) return; // already has a linked account
-    var baseUsername = s.name.toLowerCase().trim().replace(/\s+/g, '.');
+    // Honor deletion tombstones: a stale students[] briefly present during a
+    // cloud merge must never mint an account for a deleted student (the
+    // account would then resurrect the student via reconcile on other paths).
+    try {
+      if (typeof cestisIsStudentTombstoned === 'function' && cestisIsStudentTombstoned(s)) return;
+      else if (typeof isStudentDeleted === 'function' && isStudentDeleted(s.id)) return;
+    } catch(e) {}
+    // Imported/merged JSON can carry non-string fields — coerce before use so
+    // one malformed record can't abort the whole sync.
+    var sName = String(s.name).trim();
+    if (!sName) return;
+    var sCourse = (s.course == null) ? '' : String(s.course);
+    var baseUsername = sName.toLowerCase().replace(/\s+/g, '.');
     // An unlinked student-role account with the matching username adopts this record
     var existing = byUsername[baseUsername];
     if (existing && existing.role === 'student' && !existing.studentDataId) {
       existing.studentDataId = s.id;
-      if (!existing.programme && s.course) existing.programme = s.course;
+      if (!existing.programme && sCourse) existing.programme = sCourse;
       byStudentId[s.id] = existing;
       changed = true;
       return;
     }
     // Otherwise create a fresh linked account (suffix the username if taken,
-    // e.g. two students sharing a name)
+    // e.g. two students sharing a name). The loop is bounded; past the bound
+    // fall back to the student id itself, which is unique by construction.
     var username = baseUsername, n = 2;
-    while (byUsername[username]) { username = baseUsername + n; n++; }
+    while (byUsername[username] && n <= 50) { username = baseUsername + n; n++; }
+    if (byUsername[username]) username = baseUsername + '.' + String(s.id).toLowerCase();
+    if (byUsername[username]) return; // give up on this record rather than duplicate
     var acct = {
+      // Deterministic id: every device derives the same account id for the
+      // same student, so Drive merges converge instead of duplicating.
       id: 'USR-STU-' + s.id,
-      name: s.name,
+      name: sName,
       role: 'student',
       username: username,
       password: '',
-      email: s.email || '',
-      programme: s.course || '',
+      email: (s.email == null) ? '' : String(s.email),
+      programme: sCourse,
       status: 'disabled',
-      createdAt: s.createdAt || localDateStr(),
+      createdAt: s.createdAt || (typeof localDateStr === 'function' ? localDateStr() : ''),
       registeredVia: 'student-sync',
       studentDataId: s.id,
       approvedBy: 'system'
@@ -5914,12 +5931,15 @@ function lmsChatEnsureStudentAccounts() {
   return changed;
 }
 
-// Accounts eligible to appear in chat rooms and member lists: active AND
-// disabled (auto-created student accounts stay disabled until activated in
-// Verify Users — they are still real enrolled members). Pending self-
-// registrations and rejected accounts stay out.
+// Accounts eligible to appear in chat rooms and member lists. Exclusion-based
+// on purpose: only 'pending' (unapproved self-registrations) and 'rejected'
+// are hidden, so active AND disabled accounts count (auto-created student
+// accounts stay disabled until activated in Verify Users — they are still
+// real enrolled members), and legacy/imported accounts with a missing or
+// unknown status can never silently vanish from chat.
 function lmsChatAccountEligible(u) {
-  return !!u && (u.status === 'active' || u.status === 'disabled');
+  if (!u) return false;
+  return u.status !== 'pending' && u.status !== 'rejected';
 }
 
 function lmsChatEnsureMembership() {
@@ -5994,7 +6014,7 @@ function lmsChatEnsureMembership() {
 
       // Match by skill area: find the skill area for this room, then match users by programme
       var roomSkill = room.skillAreaId ? skillAreas.find(function(sk) { return sk.id === room.skillAreaId; }) : null;
-      var roomNameLower = room.name.toLowerCase().trim();
+      var roomNameLower = String(room.name || '').toLowerCase().trim();
 
       userAccounts.forEach(function(u) {
         if (!lmsChatAccountEligible(u)) return;
@@ -6002,12 +6022,12 @@ function lmsChatEnsureMembership() {
         if (memberSet[u.id]) return;
         if (!u.programme) return;
 
-        var progLower = u.programme.toLowerCase().trim();
+        var progLower = String(u.programme).toLowerCase().trim();
         // Direct name match
         if (progLower === roomNameLower) { memberSet[u.id] = true; return; }
         // Skill area match via findSkillAreaForCourse
         if (typeof findSkillAreaForCourse === 'function') {
-          var userSkill = findSkillAreaForCourse(u.programme);
+          var userSkill = findSkillAreaForCourse(String(u.programme));
           if (roomSkill && userSkill && userSkill.id && roomSkill.id && userSkill.id === roomSkill.id) {
             memberSet[u.id] = true; return;
           }
@@ -26658,12 +26678,12 @@ function lmsChatRenderMembersDirectory(filter) {
   var currentUser = lmsChatGetCurrentUser();
   var allUsers = lmsChatGetRosterUsers();
   var roleLabels = { admin: 'Administrator', adminstaff: 'Admin Staff', instructor: 'Instructor', student: 'Student', cmc: 'Board Member' };
-  var q = (filter || '').toLowerCase();
+  var q = String(filter || '').toLowerCase();
   var filtered = q ? allUsers.filter(function(u) {
-    return u.name.toLowerCase().indexOf(q) !== -1 ||
-           u.role.toLowerCase().indexOf(q) !== -1 ||
+    return String(u.name || '').toLowerCase().indexOf(q) !== -1 ||
+           String(u.role || '').toLowerCase().indexOf(q) !== -1 ||
            (roleLabels[u.role]||'').toLowerCase().indexOf(q) !== -1 ||
-           (u.programme||'').toLowerCase().indexOf(q) !== -1;
+           String(u.programme || '').toLowerCase().indexOf(q) !== -1;
   }) : allUsers;
 
   var roleColors = { admin: 'var(--accent)', adminstaff: 'var(--purple)', instructor: 'var(--green)', student: 'var(--blue)', cmc: 'var(--teal)' };
@@ -26685,7 +26705,7 @@ function lmsChatRenderMembersDirectory(filter) {
       avatarHtml +
       '<div class="mc-name">'+lmsChatEscapeHtml(u.name)+isSelf+'</div>' +
       '<div class="mc-role">'+lmsChatEscapeHtml(roleLabels[u.role]||u.role)+(u.programme?' &bull; '+lmsChatEscapeHtml(u.programme):'')+'</div>' +
-      (prof.statusMsg ? '<div class="mc-status-msg">'+lmsChatEscapeHtml(prof.statusMsg.substring(0,30))+'</div>' : '') +
+      (prof.statusMsg ? '<div class="mc-status-msg">'+lmsChatEscapeHtml(String(prof.statusMsg).substring(0,30))+'</div>' : '') +
     '</div>';
   }
 
@@ -26694,7 +26714,7 @@ function lmsChatRenderMembersDirectory(filter) {
       var ra = (roleRank[a.role] != null ? roleRank[a.role] : 9);
       var rb = (roleRank[b.role] != null ? roleRank[b.role] : 9);
       if(ra !== rb) return ra - rb;
-      return (a.name||'').localeCompare(b.name||'');
+      return String(a.name||'').localeCompare(String(b.name||''));
     });
   }
 
@@ -26707,10 +26727,14 @@ function lmsChatRenderMembersDirectory(filter) {
   filtered.forEach(function(u) {
     if(u.role !== 'student' && u.role !== 'instructor') { staff.push(u); return; }
     var sk = null;
-    if(u.programme && typeof findSkillAreaForCourse === 'function') {
-      var found = findSkillAreaForCourse(u.programme);
-      if(found && found.id) sk = found; // id 0 = synthetic fallback, treat as unmatched
-    }
+    // Per-member try/catch: one malformed programme value must not blank the
+    // whole directory — the member just lands in "Other Programmes".
+    try {
+      if(u.programme && typeof findSkillAreaForCourse === 'function') {
+        var found = findSkillAreaForCourse(String(u.programme));
+        if(found && found.id) sk = found; // id 0 = synthetic fallback, treat as unmatched
+      }
+    } catch(e) {}
     if(sk) {
       if(!bySkillId[sk.id]) bySkillId[sk.id] = [];
       bySkillId[sk.id].push(u);
