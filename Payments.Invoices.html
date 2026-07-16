@@ -78,7 +78,9 @@
 <script>
 (function () {
   var store = window.CESTISStore || window.localStorage;
-  var F = window.CESTISCore.Finance;
+  // Guard: if the shared core failed to load, degrade gracefully instead of
+  // throwing a TypeError that would blank the whole page.
+  var F = (window.CESTISCore && window.CESTISCore.Finance) ? window.CESTISCore.Finance : null;
   function count(key) {
     try { var a = JSON.parse(store.getItem(key)); return Array.isArray(a) ? a.length : 0; } catch (e) { return 0; }
   }

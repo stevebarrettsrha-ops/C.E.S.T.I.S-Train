@@ -4345,6 +4345,21 @@ body.vc-fullscreen-mode.vc-host-only-mode .video-grid .video-tile:not(.vc-hoston
   </div>
 </div>
 
+<!-- FORCED PASSWORD CHANGE (default/seeded credentials) -->
+<div class="modal-overlay" id="forceChangePwModal" style="z-index:1200;">
+  <div class="modal" style="max-width:420px;">
+    <div class="modal-header"><h3>Set a New Password</h3></div>
+    <p style="font-size:13px;color:var(--text-secondary);margin-bottom:16px;">This account is still using the default password. For security you must set a new one before continuing.</p>
+    <div class="form-group"><label>New Password</label><input type="password" class="form-control" id="forceChangePwNew" placeholder="Minimum 8 characters"></div>
+    <div class="form-group"><label>Confirm Password</label><input type="password" class="form-control" id="forceChangePwConfirm" placeholder="Re-enter password" onkeydown="if(event.key==='Enter')forceChangePwSubmit()"></div>
+    <div id="forceChangePwError" class="tfa-error" style="display:none;"></div>
+    <div style="display:flex;gap:10px;justify-content:flex-end;margin-top:20px;">
+      <button class="btn btn-secondary" onclick="forceChangePwCancel()">Cancel</button>
+      <button class="btn btn-primary" onclick="forceChangePwSubmit()">Set Password &amp; Continue</button>
+    </div>
+  </div>
+</div>
+
 <!-- TWO-STEP VERIFICATION (TOTP) MODALS -->
 <style>
 #tfaVerifyModal{z-index:300;}
@@ -4962,7 +4977,7 @@ function addNotification(text, type, icon, forRoles) {
   type = type || 'info';
   var icons = {success:'\u2705',warning:'\u26A0\uFE0F',info:'\uD83D\uDD14',exam:'\uD83D\uDCDD',student:'\uD83D\uDC64',cert:'\uD83C\uDF93',announce:'\uD83D\uDCE2',calendar:'\uD83D\uDCC5',attendance:'\uD83D\uDCCB',resource:'\uD83D\uDCC1',grade:'\uD83C\uDF1F'};
   var notif = {
-    id: Date.now() + Math.random(),
+    id: cestisGenId('NOTIF-'),
     text: text,
     timestamp: Date.now(),
     time: 'Just now',
@@ -5002,7 +5017,7 @@ function addNotificationForUser(text, type, icon, userId, role) {
   type = type || 'info';
   var icons = {success:'\u2705',warning:'\u26A0\uFE0F',info:'\uD83D\uDD14',dm:'\uD83D\uDCAC',follow:'\uD83D\uDC65'};
   var notif = {
-    id: Date.now() + Math.random(),
+    id: cestisGenId('NOTIF-'),
     text: text,
     timestamp: Date.now(),
     time: 'Just now',
@@ -5126,6 +5141,32 @@ async function hashPassword(password) {
   }
 }
 
+// Passwords published in this (public) repo. Any account still using one must be
+// forced to change it before it can access the app (see enterApp / mustChangePassword).
+var KNOWN_DEFAULT_PASSWORDS = ['cestisadmin123$', 'admin123'];
+
+// One-time async sweep: flag accounts whose ALREADY-HASHED password still verifies
+// against a known default (covers deployments that hashed the default before the
+// force-change guard existed). Bounded to privileged roles so it's cheap.
+var _defaultPwSweepDone = false;
+async function flagDefaultPasswordAccounts() {
+  if(_defaultPwSweepDone) return;
+  _defaultPwSweepDone = true;
+  var changed = false;
+  for(var i = 0; i < userAccounts.length; i++) {
+    var a = userAccounts[i];
+    if(!a || !a.password || a.mustChangePassword) continue;
+    if(a.role !== 'admin' && a.role !== 'adminstaff' && a.role !== 'cmc') continue;
+    if(!isHashedPassword(a.password)) continue; // plaintext defaults handled synchronously
+    for(var d = 0; d < KNOWN_DEFAULT_PASSWORDS.length; d++) {
+      try {
+        if(await verifyPassword(KNOWN_DEFAULT_PASSWORDS[d], a.password)) { a.mustChangePassword = true; changed = true; break; }
+      } catch(e) {}
+    }
+  }
+  if(changed) { try { saveUserAccounts(); } catch(e) {} }
+}
+
 // True for both the new PBKDF2 format and the legacy 64-hex SHA-256 hash.
 function isHashedPassword(pw) {
   return typeof pw === 'string' && (pw.indexOf('pbkdf2$') === 0 || /^[a-f0-9]{64}$/.test(pw));
@@ -5200,6 +5241,7 @@ async function maybeUpgradePasswordHash(account, plaintext, storedPassword) {
     canonical.password = await hashPassword(plaintext);
     if (account !== canonical) account.password = canonical.password;
     cachePlaintextPw(canonical, plaintext);
+    if (typeof touchAccount === 'function') touchAccount(canonical);
     if (typeof saveUserAccounts === 'function') saveUserAccounts();
     console.log('[Security] Upgraded account ' + (canonical.id || '') + ' password hash to PBKDF2');
   } catch (e) { console.warn('[Security] Password hash upgrade skipped:', e); }
@@ -5450,11 +5492,25 @@ function exportDataBackup() {
     'voctrain_adrStaffMeta','voctrain_adminStaffAccess','voctrain_instructorData','voctrain_certDownloadApprovals',
     'voctrain_skillAreas','voctrain_certTemplates','voctrain_chatRooms','voctrain_chatMessages',
     'voctrain_chatProfiles','voctrain_chatFollows',
-    'voctrain_unitCatalogs','voctrain_transcriptGrades','voctrain_certTranscriptRequests','voctrain_transcriptProfiles'];
-  // Include every per-quarter attendance bucket so all quarters are backed up.
+    'voctrain_unitCatalogs','voctrain_transcriptGrades','voctrain_certTranscriptRequests','voctrain_transcriptProfiles',
+    // Sibling-app data (same-origin IndexedDB): finance documents, cashbook,
+    // virements, staff time-clock/payroll. Included so this local JSON export is a
+    // true last-resort backup of EVERYTHING, independent of Google Drive — these
+    // modules previously had no Google-free backup path at all.
+    'cestis_finance_invoices','cestis_finance_quotes','cestis_finance_pos','cestis_finance_voucher_overrides',
+    'cestis_finance_convert','cesti_cashbook_data','cesti_virements','cesti_virement_logo',
+    'cestis_budget_overrides','cestis_budget_deleted','cestis_active_quarter',
+    'cestisStaffMembers','cestisTimeRecords','cestiSchoolFeeStudents','cestiSchoolFeePayments','cestiUsers'];
+  // Include every dynamically-keyed bucket (per-quarter attendance/budget/virement,
+  // finance docs) so nothing is silently left out of the backup.
   try {
     (CESTISStore.keys ? CESTISStore.keys() : Object.keys(CESTISStore._cache || {})).forEach(function(k) {
-      if (k && k.indexOf('voctrain_attendance::') === 0 && keys.indexOf(k) === -1) keys.push(k);
+      if (!k || keys.indexOf(k) !== -1) return;
+      if (k.indexOf('voctrain_attendance::') === 0
+          || k.indexOf('cestis_quarter_') === 0
+          || k.indexOf('cestis_budget') === 0
+          || k.indexOf('cestis_finance_') === 0
+          || k.indexOf('cesti_virement') === 0) keys.push(k);
     });
   } catch(e) {}
   keys.forEach(function(k) {
@@ -5568,7 +5624,7 @@ function batchDOMUpdate(callback) {
 }
 
 // ---------- Run password migration on load ----------
-setTimeout(function() { migratePasswordsToHash(); }, 100);
+setTimeout(function() { migratePasswordsToHash(); flagDefaultPasswordAccounts(); }, 100);
 
 // ============================== SESSION EXPIRY CONFIG ==============================
 var SESSION_EXPIRY_MS = 8 * 60 * 60 * 1000; // 8 hours default session duration
@@ -6986,6 +7042,13 @@ function saveUserAccounts() {
   // Push changes to Google Drive immediately (debounced)
   scheduleDebouncedCloudSave();
 }
+// Stamp an account as edited NOW. The cloud merges compare this stamp so a stale
+// device's copy can no longer overwrite a newer local edit (password reset,
+// status/role change, email update) — without it, edits silently reverted when
+// an out-of-date device auto-saved first.
+function touchAccount(acct) {
+  if (acct) acct.updatedAt = new Date().toISOString();
+}
 function loadUserAccounts() {
   try {
     var u = CESTISStore.getItem('voctrain_users');
@@ -6996,41 +7059,74 @@ function loadUserAccounts() {
     // default on every load silently undid admin password changes and left a
     // permanent default-credentials backdoor that synced to every device.
     // The default password is only seeded when the account has no password.
-    var defAdmin = {id:'USR-001',name:'Administrator',role:'admin',username:'cestisadmin',password:'cestisadmin123$',email:'admin@heartlms.edu.jm',programme:'',status:'active',createdAt:'2026-01-01'};
+    // The seeded password below is PUBLISHED in this (public) repo, so any account
+    // still carrying it is a known-credentials backdoor. Mark such seeds with
+    // mustChangePassword so the app forces a new password before granting access
+    // (enforced in enterApp). A real, admin-set password never gets this flag.
+    var DEFAULT_SEED_PW = 'cestisadmin123$';
+    var defAdmin = {id:'USR-001',name:'Administrator',role:'admin',username:'cestisadmin',password:DEFAULT_SEED_PW,mustChangePassword:true,email:'admin@heartlms.edu.jm',programme:'',status:'active',createdAt:'2026-01-01'};
     var adminAcct = userAccounts.find(function(a){ return a.id === 'USR-001' && a.role === 'admin'; });
     if(adminAcct) {
       adminAcct.username = 'cestisadmin';
-      if(!adminAcct.password) adminAcct.password = 'cestisadmin123$';
+      if(!adminAcct.password) { adminAcct.password = DEFAULT_SEED_PW; adminAcct.mustChangePassword = true; }
       adminAcct.status = 'active';
     } else {
       userAccounts.push(defAdmin);
     }
     // Migrate: ensure default admin staff account exists (password seeded only if missing)
-    var defAS = {id:'USR-011',name:'Admin Staff',role:'adminstaff',username:'adminstaff',password:'cestisadmin123$',email:'adminstaff@heartlms.edu.jm',programme:'',status:'active',createdAt:'2026-01-15'};
+    var defAS = {id:'USR-011',name:'Admin Staff',role:'adminstaff',username:'adminstaff',password:DEFAULT_SEED_PW,mustChangePassword:true,email:'adminstaff@heartlms.edu.jm',programme:'',status:'active',createdAt:'2026-01-15'};
     var existingAS = userAccounts.find(function(u){ return u.id === 'USR-011'; });
     if(!existingAS) {
       userAccounts.push(defAS);
     } else {
       existingAS.username = 'adminstaff';
-      if(!existingAS.password) existingAS.password = 'cestisadmin123$';
+      if(!existingAS.password) { existingAS.password = DEFAULT_SEED_PW; existingAS.mustChangePassword = true; }
       existingAS.role = 'adminstaff';
     }
     // Migrate: ensure default CMC board member account exists (password seeded only if missing)
-    var defCMC = {id:'USR-021',name:'Board Chair',role:'cmc',username:'cmcadmin',password:'cestisadmin123$',email:'cmc@heartlms.edu.jm',programme:'',status:'active',createdAt:'2026-01-01'};
+    var defCMC = {id:'USR-021',name:'Board Chair',role:'cmc',username:'cmcadmin',password:DEFAULT_SEED_PW,mustChangePassword:true,email:'cmc@heartlms.edu.jm',programme:'',status:'active',createdAt:'2026-01-01'};
     var existingCMC = userAccounts.find(function(u){ return u.id === 'USR-021'; });
     if(!existingCMC) {
       userAccounts.push(defCMC);
     } else {
       existingCMC.username = 'cmcadmin';
-      if(!existingCMC.password) existingCMC.password = 'cestisadmin123$';
+      if(!existingCMC.password) { existingCMC.password = DEFAULT_SEED_PW; existingCMC.mustChangePassword = true; }
       existingCMC.role = 'cmc';
     }
+    // Flag ANY account still carrying a known published default password (the
+    // literal seeds above start plaintext, before hashing runs) so enterApp forces
+    // a change. This is the primary guard for fresh devices / public repo clones.
+    userAccounts.forEach(function(a){
+      if(a && a.password && KNOWN_DEFAULT_PASSWORDS.indexOf(a.password) !== -1) a.mustChangePassword = true;
+    });
     // Purge any plaintext password caches that older versions persisted to
     // storage/backups — they are transient, in-memory-only session caches.
     userAccounts.forEach(function(a){ delete a._plaintextPw; });
   } catch(e) {}
 }
 loadUserAccounts();
+// Re-read accounts once IndexedDB hydration completes. The synchronous load above
+// can only see the localStorage mirror; if that mirror was evicted/cleared while
+// IndexedDB survived (the exact case the durable store exists for), userAccounts
+// would otherwise stay stuck on the 3 seed defaults — disabling offline login and
+// making every real account "not found" until a cloud sync. This also re-runs the
+// login-button gate so locally-stored accounts unlock login without any network.
+try {
+  CESTISStore.whenReady(function(){
+    try {
+      loadUserAccounts();
+      if(typeof migratePasswordsToHash === 'function'){ _passwordMigrationDone = false; migratePasswordsToHash(); }
+      if(typeof flagDefaultPasswordAccounts === 'function'){ flagDefaultPasswordAccounts(); }
+      var hasLocalAccounts = userAccounts.length > 3 || userAccounts.some(function(u) {
+        return u.id !== 'USR-001' && u.id !== 'USR-011' && u.id !== 'USR-021';
+      });
+      if(hasLocalAccounts && !loginSyncCompleted) {
+        loginSyncCompleted = true;
+        if(typeof enableLoginButtons === 'function') enableLoginButtons();
+      }
+    } catch(e) { console.warn('[Accounts] post-IndexedDB account reload failed:', e && e.message); }
+  });
+} catch(e) {}
 // Attendance quarter separation runs AFTER critical auth/account loading so it can
 // never block login, and is itself fully guarded against errors.
 initAttendanceQuarters();
@@ -7109,12 +7205,11 @@ initLmsChatData();
 lmsChatEnsureMembership();
 
 function getNextUserId() {
-  var maxNum = 0;
-  userAccounts.forEach(function(u) {
-    var n = parseInt(u.id.replace('USR-',''));
-    if(n > maxNum) maxNum = n;
-  });
-  return 'USR-' + String(maxNum + 1).padStart(3,'0');
+  // Collision-resistant across devices. The old sequential "USR-<max+1>" scheme
+  // meant two admins adding a user offline both got the same id, and the sync
+  // merge then collapsed the two accounts into one (a user silently lost their
+  // login). A crypto-random id can't collide that way.
+  return cestisGenId('USR-');
 }
 
 function toggleUserFormFields() {
@@ -7203,6 +7298,7 @@ function saveUserEdit() {
   var oldRole = user.role;
   user.name = name; user.role = role; user.username = username; user.email = email;
   user.programme = (role === 'admin' || role === 'adminstaff' || role === 'cmc') ? '' : programme;
+  touchAccount(user);
   // Create linked instructor/student data when role changes
   if(role === 'instructor' && oldRole !== 'instructor') {
     var existingIns = instructorData.find(function(ins){ return ins.name === user.name || ins.email === user.email; });
@@ -7249,6 +7345,7 @@ async function confirmResetPasswordVerified() {
   if(!user) return;
   user.password = await hashPassword(newPw);
   cachePlaintextPw(user, newPw);
+  touchAccount(user);
   saveUserAccounts();
   closeModal('resetPasswordModal');
   showToast('Password reset successfully for ' + user.name);
@@ -7369,6 +7466,7 @@ async function forgotPwSubmit() {
   if(newPw !== confirmPw) { showToast('Passwords do not match.', 'warning'); return; }
   acct.password = await hashPassword(newPw);
   cachePlaintextPw(acct, newPw);
+  touchAccount(acct);
   // Clear any active lockout so the user can sign in right away.
   try { if(acct.username) clearLoginFailures(acct.username); if(acct.email) clearLoginFailures(acct.email); } catch(_){}
   saveUserAccounts(); // persists locally + syncs to Google Drive
@@ -7381,6 +7479,7 @@ function toggleUserStatus(userId) {
   var user = userAccounts.find(function(u){ return u.id === userId; });
   if(!user) return;
   user.status = user.status === 'active' ? 'disabled' : 'active';
+  touchAccount(user);
   saveUserAccounts();
   renderUserAccountsTable();
   showToast(user.name + ' account ' + (user.status === 'active' ? 'enabled' : 'disabled'));
@@ -7423,7 +7522,7 @@ function updateBulkBar() {
 function bulkActivate() {
   umSelectedIds.forEach(function(id) {
     var u = userAccounts.find(function(a){ return a.id === id; });
-    if(u) u.status = 'active';
+    if(u) { u.status = 'active'; touchAccount(u); }
   });
   saveUserAccounts();
   umSelectedIds = [];
@@ -7434,7 +7533,7 @@ function bulkActivate() {
 function bulkDeactivate() {
   umSelectedIds.forEach(function(id) {
     var u = userAccounts.find(function(a){ return a.id === id; });
-    if(u) u.status = 'disabled';
+    if(u) { u.status = 'disabled'; touchAccount(u); }
   });
   saveUserAccounts();
   umSelectedIds = [];
@@ -8275,6 +8374,7 @@ function tfaSaveEmail(){
   if(!emailRegex.test(email)){ showToast('Please enter a valid email address.', 'error'); return; }
   acct.email = email;
   if(currentLoggedInUser && currentLoggedInUser.id === acct.id) currentLoggedInUser.email = email;
+  touchAccount(acct);
   saveUserAccounts();
   showToast('Recovery email address saved.');
   tfaRenderManage();
@@ -8420,8 +8520,56 @@ function tfaBeginDisable(){
   });
 }
 
+var _forceChangePwRole = null;
+function openForceChangePw(role) {
+  _forceChangePwRole = role;
+  var n = document.getElementById('forceChangePwNew');
+  var c = document.getElementById('forceChangePwConfirm');
+  var e = document.getElementById('forceChangePwError');
+  if(n) n.value = ''; if(c) c.value = ''; if(e) e.style.display = 'none';
+  openModal('forceChangePwModal');
+  setTimeout(function(){ if(n) n.focus(); }, 60);
+}
+function forceChangePwCancel() {
+  // Refuse access rather than let a default-password account in.
+  closeModal('forceChangePwModal');
+  currentLoggedInUser = null;
+  _forceChangePwRole = null;
+}
+async function forceChangePwSubmit() {
+  var err = document.getElementById('forceChangePwError');
+  function fail(msg){ if(err){ err.textContent = msg; err.style.display = 'block'; } }
+  var acct = currentLoggedInUser;
+  if(!acct){ closeModal('forceChangePwModal'); return; }
+  var np = document.getElementById('forceChangePwNew').value;
+  var cp = document.getElementById('forceChangePwConfirm').value;
+  if(!np || np.length < 8){ fail('Password must be at least 8 characters.'); return; }
+  if(np !== cp){ fail('Passwords do not match.'); return; }
+  // Must not keep any known default password.
+  if(np === 'cestisadmin123$' || np === 'admin123' || np.toLowerCase() === 'password'){ fail('Choose a password that is not the default.'); return; }
+  var canonical = userAccounts.find(function(u){ return u.id === acct.id; }) || acct;
+  canonical.password = await hashPassword(np);
+  canonical.mustChangePassword = false;
+  cachePlaintextPw(canonical, np);
+  touchAccount(canonical);
+  if(acct !== canonical){ acct.password = canonical.password; acct.mustChangePassword = false; }
+  try { if(canonical.username) clearLoginFailures(canonical.username); if(canonical.email) clearLoginFailures(canonical.email); } catch(_){}
+  saveUserAccounts();
+  closeModal('forceChangePwModal');
+  showToast('Password updated. Welcome.');
+  var role = _forceChangePwRole; _forceChangePwRole = null;
+  enterApp(role);
+}
 function enterApp(role) {
   try {
+    // Force a password change before granting access to any account still using a
+    // seeded/default password (published in this public repo). Closes the
+    // default-credentials backdoor without locking out first-run setup: the
+    // legitimate first admin signs in with the default, then must set a new one.
+    if(currentLoggedInUser && currentLoggedInUser.mustChangePassword) {
+      openForceChangePw(role);
+      return;
+    }
     // Maintenance mode check — block all non-admin users
     if(systemSettings.maintenanceMode === true && role !== 'admin') {
       alert('The site is currently under maintenance. Only administrators can access the system at this time. Please try again later.');
@@ -8683,7 +8831,7 @@ async function submitRegistration() {
 
   // Create the user account with pending status
   var newUser = {
-    id: 'USR-' + Date.now(),
+    id: cestisGenId('USR-'),
     name: name,
     role: role,
     username: email.split('@')[0],
@@ -8746,7 +8894,7 @@ function createStudentDataForAccount(userAccount) {
   var matchedInstructor = instructorData.find(function(ins){ return ins.course && instructorCourseMatch(prog, ins.course); });
   var assignedInstructor = matchedInstructor ? matchedInstructor.name : (instructorData.length > 0 ? instructorData[0].name : '');
   var newStudent = {
-    id: 'STU-' + Date.now(),
+    id: cestisGenId('STU-'),
     name: userAccount.name,
     stage: 'training',
     course: prog,
@@ -8775,7 +8923,7 @@ function createStudentDataForAccount(userAccount) {
 
 function createInstructorDataForAccount(userAccount) {
   var newInstructor = {
-    id: 'INS-' + Date.now(),
+    id: cestisGenId('INS-'),
     name: userAccount.name,
     course: userAccount.programme || 'Welding',
     email: userAccount.email,
@@ -8872,6 +9020,7 @@ function approveUser(userId) {
   user.status = 'active';
   user.approvedAt = localDateStr();
   user.approvedBy = 'admin';
+  touchAccount(user);
   // Ensure student data is created and linked when approving a student account
   if (user.role === 'student' && !user.studentDataId) {
     var existingStudent = students.find(function(s) { return s.name === user.name; });
@@ -8902,6 +9051,7 @@ function rejectUser(userId) {
   user.status = 'rejected';
   user.approvedAt = localDateStr();
   user.approvedBy = 'admin';
+  touchAccount(user);
   saveState();
   renderVerifyUsersPage();
   showToast('Account rejected: ' + user.name);
@@ -8917,6 +9067,7 @@ function approveAllPending() {
     u.status = 'active';
     u.approvedAt = dateStr;
     u.approvedBy = 'admin';
+    touchAccount(u);
     // Create linked student/instructor data on approval
     if (u.role === 'student' && !u.studentDataId) {
       var existingStudent = students.find(function(s) { return s.name === u.name; });
@@ -11257,7 +11408,7 @@ function createInstructorAnnouncement() {
   if(document.getElementById('iAnnRoleAdminStaff')?.checked) targetRoles.push('adminstaff');
   if(targetRoles.length === 0) { alert('Please select at least one target audience'); return; }
   announcements.unshift({
-    id: Date.now(), title, body, priority, date: localDateStr(), author: currentInstructor.name, forRoles: targetRoles
+    id: cestisGenId('ANN-'), title, body, priority, date: localDateStr(), author: currentInstructor.name, forRoles: targetRoles
   });
   document.getElementById('iAnnTitle').value = '';
   document.getElementById('iAnnBody').value = '';
@@ -11294,7 +11445,7 @@ function renderInstructorAnnouncements() {
       <div class="ann-footer">
         <span style="font-size:11px;color:var(--text-muted);">By ${a.author}</span>
         <span style="display:flex;gap:4px;align-items:center;margin-left:8px;">${audienceBadges}</span>
-        ${a.author === (currentInstructor ? currentInstructor.name : '') ? '<button class="btn btn-sm btn-danger" style="margin-left:auto;" onclick="deleteAnnouncement(' + a.id + ');renderInstructorAnnouncements();">Delete</button>' : ''}
+        ${a.author === (currentInstructor ? currentInstructor.name : '') ? '<button class="btn btn-sm btn-danger" style="margin-left:auto;" onclick="deleteAnnouncement(\'' + a.id + '\');renderInstructorAnnouncements();">Delete</button>' : ''}
       </div>
     </div>
   `}).join('');
@@ -13336,7 +13487,7 @@ function createClassSession() {
   if(!time) { showToast('Please select a start time'); return; }
 
   const session = {
-    id: 'CS-' + Date.now(),
+    id: cestisGenId('CS-'),
     name: name,
     course: course,
     date: date,
@@ -13573,7 +13724,7 @@ function createAdminMeeting() {
   if(!time) { showToast('Please select a start time'); return; }
 
   var meeting = {
-    id: 'AM-' + Date.now(),
+    id: cestisGenId('AM-'),
     title: title,
     description: description,
     date: date,
@@ -13801,7 +13952,7 @@ function createAssignment() {
 
   Promise.all(filePromises).then(function(attachments) {
     const assignment = {
-      id: 'ASN-' + Date.now(),
+      id: cestisGenId('ASN-'),
       title: title,
       type: type,
       course: assignCourse,
@@ -14270,7 +14421,7 @@ function submitStudentAssignment() {
     }
 
     var submission = {
-      id: 'SUB-' + Date.now(),
+      id: cestisGenId('SUB-'),
       assignmentId: assignmentId,
       studentId: s.id,
       studentName: s.name,
@@ -14715,7 +14866,7 @@ function uploadResource() {
 
   const ins = currentInstructor;
   const resource = {
-    id: 'RES-' + Date.now(),
+    id: cestisGenId('RES-'),
     name: name,
     category: cat,
     type: type,
@@ -14749,7 +14900,7 @@ function createResourceFolder() {
 
   const ins = currentInstructor;
   const folder = {
-    id: 'FLD-' + Date.now(),
+    id: cestisGenId('FLD-'),
     name: name,
     category: cat,
     type: 'Folder',
@@ -15118,7 +15269,7 @@ async function scanDriveFolderForResources(courseName) {
       var viewLink = file.webViewLink || ('https://drive.google.com/file/d/' + file.id + '/view');
 
       driveResources.push({
-        id: 'DRES-' + Date.now() + '-' + imported,
+        id: cestisGenId('DRES-') + '-' + imported,
         resourceId: resourceId,
         name: displayName,
         course: courseName,
@@ -15388,7 +15539,7 @@ async function uploadResourceToDrive() {
     barEl.style.width = '90%';
 
     const resource = {
-      id: 'DRES-' + Date.now(),
+      id: cestisGenId('DRES-'),
       resourceId: resourceId,
       name: name,
       course: course,
@@ -16992,7 +17143,7 @@ async function addStudent() {
   if (!dupAccount) {
     var defaultPw = await hashPassword(name.split(' ')[0].toLowerCase() + '123');
     var newAccount = {
-      id: 'USR-' + Date.now(),
+      id: cestisGenId('USR-'),
       name: name,
       role: 'student',
       username: username,
@@ -18574,7 +18725,7 @@ function goToExamStep2() {
 }
 
 function addExamQuestion(type) {
-  var q = { id:'Q-'+Date.now()+'-'+Math.random().toString(36).substr(2,4), type:type, text:'', points:1 };
+  var q = { id: cestisGenId('Q-')+'-'+Math.random().toString(36).substr(2,4), type:type, text:'', points:1 };
   if(type==='mcq') { q.options=['Option A','Option B','Option C','Option D']; q.correctAnswer=0; }
   else if(type==='tf') { q.correctAnswer=true; }
   else if(type==='fill') { q.correctAnswer=''; }
@@ -19511,7 +19662,7 @@ function submitExam() {
   var exam = exams[s.examIdx];
 
   var result = {
-    id: 'RES-'+Date.now(),
+    id: cestisGenId('RES-'),
     examId: s.examId,
     studentId: currentStudent.id,
     studentName: currentStudent.name,
@@ -20072,7 +20223,7 @@ function createAnnouncement() {
   if(document.getElementById('annRoleAdminStaff')?.checked) targetRoles.push('adminstaff');
   if(targetRoles.length === 0) { alert('Please select at least one target audience'); return; }
   announcements.unshift({
-    id: Date.now(), title, body, priority, date: localDateStr(), author, forRoles: targetRoles
+    id: cestisGenId('ANN-'), title, body, priority, date: localDateStr(), author, forRoles: targetRoles
   });
   document.getElementById('annTitle').value = '';
   document.getElementById('annBody').value = '';
@@ -20113,7 +20264,7 @@ function renderAnnouncements() {
       <div class="ann-footer">
         <span style="font-size:11px;color:var(--text-muted);">By ${a.author}</span>
         <span style="display:flex;gap:4px;align-items:center;margin-left:8px;">${audienceBadges}</span>
-        <button class="btn btn-sm btn-danger" style="margin-left:auto;" onclick="deleteAnnouncement(${a.id})">Delete</button>
+        <button class="btn btn-sm btn-danger" style="margin-left:auto;" onclick="deleteAnnouncement('${a.id}')">Delete</button>
       </div>
     </div>
   `}).join('');
@@ -20466,7 +20617,7 @@ function submitSupportMessage() {
 
   loadSupportMessages();
   var msg = {
-    id: 'SUP-' + Date.now(),
+    id: cestisGenId('SUP-'),
     name: name,
     email: email,
     phone: phone,
@@ -20951,7 +21102,7 @@ function detectQuestionsFromText() {
     if(!fullText) continue;
 
     var q = {
-      id: 'IQ-' + Date.now() + '-' + Math.random().toString(36).substr(2, 4),
+      id: cestisGenId('IQ-') + '-' + Math.random().toString(36).substr(2, 4),
       text: fullText,
       points: 1,
       type: 'mcq',
@@ -21141,7 +21292,7 @@ function moveImportQuestion(idx, dir) {
 
 function addImportQuestion() {
   importedQuestions.push({
-    id: 'IQ-' + Date.now() + '-' + Math.random().toString(36).substr(2, 4),
+    id: cestisGenId('IQ-') + '-' + Math.random().toString(36).substr(2, 4),
     text: '', type: 'mcq', points: 1,
     options: ['Option A','Option B','Option C','Option D'],
     correctAnswer: 0
@@ -21249,6 +21400,27 @@ var AUTO_SAVE_INTERVAL_MS = 5000; // 5 seconds
 var _debouncedCloudSaveTimer = null;
 var _lastAutoSaveHash = null; // hash of last data successfully pushed to the cloud (dirty-check)
 var _consecutiveCloudSaveFailures = 0;
+// Conflict-safe sync: the Drive `version` (monotonic per-file counter) we last
+// saw for each folder's backup file. Before overwriting, we compare the current
+// cloud version against this; a mismatch means another device wrote since we
+// last looked, so we pull+merge their changes first and never clobber them.
+var _lastCloudVersion = {}; // folderId -> last-seen Drive file version (string)
+
+// Collision-resistant unique id for records created independently on multiple
+// devices and later merged by id across Google Drive. Timestamp (keeps records
+// sortable) + a crypto-random suffix, so two devices minting a record in the
+// same millisecond can't produce the same id (which the merge would then collapse,
+// silently dropping one record). Returns a STRING.
+function cestisGenId(prefix) {
+  var rand;
+  try {
+    var b = new Uint32Array(2); crypto.getRandomValues(b);
+    rand = b[0].toString(36) + b[1].toString(36);
+  } catch(e) {
+    rand = Math.floor(Math.random()*2176782336).toString(36) + Math.floor(Math.random()*2176782336).toString(36);
+  }
+  return (prefix || '') + Date.now().toString(36) + '-' + rand;
+}
 
 // Fast, non-cryptographic 53-bit string hash (cyrb53) used to detect whether the
 // backup payload actually changed since the last cloud save, so an idle app does
@@ -21605,15 +21777,73 @@ function checkCloudAndNotify(reason) {
   }
 }
 
-// Real-time monitor: every 30s, check whether the saved token has expired
-// while the user is connected, and notify immediately if it has.
+// Silent Google-token refresh so long, unattended sessions keep backing up
+// instead of stopping when the ~1h token expires. A DEDICATED token client with
+// a lightweight callback (no "Connected!" alert, no re-sync) requests a fresh
+// token with prompt:'' — Google returns one with no UI when the user still has
+// an active, previously-granted session. If interaction is genuinely required it
+// fails quietly and the normal expiry banner takes over.
+var _silentRefreshClient = null;
+var _silentRefreshInFlight = false;
+var _lastSilentRefreshAt = 0;
+function ensureSilentRefreshClient() {
+  if (_silentRefreshClient) return _silentRefreshClient;
+  if (typeof google === 'undefined' || !google.accounts || !google.accounts.oauth2) return null;
+  _silentRefreshClient = google.accounts.oauth2.initTokenClient({
+    client_id: GOOGLE_DRIVE_CONFIG.CLIENT_ID,
+    scope: GOOGLE_DRIVE_CONFIG.SCOPES,
+    callback: function(resp) {
+      _silentRefreshInFlight = false;
+      if (resp && resp.access_token && !resp.error) {
+        googleAccessToken = resp.access_token;
+        isCloudConnected = true;
+        _cloudAuthExpiredNotified = false;
+        var expiry = new Date();
+        expiry.setSeconds(expiry.getSeconds() + (resp.expires_in || 3600));
+        CESTISStore.setItem('schoolDashboardGoogleAccessToken', googleAccessToken);
+        CESTISStore.setItem('schoolDashboardGoogleTokenExpiry', expiry.toISOString());
+        try { dismissCloudNotification(); } catch(e) {}
+        console.log('[Auth] Google token refreshed silently — backup continues.');
+      }
+    },
+    error_callback: function(err) {
+      _silentRefreshInFlight = false;
+      console.warn('[Auth] Silent token refresh needs interaction:', err && err.type);
+      // Don't nag here — handleCloudAuthExpired()'s banner is the fallback once
+      // the token actually expires.
+    }
+  });
+  return _silentRefreshClient;
+}
+function attemptSilentTokenRefresh() {
+  if (_silentRefreshInFlight) return;
+  if (Date.now() - _lastSilentRefreshAt < 120000) return; // at most once every 2 min
+  var client = ensureSilentRefreshClient();
+  if (!client) return;
+  try {
+    _silentRefreshInFlight = true;
+    _lastSilentRefreshAt = Date.now();
+    client.requestAccessToken({ prompt: '' }); // '' = no consent UI when already granted
+  } catch (e) {
+    _silentRefreshInFlight = false;
+    console.warn('[Auth] Silent refresh call failed:', e && e.message);
+  }
+}
+
+// Real-time monitor: every 30s, while connected, proactively refresh the token
+// before it expires; if it has already expired, notify.
 function startCloudMonitor() {
   if (_cloudCheckInterval) clearInterval(_cloudCheckInterval);
   _cloudCheckInterval = setInterval(function() {
     if (isCloudConnected && googleAccessToken) {
       var savedExpiry = CESTISStore.getItem('schoolDashboardGoogleTokenExpiry');
-      if (savedExpiry && new Date(savedExpiry) <= new Date()) {
+      if (!savedExpiry) return;
+      var msLeft = new Date(savedExpiry).getTime() - Date.now();
+      if (msLeft <= 0) {
         handleCloudAuthExpired();
+      } else if (msLeft < 5 * 60 * 1000) {
+        // Within 5 minutes of expiry — try to renew silently so backup never stops.
+        attemptSilentTokenRefresh();
       }
     }
   }, 30000);
@@ -21941,6 +22171,7 @@ function disconnectFromGoogleDrive() {
     isCloudConnected = false;
     cloudFileId = null;
     _autoSaveFileIds = {};
+    _lastCloudVersion = {}; // re-establish the conflict-safety baseline on reconnect
 
     CESTISStore.removeItem('schoolDashboardGoogleAccessToken');
     CESTISStore.removeItem('schoolDashboardGoogleTokenExpiry');
@@ -22154,7 +22385,7 @@ async function saveToCloud() {
     if (cloudFileId) {
       // Update existing file
       response = await fetch(
-        `https://www.googleapis.com/upload/drive/v3/files/${cloudFileId}?uploadType=media`,
+        `https://www.googleapis.com/upload/drive/v3/files/${cloudFileId}?uploadType=media&fields=id,version`,
         {
           method: 'PATCH',
           headers: {
@@ -22164,6 +22395,10 @@ async function saveToCloud() {
           body: blob
         }
       );
+      if (response.ok) {
+        const pRes = await response.json().catch(() => ({}));
+        if (pRes && pRes.version != null) _lastCloudVersion[GOOGLE_DRIVE_CONFIG.FOLDER_ID] = String(pRes.version);
+      }
     } else {
       // Create new file with metadata
       const metadata = {
@@ -22177,7 +22412,7 @@ async function saveToCloud() {
       formData.append('file', blob);
 
       response = await fetch(
-        'https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart&fields=id,name',
+        'https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart&fields=id,name,version',
         {
           method: 'POST',
           headers: { 'Authorization': `Bearer ${googleAccessToken}` },
@@ -22189,6 +22424,7 @@ async function saveToCloud() {
         const result = await response.json();
         cloudFileId = result.id;
         CESTISStore.setItem('schoolDashboardCloudFileId', cloudFileId);
+        if (result.version != null) _lastCloudVersion[GOOGLE_DRIVE_CONFIG.FOLDER_ID] = String(result.version);
       }
     }
 
@@ -23529,18 +23765,31 @@ async function silentMergeFromBackup(fileId) {
           return false;
         });
         if (localMatch) {
-          // Update existing account with cloud data (password, status, name, etc.)
-          if (cloudUser.password && cloudUser.password !== localMatch.password) { localMatch.password = cloudUser.password; userAccountsChanged = true; }
-          if (cloudUser.status && cloudUser.status !== localMatch.status) { localMatch.status = cloudUser.status; userAccountsChanged = true; }
-          if (cloudUser.name && cloudUser.name !== localMatch.name) { localMatch.name = cloudUser.name; userAccountsChanged = true; }
-          if (cloudUser.email && cloudUser.email !== localMatch.email) { localMatch.email = cloudUser.email; userAccountsChanged = true; }
-          if (cloudUser.programme !== undefined && cloudUser.programme !== localMatch.programme) { localMatch.programme = cloudUser.programme; userAccountsChanged = true; }
-          if (cloudUser.role && cloudUser.role !== localMatch.role) { localMatch.role = cloudUser.role; userAccountsChanged = true; }
+          // Newest-edit-wins guard: if THIS device's copy was edited more recently
+          // than the cloud copy (see touchAccount), do NOT let the stale cloud
+          // record overwrite it — that was silently reverting password resets,
+          // status changes and role edits whenever an out-of-date device had
+          // auto-saved first. Legacy records without updatedAt keep the old
+          // cloud-wins behaviour so existing deployments still converge.
+          var _cu = Date.parse(cloudUser.updatedAt || '') || 0;
+          var _lu = Date.parse(localMatch.updatedAt || '') || 0;
+          if (_cu >= _lu) {
+            // Update existing account with cloud data (password, status, name, etc.)
+            if (cloudUser.password && cloudUser.password !== localMatch.password) { localMatch.password = cloudUser.password; userAccountsChanged = true; }
+            if (cloudUser.status && cloudUser.status !== localMatch.status) { localMatch.status = cloudUser.status; userAccountsChanged = true; }
+            if (cloudUser.name && cloudUser.name !== localMatch.name) { localMatch.name = cloudUser.name; userAccountsChanged = true; }
+            if (cloudUser.email && cloudUser.email !== localMatch.email) { localMatch.email = cloudUser.email; userAccountsChanged = true; }
+            if (cloudUser.programme !== undefined && cloudUser.programme !== localMatch.programme) { localMatch.programme = cloudUser.programme; userAccountsChanged = true; }
+            if (cloudUser.role && cloudUser.role !== localMatch.role) { localMatch.role = cloudUser.role; userAccountsChanged = true; }
+            if (!!cloudUser.mustChangePassword !== !!localMatch.mustChangePassword) { localMatch.mustChangePassword = !!cloudUser.mustChangePassword; userAccountsChanged = true; }
+            if (_cu > _lu && cloudUser.updatedAt !== localMatch.updatedAt) { localMatch.updatedAt = cloudUser.updatedAt; userAccountsChanged = true; }
+          }
           if (cloudUser.studentDataId && !localMatch.studentDataId) { localMatch.studentDataId = cloudUser.studentDataId; userAccountsChanged = true; }
           if (cloudUser.registeredVia && !localMatch.registeredVia) { localMatch.registeredVia = cloudUser.registeredVia; userAccountsChanged = true; }
           // Two-step-verification state (secret, enabled flag, backup codes) —
           // WITHOUT this, enabling 2FA on one device never reached devices that
           // already had the account row, so 2FA "didn't work" across devices.
+          // (Has its own newest-wins stamp, so it sits outside the guard above.)
           if (mergeTwoFactorState(localMatch, cloudUser)) userAccountsChanged = true;
         } else {
           // New account — add it (dropping any plaintext cache an old backup leaked)
@@ -24341,9 +24590,10 @@ async function silentSaveToFolder(folderId, folderLabel, blob) {
 
     let response;
     if (fileId) {
-      // Update existing file
+      // Update existing file (ask for the new `version` back so we can record our
+      // own write and not treat it as someone else's change on the next pull).
       response = await fetch(
-        `https://www.googleapis.com/upload/drive/v3/files/${fileId}?uploadType=media`,
+        `https://www.googleapis.com/upload/drive/v3/files/${fileId}?uploadType=media&fields=id,version`,
         {
           method: 'PATCH',
           headers: {
@@ -24353,6 +24603,10 @@ async function silentSaveToFolder(folderId, folderLabel, blob) {
           body: blob
         }
       );
+      if (response.ok) {
+        const pResult = await response.json().catch(() => ({}));
+        if (pResult && pResult.version != null) _lastCloudVersion[folderId] = String(pResult.version);
+      }
     } else {
       // Create new file in this folder
       const metadata = {
@@ -24365,7 +24619,7 @@ async function silentSaveToFolder(folderId, folderLabel, blob) {
       formData.append('file', blob);
 
       response = await fetch(
-        'https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart&fields=id,name',
+        'https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart&fields=id,name,version',
         {
           method: 'POST',
           headers: { 'Authorization': `Bearer ${googleAccessToken}` },
@@ -24376,6 +24630,7 @@ async function silentSaveToFolder(folderId, folderLabel, blob) {
       if (response.ok) {
         const result = await response.json();
         _autoSaveFileIds[folderId] = result.id;
+        if (result.version != null) _lastCloudVersion[folderId] = String(result.version);
         // Keep main cloudFileId in sync for the main folder
         if (folderId === GOOGLE_DRIVE_CONFIG.FOLDER_ID) {
           cloudFileId = result.id;
@@ -24400,6 +24655,51 @@ async function silentSaveToFolder(folderId, folderLabel, blob) {
   }
 }
 
+// Conflict-safety + periodic convergence: check the MAIN backup file's Drive
+// `version`; if another device has written since we last saw it, pull+merge that
+// file into local state BEFORE we build our own save payload. This (a) stops a
+// stale device silently overwriting newer cloud data (the lost-update window),
+// and (b) doubles as the cross-device pull that was previously missing between
+// logins — it runs on every autosave tick, but only downloads the file when the
+// version actually changed, so idle devices stay cheap.
+async function pullMainIfRemoteNewer() {
+  try {
+    if (!isCloudConnected || !googleAccessToken) return false;
+    var folderId = GOOGLE_DRIVE_CONFIG.FOLDER_ID;
+    var fileId = _autoSaveFileIds[folderId];
+    if (!fileId) {
+      fileId = await findBackupFileInFolder(folderId);
+      if (!fileId || fileId === 'LOOKUP_FAILED') return false;
+    }
+    var metaResp = await fetch('https://www.googleapis.com/drive/v3/files/' + fileId + '?fields=version', {
+      headers: { 'Authorization': 'Bearer ' + googleAccessToken }
+    });
+    if (!metaResp.ok) {
+      if (metaResp.status === 401 || metaResp.status === 403) handleCloudAuthExpired();
+      return false;
+    }
+    var meta = await metaResp.json();
+    var ver = String(meta.version || '');
+    if (!ver) return false;
+    var baseline = _lastCloudVersion[folderId];
+    if (baseline === undefined) {
+      // First sight this session — login sync already merged, so just record the
+      // baseline; don't re-download.
+      _lastCloudVersion[folderId] = ver;
+      return false;
+    }
+    if (ver === baseline) return false; // nobody else has written since we last saw it
+    // Another device wrote: merge their changes into local before we save ours.
+    var merged = await silentMergeFromBackup(fileId);
+    _lastCloudVersion[folderId] = ver;
+    if (merged) console.log('[Sync] Merged newer cloud data (v' + ver + ') before saving.');
+    return merged;
+  } catch (e) {
+    console.warn('[Sync] pre-save version check failed:', e && e.message);
+    return false;
+  }
+}
+
 // Auto-save all dashboard data to ALL Google Drive folders (silent, every 5s)
 async function autoSaveToAllFolders() {
   if (!isCloudConnected || !googleAccessToken || _isAutoSaving) return;
@@ -24407,6 +24707,10 @@ async function autoSaveToAllFolders() {
   _isAutoSaving = true;
 
   try {
+    // Ingest any newer cloud state first so our save writes the union, never a
+    // stale overwrite. Also serves as the periodic cross-device pull.
+    await pullMainIfRemoteNewer();
+
     const cloudUser = getCurrentCloudUser();
 
     // Prepare the full backup data
@@ -25051,16 +25355,25 @@ function cloudFetchAccountData(interactive) {
         return false;
       });
       if (local) {
-        if (ca.password && ca.password !== local.password) {
-          local.password = ca.password;
-          // Drop any stale plaintext cache so an old password no longer validates
-          delete local._plaintextPw;
+        // Newest-edit-wins (see touchAccount): a stale cloud copy must not
+        // overwrite a fresher local edit. Legacy records without updatedAt
+        // keep the original cloud-wins behaviour.
+        var _cu2 = Date.parse(ca.updatedAt || '') || 0;
+        var _lu2 = Date.parse(local.updatedAt || '') || 0;
+        if (_cu2 >= _lu2) {
+          if (ca.password && ca.password !== local.password) {
+            local.password = ca.password;
+            // Drop any stale plaintext cache so an old password no longer validates
+            delete local._plaintextPw;
+          }
+          if (ca.status && ca.status !== local.status) local.status = ca.status;
+          if (ca.name && ca.name !== local.name) local.name = ca.name;
+          if (ca.email && ca.email !== local.email) local.email = ca.email;
+          if (ca.role && ca.role !== local.role) local.role = ca.role;
+          if (ca.programme !== undefined && ca.programme !== local.programme) local.programme = ca.programme;
+          if (!!ca.mustChangePassword !== !!local.mustChangePassword) local.mustChangePassword = !!ca.mustChangePassword;
+          if (_cu2 > _lu2 && ca.updatedAt !== local.updatedAt) local.updatedAt = ca.updatedAt;
         }
-        if (ca.status && ca.status !== local.status) local.status = ca.status;
-        if (ca.name && ca.name !== local.name) local.name = ca.name;
-        if (ca.email && ca.email !== local.email) local.email = ca.email;
-        if (ca.role && ca.role !== local.role) local.role = ca.role;
-        if (ca.programme !== undefined && ca.programme !== local.programme) local.programme = ca.programme;
         if (ca.studentDataId && !local.studentDataId) local.studentDataId = ca.studentDataId;
         // Carry two-step-verification state across devices (see mergeTwoFactorState).
         mergeTwoFactorState(local, ca);
@@ -28822,7 +29135,7 @@ function adrSubmitTask() {
   var deadline = deadlineDate + 'T' + (deadlineTime || '17:00') + ':00';
 
   var task = {
-    id: 'ADR-' + Date.now(),
+    id: cestisGenId('ADR-'),
     title: title,
     description: desc,
     taskType: taskType,
@@ -28966,7 +29279,7 @@ function adrRejectCompletion(taskId) {
   // Add a comment explaining the rejection
   if(!task.comments) task.comments = [];
   task.comments.push({
-    id: 'CMT-' + Date.now(),
+    id: cestisGenId('CMT-'),
     author: adrGetCurrentUserName(),
     authorId: adrGetCurrentUserId(),
     text: '\u274C Task completion rejected by Administrator.' + (reason ? ' Reason: ' + reason : '') + ' Please review and resubmit.',
@@ -29136,7 +29449,7 @@ function adrAddComment(taskId) {
 
   if(!task.comments) task.comments = [];
   var comment = {
-    id: 'CMT-' + Date.now(),
+    id: cestisGenId('CMT-'),
     author: adrGetCurrentUserName(),
     authorId: adrGetCurrentUserId(),
     text: text,
@@ -29866,7 +30179,7 @@ function docHubUploadFile(prefix) {
     if(currentLoggedInUser) uploaderName = currentLoggedInUser.name;
 
     var doc = {
-      id: 'DOC-' + Date.now(),
+      id: cestisGenId('DOC-'),
       title: title,
       category: category,
       audience: audience,

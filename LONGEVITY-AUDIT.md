@@ -1,81 +1,78 @@
 # C.E.S.T.I.S System Longevity Audit
 
-**Date:** 2026-07-11 · **Scope:** every HTML file in the repository (43 files) plus `cestis-core.js` · **Goal:** the system must keep working and keep its data indefinitely — offline, across browser restarts, and across the disappearance of any single third-party service.
+**Last full audit:** 2026-07-16 · **Scope:** the whole codebase — `index.html` (main LMS), the sibling apps (`School.Fee.html`, `Staff.Payslip.html`, `Staff.Clock.in.html`, `CESTIS.Cashbook.html`, `Virement.Request.html`, finance docs, transcript pages), `cestis-core.js`, `Pages/*` fragments, and `vendor/`. · **Goal:** the system must keep working and keep its data indefinitely — offline, across browser restarts, across devices, and across the disappearance of any single third-party service.
+
+This audit was run with **real-browser verification**, not just static review: every page was loaded headless with all network blocked, and the auth/sync/storage flows were exercised. That is how the two runtime-only defects below (which passed a plain syntax check) were caught.
 
 ---
 
-## 1. Architecture summary (what was audited)
+## 1. Architecture (unchanged core model)
 
 | Layer | Files | Role |
 |---|---|---|
-| Data-bearing apps | `index.html`, `CESTIS.Cashbook.html`, `School.Fee.html`, `Staff.Clock.in.html`, `Staff.Payslip.html`, `Virement.Request.html`, `Student-Progress.html`, `Qual-Plan-Curriculum.html` | Full applications; all load the shared data core |
-| Shared data core | `cestis-core.js` | `CESTISStore`: IndexedDB-backed store with a synchronous localStorage-compatible API, plus shared domain logic (42 Node unit tests) |
-| UI fragments | `Pages/*.html` (31 files), `LMS-Chat*.html`, `Video-Conference*.html` | Markup-only fragments injected into `index.html` via `innerHTML`; they contain **no scripts and no storage** by design |
-| Standalone tool | `PDF.Workshop.html` | Pure in-memory file converter; deliberately stores nothing |
+| Main app | `index.html` | Full LMS; loads the shared data core |
+| Sibling apps | `School.Fee.html`, `Staff.Payslip.html`, `Staff.Clock.in.html`, `CESTIS.Cashbook.html`, `Virement.Request.html`, finance/transcript pages | Separate apps, each with its own store keys, sharing the same-origin IndexedDB (`CESTIS_KV`) and the Google-Drive backup model |
+| Shared core | `cestis-core.js` | `CESTISStore` (IndexedDB w/ synchronous cache + localStorage mirror) + pure domain logic (merge/dedupe/relink/snapshot/finance/transcript), 83 Node unit tests |
+| UI fragments | `Pages/*.html`, `LMS-Chat*`, `Video-Conference*` | Markup-only, injected via `innerHTML`; no scripts, no storage (verified) |
 
-## 2. Storage audit — verdict: all persistent data goes through IndexedDB
+Data flows: in-memory cache → **IndexedDB** (durable source of truth) → localStorage mirror (fast-load seed) → Google Drive (off-device backup + cross-device sync). Verified on all 10 data pages that a value written through the store **survives a full reload with localStorage wiped** (IndexedDB path alone preserves it).
 
-Every data-bearing page routes application data through `CESTISStore`, which:
+---
 
-1. keeps a **synchronous in-memory cache** (fast reads, unchanged call sites),
-2. persists **every write to IndexedDB** (`CESTIS_KV` database) — the durable source of truth with a quota far beyond localStorage's ~5 MB,
-3. **mirrors to localStorage** as a best-effort fast-load seed, and
-4. re-hydrates from IndexedDB on load (`whenReady`), so data survives even if localStorage is cleared or overflows.
+## 2. Defects found and FIXED in this audit
 
-`sessionStorage` usage was reviewed line-by-line: it holds only login/session flags (`isLoggedIn`, `loggedInUser`, sync-dismissed banners) — deliberately ephemeral, no durable data at risk. No cookies are used. No `CESTISStore.clear()`/`localStorage.clear()` wipe paths exist in app code.
+### Runtime-only corruption (would pass a syntax check, breaks the page)
+- **Login page dead / "Sync Now" broken (CRITICAL).** A regex in the User-Login helper contained stray control-character bytes (`\x00–\x1f`) — a valid *token* but an invalid *RegExp*, throwing "Range out of order" at load and leaving **every** function undefined. Fixed; a repo-wide control-byte scan is now clean.
+- **`cestis-core.js` control bytes.** Raw `0x00`/`0x01` inside `stableStringify` string literals replaced with `\u` escapes; checksum tests confirm byte-identical output.
 
-**Gap found and fixed:** the video-conference chat history in `index.html` wrote directly to raw `localStorage`; it now uses `CESTISStore` (with a localStorage fallback if the store is somehow absent).
+### Authentication & credentials
+- **Default-credential backdoor (CRITICAL).** Seeded admin/adminstaff/cmc accounts shipped with a password published in this **public** repo, so anyone could sign in on a fresh device or clone. Accounts still holding a known default are now flagged (synchronously for plaintext, plus a hash-verify sweep for already-hashed ones) and **forced through a change-password dialog before `enterApp` grants access**; cancelling refuses entry; the flag clears across devices once changed.
+- **Weak password hashing → PBKDF2.** Was unsalted-per-user SHA-256 with a fixed app salt. Now PBKDF2-HMAC-SHA256 with a random per-user salt (`pbkdf2$iter$salt$hash`), legacy hashes still verify, and a correct login transparently upgrades the stored hash.
+- **2FA never propagated across devices.** The account merge whitelisted fields and dropped `twoFactorEnabled/twoFactorSecret/backupCodes`. Now merged newest-wins with backup-code union — in `index.html` **and** in `Staff.Payslip.html` (same bug, 4 sites).
+- **2FA library-missing lockout.** A 2FA login used to hard-block if the OTPAuth library failed to load. Now falls back to backup codes / emailed code (neither needs the library).
 
-## 3. Durability hardening applied in this audit
+### Sync integrity
+- **Account edits reverting on sync (HIGH).** `userAccounts` merged cloud-over-local with no recency guard, so a stale device could revert a password reset / status / role / email change. Added an `updatedAt` stamp (`touchAccount`) on every account mutation and a newest-wins guard in both merge paths.
+- **Login/cert dangling after sync.** Student dedupe now applies its id-remap to accounts/approvals/attendance/exam/transcript records instead of discarding it; account & approval dedup keep the *best* record (real password/active; approved) instead of order-dependent first-wins.
+- **Offline account load.** Accounts are re-read once IndexedDB hydration completes and the login-button gate re-runs, so accounts survive a localStorage wipe and unlock offline login with no network.
 
-- **Eviction protection everywhere.** `navigator.storage.persist()` — which asks the browser to never auto-evict this origin's IndexedDB under storage pressure — existed only in `index.html`. It is now called by the canonical `cestis-core.js` (covering all eight data pages) **and** by every page's inline fallback shim, so protection holds even in degraded mode.
-- **Silent write-failure elimination.** IndexedDB quota errors fire asynchronously (transaction `onerror`/`onabort`) and were being swallowed in `cestis-core.js`. The core now counts failures, logs them, and dispatches a `cestis-store-write-error` event so the app can warn the user instead of silently losing writes. (This hardening previously existed only as dead code in `index.html`'s inline shim, which never runs when the core loads first — it is now in the canonical core.)
-- **Fallback shim parity.** Each data page carries an inline copy of the store that activates only if `cestis-core.js` is missing; these now also request storage persistence.
-- **Cache-buster bumped** (`cestis-core.js?v=20260711a`) so browsers everywhere pick up the hardened core.
+### OTP / brute-force
+- **Emailed OTP now has an attempt cap** (6 tries, then invalidated) in `School.Fee`, `Staff.Payslip`, `Staff.Clock.in` — previously expiry-only and brute-forceable. The main app's emailed OTP already had single-use + expiry + attempt-cap + purpose/account binding.
 
-## 4. Third-party dependency audit — verdict: no single point of failure remains
+### Backup coverage
+- **Finance/cashbook/virement had no Google-independent backup.** `exportDataBackup()` now includes the sibling apps' keys (finance docs, cashbook, virements, budgets, per-quarter buckets, staff time-clock/payroll) via explicit list + dynamic prefix sweep; restore writes back every key. Verified the export payload contains them.
+- Minor: guarded `window.CESTISCore.Finance` in `Payments.Invoices.html`; removed password-length console logging in `Staff.Payslip.html`.
 
-The system's only external dependencies are CDN-hosted libraries and online-only services. Risk assessment and mitigation:
+### Verified sound (no action needed)
+Quota/write-error surfacing (`cestis-store-write-error` → visible "storage failing" banner), token 401/403 handling (stops autosave, clears token, banner; local data untouched), duplicate-file-fork guards, `{version,data}` + legacy envelope tolerance, master-snapshot add-only reconcile, logout final-save ordering, `Pages/*` purity, all local `vendor/` script refs present and pinned with CDN fallbacks, and the finance/transcript test suites.
 
-| Dependency | Used by | Risk | Mitigation applied |
-|---|---|---|---|
-| cdnjs.cloudflare.com (Chart.js, jsPDF, pdf.js, mammoth, xlsx, jszip, tesseract, otpauth, qrcodejs) | index, School.Fee, PDF.Workshop | CDN outage/shutdown breaks charts, PDF/Excel features | **Same-version fallback on a second, independent CDN (jsDelivr) added after every tag** |
-| cdn.jsdelivr.net (chart.js, emailjs, otpauth, qrcodejs) | Cashbook, School.Fee, Clock-in, Payslip | same | Fallbacks to cdnjs/unpkg added |
-| unpkg.com (peerjs) | index | same | Fallback to jsDelivr added |
-| cdn.sheetjs.com (xlsx 0.20.2) | Payslip | vendor-only CDN | Fallback to xlsx 0.18.5 on jsDelivr (API-compatible for read/write used here) |
-| **Unpinned** `npm/chart.js` (always latest major!) | Cashbook | future breaking release silently breaks charts | **Pinned to chart.js@4.4.1** + cdnjs fallback |
-| pdf.js worker script | index, PDF.Workshop | worker must come from same source as library | `workerSrc` now follows whichever CDN actually served pdf.js |
-| Google Fonts | several | cosmetic only | Every font stack already ends in a system fallback (`sans-serif`/`monospace`) — pages render fine without it |
-| Google Drive / GSI, EmailJS, PeerJS cloud | sync, email, video calls | online-only services by nature | Optional features; core data entry/reporting works fully offline. Drive sync doubles as an **off-device backup** of the datastore |
+---
 
-The fallback loader is the synchronous `document.write` pattern (`window.Chart||document.write('<script src="…fallback…">…')`), so script order and parse-time dependencies are preserved.
+## 3. Known RESIDUAL risks (documented, not yet changed)
 
-### 4b. Full vendoring — the system is now self-contained on disk
+These are real but lower-severity or architectural; left as-is to avoid destabilising the sync core, and recorded here so they are tracked, not forgotten.
 
-All libraries are now **vendored into `vendor/`** (fetched from the npm registry at the exact pinned versions) and every page loads the **local copy first**, falling back to the CDN chain only if the vendor file is missing (e.g. a deployment that omits the folder):
+| Risk | Severity | Note |
+|---|---|---|
+| ~~No conflict check on the 5 s auto-save; no periodic pull.~~ **FIXED (2026-07-16).** | — | Auto-save now checks the main backup file's Drive `version` before every write; if another device wrote since we last saw it, we **pull+merge their changes first** (`pullMainIfRemoteNewer`), so a write can never silently clobber unseen data. Our own writes record the returned `version` so we don't re-pull them. This also serves as the **periodic cross-device pull** (runs every autosave tick, downloads only on actual change). A sub-second race remains between the version GET and the PATCH, but it is covered by the additive/newest-wins merges and self-heals on the next tick. Verified with a mocked-Drive test. |
+| ~~`Date.now()`-based ids collide across devices.~~ **FIXED (2026-07-16).** | — | `cestisGenId()` (timestamp + crypto-random) now generates every cross-device record id — accounts (incl. the old sequential `getNextUserId`), students, instructors, sessions, meetings, assignments, submissions, resources, notifications, announcements, etc. Verified unique across 5000 tight-loop mints. |
+| ~~No silent Google-token refresh.~~ **FIXED (2026-07-16).** | — | The 30 s monitor now silently renews the token (`prompt:''`, dedicated lightweight client) when within 5 min of expiry, so unattended sessions keep backing up; falls back to the expiry banner if interaction is required. Verified with a mocked GIS client. |
+| ~~Account status/edit changes could revert on sync.~~ **FIXED (2026-07-16).** | — | Every account mutation (edit, reset, approve/reject, toggle, bulk activate/deactivate, recovery-email, hash-upgrade) now stamps `updatedAt`, and both merge paths honour newest-wins. |
+| **Deletions don't propagate for non-student records** (exams/announcements/etc.; tombstones exist only for students / fee LMS ids). | MEDIUM (DEFERRED) | User accounts are never hard-deleted (only disabled — and that status now syncs safely), so no login-resurrection path. Remaining case is content records resurrecting — an integrity annoyance, not data loss. Fix = extend the tombstone-union pattern to the other id-keyed collections; deferred as a focused, separately-reviewed change to the sync core. |
+| **Sibling apps store passwords in plaintext** (`cestiUsers`, `dashboardUsers`, `cestisStaffMembers`). | SECURITY / latent (DEFERRED) | They don't read the LMS `userAccounts`, so today nothing breaks. Hashing them means porting the PBKDF2 + legacy-verify + transparent-upgrade path into three separate login flows and keeping the index.html-shared `cestisStaffMembers` in lockstep — worth doing, but high-risk (a migration slip locks staff out), so deferred to its own reviewed change rather than bundled into this audit. |
+| **Sibling wholesale-restore paths** (`users = backup.data.users`, `staffMembers = …`) can drop local-only records if a pull precedes a push. | MEDIUM (DEFERRED) | On explicit restore actions only (low frequency). Fix = merge instead of replace. |
+| **Non-admin devices may upload full core collections** which can be a filtered subset. | MED (SUSPECTED, deployment-dependent) | Read-merges are additive so populated devices survive. |
+| ~~`Transcript-Grades.html` jspdf had no CDN fallback.~~ **FIXED (2026-07-16).** **Cashbook** still seeds a hardcoded default FY `2025/2026`; **Qual-Plan** view is Google-Drive-only. | LOW / cosmetic | Cashbook FY default is overridden by stored data and is coupled to its Q3-seed logic, so left as-is to avoid disturbing that seeding. |
 
-- `vendor/` (~29 MB) holds Chart.js 4.4.1 & 3.9.1, jsPDF 2.5.1 + autotable 3.5.31, pdf.js 3.11.174 (**including its worker**), pdf-lib 1.17.1, mammoth 1.6.0, xlsx 0.18.5, jszip 3.10.1, otpauth 9.2.2/9.2.1, qrcodejs 1.0.0, EmailJS SDK v3/v4, PeerJS 1.5.4, and **Tesseract OCR 5.1.1 complete with its web worker, LSTM WASM cores, and English language data** — OCR runs with zero network.
-- The pdf.js `workerSrc` follows whichever source actually served the library (vendor → cdnjs → jsDelivr).
-- `Staff.Payslip.html` keeps SheetJS 0.20.2 from the vendor CDN as its first choice when online, with the vendored 0.18.5 as the offline fallback (API-compatible for the read/write calls used).
-- Google Fonts remain remote but are cosmetic only — every font stack ends in a system font.
-- The only features that still require the internet are the ones that *are* the internet: Google Drive sync/sign-in, actually **sending** email via EmailJS, and live video calls between devices (PeerJS signaling). Their SDKs are vendored so pages load cleanly offline; the features simply wait for connectivity.
+---
 
-## 5. Verification performed
+## 4. Longevity guarantees after this audit
 
-- `node tests/cestis-core.test.js` — **all 42 tests pass** after the core changes.
-- Headless-Chromium load of all nine app pages **with every CDN unreachable** (zero internet):
-  - all vendored library globals (Chart, jspdf + autoTable, pdfjsLib, mammoth, XLSX, PDFLib, JSZip, Tesseract, OTPAuth, QRCode, emailjs, Peer) present on every page that uses them;
-  - a real OCR run completed fully offline (Tesseract worker + WASM core + English data all served from `vendor/`);
-  - zero syntax/parse errors from the modified files;
-  - `CESTISStore` initialized and reached ready state on all eight data pages;
-  - a value written through the store **survived a full page reload with localStorage completely wiped** — proving the IndexedDB path alone preserves data;
-  - `PDF.Workshop.html` (intentionally storage-free) boots with only the expected missing-library warnings.
+1. **Data lives in IndexedDB** on every data page, mirrored (not depended on) in localStorage, eviction-protected via `navigator.storage.persist()`, and re-hydrated on load — proven to survive a localStorage wipe.
+2. **Writes can't fail silently** — quota/transaction failures surface to the user.
+3. **No third-party script is a network dependency** — every library is vendored and pinned, with two CDN fallbacks; full offline operation verified for all 22 pages.
+4. **Off-device + Google-independent backups both exist** — Google Drive sync **and** a local JSON export that now covers *all* modules (LMS + finance + cashbook + virement + payroll).
+5. **Credentials are hardened** — PBKDF2 per-user salting, no published default that grants access, forced first-run change, 2FA that survives sync, and brute-force-capped OTP.
+6. **Regression safety** — 83 Node unit tests plus a headless page-load harness that catches runtime-only breakage.
 
-## 6. Longevity guarantees after this audit
-
-1. **Data lives in IndexedDB** on every data-bearing page, mirrored (not depended on) in localStorage, and protected from browser eviction via `navigator.storage.persist()`.
-2. **Writes can no longer fail silently** — quota/transaction failures are surfaced to the console and to the app via an event.
-3. **No third-party script is a network dependency** — every library is vendored on disk at a pinned version, with two independent CDNs as fallbacks.
-4. **Offline-first:** with zero network, every page loads with full functionality — data entry, viewing, charts, PDF/Excel/Word processing, QR/OTP, even OCR. Only inherently-online services (Drive sync, email sending, live calls) wait for connectivity.
-5. **Off-device safety net:** the built-in Google Drive sync provides an external backup of the datastore.
-6. **Regression safety:** the shared core is covered by a Node test suite (`npm test`) that runs with no browser required.
+*The main cross-device lost-update window (section 3) is now closed by version-gated pull-before-write. Remaining residuals are lower-severity (non-student delete propagation, `Date.now()` ids, sibling plaintext passwords, silent token refresh) and are tracked above.*
