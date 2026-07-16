@@ -5854,8 +5854,85 @@ function initLmsChatData() {
 // after a Video Conference) can replace the in-memory room list with an empty
 // or stale array. In that case we still need to rebuild the default Skill Area /
 // Training Centre rooms below, otherwise the chat page shows "No chats available".
+// Ensure every student record has a linked user account, so every enrolled
+// student is visible in LMS Chat (members directory + their skill-area room).
+// Students added via addStudent()/fee-sync already get a disabled account, but
+// students that arrived through backup restores or Drive merges could exist in
+// students[] with no account at all — and chat visibility is derived entirely
+// from userAccounts. Mirrors the fee-sync account shape: disabled until
+// activated in Verify Users. Returns true if anything changed.
+function lmsChatEnsureStudentAccounts() {
+  if (typeof students === 'undefined' || !Array.isArray(students)) return false;
+  if (typeof userAccounts === 'undefined' || !Array.isArray(userAccounts)) return false;
+  var byStudentId = {};
+  var byUsername = {};
+  userAccounts.forEach(function(u) {
+    if (!u) return;
+    if (u.studentDataId) byStudentId[u.studentDataId] = u;
+    if (u.username) byUsername[String(u.username).toLowerCase()] = u;
+  });
+  var changed = false;
+  students.forEach(function(s) {
+    if (!s || !s.id || !s.name) return;
+    if (byStudentId[s.id]) return; // already has a linked account
+    var baseUsername = s.name.toLowerCase().trim().replace(/\s+/g, '.');
+    // An unlinked student-role account with the matching username adopts this record
+    var existing = byUsername[baseUsername];
+    if (existing && existing.role === 'student' && !existing.studentDataId) {
+      existing.studentDataId = s.id;
+      if (!existing.programme && s.course) existing.programme = s.course;
+      byStudentId[s.id] = existing;
+      changed = true;
+      return;
+    }
+    // Otherwise create a fresh linked account (suffix the username if taken,
+    // e.g. two students sharing a name)
+    var username = baseUsername, n = 2;
+    while (byUsername[username]) { username = baseUsername + n; n++; }
+    var acct = {
+      id: 'USR-STU-' + s.id,
+      name: s.name,
+      role: 'student',
+      username: username,
+      password: '',
+      email: s.email || '',
+      programme: s.course || '',
+      status: 'disabled',
+      createdAt: s.createdAt || localDateStr(),
+      registeredVia: 'student-sync',
+      studentDataId: s.id,
+      approvedBy: 'system'
+    };
+    userAccounts.push(acct);
+    byStudentId[s.id] = acct;
+    byUsername[username] = acct;
+    changed = true;
+  });
+  if (changed) {
+    try { if (typeof saveUserAccounts === 'function') saveUserAccounts(); } catch(e) {}
+  }
+  return changed;
+}
+
+// Accounts eligible to appear in chat rooms and member lists: active AND
+// disabled (auto-created student accounts stay disabled until activated in
+// Verify Users — they are still real enrolled members). Pending self-
+// registrations and rejected accounts stay out.
+function lmsChatAccountEligible(u) {
+  return !!u && (u.status === 'active' || u.status === 'disabled');
+}
+
 function lmsChatEnsureMembership() {
   if (!lmsChatRooms) lmsChatRooms = [];
+  // Fill blank programmes from linked student records first (a blank programme
+  // keeps a student out of every class room), then make sure every student
+  // record actually has an account to add.
+  try {
+    if (typeof backfillAccountProgrammes === 'function' && backfillAccountProgrammes()) {
+      try { if (typeof saveUserAccounts === 'function') saveUserAccounts(); } catch(e) {}
+    }
+  } catch(e) {}
+  try { lmsChatEnsureStudentAccounts(); } catch(e) {}
   var changed = false;
 
   // 1. Ensure default skill area rooms exist and sync names/icons with current skill areas
@@ -5900,6 +5977,7 @@ function lmsChatEnsureMembership() {
     if (room.type === 'admin' || room.id === 'chat-admin') {
       // Admin room: all admins and admin staff
       userAccounts.forEach(function(u) {
+        if (!lmsChatAccountEligible(u)) return;
         if ((u.role === 'admin' || u.role === 'adminstaff') && !memberSet[u.id]) {
           memberSet[u.id] = true;
         }
@@ -5908,6 +5986,7 @@ function lmsChatEnsureMembership() {
       // Class rooms: admin + admin staff + matching instructors + matching students
       // Always add admins and admin staff
       userAccounts.forEach(function(u) {
+        if (!lmsChatAccountEligible(u)) return;
         if ((u.role === 'admin' || u.role === 'adminstaff') && !memberSet[u.id]) {
           memberSet[u.id] = true;
         }
@@ -5918,6 +5997,7 @@ function lmsChatEnsureMembership() {
       var roomNameLower = room.name.toLowerCase().trim();
 
       userAccounts.forEach(function(u) {
+        if (!lmsChatAccountEligible(u)) return;
         if (u.role !== 'instructor' && u.role !== 'student') return;
         if (memberSet[u.id]) return;
         if (!u.programme) return;
@@ -26562,24 +26642,34 @@ function lmsChatCloseMembersDirectory() {
   if(overlay) overlay.classList.remove('active');
 }
 
+// Every real platform member: active AND disabled accounts. Student accounts
+// are auto-created disabled (addStudent / fee-sync / student-sync) and stay
+// disabled until activated in Verify Users — filtering the directory to
+// active-only hid most enrolled students. Pending/rejected stay hidden.
+function lmsChatGetRosterUsers() {
+  try { lmsChatEnsureStudentAccounts(); } catch(e) {}
+  return userAccounts.filter(lmsChatAccountEligible);
+}
+
 function lmsChatRenderMembersDirectory(filter) {
   var panel = document.getElementById('lmsMembersPanel');
   if(!panel) return;
 
   var currentUser = lmsChatGetCurrentUser();
-  var allUsers = userAccounts.filter(function(u) { return u.status === 'active'; });
+  var allUsers = lmsChatGetRosterUsers();
+  var roleLabels = { admin: 'Administrator', adminstaff: 'Admin Staff', instructor: 'Instructor', student: 'Student', cmc: 'Board Member' };
   var q = (filter || '').toLowerCase();
   var filtered = q ? allUsers.filter(function(u) {
     return u.name.toLowerCase().indexOf(q) !== -1 ||
            u.role.toLowerCase().indexOf(q) !== -1 ||
+           (roleLabels[u.role]||'').toLowerCase().indexOf(q) !== -1 ||
            (u.programme||'').toLowerCase().indexOf(q) !== -1;
   }) : allUsers;
 
   var roleColors = { admin: 'var(--accent)', adminstaff: 'var(--purple)', instructor: 'var(--green)', student: 'var(--blue)', cmc: 'var(--teal)' };
-  var roleLabels = { admin: 'Administrator', adminstaff: 'Admin Staff', instructor: 'Instructor', student: 'Student', cmc: 'Board Member' };
+  var roleRank = { admin: 0, adminstaff: 1, cmc: 2, instructor: 3, student: 4 };
 
-  var cardsHtml = '';
-  filtered.forEach(function(u) {
+  function buildCard(u) {
     var prof = lmsChatGetProfile(u.id);
     var status = prof.status || 'offline';
     var roleColor = roleColors[u.role] || 'var(--accent)';
@@ -26591,13 +26681,61 @@ function lmsChatRenderMembersDirectory(filter) {
       avatarHtml = '<div class="mc-avatar" style="background:'+roleColor+'33;color:'+roleColor+';">'+lmsChatEscapeHtml(initials)+'<span class="mc-status-dot '+status+'"></span></div>';
     }
     var isSelf = (u.id === currentUser.id) ? ' <span style="font-size:10px;color:var(--accent);">(You)</span>' : '';
-    cardsHtml += '<div class="lms-member-card" onclick="lmsChatViewMemberProfile(\''+lmsChatEscapeHtml(u.id)+'\')">' +
+    return '<div class="lms-member-card" onclick="lmsChatViewMemberProfile(\''+lmsChatEscapeHtml(u.id)+'\')">' +
       avatarHtml +
       '<div class="mc-name">'+lmsChatEscapeHtml(u.name)+isSelf+'</div>' +
       '<div class="mc-role">'+lmsChatEscapeHtml(roleLabels[u.role]||u.role)+(u.programme?' &bull; '+lmsChatEscapeHtml(u.programme):'')+'</div>' +
       (prof.statusMsg ? '<div class="mc-status-msg">'+lmsChatEscapeHtml(prof.statusMsg.substring(0,30))+'</div>' : '') +
     '</div>';
+  }
+
+  function sortMembers(list) {
+    return list.slice().sort(function(a, b) {
+      var ra = (roleRank[a.role] != null ? roleRank[a.role] : 9);
+      var rb = (roleRank[b.role] != null ? roleRank[b.role] : 9);
+      if(ra !== rb) return ra - rb;
+      return (a.name||'').localeCompare(b.name||'');
+    });
+  }
+
+  // Group members by centre/skill area so every student appears under their
+  // respective Training Centre. Staff (admin/admin staff/board) come first,
+  // then one section per skill area, then anything whose programme doesn't
+  // map to a known centre.
+  var staff = [], unassigned = [];
+  var bySkillId = {};
+  filtered.forEach(function(u) {
+    if(u.role !== 'student' && u.role !== 'instructor') { staff.push(u); return; }
+    var sk = null;
+    if(u.programme && typeof findSkillAreaForCourse === 'function') {
+      var found = findSkillAreaForCourse(u.programme);
+      if(found && found.id) sk = found; // id 0 = synthetic fallback, treat as unmatched
+    }
+    if(sk) {
+      if(!bySkillId[sk.id]) bySkillId[sk.id] = [];
+      bySkillId[sk.id].push(u);
+    } else {
+      unassigned.push(u);
+    }
   });
+
+  function sectionHtml(icon, name, color, members) {
+    if(!members.length) return '';
+    return '<div style="display:flex;align-items:center;gap:8px;margin:18px 4px 10px;">' +
+        '<span style="font-size:15px;">'+icon+'</span>' +
+        '<span style="font-size:12px;font-weight:600;letter-spacing:.5px;text-transform:uppercase;color:'+(color||'var(--text-secondary)')+';">'+lmsChatEscapeHtml(name)+'</span>' +
+        '<span style="font-size:11px;color:var(--text-muted);">('+members.length+')</span>' +
+        '<div style="flex:1;height:1px;background:var(--border);"></div>' +
+      '</div>' +
+      '<div class="lms-members-grid">'+sortMembers(members).map(buildCard).join('')+'</div>';
+  }
+
+  var bodyHtml = '';
+  bodyHtml += sectionHtml('🏛️', 'Administration & Staff', '', staff);
+  skillAreas.forEach(function(sk) {
+    bodyHtml += sectionHtml(sk.icon, sk.name, sk.color, bySkillId[sk.id] || []);
+  });
+  bodyHtml += sectionHtml('📚', 'Other Programmes', '', unassigned);
 
   panel.innerHTML =
     '<div class="lms-members-panel-header">' +
@@ -26608,7 +26746,7 @@ function lmsChatRenderMembersDirectory(filter) {
       '<input type="text" placeholder="Search members by name, role, or programme..." value="'+lmsChatEscapeHtml(filter||'')+'" oninput="lmsChatRenderMembersDirectory(this.value)">' +
     '</div>' +
     '<div class="lms-members-body">' +
-      (cardsHtml ? '<div class="lms-members-grid">'+cardsHtml+'</div>' :
+      (bodyHtml ? bodyHtml :
         '<div style="text-align:center;padding:40px;color:var(--text-muted);">No members found</div>') +
     '</div>';
 }
@@ -26761,7 +26899,7 @@ function lmsChatManageMembers() {
     document.body.appendChild(modal);
   }
 
-  var allUsers = userAccounts.filter(function(u){ return u.status === 'active'; });
+  var allUsers = lmsChatGetRosterUsers();
   var html = '<div class="manage-modal-content">';
   html += '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px;"><h3>Manage Members: '+room.name+'</h3>';
   html += '<button class="btn btn-secondary btn-sm" onclick="lmsChatCloseManageModal()" style="font-size:18px;background:none;border:none;color:var(--text-secondary);cursor:pointer;">&#10005;</button></div>';
